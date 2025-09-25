@@ -26,6 +26,7 @@
 #include "containers/archive_handler.hpp"
 #include "utils/file_scanner.hpp"
 #include <clocale>
+#include "encoder/alac_encoder.hpp"
 #include "encoder/wav_encoder.hpp"
 #include "encoder/webp_encoder.hpp"
 
@@ -104,6 +105,16 @@ int main(const int argc, char *argv[]) {
         }
     };
     factories["image/x-webp"] = factories["image/webp"];
+    factories["audio/mp4"] = {
+        [settings] {
+            return std::make_unique<AlacEncoder>(settings.preserve_metadata);
+        }
+    };
+
+    factories["audio/m4a"]   = factories["audio/mp4"];
+    factories["audio/x-m4a"] = factories["audio/mp4"];
+    factories["audio/alac"]  = factories["audio/mp4"];
+
 
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;

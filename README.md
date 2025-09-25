@@ -7,22 +7,44 @@ It focuses on lossless recompression of various file formats by integrating mult
 
 ## Requirements
 
-- C++23 or newer
-- [CMake](https://cmake.org/) >= 4.0
+To build monolith you need only a few system tools, since all other libraries are automatically fetched and built by CMake:
+
+### Linux
+- CMake ≥ 3.20
+- A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
+- Git
+- Autotools (for building libmagic)
+
+### macOS
+- CMake ≥ 3.20
+- Xcode Command Line Tools (Clang with C++23 support)
+- Git
+- Autotools (for building libmagic)
+- Homebrew is recommended for installing missing build tools
+
+### Windows
+- CMake ≥ 3.20
+- Visual Studio 2022 (MSVC with C++23 support)
+- Git
+- [vcpkg](https://github.com/microsoft/vcpkg) for dependency integration
 
 ---
 
 ## Installing dependencies
 
 ### Linux (Debian/Ubuntu)
-TBD
+```bash
+sudo apt update
+sudo apt install build-essential cmake git autoconf automake libtool
+```
 
 ### macOS (Homebrew)
-TBD
+```bash
+brew install cmake git autoconf automake libtool
+```
 
-### Windows (vcpkg)
-Install [vcpkg](https://github.com/microsoft/vcpkg), then:
-TBD
+### Windows
+Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available in your environment.
 
 ---
 
@@ -46,14 +68,26 @@ cmake --build build
 ## Usage
 
 ```bash
-./monolith [--no-meta] [--recursive] [--threads N] [--log-level LEVEL] <file-or-directory>...
+./monolith <file-or-directory>... [options]
 ```
 
 **Options:**
-- `--no-meta`Do not preserve metadata in recompressed files.
-- `--recursive`Process directories recursively.
-- `--threads N`Number of worker threads to use (default: half of available cores).
-- `--log-level LEVEL`Set logging verbosity ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'NONE').
+- `--dry-run`                  Use monolith without replacing original files.
+- `--no-meta`                  Do not preserve metadata in recompressed files.
+- `--recursive`                Process directories recursively.
+- `--threads N`                Number of worker threads to use (default: half of available cores).
+- `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
+- `-o, --output-csv FILE`      CSV report export filename. If not specified, report is printed on stdout.
+- `--recompress-unencodable FORMAT`  
+  Allows to recompress archives that can be opened but not recompressed  
+  into a different format (zip, 7z, tar, gz, bz2, xz, wim).  
+  If not specified, such archives are left untouched.
+
+**Examples:**
+- `./monolith file.jpg dir/ --recursive --threads 4`
+- `./monolith archive.zip`
+- `./monolith archive.rar --recompress-unencodable 7z`
+- `./monolith dir/ -o report.csv`
 
 ---
 
@@ -63,9 +97,9 @@ Currently implemented:
 - **JPEG** (lossless recompression via mozjpeg)
 - **PNG** (lossless recompression via zlib/Deflate)
 - **FLAC** (lossless audio recompression)
+- **ALAC (M4A/MP4)** (lossless audio recompression with metadata and cover art support)
 - **Archive formats** (ZIP, TAR, 7z, etc. via libarchive)
 
 Planned:
-- Additional image and audio formats.
-
----
+- Additional image and audio formats
+- MKV/Matroska support via FFmpeg

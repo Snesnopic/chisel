@@ -195,6 +195,83 @@ set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libwebp)
 
+# alac
+FetchContent_Declare(
+        alac
+        GIT_REPOSITORY https://github.com/mikebrady/alac.git
+        GIT_TAG master
+)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(alac)
+add_library(alac STATIC
+        ${alac_SOURCE_DIR}/codec/ag_dec.c
+        ${alac_SOURCE_DIR}/codec/ag_enc.c
+        ${alac_SOURCE_DIR}/codec/ALACBitUtilities.c
+        ${alac_SOURCE_DIR}/codec/ALACDecoder.cpp
+        ${alac_SOURCE_DIR}/codec/ALACEncoder.cpp
+        ${alac_SOURCE_DIR}/codec/dp_dec.c
+        ${alac_SOURCE_DIR}/codec/dp_enc.c
+        ${alac_SOURCE_DIR}/codec/EndianPortable.c
+        ${alac_SOURCE_DIR}/codec/matrix_dec.c
+        ${alac_SOURCE_DIR}/codec/matrix_enc.c
+)
+
+target_include_directories(alac PUBLIC ${alac_SOURCE_DIR}/codec)
+
+set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
+
+ExternalProject_Add(ffmpeg
+        GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
+        GIT_TAG n7.0.2   # scegli una release stabile
+        PREFIX ${CMAKE_BINARY_DIR}/ffmpeg
+        CONFIGURE_COMMAND ./configure
+        --prefix=${FFMPEG_PREFIX}
+        --disable-shared
+        --enable-static
+        --disable-programs
+        --disable-doc
+        --disable-debug
+        --disable-everything
+        --enable-encoder=alac
+        --enable-decoder=alac
+        --enable-muxer=mp4
+        --enable-demuxer=mov
+        --enable-protocol=file
+        BUILD_COMMAND make -j4
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 1
+        UPDATE_DISCONNECTED 1
+        BUILD_BYPRODUCTS
+        ${FFMPEG_PREFIX}/lib/libavcodec.a
+        ${FFMPEG_PREFIX}/lib/libavformat.a
+        ${FFMPEG_PREFIX}/lib/libavutil.a
+)
+
+# crea target importati per linkare facilmente
+add_library(ffmpeg_avcodec STATIC IMPORTED GLOBAL)
+add_library(ffmpeg_avformat STATIC IMPORTED GLOBAL)
+add_library(ffmpeg_avutil STATIC IMPORTED GLOBAL)
+
+add_dependencies(ffmpeg_avcodec ffmpeg)
+add_dependencies(ffmpeg_avformat ffmpeg)
+add_dependencies(ffmpeg_avutil ffmpeg)
+
+file(MAKE_DIRECTORY ${FFMPEG_PREFIX}/include)
+
+set_target_properties(ffmpeg_avcodec PROPERTIES
+        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavcodec.a
+        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
+)
+set_target_properties(ffmpeg_avformat PROPERTIES
+        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavformat.a
+        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
+)
+set_target_properties(ffmpeg_avutil PROPERTIES
+        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavutil.a
+        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
+)
+
+
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -227,6 +304,8 @@ add_executable(monolith
         src/encoder/wav_encoder.hpp
         src/encoder/webp_encoder.cpp
         src/encoder/webp_encoder.hpp
+        src/encoder/alac_encoder.cpp
+        src/encoder/alac_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -266,7 +345,8 @@ if(NOT WIN32)
 endif()
 target_link_directories(monolith PRIVATE ${MOZJPEG_LIB_DIR})
 
-target_link_libraries(monolith
+# common libraries for all platforms
+set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
         FLAC
         png_static
@@ -279,4 +359,40 @@ target_link_libraries(monolith
         wavpack
         webp
         libwebpmux
+        alac
+        ffmpeg_avcodec
+        ffmpeg_avformat
+        ffmpeg_avutil
 )
+
+if(APPLE)
+    # ffmpeg built with videotoolbox needs these frameworks
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
+    find_library(COREVIDEO_FRAMEWORK CoreVideo)
+    find_library(COREMEDIA_FRAMEWORK CoreMedia)
+    find_library(VIDEOTOOLBOX_FRAMEWORK VideoToolbox)
+
+    list(APPEND MONOLITH_LIBS
+            ${COREFOUNDATION_FRAMEWORK}
+            ${COREVIDEO_FRAMEWORK}
+            ${COREMEDIA_FRAMEWORK}
+            ${VIDEOTOOLBOX_FRAMEWORK}
+    )
+elseif(UNIX)
+    # linux: ffmpeg often needs pthread, dl, m
+    list(APPEND MONOLITH_LIBS
+            pthread
+            dl
+            m
+    )
+elseif(WIN32)
+    # windows: depending on ffmpeg build, these are common
+    list(APPEND MONOLITH_LIBS
+            ws2_32
+            secur32
+            bcrypt
+            avrt
+    )
+endif()
+
+target_link_libraries(monolith PRIVATE ${MONOLITH_LIBS})
