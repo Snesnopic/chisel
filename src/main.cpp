@@ -26,13 +26,14 @@
 #include "containers/archive_handler.hpp"
 #include "utils/file_scanner.hpp"
 #include <clocale>
+#include "encoder/wav_encoder.hpp"
 
 inline void init_utf8_locale() {
     std::setlocale(LC_ALL, "");
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
-        Logger::log(LogLevel::DEBUG, std::string("Locale corrente: ") + cur, "LocaleInit");
+        Logger::log(LogLevel::DEBUG, std::string("Current locale: ") + cur, "LocaleInit");
         return; // ok
     }
 
@@ -88,6 +89,14 @@ int main(const int argc, char *argv[]) {
     };
     factories["image/jpg"] = factories["image/jpeg"];
 
+    factories["audio/wav"] = {
+        [settings] {
+            return std::make_unique<WavEncoder>(settings.preserve_metadata);
+        }
+    };
+    factories["audio/x-wav"] = factories["audio/wav"];
+    factories["audio/x-wavpack"] = factories["audio/wav"];
+
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;
 
@@ -110,7 +119,7 @@ int main(const int argc, char *argv[]) {
         settings.num_threads = files.size();
     }
 
-    // elaboriamo ogni file
+    // we process each file
     std::vector<Result> results;
     ThreadPool pool(settings.num_threads);
     std::mutex results_mutex;

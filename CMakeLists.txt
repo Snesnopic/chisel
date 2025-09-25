@@ -106,6 +106,20 @@ if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
+# wavpack
+FetchContent_Declare(
+        wavpack
+        GIT_REPOSITORY https://github.com/dbry/WavPack.git
+        GIT_TAG master
+)
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+set(WAVPACK_BUILD_CLI OFF CACHE BOOL "Build command line programs" FORCE)
+set(WAVPACK_BUILD_DOCS OFF CACHE BOOL "Build documentation" FORCE)
+set(WAVPACK_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
+
+FetchContent_MakeAvailable(wavpack)
+
 # libarchive
 set(ENABLE_TAR OFF CACHE BOOL "" FORCE)
 set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
@@ -186,6 +200,8 @@ add_executable(monolith
         src/containers/container.hpp
         src/containers/mkv_handler.cpp
         src/containers/mkv_handler.hpp
+        src/encoder/wav_encoder.cpp
+        src/encoder/wav_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -235,4 +251,5 @@ target_link_libraries(monolith
         ${ZLIB_TARGET}
         ebml
         matroska
+        wavpack
 )

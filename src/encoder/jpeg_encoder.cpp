@@ -4,7 +4,6 @@
 
 #include "jpeg_encoder.hpp"
 #include "../utils/logger.hpp"
-
 #include <algorithm>
 #include <jpeglib.h>
 #include <cstdio>

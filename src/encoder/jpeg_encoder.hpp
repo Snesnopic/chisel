@@ -10,9 +10,7 @@
 
 class JpegEncoder : public IEncoder {
 public:
-    explicit JpegEncoder(bool preserve_metadata);
-
-    ~JpegEncoder() override = default;
+    explicit JpegEncoder(bool preserve_metadata = true);
 
     bool recompress(const std::filesystem::path &input,
                     const std::filesystem::path &output) override;

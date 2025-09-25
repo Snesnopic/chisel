@@ -183,7 +183,7 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
     FLAC__stream_encoder_finish(encoder);
     FLAC__stream_encoder_delete(encoder);
 
-    // Cleanup metadati
+    // cleanup metadata
     if (metadata_blocks) {
         for (unsigned i = 0; i < num_blocks; ++i) {
             FLAC__metadata_object_delete(metadata_blocks[i]);

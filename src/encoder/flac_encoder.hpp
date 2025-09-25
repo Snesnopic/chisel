@@ -4,6 +4,7 @@
 
 #ifndef MONOLITH_FLAC_ENCODER_HPP
 #define MONOLITH_FLAC_ENCODER_HPP
+
 #include "encoder.hpp"
 #include <filesystem>
 
