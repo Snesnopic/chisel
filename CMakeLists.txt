@@ -172,6 +172,29 @@ if(NOT libmatroska_POPULATED)
     add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
 endif()
 
+include(FetchContent)
+
+# libwebp
+FetchContent_Declare(
+        libwebp
+        GIT_REPOSITORY https://chromium.googlesource.com/webm/libwebp
+        GIT_TAG main
+)
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_DWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_GIF2WEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_IMG2WEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_VWEBP OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(libwebp)
+
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -202,6 +225,8 @@ add_executable(monolith
         src/containers/mkv_handler.hpp
         src/encoder/wav_encoder.cpp
         src/encoder/wav_encoder.hpp
+        src/encoder/webp_encoder.cpp
+        src/encoder/webp_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -252,4 +277,6 @@ target_link_libraries(monolith
         ebml
         matroska
         wavpack
+        webp
+        libwebpmux
 )

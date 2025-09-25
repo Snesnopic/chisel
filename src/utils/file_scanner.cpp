@@ -36,8 +36,8 @@ void collect_inputs(const std::vector<fs::path>& inputs,
                 }
             }
         } else {
-            auto fname = p.filename().string();
-            std::string lower = fname;
+            auto filename = p.filename().string();
+            std::string lower = filename;
             std::ranges::transform(lower, lower.begin(), ::tolower);
 
             if (lower != ".ds_store" && lower != "desktop.ini") {

@@ -129,8 +129,8 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
     if (can_write_format(job.format)) {
         out_fmt = job.format;
-    } else if (settings.nonencodable_target_format.has_value()) {
-        out_fmt = settings.nonencodable_target_format.value();
+    } else if (settings.unencodable_target_format.has_value()) {
+        out_fmt = settings.unencodable_target_format.value();
         Logger::log(
             LogLevel::INFO,
             "Non writable format (" + container_format_to_string(job.format) + "), recompressing in: " +
@@ -235,7 +235,7 @@ ContainerFormat ArchiveHandler::detect_format(const std::string& path) {
     std::string ext = to_lower_copy(fs::path(path).extension().string());
     if (!ext.empty() && ext.front() == '.') ext.erase(0, 1);
     if (!ext.empty()) {
-        if (auto parsed = parse_contaier_format(ext)) {
+        if (auto parsed = parse_container_format(ext)) {
             return *parsed;
         }
         // double extension support
@@ -356,7 +356,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             if (r == ARCHIVE_OK) r = archive_write_add_filter_xz(a);
             break;
         default:
-            Logger::log(LogLevel::ERROR, "Unsopprted output format for writing: " + container_format_to_string(fmt), "ArchiveHandler");
+            Logger::log(LogLevel::ERROR, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveHandler");
             archive_write_free(a);
             return false;
     }

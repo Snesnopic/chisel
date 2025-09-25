@@ -20,7 +20,7 @@ struct Settings {
     unsigned num_threads = 1;
     std::string log_level = "INFO";
     std::vector<std::filesystem::path> inputs;
-    std::optional<ContainerFormat> nonencodable_target_format;
+    std::optional<ContainerFormat> unencodable_target_format;
     std::filesystem::path output_csv;
 };
 

@@ -26,14 +26,14 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  --log-level LEVEL          Log level: ERROR, WARNING, INFO, DEBUG, NONE.\n"
                   << "  -o, --output-csv FILE      CSV report export filename.\n"
                   << "                             If not specified, report is printed on stdout.\n"
-                  << "  --recompress-nonencodable FORMAT\n"
+                  << "  --recompress-unencodable FORMAT\n"
                   << "                             allows to recompress archives that can be opened but not recompressed\n"
                   << "                             into a different format (zip, 7z, tar, gz, bz2, xz, wim).\n"
                   << "                             if not specified, such archives are left untouched.\n\n"
                   << "Examples:\n"
                   << "  " << argv[0] << " file.jpg dir/ --recursive --threads 4\n"
                   << "  " << argv[0] << " archive.zip\n"
-                  << "  " << argv[0] << " archive.rar --recompress-nonencodable 7z\n"
+                  << "  " << argv[0] << " archive.rar --recompress-unencodable 7z\n"
                   << "  " << argv[0] << " dir/ -o report.csv\n";
         return false;
     }
@@ -63,18 +63,18 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         settings.num_threads = std::max(1UL, std::stoul(args[++i]));
     };
 
-    flag_map["--recompress-nonencodable"] = [&](int &i, char **args) {
+    flag_map["--recompress-unencodable"] = [&](int &i, char **args) {
         if (i + 1 >= argc) {
-            std::cerr << "--recompress-nonencodable requires a format (zip, 7z, tar, gz, bz2, xz, wim)\n";
+            std::cerr << "--recompress-unencodable requires a format (zip, 7z, tar, gz, bz2, xz, wim)\n";
             exit(1);
         }
         std::string fmt_str = args[++i];
-        auto fmt = parse_contaier_format(fmt_str);
+        auto fmt = parse_container_format(fmt_str);
         if (!fmt.has_value()) {
-            std::cerr << "Format not valid for --recompress-nonencodable: " << fmt_str << "\n";
+            std::cerr << "Format not valid for --recompress-unencodable: " << fmt_str << "\n";
             exit(1);
         }
-        settings.nonencodable_target_format = fmt.value();
+        settings.unencodable_target_format = fmt.value();
     };
 
     flag_map["-o"] = [&](int &i, char **args) {

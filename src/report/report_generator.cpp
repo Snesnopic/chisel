@@ -55,7 +55,7 @@ void print_console_report(const std::vector<Result>& results,
     size_t max_after = 12;
     size_t max_delta = 10;
     size_t max_time = 10;
-    size_t max_esito = 10;
+    size_t max_result = 10;
 
     for (const auto& r : results) {
         max_mime   = std::max(max_mime,   strip_ansi(r.mime).size());
@@ -75,11 +75,11 @@ void print_console_report(const std::vector<Result>& results,
         } else {
             outcome = use_colors ? "\033[1;33mOK (skipped)\033[0m" : "OK (skipped)";
         }
-        max_esito  = std::max(max_esito, strip_ansi(outcome).size());
+        max_result  = std::max(max_result, strip_ansi(outcome).size());
     }
 
     unsigned fixed_cols_width = max_mime + max_before + max_after +
-                                 max_delta + max_time + max_esito;
+                                 max_delta + max_time + max_result;
 
     fixed_cols_width += 6;
 
@@ -98,13 +98,13 @@ void print_console_report(const std::vector<Result>& results,
              + "{:<" + std::to_string(max_after) + "}"
              + "{:<" + std::to_string(max_delta) + "}"
              + "{:<" + std::to_string(max_time) + "}"
-             + "{:<" + std::to_string(max_esito) + "}"
+             + "{:<" + std::to_string(max_result) + "}"
              + "{}\n";
 
 std::cout << "\n" << std::vformat(fmt_str,
     std::make_format_args(
-        "File", "Tipo MIME", "Prima(KB)", "Dopo(KB)",
-        "Delta(%)", "Tempo(s)", "Esito", "" ));
+        "File", "MIME type", "Before(KB)", "After(KB)",
+        "Delta(%)", "Time(s)", "Result", "" ));
 
     uintmax_t total_saved = 0;
     auto sorted = results;
@@ -117,7 +117,7 @@ std::cout << "\n" << std::vformat(fmt_str,
                  + "{:<" + std::to_string(max_after) + "}"
                  + "{:<" + std::to_string(max_delta) + "}"
                  + "{:<" + std::to_string(max_time) + "}"
-                 + "{:<" + std::to_string(max_esito) + "}"
+                 + "{:<" + std::to_string(max_result) + "}"
                  + "{}\n";
 
     for (const auto& r : sorted) {

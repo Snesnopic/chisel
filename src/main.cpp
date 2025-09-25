@@ -27,6 +27,7 @@
 #include "utils/file_scanner.hpp"
 #include <clocale>
 #include "encoder/wav_encoder.hpp"
+#include "encoder/webp_encoder.hpp"
 
 inline void init_utf8_locale() {
     std::setlocale(LC_ALL, "");
@@ -97,6 +98,13 @@ int main(const int argc, char *argv[]) {
     factories["audio/x-wav"] = factories["audio/wav"];
     factories["audio/x-wavpack"] = factories["audio/wav"];
 
+    factories["image/webp"] = {
+        [settings] {
+            return std::make_unique<WebpEncoder>(settings.preserve_metadata);
+        }
+    };
+    factories["image/x-webp"] = factories["image/webp"];
+
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;
 
@@ -107,7 +115,7 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "\r[" << 0 << "/" << files.size() << "] completati ("
+    std::cout << "\r[" << 0 << "/" << files.size() << "] completed ("
             << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
             << std::flush;
 
@@ -185,10 +193,10 @@ int main(const int argc, char *argv[]) {
 
             std::scoped_lock lock(results_mutex);
             results.push_back({in_path.string(), mime, sz_before, sz_after_best, ok_any, replaced, seconds}); {
-                static std::mutex cout_mutex;
+                static std::mutex print_mutex;
                 static std::atomic<size_t> count{0};
                 const size_t done = ++count;
-                std::scoped_lock lock1(cout_mutex);
+                std::scoped_lock lock1(print_mutex);
                 std::cout << "\r[" << done << "/" << total_files << "] completed ("
                         << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
                         << std::flush;

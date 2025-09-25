@@ -55,7 +55,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
     }
 }
 
-inline std::optional<ContainerFormat> parse_contaier_format(const std::string &str) {
+inline std::optional<ContainerFormat> parse_container_format(const std::string &str) {
     std::string s = str;
     std::ranges::transform(s, s.begin(), tolower);
 

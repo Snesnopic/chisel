@@ -9,11 +9,11 @@
 #include "../utils/archive_formats.hpp"
 
 struct ContainerJob {
-    std::string original_path;           // Percorso archivio originale
-    std::string temp_dir;                // Cartella temporanea di estrazione
-    std::vector<std::string> file_list;  // File estratti (non archivi)
+    std::string original_path;
+    std::string temp_dir;
+    std::vector<std::string> file_list;
     ContainerFormat format = ContainerFormat::Unknown;
-    std::vector<ContainerJob> children;    // Archivi annidati
+    std::vector<ContainerJob> children;
 };
 class IContainer {
 public:

@@ -157,7 +157,7 @@ namespace {
         }
     }
 
-    // determine if an rgba row is all opaque and/or all gray
+    // determine if a rgba row is all opaque and/or all gray
     void analyze_row_rgba(const png_bytep row, png_uint_32 width, bool &all_gray, bool &all_opaque) {
         const unsigned char *p = row;
         for (png_uint_32 x = 0; x < width; ++x) {
@@ -221,7 +221,7 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
         // now rowbytes corresponds to rgba8
         png_size_t rowbytes = png_get_rowbytes(rd.png, rd.info);
         if (rowbytes != width * 4) {
-            // in theory it should match; if interlaced, libpng handles it
+            // in theory, it should match; if interlaced, libpng handles it
         }
 
         std::vector<png_bytep> row_ptrs(1);

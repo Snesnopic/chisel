@@ -63,7 +63,7 @@ namespace {
     // save markers to copy from source (must be called before jpeg_read_header)
     void setup_marker_saving(const j_decompress_ptr srcinfo, const bool preserve_metadata) {
         if (preserve_metadata) {
-            // save all app0..app15 markers + com to copy them later
+            // save all app0...app15 markers + com to copy them later
             for (int m = 0; m < 16; ++m) {
                 jpeg_save_markers(srcinfo, JPEG_APP0 + m, 0xFFFF);
             }

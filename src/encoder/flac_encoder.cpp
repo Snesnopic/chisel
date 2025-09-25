@@ -3,7 +3,7 @@
 //
 
 #include "flac_encoder.hpp"
-#include "../utils/logger.hpp" // nuovo include per il logging
+#include "../utils/logger.hpp"
 #include <FLAC/all.h>
 #include <vector>
 #include <stdexcept>
