@@ -66,7 +66,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
                     if (can_read_format(fmt)) {
                         if (fmt == ContainerFormat::Mkv) {
                             // mkv
-                            MKVHandler mkv_handler;
+                            MkvHandler mkv_handler;
                             auto job = mkv_handler.prepare(p.string());
                             if (!job.file_list.empty()) {
                                 archive_jobs.push_back(job);
