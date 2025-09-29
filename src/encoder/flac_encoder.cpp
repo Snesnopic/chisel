@@ -39,13 +39,13 @@ static FLAC__StreamDecoderWriteStatus write_callback(
 }
 
 static void metadata_callback(
-    const FLAC__StreamDecoder *,
+    const FLAC__StreamDecoder * /*decoder*/,
     const FLAC__StreamMetadata *,
     void *) {
 }
 
 static void error_callback(
-    const FLAC__StreamDecoder *,
+    const FLAC__StreamDecoder *  /*decoder*/,
     FLAC__StreamDecoderErrorStatus status,
     void *) {
     Logger::log(LogLevel::WARNING,
@@ -125,7 +125,7 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
                 FLAC__metadata_iterator_init(it, chain);
                 unsigned idx = 0;
                 do {
-                    FLAC__StreamMetadata *block = FLAC__metadata_iterator_get_block(it);
+                    const FLAC__StreamMetadata *block = FLAC__metadata_iterator_get_block(it);
                     if (block && block->type != FLAC__METADATA_TYPE_STREAMINFO) {
                         metadata_blocks[idx++] = FLAC__metadata_object_clone(block);
                     }

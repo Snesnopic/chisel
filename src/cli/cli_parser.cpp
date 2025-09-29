@@ -12,7 +12,6 @@
 #include <iostream>
 #include <thread>
 
-namespace fs = std::filesystem;
 
 bool parse_arguments(const int argc, char** argv, Settings& settings) {
     if (argc < 2) {
@@ -68,7 +67,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
             std::cerr << "--recompress-unencodable requires a format (zip, 7z, tar, gz, bz2, xz, wim)\n";
             exit(1);
         }
-        std::string fmt_str = args[++i];
+        const std::string fmt_str = args[++i];
         auto fmt = parse_container_format(fmt_str);
         if (!fmt.has_value()) {
             std::cerr << "Format not valid for --recompress-unencodable: " << fmt_str << "\n";

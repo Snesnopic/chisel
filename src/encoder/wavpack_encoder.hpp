@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 25/09/25.
 //
 
-#ifndef MONOLITH_WAV_ENCODER_HPP
-#define MONOLITH_WAV_ENCODER_HPP
+#ifndef MONOLITH_WAVPACK_ENCODER_HPP
+#define MONOLITH_WAVPACK_ENCODER_HPP
 
 #include <filesystem>
 #include "encoder.hpp"
@@ -11,15 +11,15 @@
 // wavpack forward declaration
 struct WavpackContext;
 
-class WavEncoder: public IEncoder {
+class WavpackEncoder: public IEncoder {
 public:
-    explicit WavEncoder(bool preserve_metadata = true);
+    explicit WavpackEncoder(bool preserve_metadata = true);
 
     bool recompress(const std::filesystem::path& input,
                     const std::filesystem::path& output) override;
 
-    std::string mime_type() const override { return "audio/wav"; }
+    std::string mime_type() const override { return "audio/x-wavpack"; }
 
 };
 
-#endif //MONOLITH_WAV_ENCODER_HPP
+#endif //MONOLITH_WAVPACK_ENCODER_HPP

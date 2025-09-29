@@ -14,7 +14,7 @@
 namespace {
     // error manager (jpeg error -> c++ exception)
     struct JpegErrorMgr {
-        jpeg_error_mgr pub;
+        jpeg_error_mgr pub{};
         char msg[JMSG_LENGTH_MAX]{};
     };
 

@@ -26,12 +26,15 @@
 #include "containers/archive_handler.hpp"
 #include "utils/file_scanner.hpp"
 #include <clocale>
-#include "encoder/alac_encoder.hpp"
-#include "encoder/wav_encoder.hpp"
+#include <random>
+
+#include "encoder/pdf_encoder.hpp"
+#include "encoder/wavpack_encoder.hpp"
 #include "encoder/webp_encoder.hpp"
+#include "encoder/zopflipng_encoder.hpp"
 
 inline void init_utf8_locale() {
-    std::setlocale(LC_ALL, "");
+    std::setlocale(LC_CTYPE, "");
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
@@ -39,21 +42,26 @@ inline void init_utf8_locale() {
         return; // ok
     }
 
-    const char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
+    constexpr const char * const fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
-        if (std::setlocale(LC_ALL, fb)) {
+        if (std::setlocale(LC_CTYPE, fb)) {
             Logger::log(LogLevel::INFO, std::string("Locale set to ") + fb, "LocaleInit");
             return;
         }
     }
 
-    // no UTF-8 available
     Logger::log(LogLevel::WARNING, "UTF-8 locale not available; non-ASCII file names may be problematic.",
                 "LocaleInit");
 }
 
 namespace fs = std::filesystem;
 
+inline fs::path make_temp_path(const fs::path& stem, const std::string& ext) {
+    thread_local std::mt19937_64 rng{std::random_device{}()};
+    thread_local std::uniform_int_distribution<unsigned long long> dist;
+    return fs::temp_directory_path() /
+           fs::path(stem.string() + "_tmp" + std::to_string(dist(rng)) + ext);
+}
 
 int main(const int argc, char *argv[]) {
     init_utf8_locale();
@@ -76,14 +84,17 @@ int main(const int argc, char *argv[]) {
             return std::make_unique<FlacEncoder>(settings.preserve_metadata);
         }
     };
-
     factories["audio/x-flac"] = factories["audio/flac"];
 
     factories["image/png"] = {
         [settings] {
             return std::make_unique<PngEncoder>(settings.preserve_metadata);
+        },
+        [settings] {
+            return std::make_unique<ZopfliPngEncoder>(settings.preserve_metadata);
         }
     };
+
     factories["image/jpeg"] = {
         [settings] {
             return std::make_unique<JpegEncoder>(settings.preserve_metadata);
@@ -91,13 +102,12 @@ int main(const int argc, char *argv[]) {
     };
     factories["image/jpg"] = factories["image/jpeg"];
 
-    factories["audio/wav"] = {
+    factories["audio/x-wavpack"] = {
         [settings] {
-            return std::make_unique<WavEncoder>(settings.preserve_metadata);
+            return std::make_unique<WavpackEncoder>(settings.preserve_metadata);
         }
     };
-    factories["audio/x-wav"] = factories["audio/wav"];
-    factories["audio/x-wavpack"] = factories["audio/wav"];
+    factories["audio/x-wavpack-correction"] = factories["audio/x-wavpack"];
 
     factories["image/webp"] = {
         [settings] {
@@ -105,16 +115,12 @@ int main(const int argc, char *argv[]) {
         }
     };
     factories["image/x-webp"] = factories["image/webp"];
-    factories["audio/mp4"] = {
+
+    factories["application/pdf"] = {
         [settings] {
-            return std::make_unique<AlacEncoder>(settings.preserve_metadata);
+            return std::make_unique<PdfEncoder>(settings.preserve_metadata);
         }
     };
-
-    factories["audio/m4a"]   = factories["audio/mp4"];
-    factories["audio/x-m4a"] = factories["audio/mp4"];
-    factories["audio/alac"]  = factories["audio/mp4"];
-
 
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;
@@ -127,13 +133,14 @@ int main(const int argc, char *argv[]) {
     }
 
     std::cout << "\r[" << 0 << "/" << files.size() << "] completed ("
-            << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
-            << std::flush;
+              << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
+              << std::flush;
 
     std::ranges::sort(files,
-                      [](auto const &a, auto const &b) {
-                          return a.string() < b.string();
+                      [](const auto &a, const auto &b) {
+                          return a.native() < b.native();
                       });
+
     if (settings.num_threads > files.size()) {
         settings.num_threads = files.size();
     }
@@ -162,10 +169,9 @@ int main(const int argc, char *argv[]) {
                 // execute all encoders on copy of original
                 for (size_t idx = 0; idx < it->second.size(); ++idx) {
                     const auto enc = it->second[idx]();
-                    fs::path tmp = in_path.stem().string() + "_tmp" + std::to_string(idx) + in_path.extension().
-                                   string();
+                    fs::path tmp = make_temp_path(in_path.stem(), in_path.extension().string());
                     try {
-                        bool ok = enc->recompress(in_path, tmp.string());
+                        const bool ok = enc->recompress(in_path, tmp.string());
                         if (ok && fs::exists(tmp)) {
                             const uintmax_t sz_after = fs::file_size(tmp);
                             Logger::log(LogLevel::DEBUG,
@@ -190,8 +196,15 @@ int main(const int argc, char *argv[]) {
 
                 // replace original if we have an improvement
                 if (ok_any && sz_after_best < sz_before && !settings.dry_run) {
-                    fs::rename(best_tmp, in_path);
-                    replaced = true;
+                    try {
+                        fs::rename(best_tmp, in_path);
+                        replaced = true;
+                    } catch (const std::exception &e) {
+                        Logger::log(LogLevel::ERROR,
+                                    "Failed to replace original with optimized file: " + std::string(e.what()),
+                                    "main");
+                        fs::remove(best_tmp);
+                    }
                 } else if (!best_tmp.empty()) {
                     fs::remove(best_tmp);
                 }
@@ -202,15 +215,15 @@ int main(const int argc, char *argv[]) {
             const auto end = std::chrono::steady_clock::now();
             const double seconds = std::chrono::duration<double>(end - start).count();
 
-            std::scoped_lock lock(results_mutex);
+            const std::scoped_lock lock(results_mutex);
             results.push_back({in_path.string(), mime, sz_before, sz_after_best, ok_any, replaced, seconds}); {
                 static std::mutex print_mutex;
                 static std::atomic<size_t> count{0};
                 const size_t done = ++count;
-                std::scoped_lock lock1(print_mutex);
+                const std::scoped_lock lock1(print_mutex);
                 std::cout << "\r[" << done << "/" << total_files << "] completed ("
-                        << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
-                        << std::flush;
+                          << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
+                          << std::flush;
             }
         }));
     }
@@ -226,14 +239,13 @@ int main(const int argc, char *argv[]) {
 
     std::cout << "\n";
     auto end_total = std::chrono::steady_clock::now();
-    double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
+    const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
 
     if (!settings.output_csv.empty()) {
         export_csv_report(results, settings.output_csv);
     } else {
         print_console_report(results, settings.num_threads, total_seconds);
     }
-
 
     return 0;
 }

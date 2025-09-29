@@ -151,6 +151,8 @@ namespace {
         if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) {
             png_set_gray_to_rgb(png);
         }
+        if (bit_depth < 8) png_set_packing(png);
+
         // add full alpha if missing (so the scan is always rgba)
         if (!(color_type & PNG_COLOR_MASK_ALPHA) && !png_get_valid(png, info, PNG_INFO_tRNS)) {
             png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
@@ -216,6 +218,11 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
         png_get_IHDR(rd.png, rd.info, &width, &height, &bit_depth, &color_type, &interlace, &comp, &filter);
 
         apply_input_transforms_for_scan(rd.png, rd.info);
+
+        if (png_get_interlace_type(rd.png, rd.info) != PNG_INTERLACE_NONE) {
+            png_set_interlace_handling(rd.png);
+        }
+
         png_read_update_info(rd.png, rd.info);
 
         // now rowbytes corresponds to rgba8
@@ -268,7 +275,7 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
                 Logger::log(LogLevel::ERROR, "png_create_read_struct failed: " + input.string(), "png_encoder");
                 throw std::runtime_error("png_create_read_struct failed (pass 2)");
             }
-            png_set_error_fn(rd.png, nullptr, png_error_fn, png_warning_fn);
+            png_set_error_fn(rd2.png, nullptr, png_error_fn, png_warning_fn);
 
             rd2.info = png_create_info_struct(rd2.png);
             if (!rd2.info) {
@@ -294,17 +301,21 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             //  - if all_gray and !all_opaque -> gray+alpha 8 (but we discovered alpha fully opaque, so !all_opaque does not occur with all_gray true)
             //  - if !all_gray and all_opaque -> rgb8
             //  - if !all_gray and !all_opaque -> rgba8
-            bool out_gray = all_gray;
-            bool out_alpha = !all_opaque;
+            const bool out_gray = all_gray;
+            const bool out_alpha = !all_opaque;
 
             // apply input transforms to rgba8 for easier handling
             apply_input_transforms_for_scan(rd2.png, rd2.info);
-            png_read_update_info(rd2.png, rd2.info);
 
+            if (png_get_interlace_type(rd2.png, rd2.info) != PNG_INTERLACE_NONE) {
+                png_set_interlace_handling(rd2.png);
+            }
+
+            png_read_update_info(rd2.png, rd2.info);
             // prepare writer
-            unique_FILE fp_out(std::fopen(output.string().c_str(), "wb"));
+            const unique_FILE fp_out(std::fopen(output.string().c_str(), "wb"));
             if (!fp_out) {
-                Logger::log(LogLevel::ERROR, "cannot open PNG output: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::ERROR, "cannot open PNG output: " + output.string(), "png_encoder");
                 throw std::runtime_error("cannot open PNG output");
             }
 
@@ -330,7 +341,7 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             png_set_compression_level(wr.png, 9);
             png_set_compression_mem_level(wr.png, 9);
             png_set_compression_strategy(wr.png, Z_DEFAULT_STRATEGY);
-            png_set_filter(wr.png, 0, PNG_ALL_FILTERS);
+            png_set_filter(wr.png, PNG_FILTER_TYPE_BASE, PNG_ALL_FILTERS);
 
             int out_color_type = 0;
             if (out_gray) {
@@ -352,12 +363,12 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             png_write_info(wr.png, wr.info);
 
             // prepare input row buffer (always rgba8 from pipeline)
-            png_size_t in_rowbytes = png_get_rowbytes(rd2.png, rd2.info);
+            const png_size_t in_rowbytes = png_get_rowbytes(rd2.png, rd2.info);
             std::vector<unsigned char> in_rowbuf(in_rowbytes);
             png_bytep in_row = in_rowbuf.data();
 
             // prepare output row buffer in target format
-            png_size_t out_channels = (out_color_type == PNG_COLOR_TYPE_GRAY)
+            const png_size_t out_channels = (out_color_type == PNG_COLOR_TYPE_GRAY)
                                           ? 1
                                           : (out_color_type == PNG_COLOR_TYPE_GA)
                                                 ? 2
@@ -388,10 +399,10 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
                     }
                 } else if (out_color_type == PNG_COLOR_TYPE_GA) {
                     for (png_uint_32 x = 0; x < w2; ++x) {
-                        unsigned char r = src[0];
+                        const unsigned char r = src[0];
                         // unsigned char g = src[1];
                         // unsigned char b = src[2];
-                        unsigned char a = src[3];
+                        const unsigned char a = src[3];
                         dst[0] = r; // = g = b
                         dst[1] = a;
                         src += 4;

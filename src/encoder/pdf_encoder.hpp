@@ -1,0 +1,22 @@
+//
+// Created by Giuseppe Francione on 28/09/25.
+//
+
+#ifndef MONOLITH_PDF_ENCODER_HPP
+#define MONOLITH_PDF_ENCODER_HPP
+
+#include <filesystem>
+#include "encoder.hpp"
+
+class PdfEncoder: public IEncoder{
+public:
+    explicit PdfEncoder(bool preserve_metadata = true);
+
+    bool recompress(const std::filesystem::path& input,
+                           const std::filesystem::path& output) override;
+
+    std::string mime_type() const override { return "application/pdf"; }
+
+};
+
+#endif //MONOLITH_PDF_ENCODER_HPP

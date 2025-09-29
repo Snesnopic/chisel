@@ -64,7 +64,7 @@ void print_console_report(const std::vector<Result>& results,
         double pct = r.success && r.size_before
                          ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
                          : 0.0;
-        std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
+        const std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
         max_delta  = std::max(max_delta, strip_ansi(delta).size());
         max_time   = std::max(max_time,  std::format("{:.2f}", r.seconds).size());
         std::string outcome;
@@ -83,7 +83,7 @@ void print_console_report(const std::vector<Result>& results,
 
     fixed_cols_width += 6;
 
-    unsigned file_col_width = term_width > fixed_cols_width + 10
+    const unsigned file_col_width = term_width > fixed_cols_width + 10
                                 ? term_width - fixed_cols_width
                                 : 20;
 
@@ -91,7 +91,7 @@ void print_console_report(const std::vector<Result>& results,
         return s.size() <= max_len ? s : s.substr(0, max_len - 3) + "...";
     };
 
-    // Intestazione
+    // header
     auto fmt_str = std::string("{:<") + std::to_string(file_col_width) + "}"
              + "{:<" + std::to_string(max_mime) + "}"
              + "{:<" + std::to_string(max_before) + "}"
@@ -162,7 +162,7 @@ void export_csv_report(const std::vector<Result>& results,
         const double pct = r.success && r.size_before
                          ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
                          : 0.0;
-        std::string outcome = !r.success ? "FAIL"
+        const std::string outcome = !r.success ? "FAIL"
                                          : r.replaced ? "OK (replaced)"
                                                       : "OK (skipped)";
         out << '"' << r.filename << "\","

@@ -2,19 +2,19 @@
 // Created by Giuseppe Francione on 25/09/25.
 //
 
-#include "wav_encoder.hpp"
+#include "wavpack_encoder.hpp"
 #include "../utils/logger.hpp"
 #include <wavpack.h>
 #include <stdexcept>
 #include <vector>
 #include <cstdio>
 
-WavEncoder::WavEncoder(const bool preserve_metadata) {
+WavpackEncoder::WavpackEncoder(const bool preserve_metadata) {
     preserve_metadata_ = preserve_metadata;
 }
 
-// recompress a wav or wavpack file into wavpack lossless with maximum compression
-bool WavEncoder::recompress(const std::filesystem::path& input,
+// recompress a wavpack file into wavpack lossless with maximum compression
+bool WavpackEncoder::recompress(const std::filesystem::path& input,
                             const std::filesystem::path& output) {
     Logger::log(LogLevel::INFO, "Starting WavPack recompression: " + input.string(), "wavpack_encoder");
 
@@ -26,7 +26,7 @@ bool WavEncoder::recompress(const std::filesystem::path& input,
     }
 
     char error[80]{};
-    // open input context (wav or wavpack)
+    // open input context
     WavpackContext* ctx_in = WavpackOpenFileInput(input.string().c_str(), error, OPEN_TAGS, 0);
     if (!ctx_in) {
         std::fclose(in);

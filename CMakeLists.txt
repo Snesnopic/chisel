@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.20)
+
 project(monolith)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
@@ -172,15 +173,12 @@ if(NOT libmatroska_POPULATED)
     add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
 endif()
 
-include(FetchContent)
-
 # libwebp
 FetchContent_Declare(
         libwebp
         GIT_REPOSITORY https://chromium.googlesource.com/webm/libwebp
         GIT_TAG main
 )
-
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -195,34 +193,10 @@ set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libwebp)
 
-# alac
-FetchContent_Declare(
-        alac
-        GIT_REPOSITORY https://github.com/mikebrady/alac.git
-        GIT_TAG master
-)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(alac)
-add_library(alac STATIC
-        ${alac_SOURCE_DIR}/codec/ag_dec.c
-        ${alac_SOURCE_DIR}/codec/ag_enc.c
-        ${alac_SOURCE_DIR}/codec/ALACBitUtilities.c
-        ${alac_SOURCE_DIR}/codec/ALACDecoder.cpp
-        ${alac_SOURCE_DIR}/codec/ALACEncoder.cpp
-        ${alac_SOURCE_DIR}/codec/dp_dec.c
-        ${alac_SOURCE_DIR}/codec/dp_enc.c
-        ${alac_SOURCE_DIR}/codec/EndianPortable.c
-        ${alac_SOURCE_DIR}/codec/matrix_dec.c
-        ${alac_SOURCE_DIR}/codec/matrix_enc.c
-)
-
-target_include_directories(alac PUBLIC ${alac_SOURCE_DIR}/codec)
-
 set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
-
 ExternalProject_Add(ffmpeg
         GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
-        GIT_TAG n7.0.2   # scegli una release stabile
+        GIT_TAG n7.1.2
         PREFIX ${CMAKE_BINARY_DIR}/ffmpeg
         CONFIGURE_COMMAND ./configure
         --prefix=${FFMPEG_PREFIX}
@@ -232,8 +206,6 @@ ExternalProject_Add(ffmpeg
         --disable-doc
         --disable-debug
         --disable-everything
-        --enable-encoder=alac
-        --enable-decoder=alac
         --enable-muxer=mp4
         --enable-demuxer=mov
         --enable-protocol=file
@@ -247,7 +219,6 @@ ExternalProject_Add(ffmpeg
         ${FFMPEG_PREFIX}/lib/libavutil.a
 )
 
-# crea target importati per linkare facilmente
 add_library(ffmpeg_avcodec STATIC IMPORTED GLOBAL)
 add_library(ffmpeg_avformat STATIC IMPORTED GLOBAL)
 add_library(ffmpeg_avutil STATIC IMPORTED GLOBAL)
@@ -271,6 +242,27 @@ set_target_properties(ffmpeg_avutil PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
 )
 
+# qpdf
+set(QPDF_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(QPDF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(QPDF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(QPDF_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(QPDF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+        qpdf
+        GIT_REPOSITORY https://github.com/qpdf/qpdf.git
+        GIT_TAG main
+)
+FetchContent_MakeAvailable(qpdf)
+
+# zopfli
+FetchContent_Declare(
+        zopfli
+        GIT_REPOSITORY https://github.com/google/zopfli.git
+        GIT_TAG master
+)
+FetchContent_MakeAvailable(zopfli)
 
 # monolith
 add_executable(monolith
@@ -300,12 +292,14 @@ add_executable(monolith
         src/containers/container.hpp
         src/containers/mkv_handler.cpp
         src/containers/mkv_handler.hpp
-        src/encoder/wav_encoder.cpp
-        src/encoder/wav_encoder.hpp
+        src/encoder/wavpack_encoder.cpp
+        src/encoder/wavpack_encoder.hpp
         src/encoder/webp_encoder.cpp
         src/encoder/webp_encoder.hpp
-        src/encoder/alac_encoder.cpp
-        src/encoder/alac_encoder.hpp
+        src/encoder/pdf_encoder.cpp
+        src/encoder/pdf_encoder.hpp
+        src/encoder/zopflipng_encoder.cpp
+        src/encoder/zopflipng_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -345,6 +339,20 @@ if(NOT WIN32)
 endif()
 target_link_directories(monolith PRIVATE ${MOZJPEG_LIB_DIR})
 
+target_include_directories(monolith PRIVATE
+        ${qpdf_SOURCE_DIR}/include
+        ${qpdf_BINARY_DIR}/include
+)
+
+target_include_directories(monolith PRIVATE
+        ${zopfli_SOURCE_DIR}/include
+        ${zopfli_BINARY_DIR}/include
+)
+
+target_include_directories(zopflipng PUBLIC
+        ${zopfli_SOURCE_DIR}/src/zopflipng
+        ${zopfli_SOURCE_DIR}/src/zopfli
+)
 # common libraries for all platforms
 set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
@@ -359,10 +367,12 @@ set(MONOLITH_LIBS
         wavpack
         webp
         libwebpmux
-        alac
         ffmpeg_avcodec
         ffmpeg_avformat
         ffmpeg_avutil
+        libqpdf
+        libzopfli
+        libzopflipng
 )
 
 if(APPLE)
