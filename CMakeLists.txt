@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(monolith)
+project(monolith LANGUAGES C CXX)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
@@ -263,6 +263,24 @@ FetchContent_Declare(
         GIT_TAG master
 )
 FetchContent_MakeAvailable(zopfli)
+include(FetchContent)
+
+# JPEG XL
+FetchContent_Declare(
+        libjxl
+        GIT_REPOSITORY https://github.com/libjxl/libjxl.git
+        GIT_TAG v0.11.1
+)
+
+set(JPEGXL_ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_DEVTOOLS OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_PLUGINS OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_MANPAGES OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(libjxl)
 
 # monolith
 add_executable(monolith
@@ -300,6 +318,8 @@ add_executable(monolith
         src/encoder/pdf_encoder.hpp
         src/encoder/zopflipng_encoder.cpp
         src/encoder/zopflipng_encoder.hpp
+        src/encoder/jxl_encoder.cpp
+        src/encoder/jxl_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -353,6 +373,7 @@ target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopflipng
         ${zopfli_SOURCE_DIR}/src/zopfli
 )
+
 # common libraries for all platforms
 set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
@@ -373,6 +394,8 @@ set(MONOLITH_LIBS
         libqpdf
         libzopfli
         libzopflipng
+        jxl
+        jxl_threads
 )
 
 if(APPLE)

@@ -37,7 +37,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         return false;
     }
 
-    settings.num_threads = std::max(1u, std::thread::hardware_concurrency() / 2);
+    settings.num_threads = std::max(1U, std::thread::hardware_concurrency() / 2);
 
     using FlagHandler = std::function<void(int&, char**)>;
     std::unordered_map<std::string, FlagHandler> flag_map;

@@ -27,7 +27,7 @@
 #include "utils/file_scanner.hpp"
 #include <clocale>
 #include <random>
-
+#include "encoder/jxl_encoder.hpp"
 #include "encoder/pdf_encoder.hpp"
 #include "encoder/wavpack_encoder.hpp"
 #include "encoder/webp_encoder.hpp"
@@ -101,6 +101,12 @@ int main(const int argc, char *argv[]) {
         }
     };
     factories["image/jpg"] = factories["image/jpeg"];
+
+    factories["image/jxl"] = {
+        [settings] {
+            return std::make_unique<JXLEncoder>(settings.preserve_metadata);
+        }
+    };
 
     factories["audio/x-wavpack"] = {
         [settings] {

@@ -27,8 +27,10 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         ZopfliPNGOptions opts;
         opts.lossy_transparent = false;
         opts.lossy_8bit = false;
+        opts.use_zopfli = true;
         opts.num_iterations = 15;
         opts.num_iterations_large = 5;
+
         if (preserve_metadata_) {
             opts.keepchunks = {"tEXt", "zTXt", "iTXt", "exif"};
         } else {

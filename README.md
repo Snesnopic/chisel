@@ -95,9 +95,11 @@ cmake --build build
 
 Currently implemented:
 - **JPEG** (lossless recompression via mozjpeg)
+- **WAVPACK** (lossless recompression via wavpack)
+- **JPEG XL** (lossless recompression via libjxl)
 - **PNG** (lossless recompression via zlib/Deflate)
 - **FLAC** (lossless audio recompression)
-- **ALAC (M4A/MP4)** (lossless audio recompression with metadata and cover art support)
+- **PDF** (via qpdf)
 - **Archive formats** (ZIP, TAR, 7z, etc. via libarchive)
 
 Planned:
