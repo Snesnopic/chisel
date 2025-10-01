@@ -85,7 +85,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         std::string a = argv[i];
         if (auto it = flag_map.find(a); it != flag_map.end()) {
             it->second(i, argv);
-        } else if (!a.empty() && a[0] == '-') {
+        } else if (!a.empty() && a[0] == '-' && a.size() > 1) {
             throw std::runtime_error("Unknown option: " + a);
         } else {
             settings.inputs.emplace_back(a);

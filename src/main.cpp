@@ -1,3 +1,4 @@
+//
 // Created by Giuseppe Francione on 18/09/25.
 //
 
@@ -22,12 +23,17 @@
 #include "containers/archive_handler.hpp"
 #include "utils/file_scanner.hpp"
 #include <clocale>
+#include <fstream>
 #include <random>
 #include "utils/encoder_registry.hpp"
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif
 
-static void print_progress_bar(size_t done, size_t total, double elapsed_seconds) {
+static void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
-    const int bar_width = std::max(10u, term_width > 40 ? term_width - 40 : 20);
+    const int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
     double progress = total ? static_cast<double>(done) / total : 0.0;
     int pos = static_cast<int>(bar_width * progress);
@@ -39,10 +45,10 @@ static void print_progress_bar(size_t done, size_t total, double elapsed_seconds
         else std::cout << " ";
     }
     std::cout << "] "
-              << std::format("{:3.0f}%", progress * 100.0)
-              << " (" << done << "/" << total << ")"
-              << " elapsed: " << std::format("{:.1f}s", elapsed_seconds)
-              << std::flush;
+            << std::format("{:3.0f}%", progress * 100.0)
+            << " (" << done << "/" << total << ")"
+            << " elapsed: " << std::format("{:.1f}s", elapsed_seconds)
+            << std::flush;
 }
 
 inline void init_utf8_locale() {
@@ -68,15 +74,17 @@ inline void init_utf8_locale() {
 
 namespace fs = std::filesystem;
 
-inline fs::path make_temp_path(const fs::path &stem, const std::string &ext) {
-    thread_local std::mt19937_64 rng{std::random_device{}()};
-    thread_local std::uniform_int_distribution<unsigned long long> dist;
-    return fs::temp_directory_path() /
-           fs::path(stem.string() + "_tmp" + std::to_string(dist(rng)) + ext);
-}
 
 int main(const int argc, char *argv[]) {
     init_utf8_locale();
+#ifdef _WIN32
+    if (_isatty(_fileno(stdin)) == 0) {
+        _setmode(_fileno(stdin), _O_BINARY);
+    }
+    if (_isatty(_fileno(stdout)) == 0) {
+        _setmode(_fileno(stdout), _O_BINARY);
+    }
+#endif
     Settings settings;
     try {
         if (!parse_arguments(argc, argv, settings)) {
@@ -92,7 +100,11 @@ int main(const int argc, char *argv[]) {
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;
 
-    collect_inputs(settings.inputs, settings.recursive, files, container_jobs);
+    collect_inputs(settings.inputs, settings.recursive, files, container_jobs, settings);
+
+    if (settings.is_pipe) {
+        Logger::set_level(LogLevel::ERROR);
+    }
 
     if (files.empty()) {
         Logger::log(LogLevel::ERROR, "No files, folders or archives to process.", "main");
@@ -102,8 +114,9 @@ int main(const int argc, char *argv[]) {
     auto now = std::chrono::steady_clock::now();
     const auto start_total = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - start_total).count();
-    print_progress_bar(0, files.size(), elapsed);
-
+    if (!settings.is_pipe) {
+        print_progress_bar(0, files.size(), elapsed);
+    }
     std::ranges::sort(files,
                       [](const auto &a, const auto &b) {
                           return a.native() < b.native();
@@ -176,22 +189,41 @@ int main(const int argc, char *argv[]) {
 
                 // replace original if we have an improvement
                 if (ok_any && sz_after_best < sz_before && !settings.dry_run) {
-                    try {
-                        fs::rename(best_tmp, in_path);
-                        replaced = true;
-                    } catch (const std::exception &e) {
-                        Logger::log(LogLevel::ERROR,
-                                    "Failed to replace original with optimized file: " + std::string(e.what()),
-                                    "main");
+                    if (settings.is_pipe) {
+                        // write new best to stdout
+                        std::ifstream out_best(best_tmp, std::ios::binary);
+                        std::cout << out_best.rdbuf();
+                        out_best.close();
+
                         fs::remove(best_tmp);
-                        error_msg = e.what();
+                        fs::remove(in_path);
+                        replaced = true;
+                    } else {
+                        try {
+                            fs::rename(best_tmp, in_path);
+                            replaced = true;
+                        } catch (const std::exception &e) {
+                            Logger::log(LogLevel::ERROR,
+                                        "Failed to replace original with optimized file: " + std::string(e.what()),
+                                        "main");
+                            fs::remove(best_tmp);
+                            error_msg = e.what();
+                        }
                     }
-                } else if (!best_tmp.empty()) {
-                    fs::remove(best_tmp);
-                }
+                } else // no improvement or dry run
+                    if (settings.is_pipe) {
+                        // passthrough original
+                        std::ifstream out_orig(in_path, std::ios::binary);
+                        std::cout << out_orig.rdbuf();
+                        out_orig.close();
+                        if (!best_tmp.empty()) fs::remove(best_tmp);
+                        fs::remove(in_path);
+                    } else {
+                        if (!best_tmp.empty()) fs::remove(best_tmp);
+                    }
             } else {
                 Logger::log(LogLevel::WARNING, "No encoder for " + in_path.string() + " (" + mime + ")", "main");
-                error_msg = "no encoder available";
+                error_msg = "No encoder available";
             }
 
             const auto end = std::chrono::steady_clock::now();
@@ -215,7 +247,9 @@ int main(const int argc, char *argv[]) {
                 const std::scoped_lock lock1(print_mutex);
                 auto now = std::chrono::steady_clock::now();
                 double elapsed = std::chrono::duration<double>(now - start_total).count();
-                print_progress_bar(done, total_files, elapsed);
+                if (!settings.is_pipe) {
+                    print_progress_bar(done, total_files, elapsed);
+                }
             }
         }));
     }
@@ -233,10 +267,12 @@ int main(const int argc, char *argv[]) {
     auto end_total = std::chrono::steady_clock::now();
     const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
 
-    if (!settings.output_csv.empty()) {
-        export_csv_report(results, settings.output_csv);
-    } else {
-        print_console_report(results, settings.num_threads, total_seconds);
+    if (!settings.is_pipe) {
+        if (!settings.output_csv.empty()) {
+            export_csv_report(results, settings.output_csv);
+        } else {
+            print_console_report(results, settings.num_threads, total_seconds);
+        }
     }
 
     return 0;

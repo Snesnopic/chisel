@@ -22,6 +22,7 @@ struct Settings {
     std::vector<std::filesystem::path> inputs;
     std::optional<ContainerFormat> unencodable_target_format;
     std::filesystem::path output_csv;
+    bool is_pipe = false;
 };
 
 bool parse_arguments(int argc, char** argv, Settings& settings);

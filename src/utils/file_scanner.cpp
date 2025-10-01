@@ -7,6 +7,8 @@
 #include "archive_formats.hpp"
 #include "logger.hpp"
 #include <algorithm>
+#include <fstream>
+
 #include "../containers/mkv_handler.hpp"
 
 namespace fs = std::filesystem;
@@ -14,8 +16,17 @@ namespace fs = std::filesystem;
 void collect_inputs(const std::vector<fs::path>& inputs,
                     bool recursive,
                     std::vector<fs::path>& files,
-                    std::vector<ContainerJob>& archive_jobs) {
+                    std::vector<ContainerJob>& archive_jobs, Settings &settings) {
     for (auto const& p : inputs) {
+        if (p == "-") {
+            fs::path tmp = make_temp_path("stdin", ".bin");
+            std::ofstream out(tmp, std::ios::binary);
+            out << std::cin.rdbuf();
+            out.close();
+            files.push_back(tmp);
+            settings.is_pipe = true;
+            break;
+        }
         if (!fs::exists(p)) {
             Logger::log(LogLevel::ERROR, "Scanner error: input '" + p.string() + "' not found.", "file_scanner");
             continue;

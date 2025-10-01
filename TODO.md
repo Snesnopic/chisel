@@ -79,4 +79,3 @@
 ## Other improvements
 
 - [ ] File hash cache to skip already processed files across runs.
-- [ ] Support for pipe/STDIN-STDOUT for shell pipelines and integration with other tools.
