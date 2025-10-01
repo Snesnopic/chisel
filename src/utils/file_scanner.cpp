@@ -45,7 +45,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
 
                 // fallback: if MIME empty, octet-stream or unknown, try with extension
                 if (mime.empty() || mime == "application/octet-stream" ||
-                    (mime_to_format.find(mime) == mime_to_format.end() && ext_to_mime.find(p.extension().string()) != ext_to_mime.end())) {
+                    (!mime_to_format.contains(mime) && ext_to_mime.contains(p.extension().string()))) {
 
                     std::string ext = p.extension().string();
                     std::ranges::transform(ext, ext.begin(), ::tolower);
@@ -71,7 +71,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
                             if (!job.file_list.empty()) {
                                 archive_jobs.push_back(job);
                                 for (const auto& f : job.file_list) {
-                                    files.push_back(f);
+                                    files.emplace_back(f);
                                 }
                             }
                         } else {
@@ -81,7 +81,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
                             if (!job.file_list.empty()) {
                                 archive_jobs.push_back(job);
                                 for (const auto& f : job.file_list) {
-                                    files.push_back(f);
+                                    files.emplace_back(f);
                                 }
                             }
                         }

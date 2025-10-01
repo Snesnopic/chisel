@@ -297,6 +297,15 @@ set(tiff-docs OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libtiff)
 
 
+FetchContent_Declare(
+        sqlite3
+        GIT_REPOSITORY https://github.com/sjinks/sqlite3-cmake.git
+        GIT_TAG        v3.50.2
+)
+
+FetchContent_MakeAvailable(sqlite3)
+
+
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -337,6 +346,10 @@ add_executable(monolith
         src/encoder/jxl_encoder.hpp
         src/encoder/tiff_encoder.cpp
         src/encoder/tiff_encoder.hpp
+        src/encoder/sqlite_encoder.cpp
+        src/encoder/sqlite_encoder.hpp
+        src/utils/encoder_registry.cpp
+        src/utils/encoder_registry.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -414,6 +427,7 @@ set(MONOLITH_LIBS
         jxl
         jxl_threads
         tiff
+        sqlite3
 )
 
 if(APPLE)

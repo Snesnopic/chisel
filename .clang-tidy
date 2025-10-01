@@ -1,7 +1,6 @@
 # Generated from CLion Inspection settings
 ---
 Checks: '-*,
-hicpp-*,
 misc-*,
 mpi-*,
 bugprone-*,

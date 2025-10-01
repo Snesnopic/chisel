@@ -26,7 +26,7 @@ public:
             std::bind(std::forward<F>(f), std::forward<Args>(args)...)
         );
         std::future<return_type> res = task->get_future(); {
-            std::unique_lock lock(queue_mutex_);
+            const std::unique_lock lock(queue_mutex_);
             if (stop_) {
                 Logger::log(LogLevel::ERROR, "ThreadPool error: enqueue on stopped ThreadPool", "ThreadPool");
                 throw std::runtime_error("enqueue on stopped ThreadPool");

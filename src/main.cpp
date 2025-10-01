@@ -11,15 +11,12 @@
 #include <format>
 #include "utils/file_type.hpp"
 #include "encoder/encoder.hpp"
-#include "encoder/flac_encoder.hpp"
-#include "encoder/png_encoder.hpp"
 #include <sys/ioctl.h>
 #include <string>
 #include <atomic>
 #include <mutex>
 #include <chrono>
 #include "cli/cli_parser.hpp"
-#include "encoder/jpeg_encoder.hpp"
 #include "report/report_generator.hpp"
 #include "utils/logger.hpp"
 #include "utils/thread_pool.hpp"
@@ -27,12 +24,8 @@
 #include "utils/file_scanner.hpp"
 #include <clocale>
 #include <random>
-#include "encoder/jxl_encoder.hpp"
-#include "encoder/pdf_encoder.hpp"
-#include "encoder/tiff_encoder.hpp"
-#include "encoder/wavpack_encoder.hpp"
-#include "encoder/webp_encoder.hpp"
-#include "encoder/zopflipng_encoder.hpp"
+#include "utils/encoder_registry.hpp"
+
 
 inline void init_utf8_locale() {
     std::setlocale(LC_CTYPE, "");
@@ -76,66 +69,7 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
 
-    // register encoders
-    using Factory = std::function<std::unique_ptr<IEncoder>()>;
-    std::unordered_map<std::string, std::vector<Factory> > factories;
-
-    factories["audio/flac"] = {
-        [settings] {
-            return std::make_unique<FlacEncoder>(settings.preserve_metadata);
-        }
-    };
-    factories["audio/x-flac"] = factories["audio/flac"];
-
-    factories["image/png"] = {
-        [settings] {
-            return std::make_unique<PngEncoder>(settings.preserve_metadata);
-        },
-        [settings] {
-            return std::make_unique<ZopfliPngEncoder>(settings.preserve_metadata);
-        }
-    };
-
-    factories["image/jpeg"] = {
-        [settings] {
-            return std::make_unique<JpegEncoder>(settings.preserve_metadata);
-        }
-    };
-    factories["image/jpg"] = factories["image/jpeg"];
-
-    factories["image/jxl"] = {
-        [settings] {
-            return std::make_unique<JXLEncoder>(settings.preserve_metadata);
-        }
-    };
-
-    factories["image/tiff"] = {
-        [settings] {
-            return std::make_unique<TiffEncoder>(settings.preserve_metadata);
-        }
-    };
-
-    factories["image/tiff-fx"] = factories["image/tiff"];
-
-    factories["audio/x-wavpack"] = {
-        [settings] {
-            return std::make_unique<WavpackEncoder>(settings.preserve_metadata);
-        }
-    };
-    factories["audio/x-wavpack-correction"] = factories["audio/x-wavpack"];
-
-    factories["image/webp"] = {
-        [settings] {
-            return std::make_unique<WebpEncoder>(settings.preserve_metadata);
-        }
-    };
-    factories["image/x-webp"] = factories["image/webp"];
-
-    factories["application/pdf"] = {
-        [settings] {
-            return std::make_unique<PdfEncoder>(settings.preserve_metadata);
-        }
-    };
+    auto factories = build_encoder_registry(settings.preserve_metadata);
 
     std::vector<fs::path> files;
     std::vector<ContainerJob> container_jobs;
@@ -246,7 +180,7 @@ int main(const int argc, char *argv[]) {
     // wait for all tasks to finish
     for (auto &f: futures) f.get();
 
-    // recreate extracted archives
+    // recreate extracted archives; recursion is handled inside these top level archives
     for (const auto &job: container_jobs) {
         ArchiveHandler archive_handler;
         archive_handler.finalize(job, settings);

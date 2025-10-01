@@ -57,7 +57,8 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
 
 inline std::optional<ContainerFormat> parse_container_format(const std::string &str) {
     std::string s = str;
-    std::ranges::transform(s, s.begin(), tolower);
+    std::ranges::transform(s, s.begin(),
+        [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
 
     if (s == "zip")  return ContainerFormat::Zip;
     if (s == "7z")   return ContainerFormat::SevenZip;

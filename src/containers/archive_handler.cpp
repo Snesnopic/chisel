@@ -329,9 +329,11 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
     return true;
 }
 
+
+
 bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const std::string& out_path, ContainerFormat fmt) {
 
-    struct archive* a = archive_write_new();
+    archive* a = archive_write_new();
     if (!a) return false;
 
     int r = ARCHIVE_OK;
@@ -339,21 +341,39 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
     switch (fmt) {
         case ContainerFormat::Zip:
             r = archive_write_set_format_zip(a);
+            if (r == ARCHIVE_OK) {
+                archive_write_set_filter_option(a, "deflate", "compression-level", "9");
+            }
             break;
         case ContainerFormat::Tar:
             r = archive_write_set_format_pax_restricted(a); // standard tar
             break;
         case ContainerFormat::GZip:
             r = archive_write_set_format_pax_restricted(a);
-            if (r == ARCHIVE_OK) r = archive_write_add_filter_gzip(a);
+            if (r == ARCHIVE_OK) {
+                r = archive_write_add_filter_gzip(a);
+                if (r == ARCHIVE_OK) {
+                    archive_write_set_filter_option(a, "gzip", "compression-level", "9");
+                }
+            }
             break;
         case ContainerFormat::BZip2:
             r = archive_write_set_format_pax_restricted(a);
-            if (r == ARCHIVE_OK) r = archive_write_add_filter_bzip2(a);
+            if (r == ARCHIVE_OK) {
+                r = archive_write_add_filter_bzip2(a);
+                if (r == ARCHIVE_OK) {
+                    archive_write_set_filter_option(a, "bzip2", "compression-level", "9");
+                }
+            }
             break;
         case ContainerFormat::Xz:
             r = archive_write_set_format_pax_restricted(a);
-            if (r == ARCHIVE_OK) r = archive_write_add_filter_xz(a);
+            if (r == ARCHIVE_OK) {
+                r = archive_write_add_filter_xz(a);
+                if (r == ARCHIVE_OK) {
+                    archive_write_set_filter_option(a, "xz", "compression-level", "9");
+                }
+            }
             break;
         default:
             Logger::log(LogLevel::ERROR, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveHandler");
@@ -386,10 +406,15 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
     buffer.resize(64 * 1024);
 
     const fs::path root(src_dir);
+
+    // map to track hardlinks by (dev, ino)
+    std::unordered_map<std::pair<uintmax_t,uintmax_t>, std::string, pair_hash> hardlink_map;
+
     for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
         const fs::path p = it->path();
         const bool is_dir = fs::is_directory(p, ec);
         const bool is_reg = fs::is_regular_file(p, ec);
+        const bool is_symlink = fs::is_symlink(p, ec); // added: detect symlink
 
         archive_entry* entry = archive_entry_new();
         if (!entry) {
@@ -404,7 +429,6 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         if (rel.empty()) rel = p.filename().generic_string();
         archive_entry_set_pathname(entry, rel.c_str());
 
-        // type and perms
         if (is_dir) {
             archive_entry_set_filetype(entry, AE_IFDIR);
             archive_entry_set_perm(entry, 0755);
@@ -414,8 +438,28 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             std::uintmax_t fsize = fs::file_size(p, ec);
             if (ec) fsize = 0;
             archive_entry_set_size(entry, static_cast<la_int64_t>(fsize));
+
+            // check for hardlink
+            struct stat st{};
+            if (stat(p.c_str(), &st) == 0 && st.st_nlink > 1) {
+                auto key = std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
+                auto it_hl = hardlink_map.find(key);
+                if (it_hl != hardlink_map.end()) {
+                    archive_entry_set_hardlink(entry, it_hl->second.c_str());
+                    archive_entry_set_size(entry, 0); // no data written
+                } else {
+                    hardlink_map[key] = rel;
+                }
+            }
+        } else if (is_symlink) {
+            // handle symlink
+            archive_entry_set_filetype(entry, AE_IFLNK);
+            archive_entry_set_perm(entry, 0777);
+            auto target = fs::read_symlink(p, ec);
+            if (!ec) {
+                archive_entry_set_symlink(entry, target.string().c_str());
+            }
         } else {
-            // skip symlink/specials (TODO: extend this!)
             archive_entry_free(entry);
             continue;
         }
@@ -435,25 +479,28 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
         // write file contents
         if (is_reg) {
-            std::ifstream ifs(p, std::ios::binary);
-            if (!ifs) {
-                Logger::log(LogLevel::ERROR, "Can't open file for reading: " + p.string(), "ArchiveHandler");
-                archive_entry_free(entry);
-                archive_write_close(a);
-                archive_write_free(a);
-                return false;
-            }
-            while (ifs) {
-                ifs.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-                std::streamsize got = ifs.gcount();
-                if (got > 0) {
-                    la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<size_t>(got));
-                    if (wrote < 0) {
-                        Logger::log(LogLevel::ERROR, "archive_write_data: " + std::string(archive_error_string(a)), "ArchiveHandler");
-                        archive_entry_free(entry);
-                        archive_write_close(a);
-                        archive_write_free(a);
-                        return false;
+            bool skip_data = (archive_entry_hardlink(entry) != nullptr); // skip data if hardlink
+            if (!skip_data) {
+                std::ifstream ifs(p, std::ios::binary);
+                if (!ifs) {
+                    Logger::log(LogLevel::ERROR, "Can't open file for reading: " + p.string(), "ArchiveHandler");
+                    archive_entry_free(entry);
+                    archive_write_close(a);
+                    archive_write_free(a);
+                    return false;
+                }
+                while (ifs) {
+                    ifs.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                    std::streamsize got = ifs.gcount();
+                    if (got > 0) {
+                        la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<size_t>(got));
+                        if (wrote < 0) {
+                            Logger::log(LogLevel::ERROR, "archive_write_data: " + std::string(archive_error_string(a)), "ArchiveHandler");
+                            archive_entry_free(entry);
+                            archive_write_close(a);
+                            archive_write_free(a);
+                            return false;
+                        }
                     }
                 }
             }

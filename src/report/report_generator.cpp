@@ -29,7 +29,7 @@ static unsigned get_terminal_width() {
         return csbi.srWindow.Right - csbi.srWindow.Left + 1;
     return 80;
 #else
-    winsize w;
+    winsize w{};
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
         return w.ws_col;
     return 80;

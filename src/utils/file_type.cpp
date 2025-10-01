@@ -3,10 +3,8 @@
 //
 
 #include "file_type.hpp"
-
 #include <filesystem>
 #include <magic.h>
-#include <iostream>
 #include "logger.hpp"
 
 std::string detect_mime_type(const std::string &filename) {
@@ -46,7 +44,7 @@ bool is_mpeg1_layer3_libmagic(const std::filesystem::path& path) {
     const char* desc = magic_file(magic, path.string().c_str());
     bool ok = false;
     if (desc) {
-        std::string s(desc);
+        const std::string s(desc);
 
         if (s.find("MPEG") != std::string::npos &&
             s.find("layer III") != std::string::npos &&

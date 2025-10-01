@@ -32,7 +32,7 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         opts.num_iterations_large = 5;
 
         if (preserve_metadata_) {
-            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "exif"};
+            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf"};
         } else {
             opts.keepchunks.clear();
         }
@@ -43,8 +43,12 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
             Logger::log(LogLevel::ERROR, "Failed to open input file", "ZopfliPngEncoder");
             return false;
         }
-        const std::vector<unsigned char> origpng((std::istreambuf_iterator<char>(ifs)),
-                                           std::istreambuf_iterator<char>());
+        auto size = fs::file_size(input);
+        std::vector<unsigned char> origpng;
+        origpng.reserve(size);
+        origpng.assign((std::istreambuf_iterator<char>(ifs)),
+                       std::istreambuf_iterator<char>());
+
 
         // optimize
         std::vector<unsigned char> resultpng;
