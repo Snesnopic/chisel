@@ -77,7 +77,11 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
     };
 
     flag_map["-o"] = [&](int &i, char **args) {
-        settings.output_csv = args[++i];
+        std::string out = args[++i];
+        if (out == "-") {
+            throw std::runtime_error("'-' is not allowed as output CSV (only files are supported).");
+        }
+        settings.output_csv = out;
     };
     flag_map["--output-csv"] = flag_map["-o"];
 

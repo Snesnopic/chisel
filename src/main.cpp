@@ -103,6 +103,10 @@ int main(const int argc, char *argv[]) {
     collect_inputs(settings.inputs, settings.recursive, files, container_jobs, settings);
 
     if (settings.is_pipe) {
+        if (settings.dry_run) {
+            std::cerr<<"Can't use dry run mode with pipe inputs!";
+            return 1;
+        }
         Logger::set_level(LogLevel::ERROR);
     }
 
@@ -181,9 +185,17 @@ int main(const int argc, char *argv[]) {
                     } catch (const std::exception &e) {
                         fs::remove(tmp);
                         error_msg = e.what();
+                        if (settings.is_pipe) {
+                            std::cerr << e.what() << std::endl;
+                            return 1;
+                        }
                     } catch (...) {
                         fs::remove(tmp);
                         error_msg = "Unknown error";
+                        if (settings.is_pipe) {
+                            std::cerr << "Unknown error" << std::endl;
+                            return 1;
+                        }
                     }
                 }
 
@@ -262,18 +274,19 @@ int main(const int argc, char *argv[]) {
         ArchiveHandler archive_handler;
         archive_handler.finalize(job, settings);
     }
-
-    std::cout << "\n";
+    if (!settings.is_pipe) {
+        std::cout << "\n";
+    }
     auto end_total = std::chrono::steady_clock::now();
     const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
 
-    if (!settings.is_pipe) {
         if (!settings.output_csv.empty()) {
             export_csv_report(results, settings.output_csv);
         } else {
-            print_console_report(results, settings.num_threads, total_seconds);
+            if (!settings.is_pipe) {
+                print_console_report(results, settings.num_threads, total_seconds);
+            }
         }
-    }
 
     return 0;
 }
