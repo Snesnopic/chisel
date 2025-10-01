@@ -100,6 +100,7 @@ Currently implemented:
 - **PNG** (lossless recompression via zlib/Deflate)
 - **FLAC** (lossless audio recompression)
 - **PDF** (via qpdf)
+- **TIFF** (via libtiff)
 - **Archive formats** (ZIP, TAR, 7z, etc. via libarchive)
 
 Planned:

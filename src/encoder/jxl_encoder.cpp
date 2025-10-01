@@ -1,5 +1,5 @@
 //
-// jxl_encoder.cpp
+// Created by Giuseppe Francione on 30/09/25.
 //
 
 #include "jxl_encoder.hpp"

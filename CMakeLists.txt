@@ -282,6 +282,21 @@ set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libjxl)
 
+# libtiff
+FetchContent_Declare(
+        libtiff
+        GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
+        GIT_TAG v4.7.0
+)
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(tiff-tools OFF CACHE BOOL "" FORCE)
+set(tiff-tests OFF CACHE BOOL "" FORCE)
+set(tiff-docs OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(libtiff)
+
+
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -320,6 +335,8 @@ add_executable(monolith
         src/encoder/zopflipng_encoder.hpp
         src/encoder/jxl_encoder.cpp
         src/encoder/jxl_encoder.hpp
+        src/encoder/tiff_encoder.cpp
+        src/encoder/tiff_encoder.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -396,6 +413,7 @@ set(MONOLITH_LIBS
         libzopflipng
         jxl
         jxl_threads
+        tiff
 )
 
 if(APPLE)

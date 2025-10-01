@@ -29,6 +29,7 @@
 #include <random>
 #include "encoder/jxl_encoder.hpp"
 #include "encoder/pdf_encoder.hpp"
+#include "encoder/tiff_encoder.hpp"
 #include "encoder/wavpack_encoder.hpp"
 #include "encoder/webp_encoder.hpp"
 #include "encoder/zopflipng_encoder.hpp"
@@ -107,6 +108,14 @@ int main(const int argc, char *argv[]) {
             return std::make_unique<JXLEncoder>(settings.preserve_metadata);
         }
     };
+
+    factories["image/tiff"] = {
+        [settings] {
+            return std::make_unique<TiffEncoder>(settings.preserve_metadata);
+        }
+    };
+
+    factories["image/tiff-fx"] = factories["image/tiff"];
 
     factories["audio/x-wavpack"] = {
         [settings] {
