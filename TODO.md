@@ -76,13 +76,7 @@
 - [ ] MP3 – integrate 'mp3packer' for frame-level repacking.
 - [ ] Monkey's Audio (APE) – integrate 'MACLib' for recompression.
 
-## Database / Binaries
-
-- [ ] EXE/DLL/OCX/SYS – integrate 'UPX' for executable compression.
-- [ ] OBJ/A/LIB – integrate 'strip' from binutils to remove symbols.
-
 ## Other improvements
 
 - [ ] File hash cache to skip already processed files across runs.
-- [ ] More detailed progress bar (estimated time, average speed, per-file status).
 - [ ] Support for pipe/STDIN-STDOUT for shell pipelines and integration with other tools.

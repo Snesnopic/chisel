@@ -1,4 +1,3 @@
-//
 // Created by Giuseppe Francione on 18/09/25.
 //
 
@@ -100,9 +99,10 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "\r[" << 0 << "/" << files.size() << "] completed ("
-            << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
-            << std::flush;
+    auto now = std::chrono::steady_clock::now();
+    const auto start_total = std::chrono::steady_clock::now();
+    double elapsed = std::chrono::duration<double>(now - start_total).count();
+    print_progress_bar(0, files.size(), elapsed);
 
     std::ranges::sort(files,
                       [](const auto &a, const auto &b) {
@@ -120,7 +120,6 @@ int main(const int argc, char *argv[]) {
 
     std::vector<std::future<void> > futures;
     size_t total_files = files.size();
-    const auto start_total = std::chrono::steady_clock::now();
 
     futures.reserve(files.size());
     for (auto const &in_path: files) {
@@ -214,9 +213,9 @@ int main(const int argc, char *argv[]) {
                 static std::atomic<size_t> count{0};
                 const size_t done = ++count;
                 const std::scoped_lock lock1(print_mutex);
-                std::cout << "\r[" << done << "/" << total_files << "] completed ("
-                        << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
-                        << std::flush;
+                auto now = std::chrono::steady_clock::now();
+                double elapsed = std::chrono::duration<double>(now - start_total).count();
+                print_progress_bar(done, total_files, elapsed);
             }
         }));
     }
