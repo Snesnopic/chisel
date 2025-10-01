@@ -187,7 +187,6 @@ int main(const int argc, char *argv[]) {
                         error_msg = e.what();
                         if (settings.is_pipe) {
                             std::cerr << e.what() << std::endl;
-                            return 1;
                         }
                     } catch (...) {
                         fs::remove(tmp);
@@ -269,6 +268,10 @@ int main(const int argc, char *argv[]) {
     // wait for all tasks to finish
     for (auto &f: futures) f.get();
 
+    if (settings.is_pipe && !results[0].error_msg.empty()) {
+        std::cerr<<"Encoding returner error " + results[0].error_msg;
+        return 1;
+    }
     // recreate extracted archives; recursion is handled inside these top level archives
     for (const auto &job: container_jobs) {
         ArchiveHandler archive_handler;
