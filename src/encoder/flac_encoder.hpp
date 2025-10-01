@@ -16,6 +16,8 @@ public:
                     const std::filesystem::path &output) override;
 
     std::string mime_type() const override { return "audio/flac"; }
+
+    [[nodiscard]] std::string name() const override { return "FlacEncoder"; }
 };
 
 #endif //MONOLITH_FLAC_ENCODER_HPP

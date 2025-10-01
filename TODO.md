@@ -78,7 +78,6 @@
 
 ## Database / Binaries
 
-- [ ] SQLite – always run VACUUM to reduce file size.
 - [ ] EXE/DLL/OCX/SYS – integrate 'UPX' for executable compression.
 - [ ] OBJ/A/LIB – integrate 'strip' from binutils to remove symbols.
 
@@ -87,4 +86,3 @@
 - [ ] File hash cache to skip already processed files across runs.
 - [ ] More detailed progress bar (estimated time, average speed, per-file status).
 - [ ] Support for pipe/STDIN-STDOUT for shell pipelines and integration with other tools.
-- [ ] CSV report enhancements: include original size, recompressed size, codec used, metadata preserved.

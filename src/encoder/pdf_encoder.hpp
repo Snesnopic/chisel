@@ -17,6 +17,8 @@ public:
 
     std::string mime_type() const override { return "application/pdf"; }
 
+    [[nodiscard]] std::string name() const override { return "PdfEncoder"; }
+
 };
 
 #endif //MONOLITH_PDF_ENCODER_HPP

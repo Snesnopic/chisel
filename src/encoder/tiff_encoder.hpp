@@ -18,6 +18,8 @@ public:
 
     std::string mime_type() const override { return "image/tiff"; }
 
+    [[nodiscard]] std::string name() const override { return "TiffEncoder"; }
+
 };
 
 #endif // MONOLITH_TIFF_ENCODER_HPP

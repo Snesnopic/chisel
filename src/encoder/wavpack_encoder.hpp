@@ -20,6 +20,7 @@ public:
 
     std::string mime_type() const override { return "audio/x-wavpack"; }
 
+    [[nodiscard]] std::string name() const override { return "WavpackEncoder"; }
 };
 
 #endif //MONOLITH_WAVPACK_ENCODER_HPP

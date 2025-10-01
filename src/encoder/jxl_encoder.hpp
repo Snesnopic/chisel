@@ -17,6 +17,9 @@ public:
 
     std::string mime_type() const override { return "image/jxl"; }
 
+    [[nodiscard]] std::string name() const override { return "JXLEncoder"; }
+
+
 };
 
 #endif //MONOLITH_JXL_ENCODER_HPP

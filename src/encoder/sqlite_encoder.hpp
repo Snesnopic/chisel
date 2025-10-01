@@ -19,6 +19,9 @@ public:
 
     // returns supported mime
     std::string mime_type() const override { return "application/x-sqlite3"; }
+
+    [[nodiscard]] std::string name() const override { return "SqliteEncoder"; }
+
 };
 
 #endif //MONOLITH_SQLITE_ENCODER_HPP

@@ -10,13 +10,15 @@
 #include <filesystem>
 
 struct Result {
-    std::string filename;
-    std::string mime;
-    uintmax_t size_before{};
-    uintmax_t size_after{};
-    bool success{};
-    bool replaced{};
-    double seconds{};
+    std::string filename;       // full path or relative
+    std::string mime;           // detected mime
+    uintmax_t size_before{};    // original size in bytes
+    uintmax_t size_after{};     // recompressed size in bytes
+    bool success{};             // operation succeeded
+    bool replaced{};            // file was replaced or skipped
+    double seconds{};           // processing time
+    std::vector<std::pair<std::string,double>> codecs_used; // codec name + % reduction
+    std::string error_msg;      // if !success, reason of failure
 };
 
 void print_console_report(const std::vector<Result>& results,
@@ -25,5 +27,7 @@ void print_console_report(const std::vector<Result>& results,
 
 void export_csv_report(const std::vector<Result>& results,
                        const std::filesystem::path& output_path);
+
+unsigned get_terminal_width();
 
 #endif //MONOLITH_REPORT_GENERATOR_HPP

@@ -22,7 +22,7 @@ static bool is_stdout_a_tty() {
     return isatty(fileno(stdout)) != 0;
 }
 
-static unsigned get_terminal_width() {
+unsigned get_terminal_width() {
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
@@ -56,6 +56,7 @@ void print_console_report(const std::vector<Result>& results,
     size_t max_delta = 10;
     size_t max_time = 10;
     size_t max_result = 10;
+    size_t max_error = 5;
 
     for (const auto& r : results) {
         max_mime   = std::max(max_mime,   strip_ansi(r.mime).size());
@@ -76,12 +77,13 @@ void print_console_report(const std::vector<Result>& results,
             outcome = use_colors ? "\033[1;33mOK (skipped)\033[0m" : "OK (skipped)";
         }
         max_result  = std::max(max_result, strip_ansi(outcome).size());
+        max_error   = std::max(max_error, strip_ansi(r.error_msg).size());
     }
 
     unsigned fixed_cols_width = max_mime + max_before + max_after +
-                                 max_delta + max_time + max_result;
+                                 max_delta + max_time + max_result + max_error;
 
-    fixed_cols_width += 6;
+    fixed_cols_width += 7;
 
     const unsigned file_col_width = term_width > fixed_cols_width + 10
                                 ? term_width - fixed_cols_width
@@ -99,12 +101,13 @@ void print_console_report(const std::vector<Result>& results,
              + "{:<" + std::to_string(max_delta) + "}"
              + "{:<" + std::to_string(max_time) + "}"
              + "{:<" + std::to_string(max_result) + "}"
-             + "{}\n";
+             + "{:<" + std::to_string(max_error) + "}"
+             + "\n";
 
-std::cout << "\n" << std::vformat(fmt_str,
-    std::make_format_args(
-        "File", "MIME type", "Before(KB)", "After(KB)",
-        "Delta(%)", "Time(s)", "Result", "" ));
+    std::cout << "\n" << std::vformat(fmt_str,
+        std::make_format_args(
+            "File", "MIME type", "Before(KB)", "After(KB)",
+            "Delta(%)", "Time(s)", "Result", "Error" ));
 
     uintmax_t total_saved = 0;
     auto sorted = results;
@@ -118,7 +121,8 @@ std::cout << "\n" << std::vformat(fmt_str,
                  + "{:<" + std::to_string(max_delta) + "}"
                  + "{:<" + std::to_string(max_time) + "}"
                  + "{:<" + std::to_string(max_result) + "}"
-                 + "{}\n";
+                 + "{:<" + std::to_string(max_error) + "}"
+                 + "\n";
 
     for (const auto& r : sorted) {
         double pct = r.success && r.size_before
@@ -143,10 +147,8 @@ std::cout << "\n" << std::vformat(fmt_str,
                delta,
                r.seconds,
                outcome,
-               "" ));
+               r.error_msg ));
     }
-
-
     std::cout << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
     std::cout << "Total time: " << std::format("{:.2f}", total_seconds)
               << " s (" << num_threads << " thread"<< (num_threads > 1U ? "s" : "") << ")\n";
@@ -157,7 +159,8 @@ void export_csv_report(const std::vector<Result>& results,
     std::ofstream out(output_path);
     if (!out) return;
 
-    out << "File,MIME,Before(KB),After(KB),Delta(%),Time(s),Result\n";
+    out << "File,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,CodecsTried,Error\n";
+
     for (const auto& r : results) {
         const double pct = r.success && r.size_before
                          ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
@@ -165,12 +168,23 @@ void export_csv_report(const std::vector<Result>& results,
         const std::string outcome = !r.success ? "FAIL"
                                          : r.replaced ? "OK (replaced)"
                                                       : "OK (skipped)";
+
+        // flatten codecs_used into "codec1:xx%;codec2:yy%"
+        std::string codecs_str;
+        for (size_t i = 0; i < r.codecs_used.size(); ++i) {
+            codecs_str += r.codecs_used[i].first + ":" +
+                          std::format("{:.2f}%%", r.codecs_used[i].second);
+            if (i + 1 < r.codecs_used.size()) codecs_str += ";";
+        }
+
         out << '"' << r.filename << "\","
             << r.mime << ","
             << (r.size_before / 1024) << ","
             << (r.size_after / 1024) << ","
             << pct << ","
             << r.seconds << ","
-            << outcome << "\n";
+            << outcome << ","
+            << '"' << codecs_str << "\","
+            << '"' << r.error_msg << "\"\n";
     }
 }

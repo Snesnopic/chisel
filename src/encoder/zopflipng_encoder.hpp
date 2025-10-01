@@ -17,6 +17,8 @@ public:
 
     [[nodiscard]] std::string mime_type() const override { return "image/png"; }
 
+    [[nodiscard]] std::string name() const override { return "ZopfliPngEncoder"; }
+
 };
 
 #endif //MONOLITH_ZOPFLIPNG_ENCODER_HPP

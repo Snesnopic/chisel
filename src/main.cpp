@@ -26,6 +26,25 @@
 #include <random>
 #include "utils/encoder_registry.hpp"
 
+static void print_progress_bar(size_t done, size_t total, double elapsed_seconds) {
+    const unsigned term_width = get_terminal_width();
+    const int bar_width = std::max(10u, term_width > 40 ? term_width - 40 : 20);
+
+    double progress = total ? static_cast<double>(done) / total : 0.0;
+    int pos = static_cast<int>(bar_width * progress);
+
+    std::cout << "\r[";
+    for (int i = 0; i < bar_width; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] "
+              << std::format("{:3.0f}%", progress * 100.0)
+              << " (" << done << "/" << total << ")"
+              << " elapsed: " << std::format("{:.1f}s", elapsed_seconds)
+              << std::flush;
+}
 
 inline void init_utf8_locale() {
     std::setlocale(LC_CTYPE, "");
@@ -36,7 +55,7 @@ inline void init_utf8_locale() {
         return; // ok
     }
 
-    constexpr const char * const fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
+    constexpr const char *const fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
         if (std::setlocale(LC_CTYPE, fb)) {
             Logger::log(LogLevel::INFO, std::string("Locale set to ") + fb, "LocaleInit");
@@ -50,7 +69,7 @@ inline void init_utf8_locale() {
 
 namespace fs = std::filesystem;
 
-inline fs::path make_temp_path(const fs::path& stem, const std::string& ext) {
+inline fs::path make_temp_path(const fs::path &stem, const std::string &ext) {
     thread_local std::mt19937_64 rng{std::random_device{}()};
     thread_local std::uniform_int_distribution<unsigned long long> dist;
     return fs::temp_directory_path() /
@@ -82,8 +101,8 @@ int main(const int argc, char *argv[]) {
     }
 
     std::cout << "\r[" << 0 << "/" << files.size() << "] completed ("
-              << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
-              << std::flush;
+            << std::format("{:.1f}", 100.0 * 0 / files.size()) << "%)   "
+            << std::flush;
 
     std::ranges::sort(files,
                       [](const auto &a, const auto &b) {
@@ -103,6 +122,7 @@ int main(const int argc, char *argv[]) {
     size_t total_files = files.size();
     const auto start_total = std::chrono::steady_clock::now();
 
+    futures.reserve(files.size());
     for (auto const &in_path: files) {
         futures.push_back(pool.enqueue([&, in_path] {
             const auto start = std::chrono::steady_clock::now();
@@ -112,6 +132,10 @@ int main(const int argc, char *argv[]) {
             const uintmax_t sz_before = fs::file_size(in_path);
             uintmax_t sz_after_best = sz_before;
             bool ok_any = false, replaced = false;
+
+            // new fields
+            std::vector<std::pair<std::string, double> > codecs_used;
+            std::string error_msg;
 
             if (it != factories.end()) {
                 std::string best_tmp;
@@ -123,11 +147,15 @@ int main(const int argc, char *argv[]) {
                         const bool ok = enc->recompress(in_path, tmp.string());
                         if (ok && fs::exists(tmp)) {
                             const uintmax_t sz_after = fs::file_size(tmp);
+                            double pct = sz_before > 0
+                                             ? 100.0 * (1.0 - static_cast<double>(sz_after) / sz_before)
+                                             : 0.0;
+                            codecs_used.emplace_back(enc->name(), pct); // record codec + % reduction
+
                             Logger::log(LogLevel::DEBUG,
                                         "Encoder " + std::to_string(idx) + " → " + std::to_string(sz_after) + " bytes",
                                         "main");
                             if (sz_after < sz_after_best) {
-                                // remove previous best
                                 if (!best_tmp.empty()) fs::remove(best_tmp);
                                 sz_after_best = sz_after;
                                 best_tmp = tmp.string();
@@ -138,8 +166,12 @@ int main(const int argc, char *argv[]) {
                         } else {
                             fs::remove(tmp);
                         }
+                    } catch (const std::exception &e) {
+                        fs::remove(tmp);
+                        error_msg = e.what();
                     } catch (...) {
                         fs::remove(tmp);
+                        error_msg = "Unknown error";
                     }
                 }
 
@@ -153,26 +185,38 @@ int main(const int argc, char *argv[]) {
                                     "Failed to replace original with optimized file: " + std::string(e.what()),
                                     "main");
                         fs::remove(best_tmp);
+                        error_msg = e.what();
                     }
                 } else if (!best_tmp.empty()) {
                     fs::remove(best_tmp);
                 }
             } else {
                 Logger::log(LogLevel::WARNING, "No encoder for " + in_path.string() + " (" + mime + ")", "main");
+                error_msg = "no encoder available";
             }
 
             const auto end = std::chrono::steady_clock::now();
             const double seconds = std::chrono::duration<double>(end - start).count();
 
             const std::scoped_lock lock(results_mutex);
-            results.push_back({in_path.string(), mime, sz_before, sz_after_best, ok_any, replaced, seconds}); {
+            Result r;
+            r.filename = in_path.string();
+            r.mime = mime;
+            r.size_before = sz_before;
+            r.size_after = sz_after_best;
+            r.success = ok_any;
+            r.replaced = replaced;
+            r.seconds = seconds;
+            r.codecs_used = std::move(codecs_used);
+            r.error_msg = error_msg;
+            results.push_back(std::move(r)); {
                 static std::mutex print_mutex;
                 static std::atomic<size_t> count{0};
                 const size_t done = ++count;
                 const std::scoped_lock lock1(print_mutex);
                 std::cout << "\r[" << done << "/" << total_files << "] completed ("
-                          << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
-                          << std::flush;
+                        << std::format("{:.1f}", (100.0 * done / total_files)) << "%)   "
+                        << std::flush;
             }
         }));
     }

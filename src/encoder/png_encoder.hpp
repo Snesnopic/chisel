@@ -16,6 +16,9 @@ public:
                     const std::filesystem::path &output) override;
 
     std::string mime_type() const override { return "image/png"; }
+
+    [[nodiscard]] std::string name() const override { return "PngEncoder"; }
+
 };
 
 #endif //MONOLITH_PNG_ENCODER_HPP

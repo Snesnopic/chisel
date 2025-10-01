@@ -16,6 +16,9 @@ public:
                     const std::filesystem::path& output) override;
 
     std::string mime_type() const override { return "image/webp"; }
+
+    [[nodiscard]] std::string name() const override { return "WebpEncoder"; }
+
 };
 
 #endif //MONOLITH_WEBP_ENCODER_HPP
