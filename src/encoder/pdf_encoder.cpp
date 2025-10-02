@@ -13,10 +13,33 @@
 #include <string>
 #include <stdexcept>
 #include <memory>
+#include <qpdf/QPDFLogger.hh>
 #include "zopfli.h"
 #include "zlib_container.h"
 
 namespace fs = std::filesystem;
+// helper: custom streambuf to redirect qpdf messages into our logger
+struct LoggerStreamBuf : std::stringbuf {
+    LogLevel level;
+    std::string module;
+
+    LoggerStreamBuf(const LogLevel lvl, const char* mod): level(lvl), module(mod){}
+
+    // log immediately when the buffer is flushed
+    int sync() override {
+        std::string s = str();
+        if (!s.empty()) {
+            Logger::log(level, s, module);
+            str(""); // clear buffer after logging
+        }
+        return 0;
+    }
+
+    ~LoggerStreamBuf() override {
+        // flush any remaining content
+        LoggerStreamBuf::sync();
+    }
+};
 
 // helper: recompress data with zopfli (zlib container)
 static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input)
@@ -87,6 +110,16 @@ bool PdfEncoder::recompress(const fs::path& input,
 
     try {
         QPDF pdf;
+
+        // redirect qpdf warnings and errors into logger
+        LoggerStreamBuf warn_buf{LogLevel::WARNING, "PdfEncoder"};
+        LoggerStreamBuf err_buf{LogLevel::ERROR, "PdfEncoder"};
+        std::ostream warn_os(&warn_buf);
+        std::ostream err_os(&err_buf);
+        auto qlogger = QPDFLogger::create();
+        qlogger->setOutputStreams(&warn_os, &err_os);
+        pdf.setLogger(qlogger);
+
         pdf.processFile(input.string().c_str());
 
         if (!preserve_metadata_) {
