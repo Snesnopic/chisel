@@ -8,14 +8,14 @@
 #include <filesystem>
 #include "encoder.hpp"
 
-class JpegEncoder : public IEncoder {
+class JpegEncoder final : public IEncoder {
 public:
     explicit JpegEncoder(bool preserve_metadata = true);
 
     bool recompress(const std::filesystem::path &input,
                     const std::filesystem::path &output) override;
 
-    std::string mime_type() const override { return "image/jpeg"; }
+    [[nodiscard]] std::string mime_type() const override { return "image/jpeg"; }
 
     [[nodiscard]] std::string name() const override { return "JpegEncoder"; }
 

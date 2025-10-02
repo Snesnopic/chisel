@@ -54,21 +54,6 @@ void collect_inputs(const std::vector<fs::path>& inputs,
             if (lower != ".ds_store" && lower != "desktop.ini") {
                 auto mime = detect_mime_type(p.string());
 
-                // fallback: if MIME empty, octet-stream or unknown, try with extension
-                if (mime.empty() || mime == "application/octet-stream" ||
-                    (!mime_to_format.contains(mime) && ext_to_mime.contains(p.extension().string()))) {
-
-                    std::string ext = p.extension().string();
-                    std::ranges::transform(ext, ext.begin(), ::tolower);
-                    auto ext_it = ext_to_mime.find(ext);
-                    if (ext_it != ext_to_mime.end()) {
-                        Logger::log(LogLevel::DEBUG, "MIME fallback: " + p.string() +
-                                                     " detected as " + ext_it->second + " from extension " + ext, "file_scanner");
-                        mime = ext_it->second;
-                    }
-                }
-
-
                 // if it's a supported container
                 auto fmt_it = mime_to_format.find(mime);
                 if (fmt_it != mime_to_format.end()) {

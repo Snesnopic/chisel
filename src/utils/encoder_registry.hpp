@@ -12,8 +12,6 @@
 #include <unordered_map>
 #include <vector>
 
-
-
 using Factory = std::function<std::unique_ptr<IEncoder>()>;
 using EncoderRegistry = std::unordered_map<std::string, std::vector<Factory>>;
 

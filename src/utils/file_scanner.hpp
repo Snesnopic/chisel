@@ -8,7 +8,6 @@
 #include <vector>
 #include <filesystem>
 #include <random>
-
 #include "../containers/archive_handler.hpp"
 
 void collect_inputs(const std::vector<std::filesystem::path>& inputs,

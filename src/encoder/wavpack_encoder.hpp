@@ -11,14 +11,14 @@
 // wavpack forward declaration
 struct WavpackContext;
 
-class WavpackEncoder: public IEncoder {
+class WavpackEncoder final : public IEncoder {
 public:
     explicit WavpackEncoder(bool preserve_metadata = true);
 
     bool recompress(const std::filesystem::path& input,
                     const std::filesystem::path& output) override;
 
-    std::string mime_type() const override { return "audio/x-wavpack"; }
+    [[nodiscard]] std::string mime_type() const override { return "audio/x-wavpack"; }
 
     [[nodiscard]] std::string name() const override { return "WavpackEncoder"; }
 };

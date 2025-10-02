@@ -8,7 +8,7 @@
 #include "encoder.hpp"
 #include <filesystem>
 
-class ZopfliPngEncoder : public IEncoder {
+class ZopfliPngEncoder final : public IEncoder {
 public:
     explicit ZopfliPngEncoder(bool preserve_metadata = true);
 

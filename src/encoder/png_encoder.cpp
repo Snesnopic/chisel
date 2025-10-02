@@ -11,12 +11,12 @@
 #include <iostream>
 
 namespace {
-    void png_error_fn(png_structp, png_const_charp msg) {
+    void png_error_fn(png_structp, const png_const_charp msg) {
         Logger::log(LogLevel::ERROR, std::string("libpng: ") + msg, "libpng");
         throw std::runtime_error(msg);
     }
 
-    void png_warning_fn(png_structp, png_const_charp msg) {
+    void png_warning_fn(png_structp, const png_const_charp msg) {
         Logger::log(LogLevel::WARNING, std::string("libpng: ") + msg, "libpng");
     }
 
@@ -243,7 +243,7 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             analyze_row_rgba(rowbuf.data(), width, all_gray, all_opaque);
             if (!all_gray && !all_opaque) {
                 // no need to continue analyzing if both are already false
-                // but we still need to consume the image
+                // we still need to consume the image
             }
         }
 

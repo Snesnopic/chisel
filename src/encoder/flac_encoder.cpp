@@ -59,7 +59,7 @@ FlacEncoder::FlacEncoder(bool preserve_metadata) {
 
 bool FlacEncoder::recompress(const std::filesystem::path &input,
                              const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "Starting FLAC reencoding: " + input.string(), "flac_encoder");
+    Logger::log(LogLevel::INFO, "Starting FLAC re-encoding: " + input.string(), "flac_encoder");
 
     if (std::filesystem::exists(output)) {
         std::filesystem::remove(output);
@@ -191,6 +191,6 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
         free(metadata_blocks);
     }
 
-    Logger::log(LogLevel::INFO, "FLAC reencoding completed: " + output.string(), "flac_encoder");
+    Logger::log(LogLevel::INFO, "FLAC re-encoding completed: " + output.string(), "flac_encoder");
     return true;
 }

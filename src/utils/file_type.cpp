@@ -3,7 +3,10 @@
 //
 
 #include "file_type.hpp"
+
+#include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <magic.h>
 #include "logger.hpp"
 

@@ -9,14 +9,14 @@
 #include "encoder.hpp"
 
 // tiff encoder using libtiff
-class TiffEncoder : public IEncoder {
+class TiffEncoder final : public IEncoder {
 public:
     explicit TiffEncoder(bool preserve_metadata = false);
 
     bool recompress(const std::filesystem::path& input,
                     const std::filesystem::path& output) override;
 
-    std::string mime_type() const override { return "image/tiff"; }
+    [[nodiscard]] std::string mime_type() const override { return "image/tiff"; }
 
     [[nodiscard]] std::string name() const override { return "TiffEncoder"; }
 

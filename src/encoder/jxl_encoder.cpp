@@ -63,7 +63,7 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
     // decoded frames
     struct FrameData {
         std::vector<uint8_t> pixels;
-        JxlFrameHeader header;
+        JxlFrameHeader header{};
     };
     std::vector<FrameData> frames;
 

@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <string>
 
-class SqliteEncoder : public IEncoder {
+class SqliteEncoder final : public IEncoder {
 public:
     explicit SqliteEncoder(bool preserve_metadata = true);
 
@@ -18,7 +18,7 @@ public:
                     const std::filesystem::path &output) override;
 
     // returns supported mime
-    std::string mime_type() const override { return "application/x-sqlite3"; }
+    [[nodiscard]] std::string mime_type() const override { return "application/x-sqlite3"; }
 
     [[nodiscard]] std::string name() const override { return "SqliteEncoder"; }
 

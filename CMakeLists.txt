@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(monolith LANGUAGES C CXX)
+project(monolith VERSION 0.1 LANGUAGES C CXX)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
@@ -80,7 +80,7 @@ set(PNG_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
         libpng
         GIT_REPOSITORY https://github.com/glennrp/libpng.git
-        GIT_TAG        v1.6.43
+        GIT_TAG        v1.6.50
 )
 FetchContent_MakeAvailable(libpng)
 
@@ -88,7 +88,7 @@ FetchContent_MakeAvailable(libpng)
 FetchContent_Declare(
         libogg
         GIT_REPOSITORY https://github.com/xiph/ogg.git
-        GIT_TAG        v1.3.5
+        GIT_TAG        v1.3.6
 )
 FetchContent_MakeAvailable(libogg)
 
@@ -100,7 +100,7 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
         libflac
         GIT_REPOSITORY https://github.com/xiph/flac.git
-        GIT_TAG        1.4.3
+        GIT_TAG        1.5.0
 )
 FetchContent_MakeAvailable(libflac)
 if(TARGET man)
@@ -286,7 +286,7 @@ FetchContent_MakeAvailable(libjxl)
 FetchContent_Declare(
         libtiff
         GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
-        GIT_TAG v4.7.0
+        GIT_TAG v4.7.1
 )
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)

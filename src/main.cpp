@@ -24,7 +24,6 @@
 #include "utils/file_scanner.hpp"
 #include <clocale>
 #include <fstream>
-#include <random>
 #include "utils/encoder_registry.hpp"
 #ifdef _WIN32
 #include <io.h>
@@ -33,10 +32,10 @@
 
 static void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
-    const int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
+    const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
-    double progress = total ? static_cast<double>(done) / total : 0.0;
-    int pos = static_cast<int>(bar_width * progress);
+    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
+    const int pos = static_cast<int>(bar_width * progress);
 
     std::cout << "\r[";
     for (int i = 0; i < bar_width; ++i) {
@@ -142,7 +141,18 @@ int main(const int argc, char *argv[]) {
     for (auto const &in_path: files) {
         futures.push_back(pool.enqueue([&, in_path] {
             const auto start = std::chrono::steady_clock::now();
-            const auto mime = detect_mime_type(in_path.string());
+            auto mime = detect_mime_type(in_path.string());
+            if (mime.empty() || mime =="application/octet-stream") {
+                std::string ext = in_path.extension().string();
+                std::ranges::transform(ext, ext.begin(), ::tolower);
+                auto ext_it = ext_to_mime.find(ext);
+                if (ext_it != ext_to_mime.end()) {
+                    Logger::log(LogLevel::DEBUG, "MIME fallback: " + in_path.string() +
+                                                 " detected as " + ext_it->second + " from extension " + ext,
+                                "file_scanner");
+                    mime = ext_it->second;
+                }
+            }
             const auto it = factories.find(mime);
 
             const uintmax_t sz_before = fs::file_size(in_path);
@@ -191,10 +201,6 @@ int main(const int argc, char *argv[]) {
                     } catch (...) {
                         fs::remove(tmp);
                         error_msg = "Unknown error";
-                        if (settings.is_pipe) {
-                            std::cerr << "Unknown error" << std::endl;
-                            return 1;
-                        }
                     }
                 }
 

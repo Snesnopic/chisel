@@ -17,14 +17,14 @@ public:
                             const std::filesystem::path &output) = 0;
 
     // returns supported MIME (es. "audio/flac")
-    virtual std::string mime_type() const = 0;
+    [[nodiscard]] virtual std::string mime_type() const = 0;
 
     // returns encoder name for logging purposes
-    virtual std::string name() const = 0;
+    [[nodiscard]] virtual std::string name() const = 0;
 
     // enables/disables metadata preservation
     virtual void set_preserve_metadata(const bool preserve) { preserve_metadata_ = preserve; }
-    virtual bool preserve_metadata() const { return preserve_metadata_; }
+    [[nodiscard]] virtual bool preserve_metadata() const { return preserve_metadata_; }
 
 protected:
     bool preserve_metadata_ = true;
