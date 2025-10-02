@@ -85,9 +85,9 @@ void print_console_report(const std::vector<Result>& results,
 
     fixed_cols_width += 7;
 
-    const unsigned file_col_width = term_width > fixed_cols_width + 10
+    const unsigned file_col_width = term_width > fixed_cols_width + 5
                                 ? term_width - fixed_cols_width
-                                : 20;
+                                : 10;
 
     auto truncate = [](const std::string& s, const size_t max_len) {
         return s.size() <= max_len ? s : s.substr(0, max_len - 3) + "...";
@@ -173,7 +173,7 @@ void export_csv_report(const std::vector<Result>& results,
         std::string codecs_str;
         for (size_t i = 0; i < r.codecs_used.size(); ++i) {
             codecs_str += r.codecs_used[i].first + ":" +
-                          std::format("{:.2f}%%", r.codecs_used[i].second);
+                          std::format("{:.2f}%", r.codecs_used[i].second);
             if (i + 1 < r.codecs_used.size()) codecs_str += ";";
         }
 

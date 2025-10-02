@@ -26,7 +26,7 @@ private:
 
     static const char *level_to_string(LogLevel level);
 
-    LogLevel level_ = LogLevel::INFO;
+    LogLevel level_ = LogLevel::ERROR;
     bool enabled_ = true;
     std::mutex mutex_;
 };
