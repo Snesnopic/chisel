@@ -11,7 +11,7 @@
 #include "../utils/archive_formats.hpp"
 #include "../cli/cli_parser.hpp"
 
-class ArchiveHandler: IContainer {
+class ArchiveHandler final : public IContainer {
 public:
     static void set_user_selected_format(const ContainerFormat fmt) {
         user_selected_format = fmt;

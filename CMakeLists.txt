@@ -7,12 +7,89 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
 endif()
 
 cmake_policy(SET CMP0069 NEW)
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 endif()
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+# ---------------- LTO detection and common flags (non-invasive) -------------
+include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
+
+option(MONOLITH_USE_THINLTO "Prefer -flto=thin when available" ON)
+
+set(MONOLITH_LTO_FLAG "")
+if(MONOLITH_USE_THINLTO)
+    check_c_compiler_flag("-flto=thin" MONOLITH_C_FLTO_THIN)
+    check_cxx_compiler_flag("-flto=thin" MONOLITH_CXX_FLTO_THIN)
+    if(MONOLITH_C_FLTO_THIN AND MONOLITH_CXX_FLTO_THIN)
+        set(MONOLITH_LTO_FLAG "-flto=thin")
+    endif()
+endif()
+
+if(MONOLITH_LTO_FLAG STREQUAL "")
+    check_c_compiler_flag("-flto" MONOLITH_C_FLTO)
+    check_cxx_compiler_flag("-flto" MONOLITH_CXX_FLTO)
+    if(MONOLITH_C_FLTO AND MONOLITH_CXX_FLTO)
+        set(MONOLITH_LTO_FLAG "-flto")
+    endif()
+endif()
+
+# check for linker plugin flag (helps with LTO)
+check_c_compiler_flag("-fuse-linker-plugin" MONOLITH_C_FUSE_PLUGIN)
+check_cxx_compiler_flag("-fuse-linker-plugin" MONOLITH_CXX_FUSE_PLUGIN)
+if(MONOLITH_C_FUSE_PLUGIN AND MONOLITH_CXX_FUSE_PLUGIN)
+    set(MONOLITH_FUSE_LINKER_PLUGIN_FLAG "-fuse-linker-plugin")
+else()
+    set(MONOLITH_FUSE_LINKER_PLUGIN_FLAG "")
+endif()
+
+# --- DEFINE FLAGS AS LISTS (not a single quoted string) ---------------------
+# use list form so add_compile_options expands to multiple args correctly
+set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
+
+# linker flags: platform-appropriate list
+if(APPLE)
+    # macOS linker: dead_strip removes unused code
+    set(MONOLITH_COMMON_LINK_FLAGS -Wl,-dead_strip)
+elseif(WIN32)
+    set(MONOLITH_COMMON_LINK_FLAGS) # empty on MSVC
+else()
+    set(MONOLITH_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed)
+endif()
+
+# end lists -----------------------------------------------------------------
+if(MONOLITH_LTO_FLAG)
+    message(STATUS "monolith: using LTO flag = ${MONOLITH_LTO_FLAG}")
+    # MONOLITH_LINK_FLAGS is a list too
+    set(MONOLITH_LINK_FLAGS ${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG} ${MONOLITH_COMMON_LINK_FLAGS})
+else()
+    message(STATUS "monolith: LTO not available on this compiler")
+    set(MONOLITH_LINK_FLAGS ${MONOLITH_COMMON_LINK_FLAGS})
+endif()
+
+# MONOLITH_PROPAGATE_* exclude -flto to avoid breaking subproject checks, keep lists
+set(MONOLITH_PROPAGATE_C_FLAGS ${MONOLITH_COMMON_OPT_FLAGS})
+set(MONOLITH_PROPAGATE_CXX_FLAGS ${MONOLITH_COMMON_OPT_FLAGS})
+set(MONOLITH_PROPAGATE_LINK_FLAGS ${MONOLITH_COMMON_LINK_FLAGS})
+
+# For cache variables we need a space-separated string: replace ';' with ' '
+string(REPLACE ";" " " MONOLITH_PROPAGATE_C_FLAGS_STR "${MONOLITH_PROPAGATE_C_FLAGS}")
+string(REPLACE ";" " " MONOLITH_PROPAGATE_CXX_FLAGS_STR "${MONOLITH_PROPAGATE_CXX_FLAGS}")
+string(REPLACE ";" " " MONOLITH_PROPAGATE_LINK_FLAGS_STR "${MONOLITH_PROPAGATE_LINK_FLAGS}")
+
+message(STATUS "monolith: propagate C flags (no-LTO) = ${MONOLITH_PROPAGATE_C_FLAGS_STR}")
+message(STATUS "monolith: propagate link flags (no-LTO) = ${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+
+# Prepare environment variables for autotools builds (ExternalProject)
+set(EXTERNAL_AUTOTOOLS_CFLAGS "${MONOLITH_PROPAGATE_C_FLAGS_STR}")
+set(EXTERNAL_AUTOTOOLS_CXXFLAGS "${MONOLITH_PROPAGATE_CXX_FLAGS_STR}")
+set(EXTERNAL_AUTOTOOLS_LDFLAGS "${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+# ---------------------------------------------------------------------------
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if (MSVC)
@@ -22,19 +99,57 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-fsanitize=address,undefined)
         add_link_options(-fsanitize=address,undefined)
     endif()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/debug)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/debug)
+
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
         add_compile_options(/O2 /GL /W4)
     else()
-        add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic)
+        # add list flags safely; MONOLITH_COMMON_OPT_FLAGS is a list and expands properly
+        add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
+        if(MONOLITH_LTO_FLAG)
+            add_compile_options(${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG})
+        endif()
+        # MONOLITH_LINK_FLAGS is a list
+        add_link_options(${MONOLITH_LINK_FLAGS})
     endif()
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/release)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/release)
+
+elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+    if (MSVC)
+        add_compile_options(/O1 /GL /W4)
+        add_link_options(/LTCG)
+    else()
+        add_compile_options(-Os -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
+        if(MONOLITH_LTO_FLAG)
+            add_compile_options(${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG})
+        endif()
+        add_link_options(${MONOLITH_LINK_FLAGS})
+    endif()
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/size)
 endif()
 
 include(FetchContent)
 include(ExternalProject)
+
+# Export propagated flags into CMake cache so FetchContent subprojects inherit them.
+# NOTE: we intentionally do NOT include -flto in these propagated strings to avoid
+# confusing subprojects' try_compile/try_run checks.
+set(_new_c_flags "${CMAKE_C_FLAGS} ${MONOLITH_PROPAGATE_C_FLAGS_STR}")
+set(_new_cxx_flags "${CMAKE_CXX_FLAGS} ${MONOLITH_PROPAGATE_CXX_FLAGS_STR}")
+set(_new_exe_linker_flags "${CMAKE_EXE_LINKER_FLAGS} ${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+
+if(NOT "${_new_c_flags}" STREQUAL "")
+    set(CMAKE_C_FLAGS "${_new_c_flags}" CACHE STRING "Propagated C flags for external projects" FORCE)
+endif()
+if(NOT "${_new_cxx_flags}" STREQUAL "")
+    set(CMAKE_CXX_FLAGS "${_new_cxx_flags}" CACHE STRING "Propagated CXX flags for external projects" FORCE)
+endif()
+if(NOT "${_new_exe_linker_flags}" STREQUAL "")
+    set(CMAKE_EXE_LINKER_FLAGS "${_new_exe_linker_flags}" CACHE STRING "Propagated linker flags for external projects" FORCE)
+endif()
 
 # libmagic
 if(WIN32)
@@ -53,6 +168,8 @@ else()
             BUILD_IN_SOURCE 1
             INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            # pass CFLAGS/CXXFLAGS/LDFLAGS so autotools builds see our propagated flags
+            CONFIGURE_ENV CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS} CXXFLAGS=${EXTERNAL_AUTOTOOLS_CXXFLAGS} LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}
     )
     set(LIBMAGIC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libmagic-install/include)
     set(LIBMAGIC_LIB_DIR ${CMAKE_BINARY_DIR}/libmagic-install/lib)
@@ -263,7 +380,6 @@ FetchContent_Declare(
         GIT_TAG master
 )
 FetchContent_MakeAvailable(zopfli)
-include(FetchContent)
 
 # JPEG XL
 FetchContent_Declare(
@@ -350,6 +466,12 @@ add_executable(monolith
         src/encoder/sqlite_encoder.hpp
         src/utils/encoder_registry.cpp
         src/utils/encoder_registry.hpp
+        src/containers/docx_handler.cpp
+        src/containers/docx_handler.hpp
+        src/containers/xlsx_handler.cpp
+        src/containers/xlsx_handler.hpp
+        src/containers/pptx_handler.cpp
+        src/containers/pptx_handler.hpp
 )
 
 target_include_directories(matroska PRIVATE
@@ -459,5 +581,8 @@ elseif(WIN32)
             avrt
     )
 endif()
+target_compile_features(monolith PRIVATE cxx_std_23)
 
 target_link_libraries(monolith PRIVATE ${MONOLITH_LIBS})
+
+# End of file

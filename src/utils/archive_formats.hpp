@@ -20,6 +20,9 @@ enum class ContainerFormat {
     Rar,
     Wim,
     Mkv,
+    Docx,
+    Xlsx,
+    Pptx,
     Unknown
 };
 
@@ -36,6 +39,9 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/x-rar-compressed", ContainerFormat::Rar },
     { "video/x-matroska",             ContainerFormat::Mkv },
     { "video/webm",                   ContainerFormat::Mkv },
+    { "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ContainerFormat::Docx },
+    { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",       ContainerFormat::Xlsx },
+    { "application/vnd.openxmlformats-officedocument.presentationml.presentation", ContainerFormat::Pptx },
     { "application/x-ms-wim",         ContainerFormat::Wim }
 };
 
@@ -51,25 +57,31 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Wim:      return "wim";
         case ContainerFormat::Mkv:      return "mkv";
         case ContainerFormat::Rar:      return "rar";
-        default:                      return "unknown";
+        case ContainerFormat::Docx:     return "docx";
+        case ContainerFormat::Xlsx:     return "xlsx";
+        case ContainerFormat::Pptx:     return "pptx";
+        default:                        return "unknown";
     }
 }
 
+// extension -> format
 inline std::optional<ContainerFormat> parse_container_format(const std::string &str) {
     std::string s = str;
     std::ranges::transform(s, s.begin(),
         [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
 
-    if (s == "zip")  return ContainerFormat::Zip;
-    if (s == "7z")   return ContainerFormat::SevenZip;
-    if (s == "tar")  return ContainerFormat::Tar;
-    if (s == "gz" || s == "gzip")   return ContainerFormat::GZip;
-    if (s == "bz2" || s == "bzip2") return ContainerFormat::BZip2;
-    if (s == "xz")   return ContainerFormat::Xz;
-    if (s == "wim")  return ContainerFormat::Wim;
-    if (s == "rar")  return ContainerFormat::Rar;
-    if (s == "mkv")  return ContainerFormat::Mkv;
-
+    if (s == "zip")   return ContainerFormat::Zip;
+    if (s == "7z")    return ContainerFormat::SevenZip;
+    if (s == "tar")   return ContainerFormat::Tar;
+    if (s == "gz" || s == "gzip")    return ContainerFormat::GZip;
+    if (s == "bz2" || s == "bzip2")  return ContainerFormat::BZip2;
+    if (s == "xz")    return ContainerFormat::Xz;
+    if (s == "wim")   return ContainerFormat::Wim;
+    if (s == "rar")   return ContainerFormat::Rar;
+    if (s == "mkv")   return ContainerFormat::Mkv;
+    if (s == "docx")  return ContainerFormat::Docx;
+    if (s == "xlsx")  return ContainerFormat::Xlsx;
+    if (s == "pptx")  return ContainerFormat::Pptx;
 
     return std::nullopt;
 }
@@ -88,6 +100,9 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::BZip2:
         case ContainerFormat::Xz:
         case ContainerFormat::Mkv:
+        case ContainerFormat::Docx:
+        case ContainerFormat::Xlsx:
+        case ContainerFormat::Pptx:
             return true;
         default:
             return false;
