@@ -234,12 +234,9 @@ set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
 set(ENABLE_CAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
 set(ENABLE_ZLIB ON CACHE BOOL "" FORCE)
-FetchContent_Declare(
-        libarchive
-        GIT_REPOSITORY https://github.com/libarchive/libarchive.git
-        GIT_TAG        v3.8.1
-)
-FetchContent_MakeAvailable(libarchive)
+set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
+set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
+add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR})
 
 # mozjpeg
 ExternalProject_Add(mozjpeg
@@ -363,12 +360,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(qpdf)
 
 # zopfli
-FetchContent_Declare(
-        zopfli
-        GIT_REPOSITORY https://github.com/google/zopfli.git
-        GIT_TAG master
-)
-FetchContent_MakeAvailable(zopfli)
+set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
+set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
+add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR})
+
 
 # JPEG XL
 FetchContent_Declare(
@@ -388,19 +383,13 @@ set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libjxl)
 
 # libtiff
-FetchContent_Declare(
-        libtiff
-        GIT_REPOSITORY https://gitlab.com/libtiff/libtiff.git
-        GIT_TAG v4.7.1
-)
-
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(tiff-tools OFF CACHE BOOL "" FORCE)
 set(tiff-tests OFF CACHE BOOL "" FORCE)
 set(tiff-docs OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(libtiff)
-
+set(libtiff_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libtiff")
+set(libtiff_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libtiff-build")
+add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR})
 
 FetchContent_Declare(
         sqlite3

@@ -16,3 +16,12 @@
 [submodule "third_party/mozjpeg"]
 	path = third_party/mozjpeg
 	url = https://github.com/mozilla/mozjpeg.git
+[submodule "third_party/libarchive"]
+	path = third_party/libarchive
+	url = https://github.com/libarchive/libarchive.git
+[submodule "third_party/libtiff"]
+	path = third_party/libtiff
+	url = https://gitlab.com/libtiff/libtiff.git
+[submodule "third_party/zopfli"]
+	path = third_party/zopfli
+	url = https://github.com/google/zopfli.git
