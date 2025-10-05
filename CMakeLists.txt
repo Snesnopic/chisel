@@ -353,6 +353,8 @@ set(QPDF_BUILD_DOC OFF CACHE BOOL "Disable qpdf docs")
 set(QPDF_BUILD_FUZZ OFF CACHE BOOL "Disable qpdf fuzz targets")
 set(QPDF_INSTALL OFF CACHE BOOL "Disable qpdf install rules")
 set(SKIP_INSTALL_ALL ON CACHE BOOL "Skip all install rules")
+set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "Disable qpdf CMake package export")
+set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export")
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
 
 # zopfli
