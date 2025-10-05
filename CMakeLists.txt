@@ -194,12 +194,10 @@ endif()
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
 set(PNG_STATIC ON CACHE BOOL "" FORCE)
 set(PNG_TESTS OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-        libpng
-        GIT_REPOSITORY https://github.com/glennrp/libpng.git
-        GIT_TAG        v1.6.50
-)
-FetchContent_MakeAvailable(libpng)
+set(libpng_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libpng")
+set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
+
+add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR})
 
 # libogg
 FetchContent_Declare(
