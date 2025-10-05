@@ -215,18 +215,14 @@ if(TARGET man)
 endif()
 
 # wavpack
-FetchContent_Declare(
-        wavpack
-        GIT_REPOSITORY https://github.com/dbry/WavPack.git
-        GIT_TAG master
-)
-
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WAVPACK_BUILD_CLI OFF CACHE BOOL "Build command line programs" FORCE)
 set(WAVPACK_BUILD_DOCS OFF CACHE BOOL "Build documentation" FORCE)
 set(WAVPACK_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
+set(wavpack_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/wavpack")
+set(wavpack_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/wavpack-build")
 
-FetchContent_MakeAvailable(wavpack)
+add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR})
 
 # libarchive
 set(ENABLE_TAR OFF CACHE BOOL "" FORCE)
@@ -364,14 +360,7 @@ set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
 set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
 add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR})
 
-
-# JPEG XL
-FetchContent_Declare(
-        libjxl
-        GIT_REPOSITORY https://github.com/libjxl/libjxl.git
-        GIT_TAG v0.11.1
-)
-
+# libjxl
 set(JPEGXL_ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_DEVTOOLS OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_PLUGINS OFF CACHE BOOL "" FORCE)
@@ -379,8 +368,8 @@ set(JPEGXL_ENABLE_MANPAGES OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_BENCHMARK OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(libjxl)
+set(libjxl_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libjxl")
+set(libjxl_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libjxl-build")
 
 # libtiff
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -391,14 +380,11 @@ set(libtiff_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libtiff")
 set(libtiff_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libtiff-build")
 add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR})
 
-FetchContent_Declare(
-        sqlite3
-        GIT_REPOSITORY https://github.com/sjinks/sqlite3-cmake.git
-        GIT_TAG        v3.50.2
-)
+# sqlite3
+set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
+set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 
-FetchContent_MakeAvailable(sqlite3)
-
+add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR})
 
 # monolith
 add_executable(monolith
