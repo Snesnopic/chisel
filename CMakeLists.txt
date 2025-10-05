@@ -180,8 +180,9 @@ endif()
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
 
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
@@ -255,9 +256,7 @@ set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
 add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR})
 
-if(TARGET ebml AND NOT TARGET EBML::ebml)
-    add_library(EBML::ebml ALIAS ebml)
-endif()
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # libMatroska
 set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
@@ -266,7 +265,6 @@ set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
 add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
 
 # libwebp
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_DWEBP OFF CACHE BOOL "" FORCE)
@@ -274,6 +272,7 @@ set(WEBP_BUILD_GIF2WEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_IMG2WEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_VWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -334,7 +333,12 @@ set_target_properties(ffmpeg_avutil PROPERTIES
 # qpdf
 set(qpdf_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/qpdf")
 set(qpdf_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/qpdf-build")
-add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(INSTALL_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_DOC OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(${qpdf_SOURCE_DIR}/include ${qpdf_BINARY_DIR}/include)
+add_subdirectory(${qpdf_SOURCE_DIR}/libqpdf ${qpdf_BINARY_DIR}/libqpdf)
 
 # zopfli
 set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
