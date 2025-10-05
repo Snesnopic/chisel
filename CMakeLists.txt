@@ -285,8 +285,7 @@ add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR})
 # ffmpeg
 set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
 ExternalProject_Add(ffmpeg
-        GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
-        GIT_TAG n7.1.2
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg
         PREFIX ${CMAKE_BINARY_DIR}/ffmpeg
         CONFIGURE_COMMAND ./configure
         --prefix=${FFMPEG_PREFIX}
