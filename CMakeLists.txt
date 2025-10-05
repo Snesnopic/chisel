@@ -347,7 +347,12 @@ set(qpdf_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/qpdf-build")
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(INSTALL_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_DOC OFF CACHE BOOL "" FORCE)
-
+set(QPDF_BUILD_TESTS OFF CACHE BOOL "Disable qpdf tests")
+set(QPDF_BUILD_EXAMPLES OFF CACHE BOOL "Disable qpdf examples")
+set(QPDF_BUILD_DOC OFF CACHE BOOL "Disable qpdf docs")
+set(QPDF_BUILD_FUZZ OFF CACHE BOOL "Disable qpdf fuzz targets")
+set(QPDF_INSTALL OFF CACHE BOOL "Disable qpdf install rules")
+set(SKIP_INSTALL_ALL ON CACHE BOOL "Skip all install rules")
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
 
 # zopfli
