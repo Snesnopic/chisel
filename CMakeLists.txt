@@ -333,18 +333,9 @@ set_target_properties(ffmpeg_avutil PROPERTIES
 )
 
 # qpdf
-set(QPDF_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(QPDF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(QPDF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(QPDF_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
-set(QPDF_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-
-FetchContent_Declare(
-        qpdf
-        GIT_REPOSITORY https://github.com/qpdf/qpdf.git
-        GIT_TAG main
-)
-FetchContent_MakeAvailable(qpdf)
+set(qpdf_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/qpdf")
+set(qpdf_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/qpdf-build")
+add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
 
 # zopfli
 set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
