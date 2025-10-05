@@ -389,6 +389,22 @@ set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR})
 
+# libmseed
+set(libmseed_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmseed")
+set(libmseed_BINARY_DIR "${CMAKE_BINARY_DIR}/libmseed-build")
+set(libmseed_INSTALL_DIR "${CMAKE_BINARY_DIR}/libmseed-install")
+
+ExternalProject_Add(libmseed
+        SOURCE_DIR ${libmseed_SOURCE_DIR}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND make
+        INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
+        BUILD_IN_SOURCE 1
+        BUILD_BYPRODUCTS ${libmseed_INSTALL_DIR}/lib/libmseed.a
+)
+
+
+
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -439,7 +455,12 @@ add_executable(monolith
         src/containers/xlsx_handler.hpp
         src/containers/pptx_handler.cpp
         src/containers/pptx_handler.hpp
+        src/encoder/mseed_encoder.cpp
+        src/encoder/mseed_encoder.hpp
 )
+
+add_dependencies(monolith libmseed)
+target_include_directories(monolith PRIVATE ${libmseed_SOURCE_DIR})
 
 target_include_directories(matroska PRIVATE
         ${libmatroska_BINARY_DIR}
@@ -501,6 +522,7 @@ set(MONOLITH_LIBS
         jpeg
         archive_static
         ogg
+        ${libmseed_SOURCE_DIR}/libmseed.a
         ${ZLIB_TARGET}
         ebml
         matroska

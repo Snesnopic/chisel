@@ -12,14 +12,9 @@
 
 - [ ] Abstract common logic across encoders.
 - [ ] Make encoder classes more MIME-aware.
-- [ ] Support pipeline mode: chaining multiple encoders per MIME (e.g. `PngEncoder → PngLibdeflateEncoder`) in addition to parallel mode.
-- [ ] Introduce a central `ReencoderDispatcher` to handle format/container/codec decisions.
+- [ ] Support pipeline mode: chaining multiple encoders per MIME in addition to parallel mode.
 - [ ] Normalize MIME detection and extension mapping.
-
-## PNG
-
-- [ ] Improve `PngEncoder` using optimized deflate (e.g. `zopfli`, `libdeflate`).
-- [ ] Add `PngLibdeflateEncoder` and compare output size vs. current encoder.
+- [ ] Begin support for using monolith as a library (public API, minimal dependencies).
 
 ## FLAC
 
@@ -52,10 +47,8 @@
 
 ## Archives
 
-- [ ] Handle symlinks, device files, and permissions when writing archives.
 - [ ] Implement CP437 fallback for ZIP with non-UTF-8 names if libarchive reports charset issues.
 - [ ] Limit extraction depth for nested archives to avoid infinite loops.
-- [ ] Add recompression fallback for unencodable formats (`--recompress-unencodable`).
 - [ ] Integrate multiple ZIP optimizers (`advzip`, `DeflOpt`, `ECT`, `zRecompress`) and select the best result.
 - [ ] Add support for 7Z recompression using 7zip SDK.
 - [ ] Add support for TAR.GZ recompression using zlib/libdeflate.
@@ -64,10 +57,10 @@
 
 - [ ] Preserve chapters, tags, and attachments (e.g. fonts, cover art).
 - [ ] Optional `mkclean` pass after remux for EBML optimization.
+- [ ] Finish Matroska container support (currently unfinished).
 
 ## Office / OpenDocument
 
-- [ ] DOCX/XLSX/PPTX – re-zip with `libzip` or `7zip`.
 - [ ] ODT/ODS/ODP – re-zip with `libzip` or `7zip`.
 - [ ] EPUB/CBZ/CBT – re-zip with `libzip` or `7zip`.
 
@@ -75,7 +68,18 @@
 
 - [ ] MP3 – integrate `mp3packer` for frame-level repacking.
 - [ ] Monkey's Audio (APE) – integrate `MACLib` for recompression.
+- [ ] Investigate additional lossless formats (e.g. ALAC, TAK, OptimFROG).
+- [ ] Investigate scientific formats (NetCDF, HDF5) for future integration.
+
+## Build / CI
+
+- [ ] Add GitHub Actions workflow for Linux and Windows builds.
+- [ ] Fix compilation issues on Linux and Windows (ensure reproducible builds).
+- [ ] Ensure all third-party libraries are linked statically.
+- [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
 
 ## Other improvements
 
 - [ ] File hash cache to skip already processed files across runs.
+- [ ] Investigate further metadata preservation strategies across all formats.
+- [ ] Improve logging granularity and structured output for CI integration.

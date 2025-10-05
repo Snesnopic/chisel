@@ -5,6 +5,7 @@
 #include "../encoder/zopflipng_encoder.hpp"
 #include "../encoder/jpeg_encoder.hpp"
 #include "../encoder/jxl_encoder.hpp"
+#include "../encoder/mseed_encoder.hpp"
 #include "../encoder/sqlite_encoder.hpp"
 #include "../encoder/tiff_encoder.hpp"
 #include "../encoder/wavpack_encoder.hpp"
@@ -56,5 +57,8 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
         [preserve_metadata] { return std::make_unique<PdfEncoder>(preserve_metadata); }
     };
 
+    factories["application/vnd.fdsn.mseed"] = {
+        [preserve_metadata] { return std::make_unique<MseedEncoder>(preserve_metadata); }
+    };
     return factories;
 }

@@ -49,7 +49,6 @@ Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available i
 ## Building monolith
 
 ### Linux / macOS
-
 ```bash
 mkdir build && cd build
 cmake ..
@@ -57,11 +56,11 @@ make
 ```
 
 ### Windows
-
 ```bash
 cmake -B build -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake ..
 cmake --build build
 ```
+
 ---
 
 ## Usage
@@ -115,7 +114,7 @@ Currently implemented:
 
 - **PNG**
   - MIME: image/png
-  - Lossless recompression via zlib/Deflate
+  - Lossless recompression via zlib/Deflate and zopflipng
 
 - **TIFF**
   - MIME: image/tiff
@@ -129,9 +128,13 @@ Currently implemented:
   - MIME: audio/flac
   - Lossless audio recompression
 
-- **WAVPACK**
+- **WavPack**
   - MIME: audio/x-wavpack
   - Lossless audio recompression via wavpack
+
+- **SQLite**
+  - MIME: application/vnd.sqlite3
+  - Vacuum and page reordering for compactness
 
 - **Archive formats** (via libarchive):
   - application/zip (.zip)
@@ -147,10 +150,24 @@ Currently implemented:
   - application/vnd.ms-cab-compressed (.cab)
   - application/x-ms-wim (.wim)
 
-Planned:
-- Additional image formats (HEIC/HEIF, AVIF)
-- Additional audio formats (MP3, AAC, Ogg Vorbis)
-- Video containers (MKV/Matroska, MP4) via FFmpeg
-- Extended archive support and metadata preservation
+- **Matroska containers (unfinished)**
+  - MIME: video/x-matroska, audio/x-matroska
+  - Structural optimization via libebml/libmatroska
+
+- **Microsoft Office OpenXML containers**
+  - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
+  - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx)
+  - application/vnd.openxmlformats-officedocument.presentationml.presentation (.pptx)
+
+- **MSEED files**
+  - application/vnd.fdsn.mseed (.mseed)
 
 ---
+
+## Planned
+
+- Additional image formats (HEIC/HEIF, AVIF)
+- Additional audio formats (AAC, Ogg Vorbis, MP3)
+- Finish Matroska container support
+- Extended archive support and metadata preservation
+- Advanced recompression for scientific data (NetCDF, HDF5)
