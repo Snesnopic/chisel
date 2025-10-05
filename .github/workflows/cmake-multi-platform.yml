@@ -53,13 +53,13 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           ninja-build pkg-config autoconf automake libtool \
-          libjpeg-dev libssl-dev zlib1g-dev
+          libjpeg-dev libssl-dev zlib1g-dev libpng-dev
 
     # ---------------- macOS deps ----------------
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
-        brew install ninja pkg-config autoconf automake libtool jpeg openssl
+        brew install ninja pkg-config autoconf automake libtool jpeg openssl qpdf
 
     - name: Set OpenSSL path (macOS)
       if: runner.os == 'macOS'
@@ -79,7 +79,8 @@ jobs:
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DINSTALL_MANPAGES=OFF
         -DREQUIRE_CRYPTO_OPENSSL=ON
-        -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}
+        ${OPENSSL_ROOT_DIR:+-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR}
+        -DCMAKE_PREFIX_PATH=${{ steps.strings.outputs.build-output-dir }}/third_party/qpdf-build
         -S ${{ github.workspace }}
 
     - name: Build
