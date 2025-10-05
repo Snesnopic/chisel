@@ -177,18 +177,11 @@ else()
 endif()
 
 # zlib
-FetchContent_Declare(
-        zlib
-        GIT_REPOSITORY https://github.com/madler/zlib.git
-        GIT_TAG        v1.3.1
-)
-FetchContent_MakeAvailable(zlib)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
+set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
 
-if(TARGET zlibstatic)
-    set(ZLIB_TARGET zlibstatic)
-elseif(TARGET zlib)
-    set(ZLIB_TARGET zlib)
-endif()
 
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
@@ -200,24 +193,23 @@ set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
 add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR})
 
 # libogg
-FetchContent_Declare(
-        libogg
-        GIT_REPOSITORY https://github.com/xiph/ogg.git
-        GIT_TAG        v1.3.6
-)
-FetchContent_MakeAvailable(libogg)
+set(libogg_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libogg")
+set(libogg_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libogg-build")
+
+add_subdirectory(${libogg_SOURCE_DIR} ${libogg_BINARY_DIR})
 
 # libFLAC
 set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-        libflac
-        GIT_REPOSITORY https://github.com/xiph/flac.git
-        GIT_TAG        1.5.0
-)
-FetchContent_MakeAvailable(libflac)
+
+set(libflac_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libflac")
+set(libflac_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libflac-build")
+
+add_subdirectory(${libflac_SOURCE_DIR} ${libflac_BINARY_DIR})
+
+# If the lib provides a 'man' target we exclude it from all (same semantics as before)
 if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
@@ -251,8 +243,9 @@ FetchContent_MakeAvailable(libarchive)
 
 # mozjpeg
 ExternalProject_Add(mozjpeg
-        GIT_REPOSITORY https://github.com/mozilla/mozjpeg.git
-        GIT_TAG        v4.1.5
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/mozjpeg
+        SOURCE_SUBDIR .
+        PREFIX ${CMAKE_BINARY_DIR}/mozjpeg
         CMAKE_ARGS
         -DENABLE_SHARED=FALSE
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
@@ -289,11 +282,6 @@ if(NOT libmatroska_POPULATED)
 endif()
 
 # libwebp
-FetchContent_Declare(
-        libwebp
-        GIT_REPOSITORY https://chromium.googlesource.com/webm/libwebp
-        GIT_TAG main
-)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -306,8 +294,11 @@ set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(libwebp)
+set(libwebp_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libwebp")
+set(libwebp_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libwebp-build")
+add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR})
 
+# ffmpeg
 set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
 ExternalProject_Add(ffmpeg
         GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git

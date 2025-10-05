@@ -1,3 +1,18 @@
 [submodule "third_party/libpng"]
 	path = third_party/libpng
 	url = https://github.com/glennrp/libpng.git
+[submodule "third_party/zlib"]
+	path = third_party/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "third_party/libogg"]
+	path = third_party/libogg
+	url = https://github.com/xiph/ogg.git
+[submodule "third_party/libflac"]
+	path = third_party/libflac
+	url = https://github.com/xiph/flac.git
+[submodule "third_party/libwebp"]
+	path = third_party/libwebp
+	url = https://chromium.googlesource.com/webm/libwebp.git
+[submodule "third_party/mozjpeg"]
+	path = third_party/mozjpeg
+	url = https://github.com/mozilla/mozjpeg.git
