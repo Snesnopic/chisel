@@ -251,28 +251,19 @@ set(MOZJPEG_INCLUDE_DIR ${CMAKE_BINARY_DIR}/mozjpeg-install/include)
 set(MOZJPEG_LIB_DIR ${CMAKE_BINARY_DIR}/mozjpeg-install/lib)
 
 # libEBML
-FetchContent_Declare(
-        libebml
-        GIT_REPOSITORY https://github.com/Matroska-Org/libebml.git
-        GIT_TAG        release-1.4.5
-)
-FetchContent_MakeAvailable(libebml)
+set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
+set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
+add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR})
+
+if(TARGET ebml AND NOT TARGET EBML::ebml)
+    add_library(EBML::ebml ALIAS ebml)
+endif()
 
 # libMatroska
-FetchContent_Declare(
-        libmatroska
-        GIT_REPOSITORY https://github.com/Matroska-Org/libmatroska.git
-        GIT_TAG        release-1.7.1
-)
-FetchContent_GetProperties(libmatroska)
-if(NOT libmatroska_POPULATED)
-    FetchContent_Populate(libmatroska)
-    file(READ  "${libmatroska_SOURCE_DIR}/CMakeLists.txt" _lmkv_cmake)
-    string(REPLACE "find_package(EBML" "# find_package(EBML" _lmkv_cmake "${_lmkv_cmake}")
-    string(REPLACE "EBML::ebml" "ebml" _lmkv_cmake "${_lmkv_cmake}")
-    file(WRITE "${libmatroska_SOURCE_DIR}/CMakeLists.txt" "${_lmkv_cmake}")
-    add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
-endif()
+set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
+set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
+
+add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
 
 # libwebp
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
@@ -370,6 +361,7 @@ set(JPEGXL_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(libjxl_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libjxl")
 set(libjxl_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libjxl-build")
+add_subdirectory(${libjxl_SOURCE_DIR} ${libjxl_BINARY_DIR})
 
 # libtiff
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)

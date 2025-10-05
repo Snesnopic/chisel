@@ -34,3 +34,9 @@
 [submodule "third_party/wavpack"]
 	path = third_party/wavpack
 	url = https://github.com/dbry/WavPack.git
+[submodule "third_party/libebml"]
+	path = third_party/libebml
+	url = https://github.com/Matroska-Org/libebml.git
+[submodule "third_party/libmatroska"]
+	path = third_party/libmatroska
+	url = https://github.com/Matroska-Org/libmatroska.git
