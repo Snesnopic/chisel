@@ -342,6 +342,7 @@ set_target_properties(ffmpeg_avutil PROPERTIES
 )
 
 # qpdf
+add_definitions(-DSKIP_OS_SECURE_RANDOM)
 set(qpdf_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/qpdf")
 set(qpdf_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/qpdf-build")
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -353,6 +354,9 @@ set(QPDF_BUILD_DOC OFF CACHE BOOL "Disable qpdf docs")
 set(QPDF_BUILD_FUZZ OFF CACHE BOOL "Disable qpdf fuzz targets")
 set(QPDF_INSTALL OFF CACHE BOOL "Disable qpdf install rules")
 set(SKIP_INSTALL_ALL ON CACHE BOOL "Skip all install rules")
+set(QPDF_USE_CRYPTO_NATIVE ON CACHE BOOL "Use qpdf's built-in crypto")
+set(QPDF_USE_CRYPTO_OPENSSL OFF CACHE BOOL "Disable OpenSSL crypto")
+set(QPDF_USE_CRYPTO_GNUTLS OFF CACHE BOOL "Disable GnuTLS crypto")
 set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "Disable qpdf CMake package export")
 set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export")
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
@@ -457,6 +461,10 @@ add_executable(monolith
         src/containers/pptx_handler.hpp
         src/encoder/mseed_encoder.cpp
         src/encoder/mseed_encoder.hpp
+        src/containers/odf_handler.cpp
+        src/containers/odf_handler.hpp
+        src/containers/ooxml_handler.cpp
+        src/containers/ooxml_handler.hpp
 )
 
 add_dependencies(monolith libmseed)
