@@ -47,9 +47,6 @@
 
 ## Archives
 
-- [ ] Implement CP437 fallback for ZIP with non-UTF-8 names if libarchive reports charset issues.
-- [ ] Limit extraction depth for nested archives to avoid infinite loops.
-- [ ] Integrate multiple ZIP optimizers (`advzip`, `DeflOpt`, `ECT`, `zRecompress`) and select the best result.
 - [ ] Add support for 7Z recompression using 7zip SDK.
 - [ ] Add support for TAR.GZ recompression using zlib/libdeflate.
 
@@ -58,11 +55,6 @@
 - [ ] Preserve chapters, tags, and attachments (e.g. fonts, cover art).
 - [ ] Optional `mkclean` pass after remux for EBML optimization.
 - [ ] Finish Matroska container support (currently unfinished).
-
-## Office / OpenDocument
-
-- [ ] ODT/ODS/ODP – re-zip with `libzip` or `7zip`.
-- [ ] EPUB/CBZ/CBT – re-zip with `libzip` or `7zip`.
 
 ## New MIME types / Codecs
 

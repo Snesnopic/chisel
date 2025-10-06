@@ -59,7 +59,6 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          runVcpkgFormatString: 'install libmagic ffmpeg mozjpeg --triplet x64-windows'
           runVcpkgInstall: true
 
       # ---------------- Build ----------------

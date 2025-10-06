@@ -7,6 +7,9 @@
 #include <libmseed.h>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <limits>
+#include <cmath>
 
 MseedEncoder::MseedEncoder(const bool preserve_metadata) {
     preserve_metadata_ = preserve_metadata;
