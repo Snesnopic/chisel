@@ -16,6 +16,7 @@
 #include <system_error>
 #include <chrono>
 #include <random>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -40,7 +41,7 @@ std::string to_lower_copy(std::string s) {
 
 std::string rel_path_of(const fs::path& root, const fs::path& p) {
     const auto rel = fs::relative(p, root);
-    // Normalize to forward slashes for archives
+    // normalize to forward slashes for archives
     std::string s = rel.generic_string();
     return s.empty() ? p.filename().generic_string() : s;
 }
@@ -51,6 +52,71 @@ bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
     if (fs::exists(parent, ec)) return !ec;
     fs::create_directories(parent, ec);
     return !ec;
+}
+
+// simple natural comparator for filenames (numeric-aware)
+ bool natural_less_string(const std::string& sa, const std::string& sb) {
+    size_t i = 0, j = 0;
+    while (i < sa.size() && j < sb.size()) {
+        if (std::isdigit(static_cast<unsigned char>(sa[i])) && std::isdigit(static_cast<unsigned char>(sb[j]))) {
+            // parse numbers without leading zeros significance
+            size_t ia = i, jb = j;
+            while (ia < sa.size() && std::isdigit(static_cast<unsigned char>(sa[ia]))) ++ia;
+            while (jb < sb.size() && std::isdigit(static_cast<unsigned char>(sb[jb]))) ++jb;
+            std::string as = sa.substr(i, ia - i);
+            std::string bs = sb.substr(j, jb - j);
+            // remove leading zeros for numeric compare
+            auto strip_leading = [](const std::string &s)->std::string {
+                size_t k = 0;
+                while (k + 1 < s.size() && s[k] == '0') ++k;
+                return s.substr(k);
+            };
+            std::string as2 = strip_leading(as);
+            std::string bs2 = strip_leading(bs);
+            if (as2.size() != bs2.size()) return as2.size() < bs2.size();
+            if (as2 != bs2) return as2 < bs2;
+            // numbers equal, continue
+            i = ia; j = jb;
+        } else {
+            if (sa[i] != sb[j]) return sa[i] < sb[j];
+            ++i; ++j;
+        }
+    }
+    return sa.size() < sb.size();
+}
+
+ bool natural_less_path(const fs::path& a, const fs::path& b, const fs::path& root) {
+    const std::string sa = rel_path_of(root, a);
+    const std::string sb = rel_path_of(root, b);
+    return natural_less_string(sa, sb);
+}
+
+// sanitize a candidate archive entry path to avoid zip-slip
+ bool sanitize_archive_entry_path(const std::string& entry_name, const fs::path& dest_dir, fs::path& out_path) {
+    // reject empty or containing null
+    if (entry_name.empty()) return false;
+    if (entry_name.find('\0') != std::string::npos) return false;
+
+    // normalize slashes and drop any leading slashes
+    std::string s = entry_name;
+    for (auto& c : s) { if (c == '\\') c = '/'; }
+
+    // drop absolute path leading '/'
+    while (!s.empty() && s.front() == '/') s.erase(s.begin());
+
+    // create candidate and normalize
+    fs::path candidate = fs::path(dest_dir) / fs::path(s).relative_path();
+    auto normalized = candidate.lexically_normal();
+    auto base = fs::path(dest_dir).lexically_normal();
+
+    // ensure normalized starts with base
+    const auto ns = normalized.string();
+    const auto bs = base.string();
+    if (ns.size() < bs.size()) return false;
+    if (ns.compare(0, bs.size(), bs) != 0) return false;
+
+    out_path = normalized;
+    return true;
 }
 
 } // namespace
@@ -78,16 +144,17 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
         return job;
     }
 
-    // scan extracted files and identify nexted archives
+    // scan extracted files and identify nested archives
     for (auto& p : fs::recursive_directory_iterator(job.temp_dir)) {
-        if (!fs::is_regular_file(p.path())) continue;
-
-        ContainerFormat inner_fmt;
-        if (is_archive_file(p.path().string(), inner_fmt)) {
-            Logger::log(LogLevel::DEBUG, "Found nested archive: " + p.path().string(), "ArchiveHandler");
-            job.children.push_back(prepare(p.path().string()));
-        } else {
-            job.file_list.push_back(p.path().string());
+        std::error_code ec;
+        if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
+            ContainerFormat inner_fmt;
+            if (is_archive_file(p.path().string(), inner_fmt)) {
+                Logger::log(LogLevel::DEBUG, "Found nested archive: " + p.path().string(), "ArchiveHandler");
+                job.children.push_back(prepare(p.path().string()));
+            } else {
+                job.file_list.push_back(p.path().string());
+            }
         }
     }
 
@@ -224,11 +291,11 @@ ContainerFormat ArchiveHandler::detect_format(const std::string& path) {
         if (auto parsed = parse_container_format(ext)) {
             return *parsed;
         }
-        // double extension support
+        // double extension support: map tar.* to tar container
         const auto fname = to_lower_copy(fs::path(path).filename().string());
-        if (fname.ends_with(".tar.gz"))  return ContainerFormat::GZip;
-        if (fname.ends_with(".tar.bz2")) return ContainerFormat::BZip2;
-        if (fname.ends_with(".tar.xz"))  return ContainerFormat::Xz;
+        if (fname.ends_with(".tar.gz"))  return ContainerFormat::Tar;
+        if (fname.ends_with(".tar.bz2")) return ContainerFormat::Tar;
+        if (fname.ends_with(".tar.xz"))  return ContainerFormat::Tar;
     }
 
     return ContainerFormat::Unknown;
@@ -270,7 +337,14 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
             continue;
         }
 
-        fs::path out_path = fs::path(dest_dir) / fs::path(current).relative_path();
+        // sanitize path to avoid zip-slip
+        fs::path out_path;
+        if (!sanitize_archive_entry_path(current, dest_dir, out_path)) {
+            Logger::log(LogLevel::WARNING, "Skipping suspicious archive entry (path traversal): " + std::string(current), "ArchiveHandler");
+            archive_read_data_skip(a);
+            continue;
+        }
+
         if (!ensure_parent_dirs(out_path, ec)) {
             Logger::log(LogLevel::ERROR, "Can't create folder for: " + out_path.string(), "ArchiveHandler");
             archive_read_data_skip(a);
@@ -284,7 +358,30 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
             continue;
         }
 
-        // file
+        // file or symlink
+        // handle symlink entries explicitly if libarchive reports them
+        if (archive_entry_filetype(entry) == AE_IFLNK) {
+            const char* link_target = archive_entry_symlink(entry);
+            if (link_target && link_target[0]) {
+                std::error_code rc;
+                fs::create_directories(out_path.parent_path(), rc);
+                // create symlink (best-effort)
+                std::error_code sce;
+#if defined(_WIN32)
+                // on windows attempt to create symlink; may fail due to privileges
+                std::string tgt = link_target;
+                fs::path target_path = tgt;
+                std::error_code tmp_ec;
+                fs::create_symlink(target_path, out_path, tmp_ec);
+                (void)tmp_ec;
+#else
+                fs::create_symlink(fs::path(link_target), out_path, sce);
+#endif
+            }
+            archive_read_data_skip(a);
+            continue;
+        }
+
         std::ofstream ofs(out_path, std::ios::binary);
         if (!ofs) {
             Logger::log(LogLevel::ERROR, "Can't open file in write mode: " + out_path.string(), "ArchiveHandler");
@@ -401,7 +498,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             archive_write_set_format_option(a, "zip", "compression", "store");
 
             std::ifstream ifs(mimetype_path, std::ios::binary);
-            std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), {});
+            std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
             archive_entry* entry = archive_entry_new();
             archive_entry_set_pathname(entry, "mimetype");
@@ -438,14 +535,16 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
     std::vector<fs::path> files;
     for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
-        if (fs::is_regular_file(it->path(), ec)) {
+        std::error_code ec2;
+        // include regular files and symlinks (so symlinks are archived)
+        if (fs::is_regular_file(it->path(), ec2) || fs::is_symlink(it->path(), ec2)) {
             if (fmt == ContainerFormat::Epub && it->path().filename() == "mimetype") continue;
             files.push_back(it->path());
         }
     }
     if (fmt == ContainerFormat::Cbz || fmt == ContainerFormat::Cbt) {
         std::sort(files.begin(), files.end(), [&](const fs::path& a, const fs::path& b) {
-            return rel_path_of(root, a) < rel_path_of(root, b);
+            return natural_less_path(a, b, root);
         });
     }
 
@@ -462,7 +561,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             return false;
         }
 
-        // relative name in archive
+        // relative name in archive (forward slashes)
         std::string rel = rel_path_of(root, p);
         if (rel.empty()) rel = p.filename().generic_string();
         archive_entry_set_pathname(entry, rel.c_str());
