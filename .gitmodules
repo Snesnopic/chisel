@@ -42,7 +42,7 @@
 	url = https://github.com/Matroska-Org/libmatroska.git
 [submodule "third_party/qpdf"]
 	path = third_party/qpdf
-	url = https://github.com/qpdf/qpdf.git
+	url = https://github.com/Snesnopic/qpdf.git
 [submodule "third_party/ffmpeg"]
 	path = third_party/ffmpeg
 	url = https://github.com/FFmpeg/FFmpeg.git
