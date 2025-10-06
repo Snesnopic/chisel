@@ -11,6 +11,8 @@
 
 #include "../containers/mkv_handler.hpp"
 #include "../containers/docx_handler.hpp"
+#include "../containers/odf_handler.hpp"
+#include "../containers/ooxml_handler.hpp"
 #include "../containers/xlsx_handler.hpp"
 #include "../containers/pptx_handler.hpp"
 
@@ -19,11 +21,18 @@ namespace fs = std::filesystem;
 // static factory for handlers
 static std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
     switch (fmt) {
-        case ContainerFormat::Mkv:   return std::make_unique<MkvHandler>();
-        case ContainerFormat::Docx:  return std::make_unique<DocxHandler>();
-        case ContainerFormat::Xlsx:  return std::make_unique<XlsxHandler>();
-        case ContainerFormat::Pptx:  return std::make_unique<PptxHandler>();
-        default:                     return std::make_unique<ArchiveHandler>();
+        case ContainerFormat::Mkv:
+            return std::make_unique<MkvHandler>();
+        case ContainerFormat::Docx:
+        case ContainerFormat::Xlsx:
+        case ContainerFormat::Pptx:
+            return std::make_unique<OoxmlHandler>(fmt);
+        case ContainerFormat::Odt:
+        case ContainerFormat::Ods:
+        case ContainerFormat::Odp:
+            return std::make_unique<OdfHandler>(fmt);
+        default:
+            return std::make_unique<ArchiveHandler>();
     }
 }
 
