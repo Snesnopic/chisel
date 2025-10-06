@@ -45,7 +45,7 @@ bool MseedEncoder::recompress(const std::filesystem::path &input,
         msr->reclen = reclen;
 
         // write record(s) to output
-        const int rv = msr3_writemseed(msr, output.string().c_str(), 1, write_flags, verbose);
+        const int64_t rv = msr3_writemseed(msr, output.string().c_str(), 1, write_flags, verbose);
         if (rv < 0) {
             Logger::log(LogLevel::ERROR, "Error writing MiniSEED record", name());
             ms3_readmsr(&msr, nullptr, read_flags, 0); // cleanup
@@ -83,8 +83,8 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
         candidates.push_back(1 << e);
 
     // observed values (use msr when available)
-    uint64_t input_reclen = (msr && msr->reclen > 0) ? static_cast<uint64_t>(msr->reclen) : static_cast<uint64_t>(DEFAULT_RECLEN);
-    int64_t in_numsamples = (msr && msr->numsamples > 0) ? static_cast<int64_t>(msr->numsamples) : -1;
+    const uint64_t input_reclen = (msr && msr->reclen > 0) ? static_cast<uint64_t>(msr->reclen) : static_cast<uint64_t>(DEFAULT_RECLEN);
+    const int64_t in_numsamples = (msr && msr->numsamples > 0) ? static_cast<int64_t>(msr->numsamples) : -1;
     double observed_bps = -1.0; // bytes per sample (empirical)
     if (in_numsamples > 0) {
         observed_bps = static_cast<double>(input_reclen) / static_cast<double>(in_numsamples);
@@ -97,11 +97,11 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
 
     // rough estimate of header overhead inside a record (bytes)
     // choose a conservative estimate so we don't overpack records
-    const double header_estimate = 128.0;
+    constexpr double header_estimate = 128.0;
 
     // small empirical gain factor: larger records may compress slightly better
     // keep this modest to avoid overly favoring huge records
-    const double max_compression_gain = 0.05; // up to 5% bps reduction
+    constexpr double max_compression_gain = 0.05; // up to 5% bps reduction
 
     // reference reclen used to scale compression gain (input reclen)
     const double ref_reclen = static_cast<double>(input_reclen);
@@ -109,7 +109,7 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
     double best_cost = std::numeric_limits<double>::infinity();
     int best_reclen = candidates.front(); // default to smallest candidate
 
-    for (int reclen : candidates) {
+    for (const int reclen : candidates) {
         // compute a small, bounded gain if reclen > ref_reclen
         double reclen_ratio = static_cast<double>(reclen) / ref_reclen;
         double gain = 0.0;
@@ -122,7 +122,7 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
         }
 
         // estimate bytes-per-sample after gain
-        double est_bps = std::max(0.5, observed_bps * (1.0 - gain));
+        const double est_bps = std::max(0.5, observed_bps * (1.0 - gain));
 
         // usable payload bytes in this record
         double usable_bytes = static_cast<double>(reclen) - header_estimate;
@@ -136,7 +136,7 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
         if (samples_per_record < 1) samples_per_record = 1;
 
         // how many records needed to store sample_count
-        double records_needed = std::ceil(static_cast<double>(sample_count) / static_cast<double>(samples_per_record));
+        const double records_needed = std::ceil(static_cast<double>(sample_count) / static_cast<double>(samples_per_record));
         double total_bytes = records_needed * static_cast<double>(reclen);
 
         // penalize excessively long record durations (avoid hours-long records)

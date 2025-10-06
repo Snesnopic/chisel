@@ -26,7 +26,7 @@ public:
 
 private:
     // choose record length
-    int choose_reclen(const MS3Record *msr, size_t sample_count);
+    static int choose_reclen(const MS3Record *msr, size_t sample_count);
 };
 
 #endif // MONOLITH_MSEED_ENCODER_HPP
