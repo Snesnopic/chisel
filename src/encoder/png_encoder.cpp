@@ -418,7 +418,7 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
                     }
                 } else {
                     // rgba
-                    std::memcpy(dst, src, static_cast<size_t>(w2) * 4);
+                    memcpy(dst, src, static_cast<size_t>(w2) * 4);
                 }
 
                 // write row

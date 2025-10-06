@@ -59,8 +59,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgArguments: 'libmagic ffmpeg mozjpeg'
-          vcpkgTriplet: x64-windows
+          runVcpkgFormatString: install libmagic ffmpeg mozjpeg --triplet x64-windows
           runVcpkgInstall: true
 
       # ---------------- Build ----------------
@@ -72,6 +71,14 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
+          -DBUILD_TESTING=OFF
+          -DGENERATE_AUTO_JOB=OFF
+          -DQPDF_BUILD_TESTS=OFF
+          -DQPDF_BUILD_EXAMPLES=OFF
+          -DQPDF_BUILD_DOC=OFF
+          -DQPDF_BUILD_FUZZ=OFF
+          -DQPDF_INSTALL=OFF
+          -DSKIP_INSTALL_ALL=ON
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
