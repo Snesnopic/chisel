@@ -23,6 +23,12 @@ enum class ContainerFormat {
     Docx,
     Xlsx,
     Pptx,
+    Ods,
+    Odt,
+    Odp,
+    Epub,
+    Cbz,
+    Cbt,
     Unknown
 };
 
@@ -42,7 +48,13 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ContainerFormat::Docx },
     { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",       ContainerFormat::Xlsx },
     { "application/vnd.openxmlformats-officedocument.presentationml.presentation", ContainerFormat::Pptx },
-    { "application/x-ms-wim",         ContainerFormat::Wim }
+    { "application/vnd.oasis.opendocument.presentation", ContainerFormat::Odp },
+    { "application/vnd.oasis.opendocument.spreadsheet", ContainerFormat::Ods},
+    { "application/vnd.oasis.opendocument.text", ContainerFormat::Odt},
+    { "application/x-ms-wim",           ContainerFormat::Wim },
+    { "application/epub+zip",           ContainerFormat::Epub },
+    { "application/vnd.comicbook+zip",  ContainerFormat::Cbz },
+    { "application/vnd.comicbook+tar",  ContainerFormat::Cbt }
 };
 
 // format -> extension
@@ -60,6 +72,12 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Docx:     return "docx";
         case ContainerFormat::Xlsx:     return "xlsx";
         case ContainerFormat::Pptx:     return "pptx";
+        case ContainerFormat::Ods:      return "ods";
+        case ContainerFormat::Odt:      return "odt";
+        case ContainerFormat::Odp:      return "odp";
+        case ContainerFormat::Epub:    return "epub";
+        case ContainerFormat::Cbz:     return "cbz";
+        case ContainerFormat::Cbt:    return "cbt";
         default:                        return "unknown";
     }
 }
@@ -82,7 +100,12 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "docx")  return ContainerFormat::Docx;
     if (s == "xlsx")  return ContainerFormat::Xlsx;
     if (s == "pptx")  return ContainerFormat::Pptx;
-
+    if (s == "ods")   return ContainerFormat::Ods;
+    if (s == "odt")   return ContainerFormat::Odt;
+    if (s == "odp")   return ContainerFormat::Odp;
+    if (s == "epub")  return ContainerFormat::Epub;
+    if (s == "cbt")   return ContainerFormat::Cbt;
+    if (s == "cbz")   return ContainerFormat::Cbz;
     return std::nullopt;
 }
 
@@ -103,6 +126,12 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Docx:
         case ContainerFormat::Xlsx:
         case ContainerFormat::Pptx:
+        case ContainerFormat::Ods:
+        case ContainerFormat::Odt:
+        case ContainerFormat::Odp:
+        case ContainerFormat::Epub:
+        case ContainerFormat::Cbz:
+        case ContainerFormat::Cbt:
             return true;
         default:
             return false;

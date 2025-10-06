@@ -45,20 +45,6 @@ std::string rel_path_of(const fs::path& root, const fs::path& p) {
     return s.empty() ? p.filename().generic_string() : s;
 }
 
-std::string output_extension_for(const ContainerFormat fmt) {
-    switch (fmt) {
-        case ContainerFormat::Zip:      return ".zip";
-        case ContainerFormat::Tar:      return ".tar";
-        case ContainerFormat::GZip:     return ".tar.gz";  // implemented as tar + gzip filter
-        case ContainerFormat::BZip2:    return ".tar.bz2"; // tar + bzip2 filter
-        case ContainerFormat::Xz:       return ".tar.xz";  // tar + xz filter
-        case ContainerFormat::SevenZip: return ".7z";
-        case ContainerFormat::Wim:      return ".wim";
-        case ContainerFormat::Rar:      return ".rar";
-        default:                      return ".zip";
-    }
-}
-
 bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
     const auto parent = p.parent_path();
     if (parent.empty()) return true;
@@ -151,7 +137,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
     // build temp output path
     const fs::path src_path(job.original_path);
-    const std::string out_ext = output_extension_for(out_fmt);
+    const std::string out_ext = container_format_to_string(out_fmt);
 
     const fs::path tmp_archive = src_path.parent_path() /
                            (src_path.stem().string() + "_tmp" + out_ext);
@@ -332,7 +318,6 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
 
 
 bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const std::string& out_path, ContainerFormat fmt) {
-
     archive* a = archive_write_new();
     if (!a) return false;
 
@@ -340,13 +325,16 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
     switch (fmt) {
         case ContainerFormat::Zip:
+        case ContainerFormat::Epub:
+        case ContainerFormat::Cbz:
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
                 archive_write_set_filter_option(a, "deflate", "compression-level", "9");
             }
             break;
         case ContainerFormat::Tar:
-            r = archive_write_set_format_pax_restricted(a); // standard tar
+        case ContainerFormat::Cbt:
+            r = archive_write_set_format_pax_restricted(a);
             break;
         case ContainerFormat::GZip:
             r = archive_write_set_format_pax_restricted(a);
@@ -389,7 +377,6 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         return false;
     }
 
-    // open output file
     r = archive_write_open_filename(a, out_path.c_str());
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
@@ -400,21 +387,72 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         return false;
     }
 
-    // iterate source files recursively
     std::error_code ec;
     std::vector<char> buffer;
     buffer.resize(64 * 1024);
 
     const fs::path root(src_dir);
-
-    // map to track hardlinks by (dev, ino)
     std::unordered_map<std::pair<uintmax_t,uintmax_t>, std::string, pair_hash> hardlink_map;
 
+    if (fmt == ContainerFormat::Epub) {
+        fs::path mimetype_path = fs::path(src_dir) / "mimetype";
+        if (fs::exists(mimetype_path)) {
+            // force "store" for this entry
+            archive_write_set_format_option(a, "zip", "compression", "store");
+
+            std::ifstream ifs(mimetype_path, std::ios::binary);
+            std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), {});
+
+            archive_entry* entry = archive_entry_new();
+            archive_entry_set_pathname(entry, "mimetype");
+            archive_entry_set_size(entry, buf.size());
+            archive_entry_set_filetype(entry, AE_IFREG);
+            archive_entry_set_perm(entry, 0644);
+            archive_entry_set_mtime(entry, 0, 0);
+
+            int rh = archive_write_header(a, entry);
+            if (rh != ARCHIVE_OK && rh != ARCHIVE_WARN) {
+                Logger::log(LogLevel::ERROR, "archive_write_header (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
+                archive_entry_free(entry);
+                archive_write_close(a);
+                archive_write_free(a);
+                return false;
+            }
+            if (!buf.empty()) {
+                la_ssize_t wrote = archive_write_data(a, buf.data(), buf.size());
+                if (wrote < 0) {
+                    Logger::log(LogLevel::ERROR, "archive_write_data (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
+                    archive_entry_free(entry);
+                    archive_write_close(a);
+                    archive_write_free(a);
+                    return false;
+                }
+            }
+            archive_entry_free(entry);
+
+            // back to deflate for other entries
+            archive_write_set_format_option(a, "zip", "compression", "deflate");
+            archive_write_set_filter_option(a, "deflate", "compression-level", "9");
+        }
+    }
+
+    std::vector<fs::path> files;
     for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
-        const fs::path p = it->path();
+        if (fs::is_regular_file(it->path(), ec)) {
+            if (fmt == ContainerFormat::Epub && it->path().filename() == "mimetype") continue;
+            files.push_back(it->path());
+        }
+    }
+    if (fmt == ContainerFormat::Cbz || fmt == ContainerFormat::Cbt) {
+        std::sort(files.begin(), files.end(), [&](const fs::path& a, const fs::path& b) {
+            return rel_path_of(root, a) < rel_path_of(root, b);
+        });
+    }
+
+    for (const auto& p : files) {
         const bool is_dir = fs::is_directory(p, ec);
         const bool is_reg = fs::is_regular_file(p, ec);
-        const bool is_symlink = fs::is_symlink(p, ec); // added: detect symlink
+        const bool is_symlink = fs::is_symlink(p, ec); // detect symlink
 
         archive_entry* entry = archive_entry_new();
         if (!entry) {
@@ -509,7 +547,6 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         archive_entry_free(entry);
     }
 
-    // close archive
     archive_write_close(a);
     archive_write_free(a);
     return true;
