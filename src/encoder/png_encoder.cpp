@@ -7,6 +7,7 @@
 #include <png.h>
 #include <zlib.h>
 #include <vector>
+#include <cstring> // IDE may say it's unused, but it's lying to you
 #include <stdexcept>
 #include <iostream>
 
