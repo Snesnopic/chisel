@@ -457,12 +457,6 @@ add_executable(monolith
         src/encoder/sqlite_encoder.hpp
         src/utils/encoder_registry.cpp
         src/utils/encoder_registry.hpp
-        src/containers/docx_handler.cpp
-        src/containers/docx_handler.hpp
-        src/containers/xlsx_handler.cpp
-        src/containers/xlsx_handler.hpp
-        src/containers/pptx_handler.cpp
-        src/containers/pptx_handler.hpp
         src/encoder/mseed_encoder.cpp
         src/encoder/mseed_encoder.hpp
         src/containers/odf_handler.cpp

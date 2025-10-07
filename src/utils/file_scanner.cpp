@@ -8,13 +8,9 @@
 #include "logger.hpp"
 #include <algorithm>
 #include <fstream>
-
 #include "../containers/mkv_handler.hpp"
-#include "../containers/docx_handler.hpp"
 #include "../containers/odf_handler.hpp"
 #include "../containers/ooxml_handler.hpp"
-#include "../containers/xlsx_handler.hpp"
-#include "../containers/pptx_handler.hpp"
 
 namespace fs = std::filesystem;
 
