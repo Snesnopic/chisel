@@ -6,17 +6,6 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
 
-if(APPLE)
-    if(EXISTS "/opt/homebrew/opt/openssl@3")
-        list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/openssl@3")
-        message(STATUS "Hinting Homebrew OpenSSL at /opt/homebrew/opt/openssl@3")
-    endif()
-endif()
-
-find_package(OpenSSL REQUIRED)
-
-set(REQUIRE_CRYPTO_OPENSSL ON CACHE BOOL "Force qpdf to use OpenSSL")
-
 cmake_policy(SET CMP0069 NEW)
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
@@ -576,8 +565,6 @@ set(MONOLITH_LIBS
         ffmpeg_avformat
         ffmpeg_avutil
         libqpdf
-        OpenSSL::SSL
-        OpenSSL::Crypto
         libzopfli
         libzopflipng
         jxl
