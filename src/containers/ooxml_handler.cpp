@@ -10,13 +10,10 @@
 #include "../containers/archive_handler.hpp"
 #include <archive.h>
 #include <archive_entry.h>
-#include "zopfli.h"
-#include "zlib_container.h"
 #include <vector>
 #include <fstream>
 #include <system_error>
 #include <filesystem>
-
 #include "../encoder/zopflipng_encoder.hpp"
 #include "../utils/random_utils.hpp"
 
