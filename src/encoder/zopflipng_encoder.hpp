@@ -18,7 +18,8 @@ public:
     [[nodiscard]] std::string mime_type() const override { return "image/png"; }
 
     [[nodiscard]] std::string name() const override { return "ZopfliPngEncoder"; }
-
+    // helper: recompress with zopfli
+    static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char> &input);
 };
 
 #endif //MONOLITH_ZOPFLIPNG_ENCODER_HPP

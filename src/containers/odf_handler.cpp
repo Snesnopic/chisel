@@ -14,6 +14,7 @@
 #include <system_error>
 #include <vector>
 #include "ooxml_handler.hpp"
+#include "../encoder/zopflipng_encoder.hpp"
 #include "../utils/random_utils.hpp"
 
 using namespace std;
@@ -121,7 +122,8 @@ ContainerJob OdfHandler::prepare(const string& path) {
 
         // Nested container detection
         const string mime = detect_mime_type(out_path.string());
-        const ContainerFormat inner_fmt = mime_to_format.find(mime)->second;
+        auto it = mime_to_format.find(mime);
+        ContainerFormat inner_fmt = (it != mime_to_format.end()) ? it->second : ContainerFormat::Unknown;
 
         if (inner_fmt != ContainerFormat::Unknown && can_read_format(inner_fmt)) {
             Logger::log(LogLevel::DEBUG, "Found nested container: " + out_path.string() + " (" + mime + ")", handler_name);
@@ -225,7 +227,7 @@ int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
         vector<unsigned char> final_data;
         string ext = rel.extension().string();
         if (ext == ".xml" || ext == ".rels") {
-            final_data = OoxmlHandler::recompress_with_zopfli(buf); // funzione già definita altrove
+            final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
             Logger::log(LogLevel::DEBUG,
                         "Recompressed entry: " + rel.string() +
                         " (" + to_string(buf.size()) + " -> " + to_string(final_data.size()) + " bytes)",

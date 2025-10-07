@@ -11,6 +11,8 @@
 #include <string>
 #include <stdexcept>
 
+#include "zlib_container.h"
+
 namespace fs = std::filesystem;
 
 ZopfliPngEncoder::ZopfliPngEncoder(const bool preserve_metadata) {
@@ -69,4 +71,19 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         Logger::log(LogLevel::ERROR, std::string("Exception during ZopfliPNG optimization: ") + e.what(), "ZopfliPngEncoder");
         return false;
     }
+}
+
+std::vector<unsigned char> ZopfliPngEncoder::recompress_with_zopfli(const std::vector<unsigned char> &input) {
+    ZopfliOptions opts;
+    ZopfliInitOptions(&opts);
+    opts.numiterations = 15;
+    opts.blocksplitting = 1;
+
+    unsigned char *out_data = nullptr;
+    size_t out_size = 0;
+    ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
+
+    std::vector<unsigned char> result(out_data, out_data + out_size);
+    free(out_data);
+    return result;
 }

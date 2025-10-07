@@ -17,23 +17,8 @@
 #include <system_error>
 #include <filesystem>
 
+#include "../encoder/zopflipng_encoder.hpp"
 #include "../utils/random_utils.hpp"
-
-// helper: recompress with zopfli (keep local, same style as existing handlers)
-std::vector<unsigned char> OoxmlHandler::recompress_with_zopfli(const std::vector<unsigned char> &input) {
-    ZopfliOptions opts;
-    ZopfliInitOptions(&opts);
-    opts.numiterations = 15;
-    opts.blocksplitting = 1;
-
-    unsigned char *out_data = nullptr;
-    size_t out_size = 0;
-    ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
-
-    std::vector<unsigned char> result(out_data, out_data + out_size);
-    free(out_data);
-    return result;
-}
 
 // helper: map mime to containerformat using provided tables
 static ContainerFormat mime_to_container_format(const std::string &mime) {
@@ -230,7 +215,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         std::vector<unsigned char> final_data;
         const auto ext = rel.extension().string();
         if (ext == ".xml" || ext == ".rels") {
-            final_data = recompress_with_zopfli(buf);
+            final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
             Logger::log(LogLevel::DEBUG,
                         "Recompressed entry: " + rel.string() + " (" + std::to_string(buf.size()) + " -> " +
                         std::to_string(final_data.size()) + " bytes)", tag);

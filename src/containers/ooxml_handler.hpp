@@ -17,8 +17,6 @@ public:
 
     bool finalize(const ContainerJob &job, Settings &settings) override;
 
-    static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char> &input);
-
 private:
     ContainerFormat fmt_;
 };
