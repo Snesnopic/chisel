@@ -411,7 +411,38 @@ ExternalProject_Add(libmseed
         BUILD_BYPRODUCTS ${libmseed_INSTALL_DIR}/lib/libmseed.a
 )
 
+# gifsicle
 
+configure_file(
+        ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/win32cfg.h
+        ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/config.h
+        COPYONLY
+)
+add_library(giflib STATIC
+        third_party/gifsicle/src/clp.c
+        third_party/gifsicle/src/fmalloc.c
+        third_party/gifsicle/src/gifdiff.c
+        third_party/gifsicle/src/giffunc.c
+        third_party/gifsicle/src/gifread.c
+        # third_party/gifsicle/src/gifsicle.c
+        third_party/gifsicle/src/giftoc.c
+        third_party/gifsicle/src/gifunopt.c
+        # third_party/gifsicle/src/gifview.c
+        third_party/gifsicle/src/gifwrite.c
+        third_party/gifsicle/src/kcolor.c
+        third_party/gifsicle/src/merge.c
+        third_party/gifsicle/src/optimize.c
+        # third_party/gifsicle/src/opttemplate.c
+        third_party/gifsicle/src/quantize.c
+        third_party/gifsicle/src/strerror.c
+        third_party/gifsicle/src/support.c
+        third_party/gifsicle/src/ungifwrt.c
+)
+
+target_include_directories(giflib PUBLIC
+        third_party/gifsicle/include
+        third_party/gifsicle/src
+)
 
 # monolith
 add_executable(monolith
@@ -465,6 +496,8 @@ add_executable(monolith
         src/containers/ooxml_handler.hpp
         src/utils/random_utils.cpp
         src/utils/random_utils.hpp
+        src/encoder/gif_encoder.cpp
+        src/encoder/gif_encoder.hpp
 )
 
 add_dependencies(monolith libmseed)
@@ -526,6 +559,7 @@ target_include_directories(zopflipng PUBLIC
 set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
         FLAC
+        giflib
         png_static
         JPEG::JPEG # for qpdf apparently
         jpeg

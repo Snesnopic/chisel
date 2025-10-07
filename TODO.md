@@ -43,7 +43,7 @@
 
 ## GIF
 
-- [ ] Integrate `gifsicle` for palette/frame optimization.
+- [ ] Improve `gifsicle` inclusion (remove duplicate symbols).
 
 ## Archives
 

@@ -49,3 +49,6 @@
 [submodule "third_party/libmseed"]
 	path = third_party/libmseed
 	url = https://github.com/EarthScope/libmseed.git
+[submodule "third_party/gifsicle"]
+	path = third_party/gifsicle
+	url = https://github.com/kohler/gifsicle

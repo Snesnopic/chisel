@@ -119,6 +119,10 @@ Currently implemented:
   - MIME: image/jpeg
   - Lossless recompression via mozjpeg
 
+- **GIF**
+  - MIME: image/gif
+  - Lossless recompression via gifsicle
+
 - **JPEG XL**
   - MIME: image/jxl
   - Lossless recompression via libjxl

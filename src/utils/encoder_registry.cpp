@@ -1,6 +1,7 @@
 // encoder_registry.cpp
 #include "encoder_registry.hpp"
 #include "../encoder/flac_encoder.hpp"
+#include "../encoder/gif_encoder.hpp"
 #include "../encoder/png_encoder.hpp"
 #include "../encoder/zopflipng_encoder.hpp"
 #include "../encoder/jpeg_encoder.hpp"
@@ -59,6 +60,10 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
 
     factories["application/vnd.fdsn.mseed"] = {
         [preserve_metadata] { return std::make_unique<MseedEncoder>(preserve_metadata); }
+    };
+
+    factories["image/gif"] = {
+        [preserve_metadata] { return std::make_unique<GifEncoder>(preserve_metadata); }
     };
     return factories;
 }
