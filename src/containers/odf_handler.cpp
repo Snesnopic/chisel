@@ -7,21 +7,16 @@
 #include "../utils/file_type.hpp"
 #include "../utils/archive_formats.hpp"
 #include "../containers/archive_handler.hpp"
-
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
 #include <fstream>
-#include <random>
 #include <system_error>
 #include <vector>
-
 #include "ooxml_handler.hpp"
+#include "../utils/random_utils.hpp"
 
 using namespace std;
-
-static thread_local mt19937_64 g_rng{ random_device{}() };
-static thread_local uniform_int_distribution<unsigned long long> g_dist;
 
 const char* OdfHandler::temp_prefix() const {
     switch (fmt_) {
@@ -62,7 +57,7 @@ ContainerJob OdfHandler::prepare(const string& path) {
     job.original_path = path;
     job.format = fmt_;
 
-    filesystem::path temp_dir = filesystem::temp_directory_path() / (string(temp_prefix()) + to_string(g_dist(g_rng)));
+    filesystem::path temp_dir = filesystem::temp_directory_path() / (string(temp_prefix()) + RandomUtils::random_suffix());
     filesystem::create_directories(temp_dir);
     job.temp_dir = temp_dir.string();
 

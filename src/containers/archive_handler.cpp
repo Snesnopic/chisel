@@ -14,9 +14,9 @@
 #include <vector>
 #include <optional>
 #include <system_error>
-#include <chrono>
 #include <random>
 #include <unordered_map>
+#include "../utils/random_utils.hpp"
 
 namespace fs = std::filesystem;
 
@@ -25,11 +25,7 @@ namespace {
 std::string make_temp_dir() {
     const auto base = fs::temp_directory_path();
     const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    const auto rnd = gen();
-
-    fs::path dir = base / ("monolith_" + std::to_string(now) + "_" + std::to_string(rnd));
+    fs::path dir = base / ("monolith_" + std::to_string(now) + "_" + RandomUtils::random_suffix());
     fs::create_directories(dir);
     return dir.string();
 }

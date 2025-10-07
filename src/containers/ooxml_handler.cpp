@@ -16,7 +16,8 @@
 #include <fstream>
 #include <system_error>
 #include <filesystem>
-#include <random>
+
+#include "../utils/random_utils.hpp"
 
 // helper: recompress with zopfli (keep local, same style as existing handlers)
 std::vector<unsigned char> OoxmlHandler::recompress_with_zopfli(const std::vector<unsigned char> &input) {
@@ -69,14 +70,11 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
     job.original_path = path;
     job.format = fmt_;
 
-    // create temp dir (use C++11 RNG like XLSX/PPTX)
-    thread_local static std::mt19937_64 rng{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<unsigned long long> dist;
     std::string prefix =
         (fmt_ == ContainerFormat::Docx ? "docx_" :
          fmt_ == ContainerFormat::Xlsx ? "xlsx_" :
          fmt_ == ContainerFormat::Pptx ? "pptx_" : "ooxml_");
-    std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (prefix + std::to_string(dist(rng)));
+    std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (prefix + RandomUtils::random_suffix());
     std::filesystem::create_directories(temp_dir);
     job.temp_dir = temp_dir.string();
 

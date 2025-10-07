@@ -463,6 +463,8 @@ add_executable(monolith
         src/containers/odf_handler.hpp
         src/containers/ooxml_handler.cpp
         src/containers/ooxml_handler.hpp
+        src/utils/random_utils.cpp
+        src/utils/random_utils.hpp
 )
 
 add_dependencies(monolith libmseed)
