@@ -7,20 +7,21 @@ It focuses on lossless recompression of various file formats by integrating mult
 
 ## Requirements
 
-To build monolith you need only a few system tools, since all other libraries are automatically fetched and built by CMake:
+To build **monolith** you need only a few system tools. All other libraries are automatically fetched and built by CMake or installed through your system package manager.
 
 ### Linux
 - CMake ≥ 3.20
 - A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
 - Git
 - Autotools (for building libmagic)
+- Standard build tools (make, pkg-config, etc.)
 
 ### macOS
 - CMake ≥ 3.20
 - Xcode Command Line Tools (Clang with C++23 support)
 - Git
 - Autotools (for building libmagic)
-- Homebrew is recommended for installing missing build tools
+- [Homebrew](https://brew.sh/) is recommended for installing missing build tools
 
 ### Windows
 - CMake ≥ 3.20
@@ -34,15 +35,23 @@ To build monolith you need only a few system tools, since all other libraries ar
 
 ### Linux (Debian/Ubuntu)
 ```bash
-apt update
-apt install build-essential cmake git autoconf automake libtool
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build pkg-config git curl wget \
+autoconf automake libtool m4 nasm yasm \
+zlib1g-dev libpng-dev libjpeg-dev libwebp-dev libtiff-dev \
+libogg-dev liblzma-dev libbz2-dev liblz4-dev libxml2-dev libexpat1-dev \
+python3 python3-pip ccache libqpdf-dev
 ```
+
 ### macOS (Homebrew)
 ```bash
-brew install cmake git autoconf automake libtool
+brew update
+brew install cmake ninja pkg-config autoconf automake libtool git wget nasm yasm qpdf
 ```
+
 ### Windows
-Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available in your environment.
+Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available in your environment.  
+Dependencies will be resolved automatically through vcpkg when configuring with CMake.
 
 ---
 
@@ -51,16 +60,22 @@ Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available i
 ### Linux / macOS
 ```bash
 mkdir build && cd build
-cmake ..
-make
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+-DBUILD_TESTING=OFF -DQPDF_BUILD_TESTS=OFF -DQPDF_BUILD_EXAMPLES=OFF \
+-DQPDF_BUILD_DOC=OFF -DQPDF_BUILD_FUZZ=OFF -DQPDF_INSTALL=OFF \
+-DSKIP_INSTALL_ALL=ON -DINSTALL_MANPAGES=OFF -DREQUIRE_CRYPTO_OPENSSL=OFF
+cmake --build . --config Release
 ```
 
 ### Windows
 ```bash
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-cmake --build build
+cmake -B build -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake \
+-DCMAKE_BUILD_TYPE=Release \
+-DBUILD_TESTING=OFF -DQPDF_BUILD_TESTS=OFF -DQPDF_BUILD_EXAMPLES=OFF \
+-DQPDF_BUILD_DOC=OFF -DQPDF_BUILD_FUZZ=OFF -DQPDF_INSTALL=OFF \
+-DSKIP_INSTALL_ALL=ON -DINSTALL_MANPAGES=OFF -DREQUIRE_CRYPTO_OPENSSL=OFF
+cmake --build build --config Release
 ```
-
 ---
 
 ## Usage

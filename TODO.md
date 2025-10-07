@@ -65,8 +65,7 @@
 
 ## Build / CI
 
-- [ ] Add GitHub Actions workflow for Linux and Windows builds.
-- [ ] Fix compilation issues on Linux and Windows (ensure reproducible builds).
+- [ ] Fix compilation issues on Windows (ensure reproducible builds).
 - [ ] Ensure all third-party libraries are linked statically.
 - [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
 
@@ -75,3 +74,4 @@
 - [ ] File hash cache to skip already processed files across runs.
 - [ ] Investigate further metadata preservation strategies across all formats.
 - [ ] Improve logging granularity and structured output for CI integration.
+- [ ] Investigate which apt/brew packages are actually needed for compiling
