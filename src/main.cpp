@@ -29,16 +29,31 @@
 #include <io.h>
 #include <fcntl.h>
 #endif
+#include <csignal>
+#include <atomic>
 
+static std::atomic<bool> interrupted{false};
+
+void signal_handler(int sig) {
+    if (sig == SIGINT) {
+        if (!interrupted.load()) {
+            Logger::log(LogLevel::WARNING, "Stop detected. Killing current threads and saving results...", "main");
+        } else {
+            Logger::log(LogLevel::WARNING, "Still waiting for the threads to finish!", "main");
+        }
+        interrupted.store(true);
+
+    }
+}
 static void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
     const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
     const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
-    const int pos = static_cast<int>(bar_width * progress);
+    const unsigned pos = static_cast<int>(bar_width * progress);
 
     std::cout << "\r[";
-    for (int i = 0; i < bar_width; ++i) {
+    for (unsigned i = 0; i < bar_width; ++i) {
         if (i < pos) std::cout << "=";
         else if (i == pos) std::cout << ">";
         else std::cout << " ";
@@ -75,6 +90,7 @@ namespace fs = std::filesystem;
 
 
 int main(const int argc, char *argv[]) {
+    std::signal(SIGINT, signal_handler);
     init_utf8_locale();
 #ifdef _WIN32
     if (_isatty(_fileno(stdin)) == 0) {
@@ -272,7 +288,12 @@ int main(const int argc, char *argv[]) {
     }
 
     // wait for all tasks to finish
-    for (auto &f: futures) f.get();
+    for (auto &f: futures) {
+        f.get();
+        if (interrupted.load()) {
+            break;
+        }
+    }
 
     if (settings.is_pipe && !results[0].error_msg.empty()) {
         std::cerr<<"Encoding returner error " + results[0].error_msg;
@@ -288,7 +309,7 @@ int main(const int argc, char *argv[]) {
     }
     auto end_total = std::chrono::steady_clock::now();
     const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
-
+    if (!results.empty()) {
         if (!settings.output_csv.empty()) {
             export_csv_report(results, settings.output_csv);
         } else {
@@ -296,6 +317,9 @@ int main(const int argc, char *argv[]) {
                 print_console_report(results, settings.num_threads, total_seconds);
             }
         }
-
+    }
+    if (interrupted.load()) {
+        return 130;
+    }
     return 0;
 }
