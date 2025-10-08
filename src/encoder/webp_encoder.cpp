@@ -16,7 +16,6 @@ WebpEncoder::WebpEncoder(const bool preserve_metadata) {
     preserve_metadata_ = preserve_metadata;
 }
 
-// recompress a webp file into webp lossless with maximum compression
 bool WebpEncoder::recompress(const std::filesystem::path& input,
                              const std::filesystem::path& output) {
     Logger::log(LogLevel::INFO, "Starting WebP recompression: " + input.string(), "webp_encoder");
@@ -25,22 +24,35 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     std::ifstream file(input, std::ios::binary | std::ios::ate);
     if (!file) {
         Logger::log(LogLevel::ERROR, "Cannot open input file: " + input.string(), "webp_encoder");
-        throw std::runtime_error("Cannot open input file");
+        throw std::runtime_error("cannot open input file");
     }
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
     std::vector<uint8_t> input_data(size);
     if (!file.read(reinterpret_cast<char*>(input_data.data()), size)) {
         Logger::log(LogLevel::ERROR, "Failed to read input file: " + input.string(), "webp_encoder");
-        throw std::runtime_error("Failed to read input file");
+        throw std::runtime_error("failed to read input file");
     }
 
-    // decode webp image
+    // inspect bitstream features to decide if recompression is meaningful
+    WebPBitstreamFeatures features;
+    if (WebPGetFeatures(input_data.data(), input_data.size(), &features) != VP8_STATUS_OK) {
+        Logger::log(LogLevel::ERROR, "WebP feature detection failed", "webp_encoder");
+        throw std::runtime_error("webp feature detection failed");
+    }
+
+    // if input is lossy, skip recompression (would only increase size)
+    if (features.format != 2) { // 2 = lossless
+        Logger::log(LogLevel::INFO, "Input is lossy WebP, skipping recompression", "webp_encoder");
+        throw std::runtime_error("Input is lossy, can't recompress further");
+    }
+
+    // decode webp image to raw rgba
     int width = 0, height = 0;
     uint8_t* decoded = WebPDecodeRGBA(input_data.data(), input_data.size(), &width, &height);
     if (!decoded) {
         Logger::log(LogLevel::ERROR, "WebP decode failed: " + input.string(), "webp_encoder");
-        throw std::runtime_error("WebP decode failed");
+        throw std::runtime_error("webp decode failed");
     }
 
     // configure encoder for maximum lossless compression
@@ -50,7 +62,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
         Logger::log(LogLevel::ERROR, "WebPConfigInit failed", "webp_encoder");
         throw std::runtime_error("WebPConfigInit failed");
     }
-    if (!WebPConfigLosslessPreset(&config, 9)) { // 9 = maximum compression
+    if (!WebPConfigLosslessPreset(&config, 9)) {
         WebPFree(decoded);
         Logger::log(LogLevel::ERROR, "WebPConfigLosslessPreset failed", "webp_encoder");
         throw std::runtime_error("WebPConfigLosslessPreset failed");
@@ -86,7 +98,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     }
     WebPPictureFree(&picture);
 
-    // create mux for metadata handling
+    // wrap encoded image
     WebPData output_image;
     output_image.bytes = writer.mem;
     output_image.size = writer.size;
@@ -135,7 +147,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
         WebPMemoryWriterClear(&writer);
         WebPDataClear(&final_data);
         Logger::log(LogLevel::ERROR, "Cannot open output file: " + output.string(), "webp_encoder");
-        throw std::runtime_error("Cannot open output file");
+        throw std::runtime_error("cannot open output file");
     }
     out.write(reinterpret_cast<const char*>(final_data.bytes), final_data.size);
 
