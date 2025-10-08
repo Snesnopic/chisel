@@ -45,10 +45,13 @@
 
 - [ ] Improve `gifsicle` inclusion (remove duplicate symbols).
 
+## BMP
+
+- [ ] Manually write an encoder with RLE encoding and palette reduction
+
 ## Archives
 
 - [ ] Add support for 7Z recompression using 7zip SDK.
-- [ ] Add support for TAR.GZ recompression using zlib/libdeflate.
 
 ## MKV / Matroska
 

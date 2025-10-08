@@ -33,8 +33,9 @@ compile_commands.json
 CTestCustom.cmake
 
 /build/
-/build*/   # build, build-debug, build-release, ecc.
-/cmake*/   # cartelle che iniziano con "cmake"
-
+/build*/
+/cmake*/
+/tests/
+/test/
 /Makefile
 

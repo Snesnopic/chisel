@@ -169,10 +169,6 @@ Currently implemented:
   - application/vnd.ms-cab-compressed (.cab)
   - application/x-ms-wim (.wim)
 
-- **Matroska containers (unfinished)**
-  - MIME: video/x-matroska, audio/x-matroska
-  - Structural optimization via libebml/libmatroska
-
 - **Microsoft Office OpenXML containers**
   - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
   - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx)
@@ -180,13 +176,3 @@ Currently implemented:
 
 - **MSEED files**
   - application/vnd.fdsn.mseed (.mseed)
-
----
-
-## Planned
-
-- Additional image formats (HEIC/HEIF, AVIF)
-- Additional audio formats (AAC, Ogg Vorbis, MP3)
-- Finish Matroska container support
-- Extended archive support and metadata preservation
-- Advanced recompression for scientific data (NetCDF, HDF5)
