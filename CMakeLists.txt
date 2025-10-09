@@ -151,6 +151,95 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
     set(CMAKE_EXE_LINKER_FLAGS "${_new_exe_linker_flags}" CACHE STRING "Propagated linker flags for external projects" FORCE)
 endif()
 
+# liblzma
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(xz_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz")
+set(xz_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/xz-build")
+set(ENABLE_NLS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_DOC OFF CACHE BOOL "" FORCE)
+set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
+add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
+
+target_include_directories(liblzma INTERFACE
+        ${xz_SOURCE_DIR}/src/liblzma/api
+)
+
+set(LIBLZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "" FORCE)
+set(LIBLZMA_LIBRARY "${xz_BINARY_DIR}/src/liblzma/liblzma.a" CACHE FILEPATH "" FORCE)
+set(LZMA_STATIC_LIB "${xz_BINARY_DIR}/src/liblzma/liblzma.a" CACHE FILEPATH "liblzma static library")
+set(LZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
+set(LZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
+set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
+set(LZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "lzma include" FORCE)
+
+# ----- robust search for liblzma static artifact -----
+# look in common build/install locations for liblzma*.a (recursively),
+# then set LZMA_STATIC_LIB and related cache vars for downstream projects.
+
+if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
+    # candidate roots where a static lib might be produced
+    set(_lzma_search_roots
+            "${CMAKE_BINARY_DIR}/third_party/xz-build"
+            "${CMAKE_BINARY_DIR}/third_party/xz"
+            "${CMAKE_SOURCE_DIR}/third_party/xz"
+            "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma"
+            "${CMAKE_SOURCE_DIR}/third_party/xz/lib"
+            "${CMAKE_BINARY_DIR}/xz-build/"
+    )
+
+    set(_found_lzma "")
+    foreach(_root IN LISTS _lzma_search_roots)
+        if (EXISTS "${_root}")
+            # recursive glob for liblzma*.a under candidate root
+            file(GLOB_RECURSE _candidates
+                    RELATIVE "${_root}"
+                    "${_root}/**/liblzma*.a"
+                    "${_root}/**/liblzma.a"
+                    "${_root}/**/liblzma_static.a")
+            foreach(_cand IN LISTS _candidates)
+                set(_full "${_root}/${_cand}")
+                if (EXISTS "${_full}")
+                    set(_found_lzma "${_full}")
+                    break()
+                endif()
+            endforeach()
+        endif()
+        if (_found_lzma)
+            break()
+        endif()
+    endforeach()
+    if(NOT _found_lzma)
+        set(_found_lzma "${CMAKE_BINARY_DIR}/xz-build/liblzma.a")
+    endif()
+    if (_found_lzma)
+        message(STATUS "found liblzma static: ${_found_lzma}")
+        # expose as cache vars so consumers (libtiff, libarchive) can use them
+        set(LZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
+        set(LIBLZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
+        # try to guess include dir (common location)
+        if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api")
+            set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
+            set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
+        elseif (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma")
+            set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
+            set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
+        endif()
+        # also set variables some Find modules look for
+        set(LZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
+        set(LIBLZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
+
+        set(LZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
+        set(LIBLZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
+
+        set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
+        set(LIBLZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
+    else()
+        message(WARNING "liblzma built but static lib not found; searched common locations. please locate liblzma.a and set LZMA_STATIC_LIB or adjust search paths.")
+    endif()
+endif()
+
 # libmagic
 if(WIN32)
     find_path(LIBMAGIC_INCLUDE_DIR magic.h)
@@ -564,6 +653,7 @@ target_include_directories(zopflipng PUBLIC
 set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
         FLAC
+        liblzma
         giflib
         png_static
         archive_static
