@@ -145,7 +145,11 @@ Currently implemented:
 
 - **FLAC**
   - MIME: audio/flac
-  - Lossless audio recompression
+  - Lossless audio recompression via FLAC
+
+- **Monkey's Audio**
+  - MIME: audio/ape
+  - Lossless audio recompression via MACLib
 
 - **WavPack**
   - MIME: audio/x-wavpack

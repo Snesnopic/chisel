@@ -62,8 +62,7 @@
 ## New MIME types / Codecs
 
 - [ ] MP3 – integrate `mp3packer` for frame-level repacking.
-- [ ] Monkey's Audio (APE) – integrate `MACLib` for recompression.
-- [ ] Investigate additional lossless formats (e.g. ALAC, TAK, OptimFROG).
+- [ ] Investigate additional lossless formats (e.g. ALAC, TAK).
 - [ ] Investigate scientific formats (NetCDF, HDF5) for future integration.
 
 ## Build / CI

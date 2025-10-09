@@ -121,7 +121,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
         add_compile_options(/O1 /GL /W4)
         add_link_options(/LTCG)
     else()
-        add_compile_options(-Os -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
+        add_compile_options(-Oz -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
         if(MONOLITH_LTO_FLAG)
             add_compile_options(${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG})
         endif()
@@ -252,7 +252,6 @@ add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
 set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
 set(ZSTD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
 set(ZSTD_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
-
 set(ZSTD_LIBRARIES libzstd_static CACHE STRING "" FORCE)
 
 # libmagic
@@ -548,6 +547,28 @@ target_include_directories(giflib PUBLIC
         third_party/gifsicle/src
 )
 
+# Monkey's Audio
+
+# --- Patch MACLib.h to include All.h if missing ---
+set(MACLIB_HEADER "${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared/MACLib.h")
+
+if(EXISTS "${MACLIB_HEADER}")
+    file(READ "${MACLIB_HEADER}" MACLIB_CONTENTS)
+    string(FIND "${MACLIB_CONTENTS}" "#include \"All.h\"" _found)
+    if(_found EQUAL -1)
+        message(STATUS "Patching MACLib.h to include All.h")
+        file(WRITE "${MACLIB_HEADER}.patched${CMAKE_BUILD_TYPE}" "#include \"All.h\"\n${MACLIB_CONTENTS}")
+        file(RENAME "${MACLIB_HEADER}.patched${CMAKE_BUILD_TYPE}" "${MACLIB_HEADER}")
+    else()
+        message(STATUS "MACLib.h already includes All.h")
+    endif()
+endif()
+set(BUILD_UTIL FALSE CACHE BOOL "" FORCE)
+set(BUILD_SHARED FALSE CACHE BOOL "" FORCE)
+add_subdirectory(third_party/MACLib)
+target_include_directories(MAC PUBLIC
+        third_party/MACLib/Shared
+)
 # monolith
 add_executable(monolith
         src/main.cpp
@@ -602,8 +623,16 @@ add_executable(monolith
         src/utils/random_utils.hpp
         src/encoder/gif_encoder.cpp
         src/encoder/gif_encoder.hpp
+        src/encoder/ape_encoder.cpp
+        src/encoder/ape_encoder.hpp
 )
-
+if(WIN32)
+    target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
+elseif(APPLE)
+    target_compile_definitions(monolith PRIVATE PLATFORM_APPLE)
+elseif(UNIX)
+    target_compile_definitions(monolith PRIVATE PLATFORM_LINUX)
+endif()
 add_dependencies(monolith libmseed)
 target_include_directories(monolith PRIVATE ${libmseed_SOURCE_DIR})
 
@@ -663,12 +692,14 @@ target_include_directories(zopflipng PUBLIC
 set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
         FLAC
+        MAC
         liblzma
         giflib
         png_static
         archive_static
         ogg
         ${libmseed_SOURCE_DIR}/libmseed.a
+        libzstd_static
         ${ZLIB_TARGET}
         ebml
         matroska
