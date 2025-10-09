@@ -52,3 +52,9 @@
 [submodule "third_party/gifsicle"]
 	path = third_party/gifsicle
 	url = https://github.com/kohler/gifsicle
+[submodule "third_party/xz"]
+	path = third_party/xz
+	url = https://github.com/tukaani-project/xz.git
+[submodule "third_party/zstd"]
+	path = third_party/zstd
+	url = https://github.com/facebook/zstd.git
