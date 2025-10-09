@@ -396,7 +396,7 @@ ExternalProject_Add(libmseed
         BUILD_COMMAND make
         INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
         BUILD_IN_SOURCE 1
-        BUILD_BYPRODUCTS ${libmseed_INSTALL_DIR}/lib/libmseed.a
+        BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/third_party/libmseed/libmseed.a
 )
 
 # gifsicle
