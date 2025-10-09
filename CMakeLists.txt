@@ -249,14 +249,11 @@ set(zstd_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zstd-build")
 
 add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
 
-set(_zstd_include "${CMAKE_SOURCE_DIR}/third_party/zstd/lib")
-set(_zstd_lib     "${zstd_BINARY_DIR}/libzstd_static.a")
-
 set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
-set(ZSTD_INCLUDE_DIR "${_zstd_include}" CACHE PATH "" FORCE)
-set(ZSTD_INCLUDE_DIRS "${_zstd_include}" CACHE PATH "" FORCE)
-set(ZSTD_LIBRARY "${_zstd_lib}" CACHE FILEPATH "" FORCE)
-set(ZSTD_LIBRARIES "${_zstd_lib}" CACHE FILEPATH "" FORCE)
+set(ZSTD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
+set(ZSTD_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
+
+set(ZSTD_LIBRARIES libzstd_static CACHE STRING "" FORCE)
 
 # libmagic
 if(WIN32)
