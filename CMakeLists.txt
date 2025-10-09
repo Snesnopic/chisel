@@ -567,7 +567,7 @@ set(MONOLITH_LIBS
         jxl
         jxl_threads
         tiff
-        sqlite3
+        SQLite::SQLite3
 )
 
 if(APPLE)
