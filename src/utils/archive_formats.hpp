@@ -47,6 +47,7 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     //{ "video/webm",                   ContainerFormat::Mkv },
     { "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ContainerFormat::Docx },
     { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",       ContainerFormat::Xlsx },
+    { "application/vnd.ms-powerpoint", ContainerFormat::Pptx},
     { "application/vnd.openxmlformats-officedocument.presentationml.presentation", ContainerFormat::Pptx },
     { "application/vnd.oasis.opendocument.presentation", ContainerFormat::Odp },
     { "application/vnd.oasis.opendocument.spreadsheet", ContainerFormat::Ods},
