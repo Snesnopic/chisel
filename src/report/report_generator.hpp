@@ -21,12 +21,24 @@ struct Result {
     std::string error_msg;      // if !success, reason of failure
 };
 
+struct ContainerResult {
+    std::string filename;
+    std::string format;
+    uintmax_t size_before{};
+    uintmax_t size_after{};
+    bool success{};
+    std::string error_msg;
+};
+
 void print_console_report(const std::vector<Result>& results,
+                          const std::vector<ContainerResult>& container_results,
                           unsigned num_threads,
                           double total_seconds);
 
 void export_csv_report(const std::vector<Result>& results,
-                       const std::filesystem::path& output_path);
+                       const std::vector<ContainerResult>& container_results,
+                       const std::filesystem::path& output_path,
+                       double total_seconds);
 
 unsigned get_terminal_width();
 

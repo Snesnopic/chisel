@@ -147,6 +147,7 @@ int main(const int argc, char *argv[]) {
 
     // we process each file
     std::vector<Result> results;
+    std::vector<ContainerResult> container_results;
     ThreadPool pool(settings.num_threads);
     std::mutex results_mutex;
 
@@ -302,7 +303,11 @@ int main(const int argc, char *argv[]) {
     // recreate extracted archives; recursion is handled inside these top level archives
     for (const auto &job: container_jobs) {
         auto handler = make_handler(job.format);
+        auto before = fs::file_size(job.original_path);
         handler->finalize(job, settings);
+        auto after = fs::file_size(job.original_path);
+        ContainerResult cr{job.original_path, container_format_to_string(job.format), before, after, true, ""};
+        container_results.push_back(std::move(cr));
     }
     if (!settings.is_pipe) {
         std::cout << "\n";
@@ -311,10 +316,10 @@ int main(const int argc, char *argv[]) {
     const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
     if (!results.empty()) {
         if (!settings.output_csv.empty()) {
-            export_csv_report(results, settings.output_csv);
+            export_csv_report(results, container_results, settings.output_csv, total_seconds);
         } else {
             if (!settings.is_pipe) {
-                print_console_report(results, settings.num_threads, total_seconds);
+                print_console_report(results, container_results, settings.num_threads, total_seconds);
             }
         }
     }

@@ -37,7 +37,7 @@ void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archi
     // skip junk
     auto lower = p.filename().string();
     std::ranges::transform(lower, lower.begin(), ::tolower);
-    if (lower == ".ds_store" || lower == "desktop.ini" || lower == ".DS_STORE") return;
+    if (lower == ".ds_store" || lower == "desktop.ini" || lower == ".DS_STORE" || lower == ".DS_Store") return;
 
     // detect format
     auto mime = detect_mime_type(p.string());

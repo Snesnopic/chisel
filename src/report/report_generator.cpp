@@ -44,6 +44,7 @@ static std::string strip_ansi(const std::string& s) {
 }
 
 void print_console_report(const std::vector<Result>& results,
+                          const std::vector<ContainerResult>& container_results,
                           const unsigned num_threads,
                           double total_seconds) {
     const unsigned term_width = get_terminal_width();
@@ -149,13 +150,38 @@ void print_console_report(const std::vector<Result>& results,
                outcome,
                r.error_msg ));
     }
+
+    if (!container_results.empty()) {
+        std::cout << "\n=== Container results ===\n";
+        std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
+            std::make_format_args("Container", "Format", "Before(KB)", "After(KB)", "Delta(%)", "Error"));
+
+        for (const auto& c : container_results) {
+            double pct = c.success && c.size_before
+                         ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
+                         : 0.0;
+            std::string delta = c.success ? std::format("{:.2f}%", pct) : "-";
+            const auto size_before = c.size_before / 1024;
+            const auto size_after = c.size_after / 1024;
+            std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
+                std::make_format_args(
+                    c.filename,
+                    c.format,
+                    size_before,
+                    size_after,
+                    delta,
+                    c.error_msg));
+        }
+    }
     std::cout << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
     std::cout << "Total time: " << std::format("{:.2f}", total_seconds)
               << " s (" << num_threads << " thread"<< (num_threads > 1U ? "s" : "") << ")\n";
 }
 
 void export_csv_report(const std::vector<Result>& results,
-                       const std::filesystem::path& output_path) {
+                       const std::vector<ContainerResult>& container_results,
+                       const std::filesystem::path& output_path,
+                       double total_seconds) {
     std::ofstream out(output_path);
     if (!out) return;
 
@@ -163,7 +189,7 @@ void export_csv_report(const std::vector<Result>& results,
 
     for (const auto& r : results) {
         const double pct = r.success && r.size_before
-                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
+                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
                          : 0.0;
         const std::string outcome = !r.success ? "FAIL"
                                          : r.replaced ? "OK (replaced)"
@@ -174,7 +200,7 @@ void export_csv_report(const std::vector<Result>& results,
         for (size_t i = 0; i < r.codecs_used.size(); ++i) {
             codecs_str += r.codecs_used[i].first + ":" +
                           std::format("{:.2f}%", r.codecs_used[i].second);
-            if (i + 1 < r.codecs_used.size()) codecs_str += ";";
+            if (i + 1 < r.codecs_used.size()) codecs_str += "   ;";
         }
 
         out << '"' << r.filename << "\","
@@ -187,4 +213,21 @@ void export_csv_report(const std::vector<Result>& results,
             << '"' << codecs_str << "\","
             << '"' << r.error_msg << "\"\n";
     }
+    if (!container_results.empty()) {
+        out << "\n\nContainer,Format,Before(KB),After(KB),Delta(%),Error\n";
+        for (const auto& c : container_results) {
+            double pct = c.success && c.size_before
+                         ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
+                         : 0.0;
+            out << '"' << c.filename << "\","
+                << c.format << ","
+                << (c.size_before / 1024) << ","
+                << (c.size_after / 1024) << ","
+                << (c.success ? pct : 0.0) << ","
+                << '"' << c.error_msg << "\"\n";
+        }
+    }
+
+    out << "\n\nTotal amount of time:\n";
+    out << total_seconds << " seconds\n";
 }
