@@ -169,6 +169,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     namespace fs = std::filesystem;
     std::error_code ec;
 
+    // finalize children first
     for (const auto &child: job.children) {
         bool ok = false;
         if (child.format == fmt_) {
@@ -193,28 +194,43 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
         return false;
     }
 
+    // set ZIP format and force deflate compression
     int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
         Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
     }
     if (set_fmt != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, std::string("Failed to set ZIP format: ") + archive_error_string(out), handler_name);
+        Logger::log(LogLevel::ERROR, "Failed to set ZIP format: " + std::string(archive_error_string(out)), handler_name);
         archive_write_free(out);
         return false;
     }
+    archive_write_set_options(out, "compression=deflate");
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
         Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
     }
     if (open_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, std::string("Failed to open temp ODF for writing: ") + archive_error_string(out),
-                    handler_name);
+        Logger::log(LogLevel::ERROR, "Failed to open temp ODF for writing: " + std::string(archive_error_string(out)), handler_name);
         archive_write_free(out);
         return false;
     }
 
-    for (const auto &file: job.file_list) {
+    // ensure "mimetype" is written first
+    std::vector<std::string> files_ordered;
+    auto it = std::find_if(job.file_list.begin(), job.file_list.end(),
+                           [](const std::string &f){ return fs::path(f).filename() == "mimetype"; });
+    if (it != job.file_list.end()) {
+        files_ordered.push_back(*it);
+    }
+    for (const auto &f : job.file_list) {
+        if (fs::path(f).filename() != "mimetype") {
+            files_ordered.push_back(f);
+        }
+    }
+
+    // write all entries
+    for (const auto &file: files_ordered) {
         fs::path rel = fs::relative(file, job.temp_dir, ec);
         if (ec) rel = fs::path(file).filename();
 
@@ -223,15 +239,21 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
             Logger::log(LogLevel::ERROR, "Failed to open file for reading: " + file, handler_name);
             continue;
         }
-
         std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
-        // for odf, recompress only xml files
         std::vector<unsigned char> final_data;
         std::string ext = rel.extension().string();
-        if (ext == ".xml") {
+
+        if (rel.filename() == "mimetype") {
+            // mimetype: must be stored uncompressed
+            final_data = buf;
+            Logger::log(LogLevel::DEBUG, "Stored mimetype entry uncompressed", handler_name);
+        } else if (ext == ".xml") {
             final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
-            Logger::log(LogLevel::DEBUG, "Copied entry without recompression: " + rel.string(), handler_name);
+            Logger::log(LogLevel::DEBUG, "Recompressed XML with Zopfli: " + rel.string(), handler_name);
+        } else {
+            final_data = buf;
+            Logger::log(LogLevel::DEBUG, "Copied entry unchanged: " + rel.string(), handler_name);
         }
 
         archive_entry *entry = archive_entry_new();
@@ -248,6 +270,13 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
         archive_entry_set_perm(entry, 0644);
         archive_entry_set_mtime(entry, 0, 0); // determinism
 
+        if (rel.filename() == "mimetype") {
+            // force store (no compression)
+            archive_write_set_options(out, "compression=store");
+        } else {
+            archive_write_set_options(out, "compression=deflate");
+        }
+
         int wh = archive_write_header(out, entry);
         if (wh == ARCHIVE_WARN) {
             Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
@@ -255,8 +284,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
         if (wh != ARCHIVE_OK) {
             Logger::log(LogLevel::ERROR,
                         "Failed to write header for: " + rel.string() +
-                        " (" + std::string(archive_error_string(out)) + ")",
-                        handler_name);
+                        " (" + std::string(archive_error_string(out)) + ")", handler_name);
             archive_entry_free(entry);
             archive_write_close(out);
             archive_write_free(out);
@@ -267,8 +295,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
         if (wrote < 0) {
             Logger::log(LogLevel::ERROR,
                         "Failed to write data for: " + rel.string() +
-                        " (" + std::string(archive_error_string(out)) + ")",
-                        handler_name);
+                        " (" + std::string(archive_error_string(out)) + ")", handler_name);
             archive_entry_free(entry);
             archive_write_close(out);
             archive_write_free(out);
@@ -280,7 +307,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, std::string("Failed to close archive: ") + archive_error_string(out), handler_name);
+        Logger::log(LogLevel::ERROR, "Failed to close archive: " + std::string(archive_error_string(out)), handler_name);
         archive_write_free(out);
         return false;
     }
@@ -308,8 +335,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::WARNING, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")",
-                    handler_name);
+        Logger::log(LogLevel::WARNING, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", handler_name);
     } else {
         Logger::log(LogLevel::DEBUG, "Removed temp dir: " + job.temp_dir, handler_name);
     }

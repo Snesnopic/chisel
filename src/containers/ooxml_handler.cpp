@@ -171,13 +171,15 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     fs::path src_path(job.original_path);
-    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + std::string("_tmp") + ext_for(this->fmt_));
+    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + ext_for(this->fmt_));
 
     struct archive *out = archive_write_new();
     if (!out) {
         Logger::log(LogLevel::ERROR, "archive_write_new failed", tag);
         return false;
     }
+
+    // set ZIP format and force deflate compression
     int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
         Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
@@ -187,6 +189,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         archive_write_free(out);
         return false;
     }
+    archive_write_set_options(out, "compression=deflate");
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
@@ -198,7 +201,21 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         return false;
     }
 
-    for (const auto &file: job.file_list) {
+    // ensure [Content_Types].xml is written first
+    std::vector<std::string> files_ordered;
+    auto it = std::find_if(job.file_list.begin(), job.file_list.end(),
+                           [](const std::string &f){ return fs::path(f).filename() == "[Content_Types].xml"; });
+    if (it != job.file_list.end()) {
+        files_ordered.push_back(*it);
+    }
+    for (const auto &f : job.file_list) {
+        if (fs::path(f).filename() != "[Content_Types].xml") {
+            files_ordered.push_back(f);
+        }
+    }
+
+    // write all entries
+    for (const auto &file: files_ordered) {
         fs::path rel = fs::relative(file, job.temp_dir, ec);
         if (ec) rel = fs::path(file).filename();
 
@@ -211,14 +228,17 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         std::vector<unsigned char> final_data;
         const auto ext = rel.extension().string();
-        if (ext == ".xml" || ext == ".rels") {
+
+        // recompress only PNG/JPG images, leave XML and others untouched
+        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
             final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
             Logger::log(LogLevel::DEBUG,
-                        "Recompressed entry: " + rel.string() + " (" + std::to_string(buf.size()) + " -> " +
+                        "Recompressed image: " + rel.string() + " (" +
+                        std::to_string(buf.size()) + " -> " +
                         std::to_string(final_data.size()) + " bytes)", tag);
         } else {
             final_data = buf;
-            Logger::log(LogLevel::DEBUG, "Copied entry without recompression: " + rel.string(), tag);
+            Logger::log(LogLevel::DEBUG, "Copied entry unchanged: " + rel.string(), tag);
         }
 
         archive_entry *entry = archive_entry_new();
@@ -228,12 +248,12 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             archive_write_free(out);
             return false;
         }
+
         archive_entry_set_pathname(entry, rel.generic_string().c_str());
         archive_entry_set_size(entry, static_cast<la_int64_t>(final_data.size()));
         archive_entry_set_filetype(entry, AE_IFREG);
         archive_entry_set_perm(entry, 0644);
-        // determinism: zero timestamps
-        archive_entry_set_mtime(entry, 0, 0);
+        archive_entry_set_mtime(entry, 0, 0); // determinism
 
         int wh = archive_write_header(out, entry);
         if (wh == ARCHIVE_WARN) {
@@ -241,8 +261,8 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         }
         if (wh != ARCHIVE_OK) {
             Logger::log(LogLevel::ERROR,
-                        "Failed to write header for: " + rel.string() + " (" + std::string(archive_error_string(out)) +
-                        ")", tag);
+                        "Failed to write header for: " + rel.string() +
+                        " (" + std::string(archive_error_string(out)) + ")", tag);
             archive_entry_free(entry);
             archive_write_close(out);
             archive_write_free(out);
@@ -252,8 +272,8 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
         if (wrote < 0) {
             Logger::log(LogLevel::ERROR,
-                        "Failed to write data for: " + rel.string() + " (" + std::string(archive_error_string(out)) +
-                        ")", tag);
+                        "Failed to write data for: " + rel.string() +
+                        " (" + std::string(archive_error_string(out)) + ")", tag);
             archive_entry_free(entry);
             archive_write_close(out);
             archive_write_free(out);
@@ -284,8 +304,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         }
         Logger::log(LogLevel::INFO,
                     "Optimized OOXML: " + src_path.string() +
-                    " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)",
-                    tag);
+                    " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)", tag);
     } else {
         fs::remove(tmp_path, ec);
         Logger::log(LogLevel::DEBUG, "No improvement for: " + src_path.string(), tag);
