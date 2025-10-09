@@ -33,6 +33,29 @@ static std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
     }
 }
 
+void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archive_jobs, std::filesystem::path const &p) {
+    // skip junk
+    auto lower = p.filename().string();
+    std::ranges::transform(lower, lower.begin(), ::tolower);
+    if (lower == ".ds_store" || lower == "desktop.ini" || lower == ".DS_STORE") return;
+
+    // detect format
+    auto mime = detect_mime_type(p.string());
+    auto fmt_it = mime_to_format.find(mime);
+    if (fmt_it != mime_to_format.end() && can_read_format(fmt_it->second)) {
+        auto handler = make_handler(fmt_it->second);
+        auto job = handler->prepare(p.string());
+        if (!job.file_list.empty() || !job.children.empty()) {
+            archive_jobs.push_back(job);
+            for (const auto& f : job.file_list) {
+                files.emplace_back(f);
+            }
+        }
+    } else {
+        files.push_back(p);
+    }
+}
+
 void collect_inputs(const std::vector<fs::path>& inputs,
                     bool recursive,
                     std::vector<fs::path>& files,
@@ -56,39 +79,20 @@ void collect_inputs(const std::vector<fs::path>& inputs,
             if (recursive) {
                 for (auto& e : fs::recursive_directory_iterator(p)) {
                     if (fs::is_regular_file(e.path())) {
-                        files.push_back(e.path());
+                        process_file(files, archive_jobs, e.path());
                     }
                 }
             } else {
                 for (auto& e : fs::directory_iterator(p)) {
                     if (fs::is_regular_file(e.path())) {
-                        files.push_back(e.path());
+                        process_file(files, archive_jobs, e.path());
                     }
                 }
             }
             continue;
         }
 
-        // skip junk
-        auto lower = p.filename().string();
-        std::ranges::transform(lower, lower.begin(), ::tolower);
-        if (lower == ".ds_store" || lower == "desktop.ini") continue;
-
-        // detect format
-        auto mime = detect_mime_type(p.string());
-        auto fmt_it = mime_to_format.find(mime);
-        if (fmt_it != mime_to_format.end() && can_read_format(fmt_it->second)) {
-            auto handler = make_handler(fmt_it->second);
-            auto job = handler->prepare(p.string());
-            if (!job.file_list.empty() || !job.children.empty()) {
-                archive_jobs.push_back(job);
-                for (const auto& f : job.file_list) {
-                    files.emplace_back(f);
-                }
-            }
-        } else {
-            files.push_back(p);
-        }
+        process_file(files, archive_jobs, p);
     }
 
     Logger::log(LogLevel::INFO,
