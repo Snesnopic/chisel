@@ -240,6 +240,24 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
     endif()
 endif()
 
+# zstd
+set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(ZSTD_BUILD_SHARED   OFF CACHE BOOL "" FORCE)
+
+set(zstd_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/build/cmake")
+set(zstd_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zstd-build")
+
+add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
+
+set(_zstd_include "${CMAKE_SOURCE_DIR}/third_party/zstd/lib")
+set(_zstd_lib     "${zstd_BINARY_DIR}/libzstd_static.a")
+
+set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
+set(ZSTD_INCLUDE_DIR "${_zstd_include}" CACHE PATH "" FORCE)
+set(ZSTD_INCLUDE_DIRS "${_zstd_include}" CACHE PATH "" FORCE)
+set(ZSTD_LIBRARY "${_zstd_lib}" CACHE FILEPATH "" FORCE)
+set(ZSTD_LIBRARIES "${_zstd_lib}" CACHE FILEPATH "" FORCE)
+
 # libmagic
 if(WIN32)
     find_path(LIBMAGIC_INCLUDE_DIR magic.h)
@@ -320,17 +338,12 @@ set(ENABLE_TAR OFF CACHE BOOL "" FORCE)
 set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
 set(ENABLE_CAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
-set(ENABLE_ZLIB ON CACHE BOOL "" FORCE)
 set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_NETTLE  OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT   OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
-set(ENABLE_LIBB2 OFF CACHE BOOL "" FORCE)
-set(ENABLE_LZ4   OFF CACHE BOOL "" FORCE)
-set(ENABLE_LZMA  OFF CACHE BOOL "" FORCE)
-set(ENABLE_ZSTD  OFF CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR})
