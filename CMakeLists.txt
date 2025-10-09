@@ -351,7 +351,6 @@ set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export" FORCE)
 if (NOT WIN32)
     find_package(qpdf REQUIRED)
 endif()
-find_package(JPEG REQUIRED)
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
 
 # zopfli
@@ -550,8 +549,6 @@ set(MONOLITH_LIBS
         FLAC
         giflib
         png_static
-        JPEG::JPEG # for qpdf apparently
-        jpeg
         archive_static
         ogg
         ${libmseed_SOURCE_DIR}/libmseed.a
