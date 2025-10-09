@@ -291,6 +291,10 @@ set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(libwebp_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libwebp")
 set(libwebp_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libwebp-build")
 add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR})
+add_library(thirdparty_webp ALIAS webp)
+add_library(thirdparty_webpdecoder ALIAS webpdecoder)
+add_library(thirdparty_webpdemux ALIAS webpdemux)
+add_library(thirdparty_webpmux ALIAS libwebpmux)
 
 # ffmpeg
 set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
@@ -567,8 +571,10 @@ set(MONOLITH_LIBS
         ebml
         matroska
         wavpack
-        webp
-        libwebpmux
+        thirdparty_webp
+        thirdparty_webpdecoder
+        thirdparty_webpdemux
+        thirdparty_webpmux
         ffmpeg_avcodec
         ffmpeg_avformat
         ffmpeg_avutil
