@@ -125,7 +125,7 @@ int main(const int argc, char *argv[]) {
         Logger::set_level(LogLevel::ERROR);
     }
 
-    if (files.empty()) {
+    if (files.empty() && container_jobs.empty()) {
         Logger::log(LogLevel::ERROR, "No files, folders or archives to process.", "main");
         return 1;
     }
@@ -301,8 +301,8 @@ int main(const int argc, char *argv[]) {
     }
     // recreate extracted archives; recursion is handled inside these top level archives
     for (const auto &job: container_jobs) {
-        ArchiveHandler archive_handler;
-        archive_handler.finalize(job, settings);
+        auto handler = make_handler(job.format);
+        handler->finalize(job, settings);
     }
     if (!settings.is_pipe) {
         std::cout << "\n";

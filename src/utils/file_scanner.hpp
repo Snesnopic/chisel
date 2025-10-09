@@ -19,5 +19,6 @@ inline std::filesystem::path make_temp_path(const std::filesystem::path &stem, c
     return std::filesystem::temp_directory_path() /
            std::filesystem::path(stem.string() + "_tmp" + RandomUtils::random_suffix() + ext);
 }
+std::unique_ptr<IContainer> make_handler(ContainerFormat fmt);
 
 #endif //MONOLITH_FILE_SCANNER_HPP

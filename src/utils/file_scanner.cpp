@@ -15,7 +15,7 @@
 namespace fs = std::filesystem;
 
 // static factory for handlers
-static std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
+std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
     switch (fmt) {
 
         //case ContainerFormat::Mkv:
