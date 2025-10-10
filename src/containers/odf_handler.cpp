@@ -21,6 +21,8 @@ static const char *handler_tag_for(ContainerFormat fmt) {
         case ContainerFormat::Odt: return "OdfHandler(ODT)";
         case ContainerFormat::Ods: return "OdfHandler(ODS)";
         case ContainerFormat::Odp: return "OdfHandler(ODP)";
+        case ContainerFormat::Odg: return "OdfHandler(ODG)";
+        case ContainerFormat::Odf: return "OdfHandler(ODF)";
         default: return "OdfHandler";
     }
 }
@@ -30,6 +32,8 @@ const char *OdfHandler::temp_prefix() const {
         case ContainerFormat::Odt: return "odt_";
         case ContainerFormat::Ods: return "ods_";
         case ContainerFormat::Odp: return "odp_";
+        case ContainerFormat::Odg: return "odg_";
+        case ContainerFormat::Odf: return "odf_";
         default: return "odf_";
     }
 }
@@ -39,6 +43,8 @@ const char *OdfHandler::output_extension() const {
         case ContainerFormat::Odt: return ".odt";
         case ContainerFormat::Ods: return ".ods";
         case ContainerFormat::Odp: return ".odp";
+        case ContainerFormat::Odg: return ".odg";
+        case ContainerFormat::Odf: return ".odf";
         default: return ".odf";
     }
 }
@@ -49,6 +55,8 @@ OdfHandler OdfHandler::from_path(const std::string &path) {
     if (ext == ".odt") return OdfHandler(ContainerFormat::Odt);
     if (ext == ".ods") return OdfHandler(ContainerFormat::Ods);
     if (ext == ".odp") return OdfHandler(ContainerFormat::Odp);
+    if (ext == ".odg") return OdfHandler(ContainerFormat::Odg);
+    if (ext == ".odf") return OdfHandler(ContainerFormat::Odf);
     return OdfHandler(ContainerFormat::Unknown);
 }
 

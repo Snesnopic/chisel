@@ -26,6 +26,8 @@ enum class ContainerFormat {
     Ods,
     Odt,
     Odp,
+    Odg,
+    Odf,
     Epub,
     Cbz,
     Cbt,
@@ -57,6 +59,8 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/vnd.oasis.opendocument.presentation", ContainerFormat::Odp },
     { "application/vnd.oasis.opendocument.spreadsheet", ContainerFormat::Ods},
     { "application/vnd.oasis.opendocument.text", ContainerFormat::Odt},
+    { "application/vnd.oasis.opendocument.graphics", ContainerFormat::Odg },
+    { "application/vnd.oasis.opendocument.formula",  ContainerFormat::Odf },
     { "application/x-ms-wim",           ContainerFormat::Wim },
     { "application/epub+zip",           ContainerFormat::Epub },
     { "application/vnd.comicbook+zip",  ContainerFormat::Cbz },
@@ -87,6 +91,8 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Ods:      return "ods";
         case ContainerFormat::Odt:      return "odt";
         case ContainerFormat::Odp:      return "odp";
+        case ContainerFormat::Odg:      return "odg";
+        case ContainerFormat::Odf:      return "odf";
         case ContainerFormat::Epub:     return "epub";
         case ContainerFormat::Cbz:      return "cbz";
         case ContainerFormat::Cbt:      return "cbt";
@@ -120,6 +126,8 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "ods")   return ContainerFormat::Ods;
     if (s == "odt")   return ContainerFormat::Odt;
     if (s == "odp")   return ContainerFormat::Odp;
+    if (s == "odg")   return ContainerFormat::Odg;
+    if (s == "odf")   return ContainerFormat::Odf;
     if (s == "epub")  return ContainerFormat::Epub;
     if (s == "cbt")   return ContainerFormat::Cbt;
     if (s == "cbz")   return ContainerFormat::Cbz;
@@ -151,6 +159,8 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Ods:
         case ContainerFormat::Odt:
         case ContainerFormat::Odp:
+        case ContainerFormat::Odg:
+        case ContainerFormat::Odf:
         case ContainerFormat::Epub:
         case ContainerFormat::Cbz:
         case ContainerFormat::Cbt:

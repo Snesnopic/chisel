@@ -166,7 +166,9 @@ cmake --build build --config Release
   - **ODT MIME:** `application/vnd.oasis.opendocument.text`
   - **ODS MIME:** `application/vnd.oasis.opendocument.spreadsheet`
   - **ODP MIME:** `application/vnd.oasis.opendocument.presentation`
-  - **Extensions:** .odt, .ods, .odp
+  - **ODG MIME:**  `application/vnd.oasis.opendocument.graphics`
+  - **ODF MIME:**  `application/vnd.oasis.opendocument.formula`,
+  - **Extensions:** .odt, .ods, .odp, .odg, .odf
 - **EPUB**
   - **MIME:** `application/epub+zip`
   - **Extensions:** .epub

@@ -51,6 +51,8 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".odt",    "application/vnd.oasis.opendocument.text"},
     {".ods",    "application/vnd.oasis.opendocument.spreadsheet"},
     {".odp",    "application/vnd.oasis.opendocument.presentation"},
+    {".odg",    "application/vnd.oasis.opendocument.graphics"},
+    {".odf",    "application/vnd.oasis.opendocument.formula"},
     {".sqlite", "application/vnd.sqlite3"},
     {".db",     "application/x-sqlite3"},
 
