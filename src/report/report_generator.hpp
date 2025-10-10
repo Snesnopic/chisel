@@ -9,6 +9,8 @@
 #include <string>
 #include <filesystem>
 
+enum class EncodeMode;
+
 struct Result {
     std::string filename;       // full path or relative
     std::string mime;           // detected mime
@@ -33,12 +35,15 @@ struct ContainerResult {
 void print_console_report(const std::vector<Result>& results,
                           const std::vector<ContainerResult>& container_results,
                           unsigned num_threads,
-                          double total_seconds);
+                          double total_seconds,
+                          EncodeMode mode
+                          );
 
 void export_csv_report(const std::vector<Result>& results,
                        const std::vector<ContainerResult>& container_results,
                        const std::filesystem::path& output_path,
-                       double total_seconds);
+                       double total_seconds,
+                       EncodeMode mode);
 
 unsigned get_terminal_width();
 

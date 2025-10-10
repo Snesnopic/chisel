@@ -370,10 +370,10 @@ int main(const int argc, char *argv[]) {
     const double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
     if (!results.empty()) {
         if (!settings.output_csv.empty()) {
-            export_csv_report(results, container_results, settings.output_csv, total_seconds);
+            export_csv_report(results, container_results, settings.output_csv, total_seconds, settings.encode_mode);
         } else {
             if (!settings.is_pipe) {
-                print_console_report(results, container_results, settings.num_threads, total_seconds);
+                print_console_report(results, container_results, settings.num_threads, total_seconds, settings.encode_mode);
             }
         }
     }
