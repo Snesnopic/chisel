@@ -2,21 +2,26 @@
 // Created by Giuseppe Francione on 07/10/25.
 //
 
-#include "gif_encoder.hpp"
-#include "../utils/logger.hpp"
-
 extern "C" {
 #include <lcdfgif/gif.h>
 #include "gifsicle.h"
 }
-
+#include "gif_encoder.hpp"
+#include "../utils/logger.hpp"
 #include <filesystem>
 #include <cstdio>
 #include <stdexcept>
+#include <cstring>
+#include <atomic>
+#include <mutex>
 
+// global mutex for optimize_fragments
+static std::mutex gifsicle_mutex;
+
+// global compress info required by gifsicle
 Gif_CompressInfo gif_write_info;
 
-GifEncoder::GifEncoder(bool preserve_metadata) {
+GifEncoder::GifEncoder(const bool preserve_metadata) {
     preserve_metadata_ = preserve_metadata;
 }
 
@@ -49,12 +54,17 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
             Gif_DeleteComment(gfs->end_comment);
             gfs->end_comment = nullptr;
         }
-        while (gfs->end_extension_list) {
+        if (gfs->end_extension_list) {
             Gif_DeleteExtension(gfs->end_extension_list);
+            gfs->end_extension_list = nullptr;
         }
     }
 
-    optimize_fragments(gfs, 3 /* livello */, 0 /* huge_stream */);
+    // optimize fragments with gifsicle (protected by mutex, because gifsicle uses global variables)
+    {
+        std::lock_guard<std::mutex> lock(gifsicle_mutex);
+        optimize_fragments(gfs, 3, 0);
+    }
 
     FILE* out = std::fopen(output.string().c_str(), "wb");
     if (!out) {
@@ -65,7 +75,11 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
         throw std::runtime_error("Cannot open GIF output");
     }
 
-    if (!Gif_WriteFile(gfs, out)) {
+    // local compress info
+    Gif_CompressInfo local_info;
+    Gif_InitCompressInfo(&local_info);
+
+    if (!Gif_FullWriteFile(gfs, &local_info, out)) {
         Logger::log(LogLevel::ERROR,
                     "Failed to write GIF: " + output.string(),
                     "gif_encoder");
