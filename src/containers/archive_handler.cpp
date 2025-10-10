@@ -420,6 +420,11 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         case ContainerFormat::Zip:
         case ContainerFormat::Epub:
         case ContainerFormat::Cbz:
+        case ContainerFormat::Jar:
+        case ContainerFormat::Xpi:
+        case ContainerFormat::Ora:
+        case ContainerFormat::Dwfx:
+        case ContainerFormat::Xps:
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
                 archive_write_set_filter_option(a, "deflate", "compression-level", "9");

@@ -29,6 +29,11 @@ enum class ContainerFormat {
     Epub,
     Cbz,
     Cbt,
+    Jar,
+    Xpi,
+    Ora,
+    Dwfx,
+    Xps,
     Unknown
 };
 
@@ -55,7 +60,13 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/x-ms-wim",           ContainerFormat::Wim },
     { "application/epub+zip",           ContainerFormat::Epub },
     { "application/vnd.comicbook+zip",  ContainerFormat::Cbz },
-    { "application/vnd.comicbook+tar",  ContainerFormat::Cbt }
+    { "application/vnd.comicbook+tar",  ContainerFormat::Cbt },
+    { "application/java-archive",       ContainerFormat::Jar },
+    { "application/x-xpinstall",        ContainerFormat::Xpi },
+    { "image/openraster",               ContainerFormat::Ora },
+    { "model/vnd.dwfx+xps",             ContainerFormat::Dwfx },
+    { "application/vnd.ms-xpsdocument", ContainerFormat::Xps },
+    { "application/oxps",               ContainerFormat::Xps }
 };
 
 // format -> extension
@@ -76,9 +87,14 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Ods:      return "ods";
         case ContainerFormat::Odt:      return "odt";
         case ContainerFormat::Odp:      return "odp";
-        case ContainerFormat::Epub:    return "epub";
-        case ContainerFormat::Cbz:     return "cbz";
-        case ContainerFormat::Cbt:    return "cbt";
+        case ContainerFormat::Epub:     return "epub";
+        case ContainerFormat::Cbz:      return "cbz";
+        case ContainerFormat::Cbt:      return "cbt";
+        case ContainerFormat::Jar:      return "jar";
+        case ContainerFormat::Xpi:      return "xpi";
+        case ContainerFormat::Ora:      return "ora";
+        case ContainerFormat::Dwfx:     return "dwfx";
+        case ContainerFormat::Xps:      return "xps";
         default:                        return "unknown";
     }
 }
@@ -107,6 +123,11 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "epub")  return ContainerFormat::Epub;
     if (s == "cbt")   return ContainerFormat::Cbt;
     if (s == "cbz")   return ContainerFormat::Cbz;
+    if (s == "jar")   return ContainerFormat::Jar;
+    if (s == "xpi")   return ContainerFormat::Xpi;
+    if (s == "ora")   return ContainerFormat::Ora;
+    if (s == "dwfx")  return ContainerFormat::Dwfx;
+    if (s == "xps" || s == "oxps") return ContainerFormat::Xps;
     return std::nullopt;
 }
 
@@ -133,6 +154,11 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Epub:
         case ContainerFormat::Cbz:
         case ContainerFormat::Cbt:
+        case ContainerFormat::Jar:
+        case ContainerFormat::Xpi:
+        case ContainerFormat::Ora:
+        case ContainerFormat::Dwfx:
+        case ContainerFormat::Xps:
             return true;
         default:
             return false;

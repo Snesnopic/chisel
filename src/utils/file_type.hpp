@@ -26,6 +26,12 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".epub",   "application/epub+zip"},
     {".cbz",    "application/vnd.comicbook+zip"},
     {".cbt",    "application/vnd.comicbook+tar"},
+    {".jar",    "application/java-archive"},
+    {".xpi",    "application/x-xpinstall"},
+    {".ora",    "image/openraster"},
+    {".dwfx",   "model/vnd.dwfx+xps"},
+    {".xps",    "application/vnd.ms-xpsdocument"},
+    {".oxps",   "application/oxps"},
 
     // images
     {".jpg",    "image/jpeg"},
