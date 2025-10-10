@@ -246,12 +246,12 @@ set(ZSTD_BUILD_SHARED   OFF CACHE BOOL "" FORCE)
 
 set(zstd_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/build/cmake")
 set(zstd_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zstd-build")
-
-add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
+add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR})
 
 set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
 set(ZSTD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
-set(ZSTD_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
+set(ZSTD_INCLUDE_DIRS "${ZSTD_INCLUDE_DIR}" CACHE PATH "" FORCE)
+set(ZSTD_LIBRARY libzstd_static CACHE STRING "" FORCE)
 set(ZSTD_LIBRARIES libzstd_static CACHE STRING "" FORCE)
 
 # libmagic
@@ -354,6 +354,8 @@ set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_NETTLE  OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT   OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LIBB2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
@@ -714,13 +716,12 @@ set(MONOLITH_LIBS
         ${LIBMAGIC_LIB}
         FLAC
         MAC
-        liblzma
+        #liblzma
         giflib
         png_static
         archive_static
         ogg
         ${libmseed_SOURCE_DIR}/libmseed.a
-        libzstd_static
         ${ZLIB_TARGET}
         ebml
         matroska
