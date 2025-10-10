@@ -15,6 +15,7 @@
 - [ ] Support pipeline mode: chaining multiple encoders per MIME in addition to parallel mode.
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Begin support for using monolith as a library (public API, minimal dependencies).
+- [ ] Implement a UriHandler to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing encoders, and reinsert re-encoded content.
 
 ## FLAC
 
@@ -47,11 +48,15 @@
 
 ## BMP
 
-- [ ] Manually write an encoder with RLE encoding and palette reduction
+- [ ] Manually write an encoder with RLE encoding and palette reduction.
 
 ## Archives
 
 - [ ] Add support for 7Z recompression using 7zip SDK.
+- [ ] Investigate integration of BestCFBF (https://papas-best.com/downloads/bestcfbf/stable/bestcfbf.cpp) for optimizing MSI, DOC, PPT, XLS:
+    - On Windows: adapt and integrate directly with COM Structured Storage APIs.
+    - On Linux/macOS: research alternative libraries (e.g. libgsf, olefile) to replicate functionality.
+- [ ] Explore Leanify-style handling of container formats that are essentially ZIP/LZMA/Deflate (APK, XPS, XPInstall, EPUB, DOCX, ODT, etc.) and integrate similar recursive optimization.
 
 ## MKV / Matroska
 
@@ -76,4 +81,5 @@
 - [ ] File hash cache to skip already processed files across runs.
 - [ ] Investigate further metadata preservation strategies across all formats.
 - [ ] Improve logging granularity and structured output for CI integration.
-- [ ] Investigate which apt/brew packages are actually needed for compiling
+- [ ] Investigate which apt/brew packages are actually needed for compiling.
+- [ ] Future: implement a general XML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
