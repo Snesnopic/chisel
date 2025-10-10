@@ -46,6 +46,10 @@
 
 - [ ] Improve `gifsicle` inclusion (remove duplicate symbols).
 
+## PDF
+
+- [ ] Convert current encoder to an IContainer, to expose and compress internal pdf attachments.
+
 ## BMP
 
 - [ ] Manually write an encoder with RLE encoding and palette reduction.
