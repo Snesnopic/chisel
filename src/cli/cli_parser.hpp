@@ -23,6 +23,7 @@ struct Settings {
     std::optional<ContainerFormat> unencodable_target_format;
     std::filesystem::path output_csv;
     bool is_pipe = false;
+    bool regenerate_magic = false;
 };
 
 bool parse_arguments(int argc, char** argv, Settings& settings);

@@ -25,6 +25,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  --log-level LEVEL          Log level: ERROR, WARNING, INFO, DEBUG, NONE.\n"
                   << "  -o, --output-csv FILE      CSV report export filename.\n"
                   << "                             If not specified, report is printed on stdout.\n"
+                  << "  --regenerate-magic         Re-install libmagic file-detection database.\n"
                   << "  --recompress-unencodable FORMAT\n"
                   << "                             allows to recompress archives that can be opened but not recompressed\n"
                   << "                             into a different format (zip, 7z, tar, gz, bz2, xz, wim).\n"
@@ -84,6 +85,10 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         settings.output_csv = out;
     };
     flag_map["--output-csv"] = flag_map["-o"];
+
+    flag_map["--regenerate-magic"] = [&](const int&, char**) {
+        settings.regenerate_magic = true;
+    };
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];

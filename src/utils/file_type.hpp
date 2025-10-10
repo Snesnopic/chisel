@@ -35,6 +35,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".tif",    "image/tiff"},
     {".tiff",   "image/tiff"},
     {".webp",   "image/webp"},
+    {".gif",    "image/gif"},
 
     // documents
     {".pdf",    "application/pdf"},
@@ -45,6 +46,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".ods",    "application/vnd.oasis.opendocument.spreadsheet"},
     {".odp",    "application/vnd.oasis.opendocument.presentation"},
     {".sqlite", "application/vnd.sqlite3"},
+    {".db",     "application/x-sqlite3"},
 
     // audio
     {".flac",   "audio/flac"},
@@ -53,6 +55,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".wvc",    "audio/x-wavpack"},
     {".mp3",    "audio/mpeg"},
     {".wav",    "audio/wav"},
+    {".ape",    "audio/ape"},
 
     // video / containers
     {".mkv",    "video/x-matroska"},
@@ -62,8 +65,11 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".mseed",  "application/vnd.fdsn.mseed"}
 };
 
+void ensure_magic_installed();
+
 std::string detect_mime_type(const std::string &filename);
 bool is_mpeg1_layer3_libmagic(const std::filesystem::path& path);
 
+std::filesystem::path get_magic_file_path();
 
 #endif //MONOLITH_FILE_TYPE_HPP

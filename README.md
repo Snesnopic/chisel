@@ -89,6 +89,7 @@ cmake --build build --config Release
 - `--threads N`                Number of worker threads to use (default: half of available cores).
 - `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
 - `-o, --output-csv FILE`      CSV report export filename. Must be a file path (stdout not supported).
+- `--regenerate-magic`         Re-install libmagic file-detection database.
 - `--recompress-unencodable FORMAT`  
   Allows to recompress archives that can be opened but not recompressed  
   into a different format (zip, 7z, tar, gz, bz2, xz, wim).  

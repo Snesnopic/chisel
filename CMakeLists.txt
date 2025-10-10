@@ -271,12 +271,28 @@ else()
             BUILD_IN_SOURCE 1
             INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-            # pass CFLAGS/CXXFLAGS/LDFLAGS so autotools builds see our propagated flags
+            BUILD_BYPRODUCTS
+            ${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc
             CONFIGURE_ENV CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS} CXXFLAGS=${EXTERNAL_AUTOTOOLS_CXXFLAGS} LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}
     )
+
     set(LIBMAGIC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libmagic-install/include)
     set(LIBMAGIC_LIB_DIR ${CMAKE_BINARY_DIR}/libmagic-install/lib)
     set(LIBMAGIC_LIB magic)
+    # --- Embed compressed magic.mgc as header ---
+    set(MAGIC_SRC "${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc")
+    set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/src/utils/magic.mgc.h")
+    set(MAGIC_COMPRESSED "${CMAKE_BINARY_DIR}/magic.mgc.gz")
+
+    add_custom_command(
+            OUTPUT ${MAGIC_HEADER}
+            COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with zopfli..."
+            COMMAND zopfli --i5 ${MAGIC_SRC} -c > ${MAGIC_COMPRESSED}
+            COMMAND xxd -i -n embedded_magic_mgc ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
+            DEPENDS ${MAGIC_SRC}
+            BYPRODUCTS ${MAGIC_COMPRESSED}
+            COMMENT "Generating embedded magic.mgc.h"
+    )
 endif()
 
 # zlib
@@ -682,6 +698,11 @@ target_include_directories(monolith PRIVATE
         ${zopfli_SOURCE_DIR}/include
         ${zopfli_BINARY_DIR}/include
 )
+
+add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
+add_dependencies(embed_magic_header libmagic)
+add_dependencies(monolith embed_magic_header)
+
 
 target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopflipng

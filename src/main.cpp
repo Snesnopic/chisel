@@ -110,6 +110,20 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
 
+
+    // if requested, delete any existing magic.mgc so it will be reinstalled
+    if (settings.regenerate_magic) {
+        const auto path = get_magic_file_path();
+        if (std::filesystem::exists(path)) {
+            Logger::log(LogLevel::INFO, "Forcing regeneration of magic.mgc at " + path.string(), "libmagic");
+            std::filesystem::remove(path);
+        }
+    }
+
+    if (!std::filesystem::exists(get_magic_file_path())) {
+        ensure_magic_installed();
+    }
+
     auto factories = build_encoder_registry(settings.preserve_metadata);
 
     std::vector<fs::path> files;
