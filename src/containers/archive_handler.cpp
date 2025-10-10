@@ -127,6 +127,15 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
     // detect format
     job.format = detect_format(archive_path);
 
+    if (job.format == ContainerFormat::Xpi) {
+        std::cerr << "WARNING: Recompressing .xpi will invalidate its digital signature. "
+                     "You must re-sign the extension to install it.\n" << std::endl;
+    }
+    if (job.format == ContainerFormat::Apk) {
+        std::cerr << "WARNING: Recompressing .apk will invalidate its digital signature. "
+                     "You must re-sign the APK to install it.\n" << std::endl;
+    }
+
     if (!can_read_format(job.format)) {
         Logger::log(LogLevel::WARNING, "Unreadable or unrecognized format: " + archive_path, "ArchiveHandler");
         return job;
@@ -241,6 +250,21 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
             final_path.replace_extension("");
             final_path += out_ext;
+        }
+
+        if (job.format == ContainerFormat::Xpi || job.format == ContainerFormat::Apk) {
+            fs::path backup_path = job.original_path;
+            backup_path += ".bak";
+            std::error_code bec;
+            fs::copy_file(job.original_path, backup_path,
+                          fs::copy_options::overwrite_existing, bec);
+            if (!bec) {
+                std::cerr << "Backup of original " << job.original_path
+                          << " saved to " << backup_path << "\n";
+            } else {
+                std::cerr << "WARNING: Failed to create backup for "
+                          << job.original_path << " (" << bec.message() << ")\n";
+            }
         }
 
         fs::rename(tmp_archive, final_path, ec);
@@ -425,6 +449,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         case ContainerFormat::Ora:
         case ContainerFormat::Dwfx:
         case ContainerFormat::Xps:
+        case ContainerFormat::Apk:
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
                 archive_write_set_filter_option(a, "deflate", "compression-level", "9");

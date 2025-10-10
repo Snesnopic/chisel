@@ -32,6 +32,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".dwfx",   "model/vnd.dwfx+xps"},
     {".xps",    "application/vnd.ms-xpsdocument"},
     {".oxps",   "application/oxps"},
+    {".apk",    "application/vnd.android.package-archive"},
 
     // images
     {".jpg",    "image/jpeg"},

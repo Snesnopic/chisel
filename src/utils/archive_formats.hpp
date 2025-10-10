@@ -36,6 +36,7 @@ enum class ContainerFormat {
     Ora,
     Dwfx,
     Xps,
+    Apk,
     Unknown
 };
 
@@ -70,7 +71,8 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "image/openraster",               ContainerFormat::Ora },
     { "model/vnd.dwfx+xps",             ContainerFormat::Dwfx },
     { "application/vnd.ms-xpsdocument", ContainerFormat::Xps },
-    { "application/oxps",               ContainerFormat::Xps }
+    { "application/oxps",               ContainerFormat::Xps },
+    { "application/vnd.android.package-archive", ContainerFormat::Apk },
 };
 
 // format -> extension
@@ -101,6 +103,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Ora:      return "ora";
         case ContainerFormat::Dwfx:     return "dwfx";
         case ContainerFormat::Xps:      return "xps";
+        case ContainerFormat::Apk:      return "apk";
         default:                        return "unknown";
     }
 }
@@ -136,6 +139,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "ora")   return ContainerFormat::Ora;
     if (s == "dwfx")  return ContainerFormat::Dwfx;
     if (s == "xps" || s == "oxps") return ContainerFormat::Xps;
+    if (s == "apk") return ContainerFormat::Apk;
     return std::nullopt;
 }
 
@@ -169,6 +173,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Ora:
         case ContainerFormat::Dwfx:
         case ContainerFormat::Xps:
+        case ContainerFormat::Apk:
             return true;
         default:
             return false;

@@ -270,6 +270,10 @@ cmake --build build --config Release
   - **MIME:** `application/x-xpinstall`
   - **Extensions:** .xpi
   - **Library:** libarchive (ZIP-based)
+- **APK**
+  - **MIME:** `application/vnd.android.package-archive`
+  - **Extensions:** .apk
+  - **Library:** libarchive (ZIP-based)
 
 ---
 
