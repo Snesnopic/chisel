@@ -2,6 +2,7 @@
 #include "encoder_registry.hpp"
 #include "../encoder/ape_encoder.hpp"
 #include "../encoder/flac_encoder.hpp"
+#include "../encoder/flexigif_encoder.hpp"
 #include "../encoder/gif_encoder.hpp"
 #include "../encoder/png_encoder.hpp"
 #include "../encoder/zopflipng_encoder.hpp"
@@ -64,7 +65,8 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
     };
 
     factories["image/gif"] = {
-        [preserve_metadata] { return std::make_unique<GifEncoder>(preserve_metadata); }
+        [preserve_metadata] { return std::make_unique<GifEncoder>(preserve_metadata); },
+        [preserve_metadata] { return std::make_unique<FlexiGifEncoder>(preserve_metadata); }
     };
 
     factories["audio/ape"] = {

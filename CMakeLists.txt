@@ -334,6 +334,21 @@ if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
+# flexiGIF
+set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
+
+file(GLOB FLEXIGIF_SOURCES
+        ${FLEXIGIF_DIR}/*.cpp
+)
+
+add_library(flexigif STATIC ${FLEXIGIF_SOURCES})
+
+target_include_directories(flexigif PUBLIC
+        ${FLEXIGIF_DIR}
+)
+
+target_compile_features(flexigif PUBLIC cxx_std_11)
+
 # wavpack
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WAVPACK_BUILD_CLI OFF CACHE BOOL "Build command line programs" FORCE)
@@ -643,6 +658,8 @@ add_executable(monolith
         src/encoder/gif_encoder.hpp
         src/encoder/ape_encoder.cpp
         src/encoder/ape_encoder.hpp
+        src/encoder/flexigif_encoder.cpp
+        src/encoder/flexigif_encoder.hpp
 )
 if(WIN32)
     target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
@@ -726,6 +743,7 @@ set(MONOLITH_LIBS
         ebml
         matroska
         wavpack
+        flexigif
         thirdparty_webp
         thirdparty_webpdecoder
         thirdparty_webpdemux

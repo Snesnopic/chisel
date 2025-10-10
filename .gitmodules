@@ -61,3 +61,6 @@
 [submodule "third_party/MACLib"]
 	path = third_party/MACLib
 	url = https://github.com/Snesnopic/MACLib
+[submodule "third_party/flexigif"]
+	path = third_party/flexigif
+	url = https://create.stephan-brumme.com/flexigif-lossless-gif-lzw-optimization/git
