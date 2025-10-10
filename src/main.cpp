@@ -173,13 +173,14 @@ int main(const int argc, char *argv[]) {
         futures.push_back(pool.enqueue([&, in_path] {
             const auto start = std::chrono::steady_clock::now();
             auto mime = detect_mime_type(in_path.string());
-            if (mime.empty() || mime =="application/octet-stream") {
+            if (mime.empty() || mime == "application/octet-stream") {
                 std::string ext = in_path.extension().string();
                 std::ranges::transform(ext, ext.begin(), ::tolower);
                 auto ext_it = ext_to_mime.find(ext);
                 if (ext_it != ext_to_mime.end()) {
-                    Logger::log(LogLevel::DEBUG, "MIME fallback: " + in_path.string() +
-                                                 " detected as " + ext_it->second + " from extension " + ext,
+                    Logger::log(LogLevel::DEBUG,
+                                "MIME fallback: " + in_path.string() +
+                                " detected as " + ext_it->second + " from extension " + ext,
                                 "file_scanner");
                     mime = ext_it->second;
                 }
@@ -189,64 +190,111 @@ int main(const int argc, char *argv[]) {
             const uintmax_t sz_before = fs::file_size(in_path);
             uintmax_t sz_after_best = sz_before;
             bool ok_any = false, replaced = false;
-
-            // new fields
             std::vector<std::pair<std::string, double> > codecs_used;
             std::string error_msg;
 
             if (it != factories.end()) {
-                std::string best_tmp;
-                // execute all encoders on copy of original
-                for (size_t idx = 0; idx < it->second.size(); ++idx) {
-                    const auto enc = it->second[idx]();
-                    fs::path tmp = make_temp_path(in_path.stem(), in_path.extension().string());
-                    try {
-                        const bool ok = enc->recompress(in_path, tmp.string());
-                        if (ok && fs::exists(tmp)) {
+                if (settings.encode_mode == EncodeMode::PIPE) {
+                    // pipeline mode: apply encoders in sequence
+                    fs::path current = in_path;
+                    fs::path tmp;
+                    bool pipeline_ok = true;
+
+                    for (size_t idx = 0; idx < it->second.size(); ++idx) {
+                        tmp = make_temp_path(in_path.stem(), in_path.extension().string());
+                        auto enc = it->second[idx]();
+                        try {
+                            bool ok = enc->recompress(current, tmp);
+                            if (!ok || !fs::exists(tmp)) {
+                                fs::remove(tmp);
+                                pipeline_ok = false;
+                                break;
+                            }
                             const uintmax_t sz_after = fs::file_size(tmp);
                             double pct = sz_before > 0
                                              ? 100.0 * (1.0 - static_cast<double>(sz_after) / sz_before)
                                              : 0.0;
-                            codecs_used.emplace_back(enc->name(), pct); // record codec + % reduction
+                            codecs_used.emplace_back(enc->name(), pct);
 
-                            Logger::log(LogLevel::DEBUG,
-                                        "Encoder " + std::to_string(idx) + " → " + std::to_string(sz_after) + " bytes",
-                                        "main");
-                            if (sz_after < sz_after_best) {
-                                if (!best_tmp.empty()) fs::remove(best_tmp);
-                                sz_after_best = sz_after;
-                                best_tmp = tmp.string();
+                            if (current != in_path && fs::exists(current))
+                                fs::remove(current);
+                            current = tmp;
+                        } catch (const std::exception &e) {
+                            fs::remove(tmp);
+                            error_msg = e.what();
+                            pipeline_ok = false;
+                            break;
+                        } catch (...) {
+                            fs::remove(tmp);
+                            error_msg = "Unknown error";
+                            pipeline_ok = false;
+                            break;
+                        }
+                    }
+
+                    if (pipeline_ok && fs::exists(current)) {
+                        const uintmax_t sz_after = fs::file_size(current);
+                        if (sz_after < sz_before && !settings.dry_run) {
+                            try {
+                                fs::rename(current, in_path);
+                                replaced = true;
                                 ok_any = true;
+                                sz_after_best = sz_after;
+                            } catch (const std::exception &e) {
+                                Logger::log(LogLevel::ERROR,
+                                            "Failed to replace original with optimized file: " + std::string(e.what()),
+                                            "main");
+                                fs::remove(current);
+                                error_msg = e.what();
+                            }
+                        } else {
+                            if (current != in_path && fs::exists(current))
+                                fs::remove(current);
+                        }
+                    }
+                } else {
+                    // parallel mode: old behaviour
+                    std::string best_tmp;
+                    for (size_t idx = 0; idx < it->second.size(); ++idx) {
+                        const auto enc = it->second[idx]();
+                        fs::path tmp = make_temp_path(in_path.stem(), in_path.extension().string());
+                        try {
+                            const bool ok = enc->recompress(in_path, tmp.string());
+                            if (ok && fs::exists(tmp)) {
+                                const uintmax_t sz_after = fs::file_size(tmp);
+                                double pct = sz_before > 0
+                                                 ? 100.0 * (1.0 - static_cast<double>(sz_after) / sz_before)
+                                                 : 0.0;
+                                codecs_used.emplace_back(enc->name(), pct);
+
+                                Logger::log(LogLevel::DEBUG,
+                                            "Encoder " + std::to_string(idx) + " → " + std::to_string(sz_after) +
+                                            " bytes",
+                                            "main");
+                                if (sz_after < sz_after_best) {
+                                    if (!best_tmp.empty()) fs::remove(best_tmp);
+                                    sz_after_best = sz_after;
+                                    best_tmp = tmp.string();
+                                    ok_any = true;
+                                } else {
+                                    fs::remove(tmp);
+                                }
                             } else {
                                 fs::remove(tmp);
                             }
-                        } else {
+                        } catch (const std::exception &e) {
                             fs::remove(tmp);
+                            error_msg = e.what();
+                            if (settings.is_pipe) {
+                                std::cerr << e.what() << std::endl;
+                            }
+                        } catch (...) {
+                            fs::remove(tmp);
+                            error_msg = "Unknown error";
                         }
-                    } catch (const std::exception &e) {
-                        fs::remove(tmp);
-                        error_msg = e.what();
-                        if (settings.is_pipe) {
-                            std::cerr << e.what() << std::endl;
-                        }
-                    } catch (...) {
-                        fs::remove(tmp);
-                        error_msg = "Unknown error";
                     }
-                }
 
-                // replace original if we have an improvement
-                if (ok_any && sz_after_best < sz_before && !settings.dry_run) {
-                    if (settings.is_pipe) {
-                        // write new best to stdout
-                        std::ifstream out_best(best_tmp, std::ios::binary);
-                        std::cout << out_best.rdbuf();
-                        out_best.close();
-
-                        fs::remove(best_tmp);
-                        fs::remove(in_path);
-                        replaced = true;
-                    } else {
+                    if (ok_any && sz_after_best < sz_before && !settings.dry_run) {
                         try {
                             fs::rename(best_tmp, in_path);
                             replaced = true;
@@ -257,20 +305,13 @@ int main(const int argc, char *argv[]) {
                             fs::remove(best_tmp);
                             error_msg = e.what();
                         }
-                    }
-                } else // no improvement or dry run
-                    if (settings.is_pipe) {
-                        // passthrough original
-                        std::ifstream out_orig(in_path, std::ios::binary);
-                        std::cout << out_orig.rdbuf();
-                        out_orig.close();
-                        if (!best_tmp.empty()) fs::remove(best_tmp);
-                        fs::remove(in_path);
                     } else {
                         if (!best_tmp.empty()) fs::remove(best_tmp);
                     }
+                }
             } else {
-                Logger::log(LogLevel::WARNING, "No encoder for " + in_path.string() + " (" + mime + ")", "main");
+                Logger::log(LogLevel::WARNING,
+                            "No encoder for " + in_path.string() + " (" + mime + ")", "main");
                 error_msg = "No encoder available";
             }
 
@@ -301,7 +342,6 @@ int main(const int argc, char *argv[]) {
             }
         }));
     }
-
     // wait for all tasks to finish
     for (auto &f: futures) {
         f.get();

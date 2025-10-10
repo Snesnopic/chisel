@@ -25,6 +25,10 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  --log-level LEVEL          Log level: ERROR, WARNING, INFO, DEBUG, NONE.\n"
                   << "  -o, --output-csv FILE      CSV report export filename.\n"
                   << "                             If not specified, report is printed on stdout.\n"
+                  << "  --mode MODE                Encoding mode: 'pipe' (default) or 'parallel'.\n"
+                  << "                             Pipe mode feeds the output of an encoder into \n"
+                  << "                             the next one. Parallel mode runs all encoders \n"
+                  << "                             on the original file, picking the best.\n"
                   << "  --regenerate-magic         Re-install libmagic file-detection database.\n"
                   << "  --recompress-unencodable FORMAT\n"
                   << "                             allows to recompress archives that can be opened but not recompressed\n"
@@ -78,7 +82,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
     };
 
     flag_map["-o"] = [&](int &i, char **args) {
-        std::string out = args[++i];
+        const std::string out = args[++i];
         if (out == "-") {
             throw std::runtime_error("'-' is not allowed as output CSV (only files are supported).");
         }
@@ -88,6 +92,20 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
 
     flag_map["--regenerate-magic"] = [&](const int&, char**) {
         settings.regenerate_magic = true;
+    };
+    flag_map["--mode"] = [&](int& i, char** args) {
+        if (i + 1 >= argc) {
+            throw std::runtime_error("--mode requires an argument (pipe|parallel)");
+        }
+        std::string mode = args[++i];
+        std::ranges::transform(mode, mode.begin(), ::tolower);
+        if (mode == "pipe") {
+            settings.encode_mode = EncodeMode::PIPE;
+        } else if (mode == "parallel") {
+            settings.encode_mode = EncodeMode::PARALLEL;
+        } else {
+            throw std::runtime_error("Unknown mode: " + mode + " (expected pipe or parallel)");
+        }
     };
 
     for (int i = 1; i < argc; ++i) {

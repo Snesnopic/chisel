@@ -13,6 +13,11 @@
 
 enum class ContainerFormat;
 
+enum class EncodeMode {
+    PIPE,      // one encoder output is the next one's output
+    PARALLEL   // all encoders on the original file
+};
+
 struct Settings {
     bool preserve_metadata = true;
     bool recursive = false;
@@ -24,6 +29,7 @@ struct Settings {
     std::filesystem::path output_csv;
     bool is_pipe = false;
     bool regenerate_magic = false;
+    EncodeMode encode_mode = EncodeMode::PIPE;
 };
 
 bool parse_arguments(int argc, char** argv, Settings& settings);
