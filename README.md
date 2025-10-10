@@ -88,9 +88,15 @@ cmake --build build --config Release
 - `--recursive`                Process directories recursively.
 - `--threads N`                Number of worker threads to use (default: half of available cores).
 - `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
+- `--mode MODE`                Select how multiple encoders are applied to a file.
+
+  PIPE (default): encoders are chained, the output of one becomes the input of the next.
+
+  PARALLEL: all encoders run independently on the original file, and the smallest result is chosen.
 - `-o, --output-csv FILE`      CSV report export filename. Must be a file path (stdout not supported).
 - `--regenerate-magic`         Re-install libmagic file-detection database.
-- `--recompress-unencodable FORMAT`  
+- `--recompress-unencodable FORMAT`
+
   Allows to recompress archives that can be opened but not recompressed  
   into a different format (zip, 7z, tar, gz, bz2, xz, wim).  
   If not specified, such archives are left untouched.
@@ -114,70 +120,159 @@ cmake --build build --config Release
 
 ## Supported formats
 
-Currently implemented:
-
+### Images
 - **JPEG**
-  - MIME: image/jpeg
-  - Lossless recompression via mozjpeg
-
+  - **MIME:** `image/jpeg`, `image/jpg`
+  - **Extensions:** .jpg, .jpeg
+  - **Library:** mozjpeg
 - **GIF**
-  - MIME: image/gif
-  - Lossless recompression via gifsicle
-
+  - **MIME:** `image/gif`
+  - **Extensions:** .gif
+  - **Libraries:** gifsicle, flexigif
 - **JPEG XL**
-  - MIME: image/jxl
-  - Lossless recompression via libjxl
-
+  - **MIME:** `image/jxl`
+  - **Extensions:** .jxl
+  - **Library:** libjxl
 - **WebP**
-  - MIME: image/webp
-  - Lossless recompression via libwebp
-
+  - **MIME:** `image/webp`, `image/x-webp`
+  - **Extensions:** .webp
+  - **Library:** libwebp
 - **PNG**
-  - MIME: image/png
-  - Lossless recompression via zlib/Deflate and zopflipng
-
+  - **MIME:** `image/png`
+  - **Extensions:** .png
+  - **Libraries:** zlib/Deflate, zopflipng
 - **TIFF**
-  - MIME: image/tiff
-  - Lossless recompression via libtiff
+  - **MIME:** `image/tiff`, `image/tiff-fx`
+  - **Extensions:** .tif, .tiff
+  - **Library:** libtiff
+- **OpenRaster**
+  - **MIME:** `image/openraster`
+  - **Extensions:** .ora
+  - **Library:** libarchive (ZIP-based)
 
+---
+
+### Documents
 - **PDF**
-  - MIME: application/pdf
-  - Structural optimization via qpdf
+  - **MIME:** `application/pdf`
+  - **Extensions:** .pdf
+  - **Library:** qpdf
+- **Microsoft Office OpenXML**
+  - **DOCX MIME:** `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+  - **XLSX MIME:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+  - **PPTX MIME:** `application/vnd.openxmlformats-officedocument.presentationml.presentation`, `application/vnd.ms-powerpoint`
+  - **Extensions:** .docx, .xlsx, .pptx
+- **OpenDocument**
+  - **ODT MIME:** `application/vnd.oasis.opendocument.text`
+  - **ODS MIME:** `application/vnd.oasis.opendocument.spreadsheet`
+  - **ODP MIME:** `application/vnd.oasis.opendocument.presentation`
+  - **Extensions:** .odt, .ods, .odp
+- **EPUB**
+  - **MIME:** `application/epub+zip`
+  - **Extensions:** .epub
+  - **Library:** libarchive (ZIP-based)
+- **Comic Book**
+  - **CBZ MIME:** `application/vnd.comicbook+zip`
+  - **CBT MIME:** `application/vnd.comicbook+tar`
+  - **Extensions:** .cbz, .cbt
+  - **Library:** libarchive
+- **XPS**
+  - **MIME:** `application/vnd.ms-xpsdocument`, `application/oxps`
+  - **Extensions:** .xps, .oxps
+  - **Library:** libarchive (ZIP-based)
+- **DWFX**
+  - **MIME:** `model/vnd.dwfx+xps`
+  - **Extensions:** .dwfx
+  - **Library:** libarchive (ZIP-based)
 
+---
+
+### Audio
 - **FLAC**
-  - MIME: audio/flac
-  - Lossless audio recompression via FLAC
-
+  - **MIME:** `audio/flac`, `audio/x-flac`
+  - **Extensions:** .flac
+  - **Library:** libFLAC
 - **Monkey's Audio**
-  - MIME: audio/ape
-  - Lossless audio recompression via MACLib
-
+  - **MIME:** `audio/ape`, `audio/x-ape`
+  - **Extensions:** .ape
+  - **Library:** MACLib
 - **WavPack**
-  - MIME: audio/x-wavpack
-  - Lossless audio recompression via wavpack
+  - **MIME:** `audio/x-wavpack`, `audio/x-wavpack-correction`
+  - **Extensions:** .wv, .wvp, .wvc
+  - **Library:** wavpack
 
+---
+
+### Databases
 - **SQLite**
-  - MIME: application/vnd.sqlite3
-  - Vacuum and page reordering for compactness
+  - **MIME:** `application/vnd.sqlite3`, `application/x-sqlite3`
+  - **Extensions:** .sqlite, .db
+  - **Library:** sqlite3
 
-- **Archive formats** (via libarchive):
-  - application/zip (.zip)
-  - application/x-7z-compressed (.7z)
-  - application/x-tar (.tar)
-  - application/gzip (.gz)
-  - application/x-bzip2 (.bz2)
-  - application/x-xz (.xz)
-  - application/x-rar (.rar, read-only)
-  - application/x-iso9660-image (.iso)
-  - application/x-cpio (.cpio)
-  - application/x-lzma (.lzma)
-  - application/vnd.ms-cab-compressed (.cab)
-  - application/x-ms-wim (.wim)
+---
 
-- **Microsoft Office OpenXML containers**
-  - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
-  - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx)
-  - application/vnd.openxmlformats-officedocument.presentationml.presentation (.pptx)
+### Archive and container formats
+- **Zip**
+  - **MIME:** `application/zip`, `application/x-zip-compressed`
+  - **Extensions:** .zip
+  - **Library:** libarchive
+- **7z**
+  - **MIME:** `application/x-7z-compressed`
+  - **Extensions:** .7z
+  - **Library:** libarchive
+- **Tar**
+  - **MIME:** `application/x-tar`
+  - **Extensions:** .tar
+  - **Library:** libarchive
+- **GZip**
+  - **MIME:** `application/gzip`
+  - **Extensions:** .gz
+  - **Library:** libarchive
+- **BZip2**
+  - **MIME:** `application/x-bzip2`
+  - **Extensions:** .bz2
+  - **Library:** libarchive
+- **Xz**
+  - **MIME:** `application/x-xz`
+  - **Extensions:** .xz
+  - **Library:** libarchive
+- **Rar**
+  - **MIME:** `application/vnd.rar`, `application/x-rar-compressed`
+  - **Extensions:** .rar
+  - **Library:** libarchive (read-only)
+- **ISO**
+  - **MIME:** `application/x-iso9660-image`
+  - **Extensions:** .iso
+  - **Library:** libarchive
+- **CPIO**
+  - **MIME:** `application/x-cpio`
+  - **Extensions:** .cpio
+  - **Library:** libarchive
+- **LZMA**
+  - **MIME:** `application/x-lzma`
+  - **Extensions:** .lzma
+  - **Library:** libarchive
+- **CAB**
+  - **MIME:** `application/vnd.ms-cab-compressed`
+  - **Extensions:** .cab
+  - **Library:** libarchive
+- **WIM**
+  - **MIME:** `application/x-ms-wim`
+  - **Extensions:** .wim
+  - **Library:** libarchive
+- **JAR**
+  - **MIME:** `application/java-archive`
+  - **Extensions:** .jar
+  - **Library:** libarchive (ZIP-based)
+- **XPI**
+  - **MIME:** `application/x-xpinstall`
+  - **Extensions:** .xpi
+  - **Library:** libarchive (ZIP-based)
 
-- **MSEED files**
-  - application/vnd.fdsn.mseed (.mseed)
+---
+
+### Scientific and seismic
+- **MSEED**
+  - **MIME:** `application/vnd.fdsn.mseed`
+  - **Extensions:** .mseed
+  - **Library:** libmseed
