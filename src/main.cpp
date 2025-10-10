@@ -148,7 +148,7 @@ int main(const int argc, char *argv[]) {
     const auto start_total = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - start_total).count();
     if (!settings.is_pipe) {
-        print_progress_bar(0, files.size(), elapsed);
+        print_progress_bar(0, files.size(), std::abs(elapsed));
     }
     std::ranges::sort(files,
                       [](const auto &a, const auto &b) {
