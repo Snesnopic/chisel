@@ -8,6 +8,8 @@
 #include "logger.hpp"
 #include <algorithm>
 #include <fstream>
+
+#include "mime_detector.hpp"
 #include "../containers/mkv_handler.hpp"
 #include "../containers/odf_handler.hpp"
 #include "../containers/ooxml_handler.hpp"
@@ -40,7 +42,7 @@ void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archi
     if (lower == ".ds_store" || lower == "desktop.ini" || lower == ".DS_STORE" || lower == ".DS_Store") return;
 
     // detect format
-    auto mime = detect_mime_type(p.string());
+    const auto mime = MimeDetector::detect(p.string());
     auto fmt_it = mime_to_format.find(mime);
     if (fmt_it != mime_to_format.end() && can_read_format(fmt_it->second)) {
         auto handler = make_handler(fmt_it->second);

@@ -15,6 +15,7 @@
 #include <system_error>
 #include <filesystem>
 #include "../encoder/zopflipng_encoder.hpp"
+#include "../utils/mime_detector.hpp"
 #include "../utils/random_utils.hpp"
 
 // helper: map mime to containerformat using provided tables
@@ -116,7 +117,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
         ofs.close();
 
         // decide if this entry is itself a container using mime detection
-        const std::string mime = detect_mime_type(out_path.string());
+        const std::string mime = MimeDetector::detect(out_path.string());
         const ContainerFormat fmt = mime_to_container_format(mime);
 
         if (fmt != ContainerFormat::Unknown && can_read_format(fmt)) {

@@ -25,6 +25,7 @@
 #include <clocale>
 #include <fstream>
 #include "utils/encoder_registry.hpp"
+#include "utils/mime_detector.hpp"
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
@@ -172,7 +173,7 @@ int main(const int argc, char *argv[]) {
     for (auto const &in_path: files) {
         futures.push_back(pool.enqueue([&, in_path] {
             const auto start = std::chrono::steady_clock::now();
-            auto mime = detect_mime_type(in_path.string());
+            auto mime = MimeDetector::detect(in_path.string());
             if (mime.empty() || mime == "application/octet-stream") {
                 std::string ext = in_path.extension().string();
                 std::ranges::transform(ext, ext.begin(), ::tolower);

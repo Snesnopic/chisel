@@ -76,9 +76,6 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
 
 void ensure_magic_installed();
 
-std::string detect_mime_type(const std::string &filename);
-bool is_mpeg1_layer3_libmagic(const std::filesystem::path& path);
-
 std::filesystem::path get_magic_file_path();
 
 #endif //MONOLITH_FILE_TYPE_HPP

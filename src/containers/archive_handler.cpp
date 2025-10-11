@@ -16,6 +16,7 @@
 #include <system_error>
 #include <random>
 #include <unordered_map>
+#include "../utils/mime_detector.hpp"
 #include "../utils/random_utils.hpp"
 
 namespace fs = std::filesystem;
@@ -298,7 +299,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
 ContainerFormat ArchiveHandler::detect_format(const std::string& path) {
     // try mime
-    const std::string mime = detect_mime_type(path);
+    const std::string mime = MimeDetector::detect(path);
     if (!mime.empty()) {
         auto it = mime_to_format.find(mime);
         if (it != mime_to_format.end()) return it->second;

@@ -255,13 +255,7 @@ set(ZSTD_LIBRARY libzstd_static CACHE STRING "" FORCE)
 set(ZSTD_LIBRARIES libzstd_static CACHE STRING "" FORCE)
 
 # libmagic
-if(WIN32)
-    find_path(LIBMAGIC_INCLUDE_DIR magic.h)
-    find_library(LIBMAGIC_LIB magic)
-    if(!LIBMAGIC_INCLUDE_DIR OR !LIBMAGIC_LIB)
-        message(FATAL_ERROR "libmagic not found. Install with vcpkg (vcpkg install libmagic) or MSYS2.")
-    endif()
-else()
+if(NOT WIN32)
     ExternalProject_Add(libmagic
             URL https://astron.com/pub/file/file-5.45.tar.gz
             URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
@@ -279,6 +273,7 @@ else()
     set(LIBMAGIC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libmagic-install/include)
     set(LIBMAGIC_LIB_DIR ${CMAKE_BINARY_DIR}/libmagic-install/lib)
     set(LIBMAGIC_LIB magic)
+
     # --- Embed compressed magic.mgc as header ---
     set(MAGIC_SRC "${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc")
     set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/src/utils/magic.mgc.h")
@@ -660,6 +655,8 @@ add_executable(monolith
         src/encoder/ape_encoder.hpp
         src/encoder/flexigif_encoder.cpp
         src/encoder/flexigif_encoder.hpp
+        src/utils/mime_detector.cpp
+        src/utils/mime_detector.hpp
 )
 if(WIN32)
     target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
@@ -683,13 +680,13 @@ target_include_directories(monolith PRIVATE
 add_dependencies(monolith mozjpeg ${ZLIB_TARGET})
 if(NOT WIN32)
     add_dependencies(monolith libmagic)
+    target_include_directories(monolith PRIVATE ${LIBMAGIC_INCLUDE_DIR})
 endif()
 
 target_include_directories(matroska PRIVATE
         ${libebml_BINARY_DIR}
 )
 target_include_directories(monolith PRIVATE
-        ${LIBMAGIC_INCLUDE_DIR}
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
         ${libpng_SOURCE_DIR}
@@ -718,9 +715,11 @@ target_include_directories(monolith PRIVATE
         ${zopfli_BINARY_DIR}/include
 )
 
-add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
-add_dependencies(embed_magic_header libmagic)
-add_dependencies(monolith embed_magic_header)
+if(NOT WIN32)
+    add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
+    add_dependencies(embed_magic_header libmagic)
+    add_dependencies(monolith embed_magic_header)
+endif()
 
 
 target_include_directories(zopflipng PUBLIC
@@ -730,10 +729,8 @@ target_include_directories(zopflipng PUBLIC
 
 # common libraries for all platforms
 set(MONOLITH_LIBS
-        ${LIBMAGIC_LIB}
         FLAC
         MAC
-        #liblzma
         giflib
         png_static
         archive_static
@@ -772,6 +769,7 @@ if(APPLE)
             ${COREVIDEO_FRAMEWORK}
             ${COREMEDIA_FRAMEWORK}
             ${VIDEOTOOLBOX_FRAMEWORK}
+            ${LIBMAGIC_LIB}
     )
 elseif(UNIX)
     # linux: ffmpeg often needs pthread, dl, m
@@ -779,6 +777,7 @@ elseif(UNIX)
             pthread
             dl
             m
+            ${LIBMAGIC_LIB}
     )
 elseif(WIN32)
     # windows: depending on ffmpeg build, these are common

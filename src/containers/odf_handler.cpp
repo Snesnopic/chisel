@@ -15,6 +15,7 @@
 #include <vector>
 #include "../encoder/zopflipng_encoder.hpp"
 #include "../utils/random_utils.hpp"
+#include "../utils/mime_detector.hpp"
 
 static const char *handler_tag_for(ContainerFormat fmt) {
     switch (fmt) {
@@ -134,9 +135,10 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
         ofs.close();
 
         // nested container detection
-        const std::string mime = detect_mime_type(out_path.string());
+        const std::string mime = MimeDetector::detect(out_path);
         auto it = mime_to_format.find(mime);
         ContainerFormat inner_fmt = (it != mime_to_format.end()) ? it->second : ContainerFormat::Unknown;
+
 
         if (inner_fmt != ContainerFormat::Unknown && can_read_format(inner_fmt)) {
             Logger::log(LogLevel::DEBUG, "Found nested container: " + out_path.string() + " (" + mime + ")",

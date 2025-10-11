@@ -16,10 +16,6 @@
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Begin support for using monolith as a library (public API, minimal dependencies).
 - [ ] Implement a UriHandler to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing encoders, and reinsert re-encoded content.
-- [ ] Abstract libmagic usage behind a cross‑platform `MimeDetector` wrapper:
-  - On Linux/macOS: use system libmagic.
-  - On Windows: allow static build or fallback to extension→MIME mapping.
-  - Ensure no DLL distribution is required for Windows standalone builds.
 
 ## FLAC
 
