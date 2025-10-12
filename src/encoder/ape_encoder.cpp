@@ -81,7 +81,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
                              true,   // analyze tag now
                              false); // don't read whole file at once
     if (!pDecompress || err != ERROR_SUCCESS) {
-        Logger::log(LogLevel::ERROR, "CAN'T CREATE APE DECOMPRESS", "ape_encoder");
+        Logger::log(LogLevel::Error, "CAN'T CREATE APE DECOMPRESS", "ape_encoder");
         if (pDecompress) delete pDecompress;
         throw std::runtime_error("Can't create APE decompress");
     }
@@ -93,7 +93,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
     ctx.total_samples   = pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_TOTAL_BLOCKS) / ctx.channels;
 
     if (ctx.channels == 0 || ctx.sample_rate == 0 || ctx.bits_per_sample == 0) {
-        Logger::log(LogLevel::ERROR, "INVALID APE FILE PARAMETERS", "ape_encoder");
+        Logger::log(LogLevel::Error, "INVALID APE FILE PARAMETERS", "ape_encoder");
         delete pDecompress;
         throw std::runtime_error("Invalid APE file");
     }
@@ -117,7 +117,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
 
         int rc = pDecompress->GetData(block.data(), samples_to_read, nullptr);
         if (rc != ERROR_SUCCESS) {
-            Logger::log(LogLevel::ERROR, "APE DECODING BLOCK FAILED", "ape_encoder");
+            Logger::log(LogLevel::Error, "APE DECODING BLOCK FAILED", "ape_encoder");
             delete pDecompress;
             throw std::runtime_error("APE decoding failed");
         }
@@ -136,7 +136,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
 
     APE::IAPECompress *pCompress = CreateIAPECompress();
     if (!pCompress) {
-        Logger::log(LogLevel::ERROR, "CAN'T CREATE APE ENCODER", "ape_encoder");
+        Logger::log(LogLevel::Error, "CAN'T CREATE APE ENCODER", "ape_encoder");
         throw std::runtime_error("Can't create APE encoder");
     }
 
@@ -154,7 +154,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
     );
 
     if (nRetVal != 0) {
-        Logger::log(LogLevel::ERROR, "ERROR STARTING APE ENCODER", "ape_encoder");
+        Logger::log(LogLevel::Error, "ERROR STARTING APE ENCODER", "ape_encoder");
         APE_SAFE_DELETE(pCompress)
         throw std::runtime_error("APE encoder start failed");
     }
@@ -168,7 +168,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
             static_cast<APE::int64>(n)
         );
         if (add_rc != 0) {
-            Logger::log(LogLevel::ERROR, "APE ENCODER ADDDATA() FAILED", "ape_encoder");
+            Logger::log(LogLevel::Error, "APE ENCODER ADDDATA() FAILED", "ape_encoder");
             pCompress->Finish(NULL, 0, 0);
             APE_SAFE_DELETE(pCompress)
             throw std::runtime_error("APE encoder AddData failed");
@@ -177,7 +177,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
     }
 
     if (pCompress->Finish(NULL, 0, 0) != 0) {
-        Logger::log(LogLevel::ERROR, "APE ENCODER FINISH() FAILED", "ape_encoder");
+        Logger::log(LogLevel::Error, "APE ENCODER FINISH() FAILED", "ape_encoder");
         APE_SAFE_DELETE(pCompress)
         throw std::runtime_error("APE encoder Finish failed");
     }
