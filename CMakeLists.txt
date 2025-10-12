@@ -5,7 +5,9 @@ project(monolith VERSION 0.1 LANGUAGES C CXX)
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
-
+if (WIN32)
+    add_compile_definitions(HAVE_UINTPTR_T=1 HAVE_STDINT_H=1 HAVE_INTTYPES_H=1)
+endif()
 cmake_policy(SET CMP0069 NEW)
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
@@ -113,7 +115,9 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         # MONOLITH_LINK_FLAGS is a list
         add_link_options(${MONOLITH_LINK_FLAGS})
     endif()
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    if(NOT MINGW)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/release)
 
 elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
@@ -127,7 +131,9 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
         endif()
         add_link_options(${MONOLITH_LINK_FLAGS})
     endif()
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    if(NOT MINGW)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/size)
 endif()
 
@@ -297,6 +303,26 @@ set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+add_library(ZLIB::ZLIB ALIAS zlibstatic)
+
+get_target_property(_zlib_type zlibstatic TYPE)
+if(_zlib_type STREQUAL "STATIC_LIBRARY")
+    set(_zlib_location $<TARGET_FILE:zlibstatic>)
+endif()
+
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dirs")
+if(MSVC)
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
+else()
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libzlibstatic.a" CACHE FILEPATH "zlib library")
+endif()
+set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
+set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
+
+set(ZLIB_H_PATH "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
+
 
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
@@ -368,11 +394,26 @@ set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBB2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
+set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
+set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR})
 
-# mozjpeg
+# --- mozjpeg via ExternalProject ---
+include(ExternalProject)
+
+if(MSVC)
+    # MSVC: la build di mozjpeg produce jpeg-static.lib
+    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/jpeg-static.lib")
+elseif(MINGW)
+    # MinGW: produce libjpeg.a
+    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
+else()
+    # Linux/macOS: produce libjpeg.a
+    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
+endif()
+
 ExternalProject_Add(mozjpeg
         SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/mozjpeg
         SOURCE_SUBDIR .
@@ -382,12 +423,44 @@ ExternalProject_Add(mozjpeg
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/mozjpeg-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -DPNG_SUPPORTED=0
         UPDATE_DISCONNECTED 1
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
-set(MOZJPEG_INCLUDE_DIR ${CMAKE_BINARY_DIR}/mozjpeg-install/include)
-set(MOZJPEG_LIB_DIR ${CMAKE_BINARY_DIR}/mozjpeg-install/lib)
 
+# --- copia jconfig.h generato nella cartella sorgente mozjpeg ---
+set(_mozjpeg_build_dir "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build")
+set(_mozjpeg_jconfig   "${_mozjpeg_build_dir}/jconfig.h")
+set(_mozjpeg_dest      "${CMAKE_SOURCE_DIR}/third_party/mozjpeg/jconfig.h")
+
+add_custom_command(
+        OUTPUT "${_mozjpeg_dest}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_mozjpeg_jconfig}" "${_mozjpeg_dest}"
+        DEPENDS mozjpeg
+        COMMENT "Copying mozjpeg jconfig.h into third_party/mozjpeg"
+)
+
+add_custom_target(copy_mozjpeg_jconfig DEPENDS "${_mozjpeg_dest}")
+
+# crea un target IMPORTED che punta al file prodotto
+add_library(mozjpeg_static STATIC IMPORTED GLOBAL)
+set_target_properties(mozjpeg_static PROPERTIES
+        IMPORTED_LOCATION "${_mozjpeg_lib}"
+        INTERFACE_INCLUDE_DIRECTORIES
+        "${CMAKE_SOURCE_DIR}/third_party/mozjpeg;${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build"
+)
+add_dependencies(mozjpeg_static mozjpeg copy_mozjpeg_jconfig)
+remove_definitions(JCONFIG_INCLUDED)
+# alias moderno (se qualcuno usa target moderni)
+add_library(JPEG::JPEG ALIAS mozjpeg_static)
+
+# --- Compatibilità con qpdf (usa variabili legacy) ---
+set(JPEG_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/mozjpeg" CACHE PATH "jpeg include dir")
+set(JPEG_INCLUDE_DIR "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
+set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
+set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
+set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 # libEBML
 set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
@@ -481,20 +554,40 @@ add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR})
 
 # libmseed
 set(libmseed_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmseed")
-set(libmseed_BINARY_DIR "${CMAKE_BINARY_DIR}/libmseed-build")
-set(libmseed_INSTALL_DIR "${CMAKE_BINARY_DIR}/libmseed-install")
-
-ExternalProject_Add(libmseed
-        SOURCE_DIR ${libmseed_SOURCE_DIR}
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND make
-        INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
-        BUILD_IN_SOURCE 1
-        BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/third_party/libmseed/libmseed.a
-)
+if(WIN32)
+    add_library(libmseed STATIC
+            ${libmseed_SOURCE_DIR}/fileutils.c
+            ${libmseed_SOURCE_DIR}/genutils.c
+            ${libmseed_SOURCE_DIR}/msio.c
+            ${libmseed_SOURCE_DIR}/lookup.c
+            ${libmseed_SOURCE_DIR}/yyjson.c
+            ${libmseed_SOURCE_DIR}/msrutils.c
+            ${libmseed_SOURCE_DIR}/extraheaders.c
+            ${libmseed_SOURCE_DIR}/pack.c
+            ${libmseed_SOURCE_DIR}/packdata.c
+            ${libmseed_SOURCE_DIR}/tracelist.c
+            ${libmseed_SOURCE_DIR}/gmtime64.c
+            ${libmseed_SOURCE_DIR}/crc32c.c
+            ${libmseed_SOURCE_DIR}/parseutils.c
+            ${libmseed_SOURCE_DIR}/unpack.c
+            ${libmseed_SOURCE_DIR}/unpackdata.c
+            ${libmseed_SOURCE_DIR}/selection.c
+            ${libmseed_SOURCE_DIR}/logging.c
+    )
+    target_include_directories(libmseed PUBLIC ${libmseed_SOURCE_DIR})
+else()
+    ExternalProject_Add(libmseed
+            SOURCE_DIR ${libmseed_SOURCE_DIR}
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND make
+            INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
+            BUILD_IN_SOURCE 1
+            BUILD_BYPRODUCTS ${libmseed_SOURCE_DIR}/libmseed.a
+    )
+endif()
 
 # gifsicle
-
+if(NOT WIN32) # we need to fork gifsicle and fix some stuff manually
 configure_file(
         ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/win32cfg.h
         ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/config.h
@@ -505,12 +598,12 @@ add_library(giflib STATIC
         third_party/gifsicle/src/fmalloc.c
         third_party/gifsicle/src/gifdiff.c
         third_party/gifsicle/src/giffunc.c
-        third_party/gifsicle/src/gifread.c
+        # third_party/gifsicle/src/gifread.c
         # third_party/gifsicle/src/gifsicle.c
         third_party/gifsicle/src/giftoc.c
         third_party/gifsicle/src/gifunopt.c
         # third_party/gifsicle/src/gifview.c
-        third_party/gifsicle/src/gifwrite.c
+        # third_party/gifsicle/src/gifwrite.c
         third_party/gifsicle/src/kcolor.c
         third_party/gifsicle/src/merge.c
         third_party/gifsicle/src/optimize.c
@@ -520,12 +613,14 @@ add_library(giflib STATIC
         third_party/gifsicle/src/support.c
         third_party/gifsicle/src/ungifwrt.c
 )
-
+if(WIN32)
+    target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
+endif()
 target_include_directories(giflib PUBLIC
         third_party/gifsicle/include
         third_party/gifsicle/src
 )
-
+endif()
 # Monkey's Audio
 
 # --- Patch MACLib.h to include All.h if missing ---
@@ -600,8 +695,6 @@ add_executable(monolith
         src/containers/ooxml_handler.hpp
         src/utils/random_utils.cpp
         src/utils/random_utils.hpp
-        src/encoder/gif_encoder.cpp
-        src/encoder/gif_encoder.hpp
         src/encoder/ape_encoder.cpp
         src/encoder/ape_encoder.hpp
         src/encoder/flexigif_encoder.cpp
@@ -609,7 +702,14 @@ add_executable(monolith
         src/utils/mime_detector.cpp
         src/utils/mime_detector.hpp
 )
+if(NOT WIN32)
+    add_executable(monolith
+            src/encoder/gif_encoder.cpp
+            src/encoder/gif_encoder.hpp
+    )
+endif()
 if(WIN32)
+    target_compile_definitions(monolith PRIVATE LIBARCHIVE_STATIC)
     target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
 elseif(APPLE)
     target_compile_definitions(monolith PRIVATE PLATFORM_APPLE)
@@ -643,6 +743,7 @@ target_include_directories(monolith PRIVATE
         ${libpng_SOURCE_DIR}
         ${libpng_BINARY_DIR}
         ${MOZJPEG_INCLUDE_DIR}
+        ${JPEG_INCLUDE}
         ${libarchive_SOURCE_DIR}/libarchive
         ${libarchive_BINARY_DIR}/libarchive
         ${libogg_SOURCE_DIR}/include
@@ -682,12 +783,10 @@ target_include_directories(zopflipng PUBLIC
 set(MONOLITH_LIBS
         FLAC
         MAC
-        giflib
         png_static
         archive_static
         ogg
-        ${libmseed_SOURCE_DIR}/libmseed.a
-        ${ZLIB_TARGET}
+        ZLIB::ZLIB
         ebml
         matroska
         wavpack
@@ -704,14 +803,15 @@ set(MONOLITH_LIBS
         tiff
         SQLite::SQLite3
 )
+if(NOT WIN32)
+    list(APPEND MONOLITH_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
+endif()
 
 if(UNIX)
     list(APPEND MONOLITH_LIBS
-
             ${LIBMAGIC_LIB}
     )
 elseif(WIN32)
-    # windows: depending on ffmpeg build, these are common
     list(APPEND MONOLITH_LIBS
             libmseed
     )

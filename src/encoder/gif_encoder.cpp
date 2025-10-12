@@ -1,7 +1,7 @@
 //
 // Created by Giuseppe Francione on 07/10/25.
 //
-
+#ifndef _WIN32
 extern "C" {
 #include <lcdfgif/gif.h>
 #include "gifsicle.h"
@@ -96,3 +96,4 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
                 "gif_encoder");
     return true;
 }
+#endif

@@ -65,7 +65,9 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
     };
 
     factories["image/gif"] = {
+#ifndef _WIN32
         [preserve_metadata] { return std::make_unique<GifEncoder>(preserve_metadata); },
+#endif
         [preserve_metadata] { return std::make_unique<FlexiGifEncoder>(preserve_metadata); }
     };
 
