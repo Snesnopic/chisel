@@ -604,6 +604,8 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             archive_entry_set_size(entry, static_cast<la_int64_t>(fsize));
 
             // check for hardlink
+            // TODO: fix this for windows
+            #ifndef _WIN32
             struct stat st{};
             if (stat(p.c_str(), &st) == 0 && st.st_nlink > 1) {
                 auto key = std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
@@ -615,6 +617,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
                     hardlink_map[key] = rel;
                 }
             }
+            #endif
         } else if (is_symlink) {
             // handle symlink
             archive_entry_set_filetype(entry, AE_IFLNK);
