@@ -316,8 +316,8 @@ if(_zlib_type STREQUAL "STATIC_LIBRARY")
     set(_zlib_location $<TARGET_FILE:zlibstatic>)
 endif()
 
-set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dirs")
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dirs")
 if(MSVC)
     set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
 else()
@@ -326,7 +326,7 @@ endif()
 set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
 set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
 
-set(ZLIB_H_PATH "${zlib_SOURCE_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
 
 
@@ -649,6 +649,21 @@ add_subdirectory(third_party/MACLib)
 target_include_directories(MAC PUBLIC
         third_party/MACLib/Shared
 )
+if(WIN32)
+    target_compile_definitions(MAC PRIVATE NO_MFC)
+        set(MACLIB_STDAFX "${CMAKE_SOURCE_DIR}/third_party/MACLib/Source/MacDll/stdafx.h")
+
+    if(EXISTS "${MACLIB_STDAFX}")
+        file(READ "${MACLIB_STDAFX}" _contents)
+
+        string(REPLACE "#include <afxwin.h>"  "//#include <afxwin.h>"  _contents "${_contents}")
+        string(REPLACE "#include <afxext.h>"  "//#include <afxext.h>"  _contents "${_contents}")
+        string(REPLACE "#include \"MFCGlobals.h\"" "//#include \"MFCGlobals.h\"" _contents "${_contents}")
+
+        file(WRITE "${MACLIB_STDAFX}" "${_contents}")
+    endif()
+endif()
+
 # monolith
 add_executable(monolith
         src/main.cpp
