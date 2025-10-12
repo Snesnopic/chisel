@@ -304,6 +304,7 @@ if(NOT WIN32)
 endif()
 
 # zlib
+if (WIN32)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
@@ -329,7 +330,15 @@ set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
 
 set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
+else (
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
+        set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+        set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+        add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+)
+endif ()
 
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
@@ -583,6 +592,8 @@ if(WIN32)
     )
     target_include_directories(libmseed PUBLIC ${libmseed_SOURCE_DIR})
 else()
+    set(libmseed_BINARY_DIR "${CMAKE_BINARY_DIR}/libmseed-build")
+    set(libmseed_INSTALL_DIR "${CMAKE_BINARY_DIR}/libmseed-install")
     ExternalProject_Add(libmseed
             SOURCE_DIR ${libmseed_SOURCE_DIR}
             CONFIGURE_COMMAND ""
@@ -605,12 +616,12 @@ add_library(giflib STATIC
         third_party/gifsicle/src/fmalloc.c
         third_party/gifsicle/src/gifdiff.c
         third_party/gifsicle/src/giffunc.c
-        # third_party/gifsicle/src/gifread.c
+        third_party/gifsicle/src/gifread.c
         # third_party/gifsicle/src/gifsicle.c
         third_party/gifsicle/src/giftoc.c
         third_party/gifsicle/src/gifunopt.c
         # third_party/gifsicle/src/gifview.c
-        # third_party/gifsicle/src/gifwrite.c
+        third_party/gifsicle/src/gifwrite.c
         third_party/gifsicle/src/kcolor.c
         third_party/gifsicle/src/merge.c
         third_party/gifsicle/src/optimize.c
@@ -666,7 +677,7 @@ if(WIN32)
 endif()
 
 # monolith
-add_executable(monolith
+set(MONOLITH_SOURCES
         src/main.cpp
         src/encoder/encoder.hpp
         src/encoder/flac_encoder.cpp
@@ -725,11 +736,14 @@ add_executable(monolith
         src/utils/mime_detector.hpp
 )
 if(NOT WIN32)
-    add_executable(monolith
+    list(APPEND MONOLITH_SOURCES
             src/encoder/gif_encoder.cpp
             src/encoder/gif_encoder.hpp
     )
 endif()
+
+add_executable(monolith ${MONOLITH_SOURCES})
+
 if(WIN32)
     target_compile_definitions(monolith PRIVATE LIBARCHIVE_STATIC)
     target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
@@ -808,7 +822,6 @@ set(MONOLITH_LIBS
         png_static
         archive_static
         ogg
-        ZLIB::ZLIB
         ebml
         matroska
         wavpack
@@ -826,7 +839,7 @@ set(MONOLITH_LIBS
         SQLite::SQLite3
 )
 if(NOT WIN32)
-    list(APPEND MONOLITH_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
+    list(APPEND MONOLITH_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib ${ZLIB_TARGET})
 endif()
 
 if(UNIX)
@@ -836,6 +849,7 @@ if(UNIX)
 elseif(WIN32)
     list(APPEND MONOLITH_LIBS
             libmseed
+            ZLIB::ZLIB
     )
 endif()
 target_compile_features(monolith PRIVATE cxx_std_23)
