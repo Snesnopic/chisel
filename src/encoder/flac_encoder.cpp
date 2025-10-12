@@ -48,7 +48,7 @@ static void error_callback(
     const FLAC__StreamDecoder *  /*decoder*/,
     FLAC__StreamDecoderErrorStatus status,
     void *) {
-    Logger::log(LogLevel::WARNING,
+    Logger::log(LogLevel::Warning,
                 std::string("FLAC decoder: ") + FLAC__StreamDecoderErrorStatusString[status],
                 "libFLAC");
 }
@@ -59,7 +59,7 @@ FlacEncoder::FlacEncoder(bool preserve_metadata) {
 
 bool FlacEncoder::recompress(const std::filesystem::path &input,
                              const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "Starting FLAC re-encoding: " + input.string(), "flac_encoder");
+    Logger::log(LogLevel::Info, "Starting FLAC re-encoding: " + input.string(), "flac_encoder");
 
     if (std::filesystem::exists(output)) {
         std::filesystem::remove(output);
@@ -69,20 +69,20 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
     DecodeContext ctx;
     FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new();
     if (!decoder) {
-        Logger::log(LogLevel::ERROR, "Can't create FLAC decoder", "flac_encoder");
+        Logger::log(LogLevel::Error, "Can't create FLAC decoder", "flac_encoder");
         throw std::runtime_error("Can't create FLAC decoder");
     }
 
     if (FLAC__stream_decoder_init_file(decoder, input.string().c_str(),
                                        write_callback, metadata_callback, error_callback,
                                        &ctx) != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
-        Logger::log(LogLevel::ERROR, "FLAC decoder init failed", "flac_encoder");
+        Logger::log(LogLevel::Error, "FLAC decoder init failed", "flac_encoder");
         FLAC__stream_decoder_delete(decoder);
         throw std::runtime_error("FLAC decoder init failed");
     }
 
     if (!FLAC__stream_decoder_process_until_end_of_stream(decoder)) {
-        Logger::log(LogLevel::ERROR, "FLAC decoding failed", "flac_encoder");
+        Logger::log(LogLevel::Error, "FLAC decoding failed", "flac_encoder");
         FLAC__stream_decoder_finish(decoder);
         FLAC__stream_decoder_delete(decoder);
         throw std::runtime_error("FLAC decoding failed");
@@ -92,11 +92,11 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
     FLAC__stream_decoder_delete(decoder);
 
     if (ctx.channels == 0 || ctx.sample_rate == 0) {
-        Logger::log(LogLevel::ERROR, "Invalid FLAC file", "flac_encoder");
+        Logger::log(LogLevel::Error, "Invalid FLAC file", "flac_encoder");
         throw std::runtime_error("Invalid FLAC file");
     }
 
-    Logger::log(LogLevel::DEBUG,
+    Logger::log(LogLevel::Debug,
                 "Params: " + std::to_string(ctx.channels) + "ch, " +
                 std::to_string(ctx.sample_rate) + "Hz, " +
                 std::to_string(ctx.bits_per_sample) + "bit",
@@ -139,7 +139,7 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
     // re-encoding
     FLAC__StreamEncoder *encoder = FLAC__stream_encoder_new();
     if (!encoder) {
-        Logger::log(LogLevel::ERROR, "Can't create FLAC encoder", "flac_encoder");
+        Logger::log(LogLevel::Error, "Can't create FLAC encoder", "flac_encoder");
         throw std::runtime_error("Can't create FLAC encoder");
     }
 
@@ -163,7 +163,7 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
 
     auto st = FLAC__stream_encoder_init_file(encoder, output.string().c_str(), nullptr, nullptr);
     if (st != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     std::string("FLAC init error: ") + FLAC__StreamEncoderInitStatusString[st],
                     "flac_encoder");
         FLAC__stream_encoder_delete(encoder);
@@ -174,7 +174,7 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
         encoder,
         ctx.pcm_data.data(),
         ctx.pcm_data.size() / ctx.channels)) {
-        Logger::log(LogLevel::ERROR, "Error during FLAC file write", "flac_encoder");
+        Logger::log(LogLevel::Error, "Error during FLAC file write", "flac_encoder");
         FLAC__stream_encoder_finish(encoder);
         FLAC__stream_encoder_delete(encoder);
         throw std::runtime_error("Error during FLAC file write");
@@ -191,6 +191,6 @@ bool FlacEncoder::recompress(const std::filesystem::path &input,
         free(metadata_blocks);
     }
 
-    Logger::log(LogLevel::INFO, "FLAC re-encoding completed: " + output.string(), "flac_encoder");
+    Logger::log(LogLevel::Info, "FLAC re-encoding completed: " + output.string(), "flac_encoder");
     return true;
 }

@@ -22,7 +22,7 @@ ZopfliPngEncoder::ZopfliPngEncoder(const bool preserve_metadata) {
 bool ZopfliPngEncoder::recompress(const fs::path& input,
                                   const fs::path& output)
 {
-    Logger::log(LogLevel::INFO, "Starting PNG optimization with ZopfliPNG: " + input.string(), "ZopfliPngEncoder");
+    Logger::log(LogLevel::Info, "Starting PNG optimization with ZopfliPNG: " + input.string(), "ZopfliPngEncoder");
 
     try {
         // configure options
@@ -42,7 +42,7 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         // read input file
         std::ifstream ifs(input, std::ios::binary);
         if (!ifs) {
-            Logger::log(LogLevel::ERROR, "Failed to open input file", "ZopfliPngEncoder");
+            Logger::log(LogLevel::Error, "Failed to open input file", "ZopfliPngEncoder");
             return false;
         }
         auto size = fs::file_size(input);
@@ -56,7 +56,7 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         std::vector<unsigned char> resultpng;
 
         if (ZopfliPNGOptimize(origpng, opts, false, &resultpng) != 0) {
-            Logger::log(LogLevel::ERROR, "ZopfliPNG optimization failed for: " + input.string(), "ZopfliPngEncoder");
+            Logger::log(LogLevel::Error, "ZopfliPNG optimization failed for: " + input.string(), "ZopfliPngEncoder");
             return false;
         }
 
@@ -64,11 +64,11 @@ bool ZopfliPngEncoder::recompress(const fs::path& input,
         std::ofstream ofs(output, std::ios::binary);
         ofs.write(reinterpret_cast<const char*>(resultpng.data()), resultpng.size());
 
-        Logger::log(LogLevel::INFO, "PNG optimization finished: " + output.string(), "ZopfliPngEncoder");
+        Logger::log(LogLevel::Info, "PNG optimization finished: " + output.string(), "ZopfliPngEncoder");
         return true;
     }
     catch (const std::exception& e) {
-        Logger::log(LogLevel::ERROR, std::string("Exception during ZopfliPNG optimization: ") + e.what(), "ZopfliPngEncoder");
+        Logger::log(LogLevel::Error, std::string("Exception during ZopfliPNG optimization: ") + e.what(), "ZopfliPngEncoder");
         return false;
     }
 }

@@ -125,7 +125,7 @@ void MimeDetector::ensure_magic_installed()
     const auto target = get_magic_file_path();
     if (!std::filesystem::exists(target))
     {
-        Logger::log(LogLevel::INFO, "Installing embedded magic.mgc to " + target.string(), "libmagic");
+        Logger::log(LogLevel::Info, "Installing embedded magic.mgc to " + target.string(), "libmagic");
         std::filesystem::create_directories(target.parent_path());
 
         const auto decompressed = decompress_gzip(embedded_magic_mgc, embedded_magic_mgc_len);

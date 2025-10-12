@@ -56,7 +56,7 @@ namespace {
     void jpeg_error_exit_throw(const j_common_ptr cinfo) {
         auto *err = reinterpret_cast<JpegErrorMgr *>(cinfo->err);
         (*cinfo->err->format_message)(cinfo, err->msg);
-        Logger::log(LogLevel::WARNING, std::string("libjpeg: ") + err->msg, "libjpeg");
+        Logger::log(LogLevel::Warning, std::string("libjpeg: ") + err->msg, "libjpeg");
         throw std::runtime_error(err->msg);
     }
 
@@ -78,17 +78,17 @@ JpegEncoder::JpegEncoder(const bool preserve_metadata) {
 
 bool JpegEncoder::recompress(const std::filesystem::path &input,
                              const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "Start JPEG recompression: " + input.string(), "jpeg_encoder");
+    Logger::log(LogLevel::Info, "Start JPEG recompression: " + input.string(), "jpeg_encoder");
 
     // open input/output in c style for libjpeg apis
     FILE *infile = std::fopen(input.string().c_str(), "rb");
     if (!infile) {
-        Logger::log(LogLevel::ERROR, "Cannot open JPEG input: " + input.string(), "jpeg_encoder");
+        Logger::log(LogLevel::Error, "Cannot open JPEG input: " + input.string(), "jpeg_encoder");
         throw std::runtime_error("Cannot open JPEG input: " + input.string());
     }
     FILE *outfile = std::fopen(output.string().c_str(), "wb");
     if (!outfile) {
-        Logger::log(LogLevel::ERROR, "Cannot open JPEG output: " + output.string(), "jpeg_encoder");
+        Logger::log(LogLevel::Error, "Cannot open JPEG output: " + output.string(), "jpeg_encoder");
         std::fclose(infile);
         throw std::runtime_error("Cannot open JPEG output: " + output.string());
     }
@@ -117,11 +117,11 @@ bool JpegEncoder::recompress(const std::filesystem::path &input,
 
         // read header and file structure
         if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
-            Logger::log(LogLevel::ERROR, "Invalid JPEG header: " + input.string(), "jpeg_encoder");
+            Logger::log(LogLevel::Error, "Invalid JPEG header: " + input.string(), "jpeg_encoder");
             throw std::runtime_error("Invalid JPEG header");
         }
 
-        Logger::log(LogLevel::DEBUG,
+        Logger::log(LogLevel::Debug,
                     std::string("JPEG ") + (srcinfo.progressive_mode ? "progressive" : "baseline"),
                     "jpeg_encoder");
 
@@ -159,7 +159,7 @@ bool JpegEncoder::recompress(const std::filesystem::path &input,
         std::fclose(infile);
         std::fclose(outfile);
 
-        Logger::log(LogLevel::INFO, "JPEG recompression completed: " + output.string(), "jpeg_encoder");
+        Logger::log(LogLevel::Info, "JPEG recompression completed: " + output.string(), "jpeg_encoder");
         return true;
     } catch (...) {
         // cleanup in case of exception

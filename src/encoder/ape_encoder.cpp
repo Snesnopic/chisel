@@ -66,7 +66,7 @@ ApeEncoder::ApeEncoder(const bool preserve_metadata) {
 
 bool ApeEncoder::recompress(const std::filesystem::path &input,
                             const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "STARTING APE RE-ENCODING: " + input.string(), "ape_encoder");
+    Logger::log(LogLevel::Info, "STARTING APE RE-ENCODING: " + input.string(), "ape_encoder");
 
     if (std::filesystem::exists(output)) {
         std::filesystem::remove(output);
@@ -98,7 +98,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
         throw std::runtime_error("Invalid APE file");
     }
 
-    Logger::log(LogLevel::DEBUG,
+    Logger::log(LogLevel::Debug,
                 "PARAMS: " + std::to_string(ctx.channels) + "ch, " +
                 std::to_string(ctx.sample_rate) + "Hz, " +
                 std::to_string(ctx.bits_per_sample) + "bit",
@@ -185,12 +185,12 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
 
     if (preserve_metadata_) {
         if (!copy_apetag(input, output)) {
-            Logger::log(LogLevel::WARNING, "APEV2 METADATA COPY FAILED OR NOT PRESENT", "ape_encoder");
+            Logger::log(LogLevel::Warning, "APEV2 METADATA COPY FAILED OR NOT PRESENT", "ape_encoder");
         } else {
-            Logger::log(LogLevel::DEBUG, "APEV2 METADATA COPIED", "ape_encoder");
+            Logger::log(LogLevel::Debug, "APEV2 METADATA COPIED", "ape_encoder");
         }
     }
 
-    Logger::log(LogLevel::INFO, "APE RE-ENCODING COMPLETED: " + output.string(), "ape_encoder");
+    Logger::log(LogLevel::Info, "APE RE-ENCODING COMPLETED: " + output.string(), "ape_encoder");
     return true;
 }

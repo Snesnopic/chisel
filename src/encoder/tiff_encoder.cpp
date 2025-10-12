@@ -70,17 +70,17 @@ static void copy_tags_with_metadata(TIFF* in, TIFF* out) {
 // recompress implementation
 bool TiffEncoder::recompress(const std::filesystem::path& input,
                              const std::filesystem::path& output) {
-    Logger::log(LogLevel::INFO, "Re-encoding " + input.string(), "TIFF");
+    Logger::log(LogLevel::Info, "Re-encoding " + input.string(), "TIFF");
 
     TIFF* in = TIFFOpen(input.string().c_str(), "r");
     if (!in) {
-        Logger::log(LogLevel::ERROR, "Failed to open input TIFF", "TIFF");
+        Logger::log(LogLevel::Error, "Failed to open input TIFF", "TIFF");
         return false;
     }
 
     TIFF* out = TIFFOpen(output.string().c_str(), "w");
     if (!out) {
-        Logger::log(LogLevel::ERROR, "Failed to open output TIFF", "TIFF");
+        Logger::log(LogLevel::Error, "Failed to open output TIFF", "TIFF");
         TIFFClose(in);
         return false;
     }
@@ -99,13 +99,13 @@ bool TiffEncoder::recompress(const std::filesystem::path& input,
             for (ttile_t t = 0; t < tile_max; ++t) {
                 const tsize_t read = TIFFReadEncodedTile(in, t, buf.data(), tile_size);
                 if (read < 0) {
-                    Logger::log(LogLevel::ERROR, "Failed to read tile", "TIFF");
+                    Logger::log(LogLevel::Error, "Failed to read tile", "TIFF");
                     TIFFClose(in);
                     TIFFClose(out);
                     return false;
                 }
                 if (TIFFWriteEncodedTile(out, t, buf.data(), read) < 0) {
-                    Logger::log(LogLevel::ERROR, "Failed to write tile", "TIFF");
+                    Logger::log(LogLevel::Error, "Failed to write tile", "TIFF");
                     TIFFClose(in);
                     TIFFClose(out);
                     return false;
@@ -120,13 +120,13 @@ bool TiffEncoder::recompress(const std::filesystem::path& input,
             for (tstrip_t s = 0; s < strip_max; ++s) {
                 const tsize_t read = TIFFReadEncodedStrip(in, s, buf.data(), strip_size);
                 if (read < 0) {
-                    Logger::log(LogLevel::ERROR, "Failed to read strip", "TIFF");
+                    Logger::log(LogLevel::Error, "Failed to read strip", "TIFF");
                     TIFFClose(in);
                     TIFFClose(out);
                     return false;
                 }
                 if (TIFFWriteEncodedStrip(out, s, buf.data(), read) < 0) {
-                    Logger::log(LogLevel::ERROR, "Failed to write strip", "TIFF");
+                    Logger::log(LogLevel::Error, "Failed to write strip", "TIFF");
                     TIFFClose(in);
                     TIFFClose(out);
                     return false;
@@ -136,7 +136,7 @@ bool TiffEncoder::recompress(const std::filesystem::path& input,
 
         // close current directory in output
         if (!TIFFWriteDirectory(out)) {
-            Logger::log(LogLevel::ERROR, "Failed to write TIFF directory", "TIFF");
+            Logger::log(LogLevel::Error, "Failed to write TIFF directory", "TIFF");
             TIFFClose(in);
             TIFFClose(out);
             return false;
@@ -147,6 +147,6 @@ bool TiffEncoder::recompress(const std::filesystem::path& input,
     TIFFClose(in);
     TIFFClose(out);
 
-    Logger::log(LogLevel::INFO, "Re-encoding complete", "TIFF");
+    Logger::log(LogLevel::Info, "Re-encoding complete", "TIFF");
     return true;
 }

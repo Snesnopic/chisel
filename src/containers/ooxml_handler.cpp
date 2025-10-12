@@ -47,7 +47,7 @@ static const char* ext_for(ContainerFormat fmt) {
 
 ContainerJob OoxmlHandler::prepare(const std::string &path) {
     const char* tag = handler_tag_for(fmt_);
-    Logger::log(LogLevel::INFO, "Preparing OOXML handler: " + path, tag);
+    Logger::log(LogLevel::Info, "Preparing OOXML handler: " + path, tag);
 
     ContainerJob job;
     job.original_path = path;
@@ -70,7 +70,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
         return job;
     }
     if (open_r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), tag);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), tag);
     }
 
     archive_entry *entry;
@@ -78,7 +78,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
     while ((r = archive_read_next_header(in, &entry)) == ARCHIVE_OK) {
         const char *ename = archive_entry_pathname(entry);
         if (!ename) {
-            Logger::log(LogLevel::WARNING, "Entry with null name skipped", tag);
+            Logger::log(LogLevel::Warning, "Entry with null name skipped", tag);
             archive_read_data_skip(in);
             continue;
         }
@@ -121,7 +121,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
         const ContainerFormat fmt = mime_to_container_format(mime);
 
         if (fmt != ContainerFormat::Unknown && can_read_format(fmt)) {
-            Logger::log(LogLevel::DEBUG, "Found nested container in OOXML: " + out_path.string() + " (" + mime + ")", tag);
+            Logger::log(LogLevel::Debug, "Found nested container in OOXML: " + out_path.string() + " (" + mime + ")", tag);
             if (fmt == this->fmt_) {
                 OoxmlHandler nested(this->fmt_);
                 job.children.push_back(nested.prepare(out_path.string()));
@@ -141,7 +141,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
     archive_read_close(in);
     archive_read_free(in);
 
-    Logger::log(LogLevel::DEBUG, std::string("OOXML prepare complete: ")
+    Logger::log(LogLevel::Debug, std::string("OOXML prepare complete: ")
                                  + std::to_string(job.file_list.size()) +
                                  " files, " + std::to_string(job.children.size()) + " nested containers", tag);
 
@@ -150,7 +150,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
 
 bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     const char* tag = handler_tag_for(fmt_);
-    Logger::log(LogLevel::INFO, "Finalizing OOXML container: " + job.original_path, tag);
+    Logger::log(LogLevel::Info, "Finalizing OOXML container: " + job.original_path, tag);
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -183,7 +183,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     // set ZIP format and force deflate compression
     int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
     if (set_fmt != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "Failed to set ZIP format: " + std::string(archive_error_string(out)), tag);
@@ -194,7 +194,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
     if (open_w != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "Failed to open temp OOXML for writing: " + std::string(archive_error_string(out)), tag);
@@ -233,13 +233,13 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         // recompress only PNG/JPG images, leave XML and others untouched
         if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
             final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
-            Logger::log(LogLevel::DEBUG,
+            Logger::log(LogLevel::Debug,
                         "Recompressed image: " + rel.string() + " (" +
                         std::to_string(buf.size()) + " -> " +
                         std::to_string(final_data.size()) + " bytes)", tag);
         } else {
             final_data = buf;
-            Logger::log(LogLevel::DEBUG, "Copied entry unchanged: " + rel.string(), tag);
+            Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), tag);
         }
 
         archive_entry *entry = archive_entry_new();
@@ -258,7 +258,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         int wh = archive_write_header(out, entry);
         if (wh == ARCHIVE_WARN) {
-            Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
+            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
         }
         if (wh != ARCHIVE_OK) {
             Logger::log(LogLevel::ERROR,
@@ -303,20 +303,20 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             Logger::log(LogLevel::ERROR, "Failed to replace original OOXML: " + ec.message(), tag);
             return false;
         }
-        Logger::log(LogLevel::INFO,
+        Logger::log(LogLevel::Info,
                     "Optimized OOXML: " + src_path.string() +
                     " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)", tag);
     } else {
         fs::remove(tmp_path, ec);
-        Logger::log(LogLevel::DEBUG, "No improvement for: " + src_path.string(), tag);
+        Logger::log(LogLevel::Debug, "No improvement for: " + src_path.string(), tag);
     }
 
     // cleanup temp dir
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::WARNING, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", tag);
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", tag);
     } else {
-        Logger::log(LogLevel::DEBUG, "Removed temp dir: " + job.temp_dir, tag);
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, tag);
     }
 
     return true;

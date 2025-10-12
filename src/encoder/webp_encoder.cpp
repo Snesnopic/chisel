@@ -18,32 +18,32 @@ WebpEncoder::WebpEncoder(const bool preserve_metadata) {
 
 bool WebpEncoder::recompress(const std::filesystem::path& input,
                              const std::filesystem::path& output) {
-    Logger::log(LogLevel::INFO, "Starting WebP recompression: " + input.string(), "webp_encoder");
+    Logger::log(LogLevel::Info, "Starting WebP recompression: " + input.string(), "webp_encoder");
 
     // read input file into memory
     std::ifstream file(input, std::ios::binary | std::ios::ate);
     if (!file) {
-        Logger::log(LogLevel::ERROR, "Cannot open input file: " + input.string(), "webp_encoder");
+        Logger::log(LogLevel::Error, "Cannot open input file: " + input.string(), "webp_encoder");
         throw std::runtime_error("cannot open input file");
     }
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
     std::vector<uint8_t> input_data(size);
     if (!file.read(reinterpret_cast<char*>(input_data.data()), size)) {
-        Logger::log(LogLevel::ERROR, "Failed to read input file: " + input.string(), "webp_encoder");
+        Logger::log(LogLevel::Error, "Failed to read input file: " + input.string(), "webp_encoder");
         throw std::runtime_error("failed to read input file");
     }
 
     // inspect bitstream features to decide if recompression is meaningful
     WebPBitstreamFeatures features;
     if (WebPGetFeatures(input_data.data(), input_data.size(), &features) != VP8_STATUS_OK) {
-        Logger::log(LogLevel::ERROR, "WebP feature detection failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebP feature detection failed", "webp_encoder");
         throw std::runtime_error("webp feature detection failed");
     }
 
     // if input is lossy, skip recompression (would only increase size)
     if (features.format != 2) { // 2 = lossless
-        Logger::log(LogLevel::INFO, "Input is lossy WebP, skipping recompression", "webp_encoder");
+        Logger::log(LogLevel::Info, "Input is lossy WebP, skipping recompression", "webp_encoder");
         throw std::runtime_error("Input is lossy, can't recompress further");
     }
 
@@ -51,7 +51,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     int width = 0, height = 0;
     uint8_t* decoded = WebPDecodeRGBA(input_data.data(), input_data.size(), &width, &height);
     if (!decoded) {
-        Logger::log(LogLevel::ERROR, "WebP decode failed: " + input.string(), "webp_encoder");
+        Logger::log(LogLevel::Error, "WebP decode failed: " + input.string(), "webp_encoder");
         throw std::runtime_error("webp decode failed");
     }
 
@@ -59,19 +59,19 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     WebPConfig config;
     if (!WebPConfigInit(&config)) {
         WebPFree(decoded);
-        Logger::log(LogLevel::ERROR, "WebPConfigInit failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPConfigInit failed", "webp_encoder");
         throw std::runtime_error("WebPConfigInit failed");
     }
     if (!WebPConfigLosslessPreset(&config, 9)) {
         WebPFree(decoded);
-        Logger::log(LogLevel::ERROR, "WebPConfigLosslessPreset failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPConfigLosslessPreset failed", "webp_encoder");
         throw std::runtime_error("WebPConfigLosslessPreset failed");
     }
 
     WebPPicture picture;
     if (!WebPPictureInit(&picture)) {
         WebPFree(decoded);
-        Logger::log(LogLevel::ERROR, "WebPPictureInit failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPPictureInit failed", "webp_encoder");
         throw std::runtime_error("WebPPictureInit failed");
     }
     picture.width = width;
@@ -79,7 +79,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     if (!WebPPictureImportRGBA(&picture, decoded, width * 4)) {
         WebPPictureFree(&picture);
         WebPFree(decoded);
-        Logger::log(LogLevel::ERROR, "WebPPictureImportRGBA failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPPictureImportRGBA failed", "webp_encoder");
         throw std::runtime_error("WebPPictureImportRGBA failed");
     }
     WebPFree(decoded);
@@ -93,7 +93,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     if (!WebPEncode(&config, &picture)) {
         WebPPictureFree(&picture);
         WebPMemoryWriterClear(&writer);
-        Logger::log(LogLevel::ERROR, "WebPEncode failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPEncode failed", "webp_encoder");
         throw std::runtime_error("WebPEncode failed");
     }
     WebPPictureFree(&picture);
@@ -106,7 +106,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     WebPMux* mux = WebPMuxCreate(&output_image, 1);
     if (!mux) {
         WebPMemoryWriterClear(&writer);
-        Logger::log(LogLevel::ERROR, "WebPMuxCreate failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPMuxCreate failed", "webp_encoder");
         throw std::runtime_error("WebPMuxCreate failed");
     }
 
@@ -136,7 +136,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     if (WebPMuxAssemble(mux, &final_data) != WEBP_MUX_OK) {
         WebPMuxDelete(mux);
         WebPMemoryWriterClear(&writer);
-        Logger::log(LogLevel::ERROR, "WebPMuxAssemble failed", "webp_encoder");
+        Logger::log(LogLevel::Error, "WebPMuxAssemble failed", "webp_encoder");
         throw std::runtime_error("WebPMuxAssemble failed");
     }
 
@@ -146,7 +146,7 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
         WebPMuxDelete(mux);
         WebPMemoryWriterClear(&writer);
         WebPDataClear(&final_data);
-        Logger::log(LogLevel::ERROR, "Cannot open output file: " + output.string(), "webp_encoder");
+        Logger::log(LogLevel::Error, "Cannot open output file: " + output.string(), "webp_encoder");
         throw std::runtime_error("cannot open output file");
     }
     out.write(reinterpret_cast<const char*>(final_data.bytes), final_data.size);
@@ -156,6 +156,6 @@ bool WebpEncoder::recompress(const std::filesystem::path& input,
     WebPMemoryWriterClear(&writer);
     WebPDataClear(&final_data);
 
-    Logger::log(LogLevel::INFO, "WebP recompression completed: " + output.string(), "webp_encoder");
+    Logger::log(LogLevel::Info, "WebP recompression completed: " + output.string(), "webp_encoder");
     return true;
 }

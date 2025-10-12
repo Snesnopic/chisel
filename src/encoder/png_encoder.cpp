@@ -13,12 +13,12 @@
 
 namespace {
     void png_error_fn(png_structp, const png_const_charp msg) {
-        Logger::log(LogLevel::ERROR, std::string("libpng: ") + msg, "libpng");
+        Logger::log(LogLevel::Error, std::string("libpng: ") + msg, "libpng");
         throw std::runtime_error(msg);
     }
 
     void png_warning_fn(png_structp, const png_const_charp msg) {
-        Logger::log(LogLevel::WARNING, std::string("libpng: ") + msg, "libpng");
+        Logger::log(LogLevel::Warning, std::string("libpng: ") + msg, "libpng");
     }
 
     struct FileCloser {
@@ -184,30 +184,30 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
                             const std::filesystem::path &output) {
     // pass 1: open input and scan
     {
-        Logger::log(LogLevel::INFO, "Start PNG recompression: " + input.string(), "png_encoder");
+        Logger::log(LogLevel::Info, "Start PNG recompression: " + input.string(), "png_encoder");
 
         unique_FILE fp(std::fopen(input.string().c_str(), "rb"));
         if (!fp) {
-            Logger::log(LogLevel::ERROR, "Cannot open PNG input: " + input.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "Cannot open PNG input: " + input.string(), "png_encoder");
             throw std::runtime_error("Cannot open PNG input (pass 1)");
         }
 
         PngRead rd;
         rd.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
         if (!rd.png) {
-            Logger::log(LogLevel::ERROR, "png_create_read_struct failed: " + input.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "png_create_read_struct failed: " + input.string(), "png_encoder");
             throw std::runtime_error("png_create_read_struct failed (pass 1)");
         }
         png_set_error_fn(rd.png, nullptr, png_error_fn, png_warning_fn);
 
         rd.info = png_create_info_struct(rd.png);
         if (!rd.info) {
-            Logger::log(LogLevel::ERROR, "png_create_info_struct failed: " + input.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "png_create_info_struct failed: " + input.string(), "png_encoder");
             throw std::runtime_error("png_create_info_struct failed (pass 1)");
         }
 
         if (setjmp(png_jmpbuf(rd.png))) {
-            Logger::log(LogLevel::ERROR, "libpng error: " + input.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "libpng error: " + input.string(), "png_encoder");
             throw std::runtime_error("libpng error (pass 1)");
         }
 
@@ -266,25 +266,25 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
         {
             unique_FILE fp2(std::fopen(input.string().c_str(), "rb"));
             if (!fp2) {
-                Logger::log(LogLevel::ERROR, "cannot reopen PNG input: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "cannot reopen PNG input: " + input.string(), "png_encoder");
                 throw std::runtime_error("cannot reopen PNG input (pass 2)");
             }
 
             PngRead rd2;
             rd2.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
             if (!rd2.png) {
-                Logger::log(LogLevel::ERROR, "png_create_read_struct failed: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "png_create_read_struct failed: " + input.string(), "png_encoder");
                 throw std::runtime_error("png_create_read_struct failed (pass 2)");
             }
             png_set_error_fn(rd2.png, nullptr, png_error_fn, png_warning_fn);
 
             rd2.info = png_create_info_struct(rd2.png);
             if (!rd2.info) {
-                Logger::log(LogLevel::ERROR, "png_create_info_struct failed: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "png_create_info_struct failed: " + input.string(), "png_encoder");
                 throw std::runtime_error("png_create_info_struct failed (pass 2)");
             }
             if (setjmp(png_jmpbuf(rd2.png))) {
-                Logger::log(LogLevel::ERROR, "libpng error: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "libpng error: " + input.string(), "png_encoder");
                 throw std::runtime_error("libpng error (pass 2)");
             }
 
@@ -316,23 +316,23 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             // prepare writer
             const unique_FILE fp_out(std::fopen(output.string().c_str(), "wb"));
             if (!fp_out) {
-                Logger::log(LogLevel::ERROR, "cannot open PNG output: " + output.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "cannot open PNG output: " + output.string(), "png_encoder");
                 throw std::runtime_error("cannot open PNG output");
             }
 
             PngWrite wr;
             wr.png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
             if (!wr.png) {
-                Logger::log(LogLevel::ERROR, "png_create_write_struct failed: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "png_create_write_struct failed: " + input.string(), "png_encoder");
                 throw std::runtime_error("png_create_write_struct failed (writer)");
             }
             wr.info = png_create_info_struct(wr.png);
             if (!wr.info) {
-                Logger::log(LogLevel::ERROR, "png_create_info_struct failed: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "png_create_info_struct failed: " + input.string(), "png_encoder");
                 throw std::runtime_error("png_create_info_struct failed (writer)");
             }
             if (setjmp(png_jmpbuf(wr.png))) {
-                Logger::log(LogLevel::ERROR, "libpng write error: " + input.string(), "png_encoder");
+                Logger::log(LogLevel::Error, "libpng write error: " + input.string(), "png_encoder");
                 throw std::runtime_error("libpng write error");
             }
 
@@ -429,6 +429,6 @@ bool PngEncoder::recompress(const std::filesystem::path &input,
             png_write_end(wr.png, wr.info);
         }
     }
-    Logger::log(LogLevel::INFO, "PNG reencoding completed: " + output.string(), "png_encoder");
+    Logger::log(LogLevel::Info, "PNG reencoding completed: " + output.string(), "png_encoder");
     return true;
 }

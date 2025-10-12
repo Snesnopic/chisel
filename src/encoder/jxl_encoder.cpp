@@ -36,19 +36,19 @@ JXLEncoder::JXLEncoder(const bool preserve_metadata) {
 // recompress implementation
 bool JXLEncoder::recompress(const std::filesystem::path &input,
                             const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "Re-encoding " + input.string(), "JXL");
+    Logger::log(LogLevel::Info, "Re-encoding " + input.string(), "JXL");
 
     // read input file
     std::vector<uint8_t> input_buf;
     if (!read_file(input, input_buf)) {
-        Logger::log(LogLevel::ERROR, "Failed to read input file", "JXL");
+        Logger::log(LogLevel::Error, "Failed to read input file", "JXL");
         return false;
     }
 
     // decoder setup
     JxlDecoder* dec = JxlDecoderCreate(nullptr);
     if (!dec) {
-        Logger::log(LogLevel::ERROR, "Failed to create decoder", "JXL");
+        Logger::log(LogLevel::Error, "Failed to create decoder", "JXL");
         return false;
     }
 
@@ -74,13 +74,13 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
     for (;;) {
         const JxlDecoderStatus status = JxlDecoderProcessInput(dec);
         if (status == JXL_DEC_ERROR) {
-            Logger::log(LogLevel::ERROR, "Decode error", "JXL");
+            Logger::log(LogLevel::Error, "Decode error", "JXL");
             ok = false;
             break;
         }
         if (status == JXL_DEC_BASIC_INFO) {
             if (JXL_DEC_SUCCESS != JxlDecoderGetBasicInfo(dec, &info)) {
-                Logger::log(LogLevel::ERROR, "Failed to get basic info", "JXL");
+                Logger::log(LogLevel::Error, "Failed to get basic info", "JXL");
                 ok = false;
                 break;
             }
@@ -89,7 +89,7 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
         if (status == JXL_DEC_FRAME) {
             JxlFrameHeader header;
             if (JXL_DEC_SUCCESS != JxlDecoderGetFrameHeader(dec, &header)) {
-                Logger::log(LogLevel::ERROR, "Failed to get frame header", "JXL");
+                Logger::log(LogLevel::Error, "Failed to get frame header", "JXL");
                 ok = false;
                 break;
             }
@@ -99,7 +99,7 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
             if (JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer(dec, &format,
                                                               frame.pixels.data(),
                                                               frame.pixels.size())) {
-                Logger::log(LogLevel::ERROR, "Failed to set output buffer", "JXL");
+                Logger::log(LogLevel::Error, "Failed to set output buffer", "JXL");
                 ok = false;
                 break;
             }
@@ -120,7 +120,7 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
     // encoder setup
     JxlEncoder* enc = JxlEncoderCreate(nullptr);
     if (!enc) {
-        Logger::log(LogLevel::ERROR, "Failed to create encoder", "JXL");
+        Logger::log(LogLevel::Error, "Failed to create encoder", "JXL");
         return false;
     }
 
@@ -134,7 +134,7 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
         if (JXL_ENC_SUCCESS != JxlEncoderAddImageFrame(frame_settings, &format,
                                                        frame.pixels.data(),
                                                        frame.pixels.size())) {
-            Logger::log(LogLevel::ERROR, "Failed to add image frame", "JXL");
+            Logger::log(LogLevel::Error, "Failed to add image frame", "JXL");
             JxlEncoderDestroy(enc);
             return false;
         }
@@ -159,19 +159,19 @@ bool JXLEncoder::recompress(const std::filesystem::path &input,
         avail_out = out_buf.size() - offset;
     }
     if (enc_status != JXL_ENC_SUCCESS) {
-        Logger::log(LogLevel::ERROR, "Encode error", "JXL");
+        Logger::log(LogLevel::Error, "Encode error", "JXL");
         JxlEncoderDestroy(enc);
         return false;
     }
     size_t out_size = next_out - out_buf.data();
     out_buf.resize(out_size);
     if (!write_file(output, out_buf)) {
-        Logger::log(LogLevel::ERROR, "Failed to write output file", "JXL");
+        Logger::log(LogLevel::Error, "Failed to write output file", "JXL");
         JxlEncoderDestroy(enc);
         return false;
     }
 
     JxlEncoderDestroy(enc);
-    Logger::log(LogLevel::INFO, "Re-encoding complete", "JXL");
+    Logger::log(LogLevel::Info, "Re-encoding complete", "JXL");
     return true;
 }

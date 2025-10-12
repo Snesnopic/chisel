@@ -27,13 +27,13 @@ GifEncoder::GifEncoder(const bool preserve_metadata) {
 
 bool GifEncoder::recompress(const std::filesystem::path &input,
                             const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO,
+    Logger::log(LogLevel::Info,
                 "Start GIF recompression: " + input.string(),
                 "gif_encoder");
 
     FILE* in = std::fopen(input.string().c_str(), "rb");
     if (!in) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     "Cannot open GIF input: " + input.string(),
                     "gif_encoder");
         throw std::runtime_error("Cannot open GIF input");
@@ -43,7 +43,7 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
     std::fclose(in);
 
     if (!gfs) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     "Failed to read GIF: " + input.string(),
                     "gif_encoder");
         return false;
@@ -68,7 +68,7 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
 
     FILE* out = std::fopen(output.string().c_str(), "wb");
     if (!out) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     "Cannot open GIF output: " + output.string(),
                     "gif_encoder");
         Gif_DeleteStream(gfs);
@@ -80,7 +80,7 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
     Gif_InitCompressInfo(&local_info);
 
     if (!Gif_FullWriteFile(gfs, &local_info, out)) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     "Failed to write GIF: " + output.string(),
                     "gif_encoder");
         std::fclose(out);
@@ -91,7 +91,7 @@ bool GifEncoder::recompress(const std::filesystem::path &input,
     std::fclose(out);
     Gif_DeleteStream(gfs);
 
-    Logger::log(LogLevel::INFO,
+    Logger::log(LogLevel::Info,
                 "GIF recompression completed: " + output.string(),
                 "gif_encoder");
     return true;

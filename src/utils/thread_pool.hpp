@@ -28,7 +28,7 @@ public:
         std::future<return_type> res = task->get_future(); {
             const std::unique_lock lock(queue_mutex_);
             if (stop_) {
-                Logger::log(LogLevel::ERROR, "ThreadPool error: enqueue on stopped ThreadPool", "ThreadPool");
+                Logger::log(LogLevel::Error, "ThreadPool error: enqueue on stopped ThreadPool", "ThreadPool");
                 throw std::runtime_error("enqueue on stopped ThreadPool");
             }
             tasks_.emplace([task]() { (*task)(); });

@@ -16,7 +16,7 @@ FlexiGifEncoder::FlexiGifEncoder(const bool preserve_metadata) {
 bool FlexiGifEncoder::recompress(const std::filesystem::path &input,
                                  const std::filesystem::path &output) {
     // log start
-    Logger::log(LogLevel::INFO,
+    Logger::log(LogLevel::Info,
                 "Start flexiGIF recompression: " + input.string(),
                 "flexigif_encoder");
 
@@ -30,7 +30,7 @@ bool FlexiGifEncoder::recompress(const std::filesystem::path &input,
         // validate decoded content
         const unsigned int numFrames = gif.getNumFrames();
         if (numFrames == 0) {
-            Logger::log(LogLevel::ERROR,
+            Logger::log(LogLevel::Error,
                         "Decoded GIF has no frames; skipping: " + input.string(),
                         "flexigif_encoder");
             return false;
@@ -45,7 +45,7 @@ bool FlexiGifEncoder::recompress(const std::filesystem::path &input,
             const auto& indices = frame.pixels;
 
             if (indices.empty()) {
-                Logger::log(LogLevel::WARNING,
+                Logger::log(LogLevel::Warning,
                             "Empty GIF frame; skipping frame " + std::to_string(frameIndex + 1),
                             "flexigif_encoder");
                 optimizedBits.emplace_back();
@@ -92,25 +92,25 @@ bool FlexiGifEncoder::recompress(const std::filesystem::path &input,
 
         gif.writeOptimized(output.string(), optimizedBits);
 
-        Logger::log(LogLevel::INFO,
+        Logger::log(LogLevel::Info,
                     "flexiGIF recompression completed: " + output.string(),
                     "flexigif_encoder");
         return true;
     }
     catch (const char* e) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     std::string("flexiGIF error: ") + (e ? e : "(no message)"),
                     "flexigif_encoder");
         return false;
     }
     catch (const std::exception& e) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     std::string("flexiGIF error: ") + e.what(),
                     "flexigif_encoder");
         return false;
     }
     catch (...) {
-        Logger::log(LogLevel::ERROR,
+        Logger::log(LogLevel::Error,
                     "Unknown flexiGIF error while processing " + input.string(),
                     "flexigif_encoder");
         return false;

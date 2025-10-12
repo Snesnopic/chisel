@@ -20,7 +20,7 @@ MseedEncoder::MseedEncoder(const bool preserve_metadata) {
 // recompress input miniSEED file into output file
 bool MseedEncoder::recompress(const std::filesystem::path &input,
                               const std::filesystem::path &output) {
-    Logger::log(LogLevel::INFO, "Starting MiniSEED recompression", name());
+    Logger::log(LogLevel::Info, "Starting MiniSEED recompression", name());
 
     MS3Record *msr = nullptr;
     uint32_t read_flags = 0;
@@ -67,7 +67,7 @@ bool MseedEncoder::recompress(const std::filesystem::path &input,
 
     ms3_readmsr(&msr, nullptr, read_flags, 0);
 
-    Logger::log(LogLevel::INFO, "Recompression completed successfully", name());
+    Logger::log(LogLevel::Info, "Recompression completed successfully", name());
     return true;
 }
 

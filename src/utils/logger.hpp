@@ -9,7 +9,7 @@
 #include <mutex>
 #include <iostream>
 
-enum class LogLevel { DEBUG, INFO, WARNING, ERROR, NONE };
+enum class LogLevel { Debug, Info, Warning, Error, None };
 
 class Logger {
 public:
@@ -26,7 +26,7 @@ private:
 
     static const char *level_to_string(LogLevel level);
 
-    LogLevel level_ = LogLevel::ERROR;
+    LogLevel level_ = LogLevel::Error;
     bool enabled_ = true;
     std::mutex mutex_;
 };

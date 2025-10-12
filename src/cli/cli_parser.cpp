@@ -55,11 +55,11 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
     flag_map["--log-level"] = [&](int& i, char** args) {
         std::string lvl = args[++i];
         std::ranges::transform(lvl, lvl.begin(), ::toupper);
-        if (lvl == "DEBUG") Logger::set_level(LogLevel::DEBUG);
-        else if (lvl == "INFO") Logger::set_level(LogLevel::INFO);
-        else if (lvl == "WARNING" || lvl == "WARN") Logger::set_level(LogLevel::WARNING);
-        else if (lvl == "ERROR") Logger::set_level(LogLevel::ERROR);
-        else if (lvl == "NONE") Logger::set_level(LogLevel::NONE);
+        if (lvl == "DEBUG") Logger::set_level(LogLevel::Debug);
+        else if (lvl == "INFO") Logger::set_level(LogLevel::Info);
+        else if (lvl == "WARNING" || lvl == "WARN") Logger::set_level(LogLevel::Warning);
+        else if (lvl == "ERROR") Logger::set_level(LogLevel::Error);
+        else if (lvl == "NONE") Logger::set_level(LogLevel::None);
         else throw std::runtime_error("Unknown log level: " + lvl);
     };
 

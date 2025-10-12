@@ -106,14 +106,14 @@ PdfEncoder::PdfEncoder(const bool preserve_metadata) {
 bool PdfEncoder::recompress(const fs::path& input,
                             const fs::path& output)
 {
-    Logger::log(LogLevel::INFO, "Starting PDF optimization: " + input.string(), "PdfEncoder");
+    Logger::log(LogLevel::Info, "Starting PDF optimization: " + input.string(), "PdfEncoder");
 
     try {
         QPDF pdf;
 
         // redirect qpdf warnings and errors into logger
-        LoggerStreamBuf warn_buf{LogLevel::WARNING, "PdfEncoder"};
-        LoggerStreamBuf err_buf{LogLevel::ERROR, "PdfEncoder"};
+        LoggerStreamBuf warn_buf{LogLevel::Warning, "PdfEncoder"};
+        LoggerStreamBuf err_buf{LogLevel::Error, "PdfEncoder"};
         std::ostream warn_os(&warn_buf);
         std::ostream err_os(&err_buf);
         auto qlogger = QPDFLogger::create();
@@ -123,7 +123,7 @@ bool PdfEncoder::recompress(const fs::path& input,
         pdf.processFile(input.string().c_str());
 
         if (!preserve_metadata_) {
-            Logger::log(LogLevel::INFO, "Stripping metadata (Info/XMP)", "PdfEncoder");
+            Logger::log(LogLevel::Info, "Stripping metadata (Info/XMP)", "PdfEncoder");
             strip_metadata(pdf);
         }
 
@@ -135,12 +135,12 @@ bool PdfEncoder::recompress(const fs::path& input,
 
             const QPDFObjectHandle dict = obj.getDict();
             if (dict.isDictionary() && dict.hasKey("/DecodeParms")) {
-                Logger::log(LogLevel::DEBUG, "Skipping stream with DecodeParms (predictor present)", "PdfEncoder");
+                Logger::log(LogLevel::Debug, "Skipping stream with DecodeParms (predictor present)", "PdfEncoder");
                 continue;
             }
 
             if (!stream_is_single_flate(obj)) {
-                Logger::log(LogLevel::DEBUG, "Skipping stream with non-single Flate filter chain", "PdfEncoder");
+                Logger::log(LogLevel::Debug, "Skipping stream with non-single Flate filter chain", "PdfEncoder");
                 continue;
             }
 
@@ -162,11 +162,11 @@ bool PdfEncoder::recompress(const fs::path& input,
         writer.setDeterministicID(true);
         writer.write();
 
-        Logger::log(LogLevel::INFO, "PDF optimization finished: " + output.string(), "PdfEncoder");
+        Logger::log(LogLevel::Info, "PDF optimization finished: " + output.string(), "PdfEncoder");
         return true;
     }
     catch (const std::exception& e) {
-        Logger::log(LogLevel::ERROR, std::string("Exception during PDF optimization: ") + e.what(), "PdfEncoder");
+        Logger::log(LogLevel::Error, std::string("Exception during PDF optimization: ") + e.what(), "PdfEncoder");
         return false;
     }
 }

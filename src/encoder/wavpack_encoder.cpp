@@ -17,14 +17,14 @@ WavpackEncoder::WavpackEncoder(const bool preserve_metadata) {
 // recompress a wavpack file into wavpack lossless with maximum compression
 bool WavpackEncoder::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output) {
-    Logger::log(LogLevel::INFO, "Starting WavPack recompression: " + input.string(), "wavpack_encoder");
+    Logger::log(LogLevel::Info, "Starting WavPack recompression: " + input.string(), "wavpack_encoder");
 
     char error[128]{};
 
     // open input context
     WavpackContext* ctx_in = WavpackOpenFileInput(input.string().c_str(), error, OPEN_TAGS, 0);
     if (!ctx_in) {
-        Logger::log(LogLevel::ERROR, std::string("WavPack open failed: ") + error, "wavpack_encoder");
+        Logger::log(LogLevel::Error, std::string("WavPack open failed: ") + error, "wavpack_encoder");
         throw std::runtime_error("WavPack open failed");
     }
 
@@ -32,7 +32,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     FILE* out = std::fopen(output.string().c_str(), "wb");
     if (!out) {
         WavpackCloseFile(ctx_in);
-        Logger::log(LogLevel::ERROR, "Cannot open output file: " + output.string(), "wavpack_encoder");
+        Logger::log(LogLevel::Error, "Cannot open output file: " + output.string(), "wavpack_encoder");
         throw std::runtime_error("Cannot open output file");
     }
 
@@ -48,7 +48,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     if (!ctx_out) {
         std::fclose(out);
         WavpackCloseFile(ctx_in);
-        Logger::log(LogLevel::ERROR, std::string("WavPack output open failed: ") + error, "wavpack_encoder");
+        Logger::log(LogLevel::Error, std::string("WavPack output open failed: ") + error, "wavpack_encoder");
         throw std::runtime_error("WavPack output open failed");
     }
 
@@ -70,7 +70,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
         WavpackCloseFile(ctx_out);
         std::fclose(out);
         WavpackCloseFile(ctx_in);
-        Logger::log(LogLevel::ERROR, "Failed to set WavPack configuration", "wavpack_encoder");
+        Logger::log(LogLevel::Error, "Failed to set WavPack configuration", "wavpack_encoder");
         throw std::runtime_error("Failed to set WavPack configuration");
     }
 
@@ -79,7 +79,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
         WavpackCloseFile(ctx_out);
         std::fclose(out);
         WavpackCloseFile(ctx_in);
-        Logger::log(LogLevel::ERROR, "WavpackPackInit failed", "wavpack_encoder");
+        Logger::log(LogLevel::Error, "WavpackPackInit failed", "wavpack_encoder");
         throw std::runtime_error("WavpackPackInit failed");
     }
 
@@ -91,7 +91,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     uint32_t samples = 0;
     while ((samples = WavpackUnpackSamples(ctx_in, buffer.data(), block_size)) > 0) {
         if (!WavpackPackSamples(ctx_out, buffer.data(), static_cast<int32_t>(samples))) {
-            Logger::log(LogLevel::ERROR, "Error packing samples", "wavpack_encoder");
+            Logger::log(LogLevel::Error, "Error packing samples", "wavpack_encoder");
             WavpackCloseFile(ctx_out);
             std::fclose(out);
             WavpackCloseFile(ctx_in);
@@ -100,7 +100,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     }
 
     if (!WavpackFlushSamples(ctx_out)) {
-        Logger::log(LogLevel::ERROR, "Error flushing samples", "wavpack_encoder");
+        Logger::log(LogLevel::Error, "Error flushing samples", "wavpack_encoder");
         WavpackCloseFile(ctx_out);
         std::fclose(out);
         WavpackCloseFile(ctx_in);
@@ -118,7 +118,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
                     std::vector<char> value(static_cast<size_t>(size) + 1);
                     if (WavpackGetTagItem(ctx_in, tag_name, value.data(), size + 1) > 0) {
                         if (!WavpackAppendTagItem(ctx_out, tag_name, value.data(), size)) {
-                            Logger::log(LogLevel::WARNING,
+                            Logger::log(LogLevel::Warning,
                                         std::string("Failed to append tag: ") + tag_name,
                                         "wavpack_encoder");
                         }
@@ -127,7 +127,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
             }
         }
         if (!WavpackWriteTag(ctx_out)) {
-            Logger::log(LogLevel::WARNING, "Failed to write tags", "wavpack_encoder");
+            Logger::log(LogLevel::Warning, "Failed to write tags", "wavpack_encoder");
         }
     }
 
@@ -136,6 +136,6 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     std::fclose(out);
     WavpackCloseFile(ctx_in);
 
-    Logger::log(LogLevel::INFO, "WavPack recompression completed: " + output.string(), "wavpack_encoder");
+    Logger::log(LogLevel::Info, "WavPack recompression completed: " + output.string(), "wavpack_encoder");
     return true;
 }

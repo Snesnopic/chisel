@@ -73,7 +73,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
             continue;
         }
         if (!fs::exists(p)) {
-            Logger::log(LogLevel::ERROR, "Scanner error: input '" + p.string() + "' not found.", "file_scanner");
+            Logger::log(LogLevel::Error, "Scanner error: input '" + p.string() + "' not found.", "file_scanner");
             continue;
         }
 
@@ -97,7 +97,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
         process_file(files, archive_jobs, p);
     }
 
-    Logger::log(LogLevel::INFO,
+    Logger::log(LogLevel::Info,
                 "Scanner collected " + std::to_string(files.size()) +
                 " files and " + std::to_string(archive_jobs.size()) +
                 " container jobs",

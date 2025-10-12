@@ -17,7 +17,7 @@ void Logger::log(const LogLevel level, const std::string &msg, const std::string
     if (!inst.enabled_ || level < inst.level_) return;
 
     std::scoped_lock lock(inst.mutex_);
-    std::ostream &out = (level == LogLevel::ERROR) ? std::cerr : std::cout;
+    std::ostream &out = (level == LogLevel::Error) ? std::cerr : std::cout;
     out << "[" << level_to_string(level) << "]";
     if (!source.empty()) out << "[" << source << "]";
     out << " " << msg << "\n";
@@ -30,10 +30,10 @@ Logger &Logger::instance() {
 
 const char *Logger::level_to_string(const LogLevel level) {
     switch (level) {
-        case LogLevel::DEBUG: return "DEBUG";
-        case LogLevel::INFO: return "INFO";
-        case LogLevel::WARNING: return "WARN";
-        case LogLevel::ERROR: return "ERROR";
+        case LogLevel::Debug: return "DEBUG";
+        case LogLevel::Info: return "INFO";
+        case LogLevel::Warning: return "WARN";
+        case LogLevel::Error: return "ERROR";
         default: return "";
     }
 }

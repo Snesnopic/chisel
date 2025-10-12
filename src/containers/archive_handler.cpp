@@ -138,11 +138,11 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
     }
 
     if (!can_read_format(job.format)) {
-        Logger::log(LogLevel::WARNING, "Unreadable or unrecognized format: " + archive_path, "ArchiveHandler");
+        Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + archive_path, "ArchiveHandler");
         return job;
     }
 
-    Logger::log(LogLevel::INFO, "Extracting archive: " + archive_path + " -> " + job.temp_dir, "ArchiveHandler");
+    Logger::log(LogLevel::Info, "Extracting archive: " + archive_path + " -> " + job.temp_dir, "ArchiveHandler");
 
     // extract with libarchive
     if (!extract_with_libarchive(archive_path, job.temp_dir)) {
@@ -156,7 +156,7 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
         if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
             ContainerFormat inner_fmt;
             if (is_archive_file(p.path().string(), inner_fmt)) {
-                Logger::log(LogLevel::DEBUG, "Found nested archive: " + p.path().string(), "ArchiveHandler");
+                Logger::log(LogLevel::Debug, "Found nested archive: " + p.path().string(), "ArchiveHandler");
                 job.children.push_back(prepare(p.path().string()));
             } else {
                 job.file_list.push_back(p.path().string());
@@ -165,7 +165,7 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
     }
 
     Logger::log(
-        LogLevel::DEBUG,
+        LogLevel::Debug,
         "Extracted files: " + std::to_string(job.file_list.size()) +
         " | Nested archives: " + std::to_string(job.children.size()),
         "ArchiveHandler"
@@ -191,14 +191,14 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     } else if (settings.unencodable_target_format.has_value()) {
         out_fmt = settings.unencodable_target_format.value();
         Logger::log(
-            LogLevel::INFO,
+            LogLevel::Info,
             "Non writable format (" + container_format_to_string(job.format) + "), recompressing in: " +
             container_format_to_string(out_fmt),
             "ArchiveHandler"
         );
     } else {
         Logger::log(
-            LogLevel::INFO,
+            LogLevel::Info,
             "Non writable format and no alternative format: left intact -> " + job.original_path,
             "ArchiveHandler"
         );
@@ -216,7 +216,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
                            (src_path.stem().string() + "_tmp" + out_ext);
 
     Logger::log(
-        LogLevel::INFO,
+        LogLevel::Info,
         "Recreating archive: " + tmp_archive.string(),
         "ArchiveHandler"
     );
@@ -240,7 +240,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     if (ec) new_size = 0;
 
     if (new_size == 0) {
-        Logger::log(LogLevel::WARNING, "Empty archive: " + tmp_archive.string(), "ArchiveHandler");
+        Logger::log(LogLevel::Warning, "Empty archive: " + tmp_archive.string(), "ArchiveHandler");
     }
 
     if (new_size > 0 && (orig_size == 0 || new_size < orig_size)) {
@@ -274,22 +274,22 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
             return false;
         }
         Logger::log(
-            LogLevel::INFO,
+            LogLevel::Info,
             "Optimized archive: " + final_path.string() +
             " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)",
             "ArchiveHandler"
         );
     } else {
         fs::remove(tmp_archive, ec);
-        Logger::log(LogLevel::DEBUG, "No improvement for: " + job.original_path, "ArchiveHandler");
+        Logger::log(LogLevel::Debug, "No improvement for: " + job.original_path, "ArchiveHandler");
     }
 
     // clean temp dir
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::WARNING, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", "ArchiveHandler");
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", "ArchiveHandler");
     } else {
-        Logger::log(LogLevel::DEBUG, "Removed temp dir: " + job.temp_dir, "ArchiveHandler");
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, "ArchiveHandler");
     }
 
     return true;
@@ -338,7 +338,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
 
     int r = archive_read_open_filename(a, archive_path.c_str(), 10240);
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "archive_read_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
@@ -361,7 +361,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
         // sanitize path to avoid zip-slip
         fs::path out_path;
         if (!sanitize_archive_entry_path(current, dest_dir, out_path)) {
-            Logger::log(LogLevel::WARNING, "Skipping suspicious archive entry (path traversal): " + std::string(current), "ArchiveHandler");
+            Logger::log(LogLevel::Warning, "Skipping suspicious archive entry (path traversal): " + std::string(current), "ArchiveHandler");
             archive_read_data_skip(a);
             continue;
         }
@@ -493,7 +493,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             return false;
     }
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveHandler");
@@ -503,7 +503,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
     r = archive_write_open_filename(a, out_path.c_str());
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
@@ -631,7 +631,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         // write header
         r = archive_write_header(a, entry);
         if (r == ARCHIVE_WARN) {
-            Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
+            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
         }
         if (r != ARCHIVE_OK) {
             Logger::log(LogLevel::ERROR, "archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, "ArchiveHandler");

@@ -38,9 +38,9 @@ static std::atomic<bool> interrupted{false};
 void signal_handler(int sig) {
     if (sig == SIGINT) {
         if (!interrupted.load()) {
-            Logger::log(LogLevel::WARNING, "Stop detected. Killing current threads and saving results...", "main");
+            Logger::log(LogLevel::Warning, "Stop detected. Killing current threads and saving results...", "main");
         } else {
-            Logger::log(LogLevel::WARNING, "Still waiting for the threads to finish!", "main");
+            Logger::log(LogLevel::Warning, "Still waiting for the threads to finish!", "main");
         }
         interrupted.store(true);
 
@@ -71,19 +71,19 @@ inline void init_utf8_locale() {
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
-        Logger::log(LogLevel::DEBUG, std::string("Current locale: ") + cur, "LocaleInit");
+        Logger::log(LogLevel::Debug, std::string("Current locale: ") + cur, "LocaleInit");
         return; // ok
     }
 
     constexpr const char *const fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
         if (std::setlocale(LC_CTYPE, fb)) {
-            Logger::log(LogLevel::INFO, std::string("Locale set to ") + fb, "LocaleInit");
+            Logger::log(LogLevel::Info, std::string("Locale set to ") + fb, "LocaleInit");
             return;
         }
     }
 
-    Logger::log(LogLevel::WARNING, "UTF-8 locale not available; non-ASCII file names may be problematic.",
+    Logger::log(LogLevel::Warning, "UTF-8 locale not available; non-ASCII file names may be problematic.",
                 "LocaleInit");
 }
 
@@ -107,7 +107,7 @@ int main(const int argc, char *argv[]) {
             return 1;
         }
     } catch (const std::exception &e) {
-        Logger::log(LogLevel::ERROR, e.what(), "main");
+        Logger::log(LogLevel::Error, e.what(), "main");
         return 1;
     }
 
@@ -116,7 +116,7 @@ int main(const int argc, char *argv[]) {
     if (settings.regenerate_magic) {
         const auto path = get_magic_file_path();
         if (std::filesystem::exists(path)) {
-            Logger::log(LogLevel::INFO, "Forcing regeneration of magic.mgc at " + path.string(), "libmagic");
+            Logger::log(LogLevel::Info, "Forcing regeneration of magic.mgc at " + path.string(), "libmagic");
             std::filesystem::remove(path);
         }
     }
@@ -137,11 +137,11 @@ int main(const int argc, char *argv[]) {
             std::cerr<<"Can't use dry run mode with pipe inputs!";
             return 1;
         }
-        Logger::set_level(LogLevel::ERROR);
+        Logger::set_level(LogLevel::Error);
     }
 
     if (files.empty() && container_jobs.empty()) {
-        Logger::log(LogLevel::ERROR, "No files, folders or archives to process.", "main");
+        Logger::log(LogLevel::Error, "No files, folders or archives to process.", "main");
         return 1;
     }
 
@@ -179,7 +179,7 @@ int main(const int argc, char *argv[]) {
                 std::ranges::transform(ext, ext.begin(), ::tolower);
                 auto ext_it = ext_to_mime.find(ext);
                 if (ext_it != ext_to_mime.end()) {
-                    Logger::log(LogLevel::DEBUG,
+                    Logger::log(LogLevel::Debug,
                                 "MIME fallback: " + in_path.string() +
                                 " detected as " + ext_it->second + " from extension " + ext,
                                 "file_scanner");
@@ -242,7 +242,7 @@ int main(const int argc, char *argv[]) {
                                 ok_any = true;
                                 sz_after_best = sz_after;
                             } catch (const std::exception &e) {
-                                Logger::log(LogLevel::ERROR,
+                                Logger::log(LogLevel::Error,
                                             "Failed to replace original with optimized file: " + std::string(e.what()),
                                             "main");
                                 fs::remove(current);
@@ -268,7 +268,7 @@ int main(const int argc, char *argv[]) {
                                                  : 0.0;
                                 codecs_used.emplace_back(enc->name(), pct);
 
-                                Logger::log(LogLevel::DEBUG,
+                                Logger::log(LogLevel::Debug,
                                             "Encoder " + std::to_string(idx) + " → " + std::to_string(sz_after) +
                                             " bytes",
                                             "main");
@@ -300,7 +300,7 @@ int main(const int argc, char *argv[]) {
                             fs::rename(best_tmp, in_path);
                             replaced = true;
                         } catch (const std::exception &e) {
-                            Logger::log(LogLevel::ERROR,
+                            Logger::log(LogLevel::Error,
                                         "Failed to replace original with optimized file: " + std::string(e.what()),
                                         "main");
                             fs::remove(best_tmp);
@@ -311,7 +311,7 @@ int main(const int argc, char *argv[]) {
                     }
                 }
             } else {
-                Logger::log(LogLevel::WARNING,
+                Logger::log(LogLevel::Warning,
                             "No encoder for " + in_path.string() + " (" + mime + ")", "main");
                 error_msg = "No encoder available";
             }

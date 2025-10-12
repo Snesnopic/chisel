@@ -63,7 +63,7 @@ OdfHandler OdfHandler::from_path(const std::string &path) {
 
 ContainerJob OdfHandler::prepare(const std::string &path) {
     const char *handler_name = handler_tag_for(fmt_);
-    Logger::log(LogLevel::INFO, std::string("Preparing ODF container: ") + path, handler_name);
+    Logger::log(LogLevel::Info, std::string("Preparing ODF container: ") + path, handler_name);
 
     ContainerJob job;
     job.original_path = path;
@@ -85,7 +85,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
         return job;
     }
     if (open_r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), handler_name);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), handler_name);
     }
 
     archive_entry *entry = nullptr;
@@ -94,7 +94,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
     while ((r = archive_read_next_header(in, &entry)) == ARCHIVE_OK) {
         const char *ename = archive_entry_pathname(entry);
         if (!ename) {
-            Logger::log(LogLevel::WARNING, "Entry with null name skipped", handler_name);
+            Logger::log(LogLevel::Warning, "Entry with null name skipped", handler_name);
             archive_read_data_skip(in);
             continue;
         }
@@ -141,7 +141,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
 
 
         if (inner_fmt != ContainerFormat::Unknown && can_read_format(inner_fmt)) {
-            Logger::log(LogLevel::DEBUG, "Found nested container: " + out_path.string() + " (" + mime + ")",
+            Logger::log(LogLevel::Debug, "Found nested container: " + out_path.string() + " (" + mime + ")",
                         handler_name);
 
             if (inner_fmt == fmt_) {
@@ -163,7 +163,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
     archive_read_close(in);
     archive_read_free(in);
 
-    Logger::log(LogLevel::DEBUG,
+    Logger::log(LogLevel::Debug,
                 std::string("ODF prepare complete: ") +
                 std::to_string(job.file_list.size()) + " files, " +
                 std::to_string(job.children.size()) + " nested containers",
@@ -174,7 +174,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
 
 bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     const char *handler_name = handler_tag_for(fmt_);
-    Logger::log(LogLevel::INFO, "Finalizing ODF container: " + job.original_path, handler_name);
+    Logger::log(LogLevel::Info, "Finalizing ODF container: " + job.original_path, handler_name);
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -207,7 +207,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     // set ZIP format and force deflate compression
     int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
     }
     if (set_fmt != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "Failed to set ZIP format: " + std::string(archive_error_string(out)), handler_name);
@@ -218,7 +218,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
-        Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
     }
     if (open_w != ARCHIVE_OK) {
         Logger::log(LogLevel::ERROR, "Failed to open temp ODF for writing: " + std::string(archive_error_string(out)), handler_name);
@@ -257,13 +257,13 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
         if (rel.filename() == "mimetype") {
             // mimetype: must be stored uncompressed
             final_data = buf;
-            Logger::log(LogLevel::DEBUG, "Stored mimetype entry uncompressed", handler_name);
+            Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", handler_name);
         } else if (ext == ".xml") {
             final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
-            Logger::log(LogLevel::DEBUG, "Recompressed XML with Zopfli: " + rel.string(), handler_name);
+            Logger::log(LogLevel::Debug, "Recompressed XML with Zopfli: " + rel.string(), handler_name);
         } else {
             final_data = buf;
-            Logger::log(LogLevel::DEBUG, "Copied entry unchanged: " + rel.string(), handler_name);
+            Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), handler_name);
         }
 
         archive_entry *entry = archive_entry_new();
@@ -289,7 +289,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         int wh = archive_write_header(out, entry);
         if (wh == ARCHIVE_WARN) {
-            Logger::log(LogLevel::WARNING, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
+            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), handler_name);
         }
         if (wh != ARCHIVE_OK) {
             Logger::log(LogLevel::ERROR,
@@ -334,20 +334,20 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
             Logger::log(LogLevel::ERROR, "Failed to replace original ODF: " + ec.message(), handler_name);
             return false;
         }
-        Logger::log(LogLevel::INFO,
+        Logger::log(LogLevel::Info,
                     "Optimized ODF: " + src_path.string() +
                     " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)",
                     handler_name);
     } else {
         fs::remove(tmp_path, ec);
-        Logger::log(LogLevel::DEBUG, "No improvement for: " + src_path.string(), handler_name);
+        Logger::log(LogLevel::Debug, "No improvement for: " + src_path.string(), handler_name);
     }
 
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::WARNING, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", handler_name);
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", handler_name);
     } else {
-        Logger::log(LogLevel::DEBUG, "Removed temp dir: " + job.temp_dir, handler_name);
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, handler_name);
     }
 
     return true;
