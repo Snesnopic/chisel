@@ -422,55 +422,6 @@ add_library(thirdparty_webpdecoder ALIAS webpdecoder)
 add_library(thirdparty_webpdemux ALIAS webpdemux)
 add_library(thirdparty_webpmux ALIAS libwebpmux)
 
-# ffmpeg
-set(FFMPEG_PREFIX ${CMAKE_BINARY_DIR}/ffmpeg-install)
-ExternalProject_Add(ffmpeg
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg
-        PREFIX ${CMAKE_BINARY_DIR}/ffmpeg
-        CONFIGURE_COMMAND ./configure
-        --prefix=${FFMPEG_PREFIX}
-        --disable-shared
-        --enable-static
-        --disable-programs
-        --disable-doc
-        --disable-debug
-        --disable-everything
-        --enable-muxer=mp4
-        --enable-demuxer=mov
-        --enable-protocol=file
-        BUILD_COMMAND make -j4
-        INSTALL_COMMAND make install
-        BUILD_IN_SOURCE 1
-        UPDATE_DISCONNECTED 1
-        BUILD_BYPRODUCTS
-        ${FFMPEG_PREFIX}/lib/libavcodec.a
-        ${FFMPEG_PREFIX}/lib/libavformat.a
-        ${FFMPEG_PREFIX}/lib/libavutil.a
-)
-
-add_library(ffmpeg_avcodec STATIC IMPORTED GLOBAL)
-add_library(ffmpeg_avformat STATIC IMPORTED GLOBAL)
-add_library(ffmpeg_avutil STATIC IMPORTED GLOBAL)
-
-add_dependencies(ffmpeg_avcodec ffmpeg)
-add_dependencies(ffmpeg_avformat ffmpeg)
-add_dependencies(ffmpeg_avutil ffmpeg)
-
-file(MAKE_DIRECTORY ${FFMPEG_PREFIX}/include)
-
-set_target_properties(ffmpeg_avcodec PROPERTIES
-        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavcodec.a
-        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
-)
-set_target_properties(ffmpeg_avformat PROPERTIES
-        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavformat.a
-        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
-)
-set_target_properties(ffmpeg_avutil PROPERTIES
-        IMPORTED_LOCATION ${FFMPEG_PREFIX}/lib/libavutil.a
-        INTERFACE_INCLUDE_DIRECTORIES ${FFMPEG_PREFIX}/include
-)
-
 # qpdf
 add_definitions(-DSKIP_OS_SECURE_RANDOM)
 set(qpdf_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/qpdf")
@@ -745,9 +696,6 @@ set(MONOLITH_LIBS
         thirdparty_webpdecoder
         thirdparty_webpdemux
         thirdparty_webpmux
-        ffmpeg_avcodec
-        ffmpeg_avformat
-        ffmpeg_avutil
         libqpdf
         libzopfli
         libzopflipng
@@ -757,35 +705,15 @@ set(MONOLITH_LIBS
         SQLite::SQLite3
 )
 
-if(APPLE)
-    # ffmpeg built with videotoolbox needs these frameworks
-    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
-    find_library(COREVIDEO_FRAMEWORK CoreVideo)
-    find_library(COREMEDIA_FRAMEWORK CoreMedia)
-    find_library(VIDEOTOOLBOX_FRAMEWORK VideoToolbox)
+if(UNIX)
+    list(APPEND MONOLITH_LIBS
 
-    list(APPEND MONOLITH_LIBS
-            ${COREFOUNDATION_FRAMEWORK}
-            ${COREVIDEO_FRAMEWORK}
-            ${COREMEDIA_FRAMEWORK}
-            ${VIDEOTOOLBOX_FRAMEWORK}
-            ${LIBMAGIC_LIB}
-    )
-elseif(UNIX)
-    # linux: ffmpeg often needs pthread, dl, m
-    list(APPEND MONOLITH_LIBS
-            pthread
-            dl
-            m
             ${LIBMAGIC_LIB}
     )
 elseif(WIN32)
     # windows: depending on ffmpeg build, these are common
     list(APPEND MONOLITH_LIBS
-            ws2_32
-            secur32
-            bcrypt
-            avrt
+            libmseed
     )
 endif()
 target_compile_features(monolith PRIVATE cxx_std_23)

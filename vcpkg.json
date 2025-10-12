@@ -3,9 +3,7 @@
   "version-string": "1.0.0",
   "builtin-baseline": "f3e9932e75d4029034ae5015e97867e7a4aaa138",
   "dependencies": [
-    "ffmpeg",
     "mozjpeg",
-    "zlib",
-    "libjpeg-turbo"
+    "zlib"
   ]
 }
