@@ -146,7 +146,7 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
 
     // extract with libarchive
     if (!extract_with_libarchive(archive_path, job.temp_dir)) {
-        Logger::log(LogLevel::ERROR, "Extraction failed for: " + archive_path, "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Extraction failed for: " + archive_path, "ArchiveHandler");
         return job;
     }
 
@@ -178,7 +178,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     // finalize children first
     for (const auto& child : job.children) {
         if (!finalize(child, settings)) {
-            Logger::log(LogLevel::ERROR, "Finalize failed per nested archive: " + child.original_path, "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Finalize failed per nested archive: " + child.original_path, "ArchiveHandler");
             return false;
         }
     }
@@ -223,14 +223,14 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
     // create archive with libarchive
     if (!create_with_libarchive(job.temp_dir, tmp_archive.string(), out_fmt)) {
-        Logger::log(LogLevel::ERROR, "Archive creation failed: " + tmp_archive.string(), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), "ArchiveHandler");
         return false;
     }
 
     // post-compression check and substitution
     std::error_code ec;
     if (!fs::exists(tmp_archive, ec) || ec) {
-        Logger::log(LogLevel::ERROR, "Compressed archive not found: " + tmp_archive.string(), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Compressed archive not found: " + tmp_archive.string(), "ArchiveHandler");
         return false;
     }
 
@@ -270,7 +270,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
         fs::rename(tmp_archive, final_path, ec);
         if (ec) {
-            Logger::log(LogLevel::ERROR, "Renaming archive failed: " + final_path.string() + " (" + ec.message() + ")", "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Renaming archive failed: " + final_path.string() + " (" + ec.message() + ")", "ArchiveHandler");
             return false;
         }
         Logger::log(
@@ -341,7 +341,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "archive_read_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "archive_read_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
         archive_read_free(a);
         return false;
     }
@@ -367,7 +367,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
         }
 
         if (!ensure_parent_dirs(out_path, ec)) {
-            Logger::log(LogLevel::ERROR, "Can't create folder for: " + out_path.string(), "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Can't create folder for: " + out_path.string(), "ArchiveHandler");
             archive_read_data_skip(a);
             continue;
         }
@@ -405,7 +405,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
 
         std::ofstream ofs(out_path, std::ios::binary);
         if (!ofs) {
-            Logger::log(LogLevel::ERROR, "Can't open file in write mode: " + out_path.string(), "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), "ArchiveHandler");
             archive_read_data_skip(a);
             continue;
         }
@@ -417,14 +417,14 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
         ofs.close();
 
         if (size_read < 0) {
-            Logger::log(LogLevel::ERROR, "Error reading data: " + std::string(archive_error_string(a)), "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Error reading data: " + std::string(archive_error_string(a)), "ArchiveHandler");
             archive_read_free(a);
             return false;
         }
     }
 
     if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::ERROR, "Error during iteration: " + std::string(archive_error_string(a)), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Error during iteration: " + std::string(archive_error_string(a)), "ArchiveHandler");
         archive_read_free(a);
         return false;
     }
@@ -488,7 +488,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             }
             break;
         default:
-            Logger::log(LogLevel::ERROR, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveHandler");
             archive_write_free(a);
             return false;
     }
@@ -496,7 +496,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveHandler");
         archive_write_free(a);
         return false;
     }
@@ -506,7 +506,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
+        Logger::log(LogLevel::Error, "archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveHandler");
         archive_write_free(a);
         return false;
     }
@@ -536,7 +536,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
             int rh = archive_write_header(a, entry);
             if (rh != ARCHIVE_OK && rh != ARCHIVE_WARN) {
-                Logger::log(LogLevel::ERROR, "archive_write_header (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
+                Logger::log(LogLevel::Error, "archive_write_header (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
                 archive_entry_free(entry);
                 archive_write_close(a);
                 archive_write_free(a);
@@ -545,7 +545,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             if (!buf.empty()) {
                 la_ssize_t wrote = archive_write_data(a, buf.data(), buf.size());
                 if (wrote < 0) {
-                    Logger::log(LogLevel::ERROR, "archive_write_data (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
+                    Logger::log(LogLevel::Error, "archive_write_data (mimetype): " + std::string(archive_error_string(a)), "ArchiveHandler");
                     archive_entry_free(entry);
                     archive_write_close(a);
                     archive_write_free(a);
@@ -582,7 +582,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
 
         archive_entry* entry = archive_entry_new();
         if (!entry) {
-            Logger::log(LogLevel::ERROR, "archive_entry_new failed", "ArchiveHandler");
+            Logger::log(LogLevel::Error, "archive_entry_new failed", "ArchiveHandler");
             archive_write_close(a);
             archive_write_free(a);
             return false;
@@ -634,7 +634,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
         }
         if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::ERROR, "archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, "ArchiveHandler");
+            Logger::log(LogLevel::Error, "archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, "ArchiveHandler");
             archive_entry_free(entry);
             archive_write_close(a);
             archive_write_free(a);
@@ -647,7 +647,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
             if (!skip_data) {
                 std::ifstream ifs(p, std::ios::binary);
                 if (!ifs) {
-                    Logger::log(LogLevel::ERROR, "Can't open file for reading: " + p.string(), "ArchiveHandler");
+                    Logger::log(LogLevel::Error, "Can't open file for reading: " + p.string(), "ArchiveHandler");
                     archive_entry_free(entry);
                     archive_write_close(a);
                     archive_write_free(a);
@@ -659,7 +659,7 @@ bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const st
                     if (got > 0) {
                         la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<size_t>(got));
                         if (wrote < 0) {
-                            Logger::log(LogLevel::ERROR, "archive_write_data: " + std::string(archive_error_string(a)), "ArchiveHandler");
+                            Logger::log(LogLevel::Error, "archive_write_data: " + std::string(archive_error_string(a)), "ArchiveHandler");
                             archive_entry_free(entry);
                             archive_write_close(a);
                             archive_write_free(a);

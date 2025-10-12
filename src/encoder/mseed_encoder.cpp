@@ -50,7 +50,7 @@ bool MseedEncoder::recompress(const std::filesystem::path &input,
         // write record(s) to output
         const int64_t rv = msr3_writemseed(msr, output.string().c_str(), 1, write_flags, verbose);
         if (rv < 0) {
-            Logger::log(LogLevel::ERROR, "Error writing MiniSEED record", name());
+            Logger::log(LogLevel::Error, "Error writing MiniSEED record", name());
             ms3_readmsr(&msr, nullptr, read_flags, 0);
             return false;
         }
@@ -60,7 +60,7 @@ bool MseedEncoder::recompress(const std::filesystem::path &input,
     }
 
     if (retcode != MS_ENDOFFILE) {
-        Logger::log(LogLevel::ERROR, "Error reading MiniSEED: " + std::string(ms_errorstr(retcode)), name());
+        Logger::log(LogLevel::Error, "Error reading MiniSEED: " + std::string(ms_errorstr(retcode)), name());
         ms3_readmsr(&msr, nullptr, read_flags, 0);
         return false;
     }

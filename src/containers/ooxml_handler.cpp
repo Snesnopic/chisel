@@ -65,7 +65,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
     archive_read_support_format_zip(in);
     int open_r = archive_read_open_filename(in, path.c_str(), 10240);
     if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
-        Logger::log(LogLevel::ERROR, "Failed to open OOXML for reading: " + std::string(archive_error_string(in)), tag);
+        Logger::log(LogLevel::Error, "Failed to open OOXML for reading: " + std::string(archive_error_string(in)), tag);
         archive_read_free(in);
         return job;
     }
@@ -88,7 +88,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
         std::error_code ec;
         std::filesystem::create_directories(out_path.parent_path(), ec);
         if (ec) {
-            Logger::log(LogLevel::ERROR,
+            Logger::log(LogLevel::Error,
                         "Failed to create parent dir: " + out_path.parent_path().string() + " (" + ec.message() + ")",
                         tag);
             archive_read_data_skip(in);
@@ -97,7 +97,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
 
         std::ofstream ofs(out_path, std::ios::binary);
         if (!ofs) {
-            Logger::log(LogLevel::ERROR, "Failed to create file during extraction: " + out_path.string(), tag);
+            Logger::log(LogLevel::Error, "Failed to create file during extraction: " + out_path.string(), tag);
             archive_read_data_skip(in);
             continue;
         }
@@ -109,7 +109,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
             int rb = archive_read_data_block(in, &buff, &size, &offset);
             if (rb == ARCHIVE_EOF) break;
             if (rb != ARCHIVE_OK) {
-                Logger::log(LogLevel::ERROR, "Error reading data block: " + std::string(archive_error_string(in)), tag);
+                Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), tag);
                 break;
             }
             ofs.write(reinterpret_cast<const char *>(buff), static_cast<std::streamsize>(size));
@@ -135,7 +135,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
     }
 
     if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::ERROR, "Iteration error: " + std::string(archive_error_string(in)), tag);
+        Logger::log(LogLevel::Error, "Iteration error: " + std::string(archive_error_string(in)), tag);
     }
 
     archive_read_close(in);
@@ -166,7 +166,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             child_ok = ah.finalize(child, settings);
         }
         if (!child_ok) {
-            Logger::log(LogLevel::ERROR, "Failed to finalize nested container: " + child.original_path, tag);
+            Logger::log(LogLevel::Error, "Failed to finalize nested container: " + child.original_path, tag);
             return false;
         }
     }
@@ -176,7 +176,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     struct archive *out = archive_write_new();
     if (!out) {
-        Logger::log(LogLevel::ERROR, "archive_write_new failed", tag);
+        Logger::log(LogLevel::Error, "archive_write_new failed", tag);
         return false;
     }
 
@@ -186,7 +186,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
     if (set_fmt != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "Failed to set ZIP format: " + std::string(archive_error_string(out)), tag);
+        Logger::log(LogLevel::Error, "Failed to set ZIP format: " + std::string(archive_error_string(out)), tag);
         archive_write_free(out);
         return false;
     }
@@ -197,7 +197,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
     if (open_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "Failed to open temp OOXML for writing: " + std::string(archive_error_string(out)), tag);
+        Logger::log(LogLevel::Error, "Failed to open temp OOXML for writing: " + std::string(archive_error_string(out)), tag);
         archive_write_free(out);
         return false;
     }
@@ -222,7 +222,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         std::ifstream ifs(file, std::ios::binary);
         if (!ifs) {
-            Logger::log(LogLevel::ERROR, "Failed to open file for reading: " + file, tag);
+            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file, tag);
             continue;
         }
         std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
@@ -244,7 +244,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         archive_entry *entry = archive_entry_new();
         if (!entry) {
-            Logger::log(LogLevel::ERROR, "archive_entry_new failed", tag);
+            Logger::log(LogLevel::Error, "archive_entry_new failed", tag);
             archive_write_close(out);
             archive_write_free(out);
             return false;
@@ -261,7 +261,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
         }
         if (wh != ARCHIVE_OK) {
-            Logger::log(LogLevel::ERROR,
+            Logger::log(LogLevel::Error,
                         "Failed to write header for: " + rel.string() +
                         " (" + std::string(archive_error_string(out)) + ")", tag);
             archive_entry_free(entry);
@@ -272,7 +272,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
         if (wrote < 0) {
-            Logger::log(LogLevel::ERROR,
+            Logger::log(LogLevel::Error,
                         "Failed to write data for: " + rel.string() +
                         " (" + std::string(archive_error_string(out)) + ")", tag);
             archive_entry_free(entry);
@@ -286,7 +286,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::ERROR, "Failed to close archive: " + std::string(archive_error_string(out)), tag);
+        Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), tag);
         archive_write_free(out);
         return false;
     }
@@ -300,7 +300,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     if (new_size > 0 && (orig_size == 0 || new_size < orig_size)) {
         fs::rename(tmp_path, src_path, ec);
         if (ec) {
-            Logger::log(LogLevel::ERROR, "Failed to replace original OOXML: " + ec.message(), tag);
+            Logger::log(LogLevel::Error, "Failed to replace original OOXML: " + ec.message(), tag);
             return false;
         }
         Logger::log(LogLevel::Info,
