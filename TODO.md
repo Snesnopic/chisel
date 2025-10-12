@@ -20,6 +20,7 @@
 - [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
 - [ ] Improve handling of SIGINT: design a safe mechanism to interrupt ongoing async tasks without leaving the system in an inconsistent state.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
+- [ ] Make `monolith` the only target in CMakeLists by marking all other dependencies `EXCLUDE_FROM_ALL`
 
 ## FLAC
 
