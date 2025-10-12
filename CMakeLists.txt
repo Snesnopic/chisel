@@ -53,6 +53,7 @@ endif()
 # --- DEFINE FLAGS AS LISTS (not a single quoted string) ---------------------
 # use list form so add_compile_options expands to multiple args correctly
 if(WIN32 AND NOT MSVC)
+    add_compile_options(-msse2)
     set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
 else()
     set(MONOLITH_COMMON_OPT_FLAGS /Gy /Gw)
