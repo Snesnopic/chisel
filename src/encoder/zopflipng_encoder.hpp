@@ -7,6 +7,7 @@
 
 #include "encoder.hpp"
 #include <filesystem>
+#include <vector>
 
 class ZopfliPngEncoder final : public IEncoder {
 public:
