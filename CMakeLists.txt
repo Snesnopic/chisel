@@ -52,14 +52,20 @@ endif()
 
 # --- DEFINE FLAGS AS LISTS (not a single quoted string) ---------------------
 # use list form so add_compile_options expands to multiple args correctly
+if(WIN32 AND NOT MSVC)
+    set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
+else()
+    set(MONOLITH_COMMON_OPT_FLAGS /Gy /Gw)
+endif()
+if(NOT WIN32)
 set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
-
+endif()
 # linker flags: platform-appropriate list
 if(APPLE)
     # macOS linker: dead_strip removes unused code
     set(MONOLITH_COMMON_LINK_FLAGS -Wl,-dead_strip)
 elseif(WIN32)
-    set(MONOLITH_COMMON_LINK_FLAGS) # empty on MSVC
+    set(MONOLITH_COMMON_LINK_FLAGS)
 else()
     set(MONOLITH_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed)
 endif()
