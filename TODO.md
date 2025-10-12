@@ -16,6 +16,10 @@
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Begin support for using monolith as a library (public API, minimal dependencies).
 - [ ] Implement a UriHandler to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing encoders, and reinsert re-encoded content.
+- [ ] Review and clean up unused or redundant CMake variables.
+- [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
+- [ ] Improve handling of SIGINT: design a safe mechanism to interrupt ongoing async tasks without leaving the system in an inconsistent state.
+- [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
 
 ## FLAC
 
@@ -44,7 +48,8 @@
 
 ## GIF
 
-- [ ] Improve `gifsicle` inclusion (remove duplicate symbols).
+- [ ] On Windows, `gifsicle` is currently unavailable: mark it as unsupported.
+- [ ] Plan a fork of `gifsicle` to refactor away global variables and enable true multi-threaded `GifEncoder` execution.
 
 ## PDF
 
@@ -65,6 +70,7 @@
 - [ ] Explore Leanify-style handling of container formats that are essentially ZIP/LZMA/Deflate (APK, XPS, XPInstall, EPUB, DOCX, ODT, etc.) and integrate similar recursive optimization.
 - [ ] Investigate **advmng** for MNG recompression (delta compression, ancillary chunk removal)  
   ↳ <https://www.advancemame.it/doc-advmng>
+- [ ] Rewrite hardlink handling in `archive_handler` with a cross-platform approach, since current implementation is not available on Windows.
 
 ## MKV / Matroska
 
@@ -110,6 +116,9 @@
 - [ ] Fix compilation issues on Windows (ensure reproducible builds).
 - [ ] Ensure all third-party libraries are linked statically.
 - [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
+- [ ] On MinGW, enforce fully static builds (no runtime DLL dependencies).
+- [ ] Review linker flags and explore options to reduce final binary size (e.g. `-Wl,--gc-sections`, `-s` for stripping symbols, or platform-specific equivalents).
+- [ ] General cleanup and unification of the CMakeLists to remove cruft and ensure consistency across platforms.
 
 ## Other improvements
 
@@ -119,3 +128,4 @@
 - [ ] Improve logging granularity and structured output for CI integration.
 - [ ] Investigate which apt/brew packages are actually needed for compiling.
 - [ ] Future: implement a general XML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
+- [ ] Improve readability of reports and logs: avoid printing full absolute paths for deeply nested files or files extracted from archives, to prevent overly long and unreadable output.
