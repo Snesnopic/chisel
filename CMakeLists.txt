@@ -294,8 +294,8 @@ if(NOT WIN32)
 
     add_custom_command(
             OUTPUT ${MAGIC_HEADER}
-            COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with zopfli..."
-            COMMAND zopfli --i5 ${MAGIC_SRC} -c > ${MAGIC_COMPRESSED}
+            COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
+            COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
             COMMAND xxd -i -n embedded_magic_mgc ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
             DEPENDS ${MAGIC_SRC}
             BYPRODUCTS ${MAGIC_COMPRESSED}
@@ -445,7 +445,6 @@ ExternalProject_Add(mozjpeg
         BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
 
-# --- copia jconfig.h generato nella cartella sorgente mozjpeg ---
 set(_mozjpeg_build_dir "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build")
 set(_mozjpeg_jconfig   "${_mozjpeg_build_dir}/jconfig.h")
 set(_mozjpeg_dest      "${CMAKE_SOURCE_DIR}/third_party/mozjpeg/jconfig.h")
@@ -459,7 +458,6 @@ add_custom_command(
 
 add_custom_target(copy_mozjpeg_jconfig DEPENDS "${_mozjpeg_dest}")
 
-# crea un target IMPORTED che punta al file prodotto
 add_library(mozjpeg_static STATIC IMPORTED GLOBAL)
 set_target_properties(mozjpeg_static PROPERTIES
         IMPORTED_LOCATION "${_mozjpeg_lib}"
@@ -468,15 +466,14 @@ set_target_properties(mozjpeg_static PROPERTIES
 )
 add_dependencies(mozjpeg_static mozjpeg copy_mozjpeg_jconfig)
 remove_definitions(JCONFIG_INCLUDED)
-# alias moderno (se qualcuno usa target moderni)
 add_library(JPEG::JPEG ALIAS mozjpeg_static)
 
-# --- Compatibilità con qpdf (usa variabili legacy) ---
 set(JPEG_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/mozjpeg" CACHE PATH "jpeg include dir")
 set(JPEG_INCLUDE_DIR "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
+
 # libEBML
 set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
