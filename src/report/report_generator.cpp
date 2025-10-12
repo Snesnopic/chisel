@@ -64,7 +64,9 @@ void print_console_report(const std::vector<Result>& results,
     size_t max_time = 10;
     size_t max_result = 10;
     size_t max_error = 5;
-
+    #ifdef max  //this is the dumbest shit i've ever had to do
+    #undef max
+    #endif
     for (const auto& r : results) {
         max_mime   = std::max(max_mime,   strip_ansi(r.mime).size());
         max_before = std::max(max_before, std::to_string(r.size_before / 1024).size());

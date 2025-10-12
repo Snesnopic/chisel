@@ -82,7 +82,7 @@ int MseedEncoder::choose_reclen(const MS3Record *msr, const size_t sample_count)
         candidates.push_back(1 << e);
 
     const std::filesystem::path tmpdir = std::filesystem::temp_directory_path();
-    uint64_t best_size = std::numeric_limits<uint64_t>::max();
+    uint64_t best_size = (std::numeric_limits<uint64_t>::max)();
     int best_reclen = 4096;
 
     for (const int& reclen : candidates) {
