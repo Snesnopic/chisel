@@ -10,6 +10,8 @@ class MimeDetector {
 public:
     static std::string detect(const std::filesystem::path& path);
     static bool is_mpeg1_layer3(const std::filesystem::path& path);
+    static void ensure_magic_installed();
+    static std::filesystem::path get_magic_file_path();
 };
 
 #endif //MONOLITH_MIME_DETECTOR_HPP

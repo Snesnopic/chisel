@@ -74,8 +74,6 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".mseed",  "application/vnd.fdsn.mseed"}
 };
 
-void ensure_magic_installed();
 
-std::filesystem::path get_magic_file_path();
 
 #endif //MONOLITH_FILE_TYPE_HPP
