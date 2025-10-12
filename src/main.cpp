@@ -11,7 +11,6 @@
 #include <format>
 #include "utils/file_type.hpp"
 #include "encoder/encoder.hpp"
-#include <sys/ioctl.h>
 #include <string>
 #include <atomic>
 #include <mutex>
@@ -29,6 +28,8 @@
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
+#else
+#include <sys/ioctl.h>
 #endif
 #include <csignal>
 #include <atomic>
