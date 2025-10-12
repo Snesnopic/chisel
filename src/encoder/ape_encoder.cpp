@@ -131,8 +131,8 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
     APE::WAVEFORMATEX wfeAudioFormat{};
     FillWaveFormatEx(&wfeAudioFormat, WAVE_FORMAT_PCM,
                      static_cast<APE::int32>(ctx.sample_rate),
-                     static_cast<APE::WORD>(ctx.bits_per_sample),
-                     static_cast<APE::WORD>(ctx.channels));
+                     static_cast<unsigned short>(ctx.bits_per_sample),
+                     static_cast<unsigned short>(ctx.channels));
 
     APE::IAPECompress *pCompress = CreateIAPECompress();
     if (!pCompress) {
