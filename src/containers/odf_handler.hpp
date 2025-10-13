@@ -13,10 +13,10 @@ class OdfHandler final: public IContainer {
 public:
     explicit OdfHandler(const ContainerFormat fmt) : fmt_(fmt) {}
 
-    [[nodiscard]] ContainerJob prepare(const std::string& path) override;
+    [[nodiscard]] ContainerJob prepare(const std::filesystem::path& path) override;
     bool finalize(const ContainerJob& job, Settings& settings) override;
 
-    static OdfHandler from_path(const std::string& path);
+    static OdfHandler from_path(const std::filesystem::path& path);
 private:
     ContainerFormat fmt_;
 

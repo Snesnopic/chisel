@@ -120,7 +120,7 @@ bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
 
 // ---------- ArchiveHandler public methods ----------
 
-ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
+ContainerJob ArchiveHandler::prepare(const std::filesystem::path &archive_path) {
     ContainerJob job;
     job.original_path = archive_path;
     job.temp_dir = make_temp_dir();
@@ -138,15 +138,15 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
     }
 
     if (!can_read_format(job.format)) {
-        Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + archive_path, "ArchiveHandler");
+        Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + archive_path.filename().string(), "ArchiveHandler");
         return job;
     }
 
-    Logger::log(LogLevel::Info, "Extracting archive: " + archive_path + " -> " + job.temp_dir.filename().string(), "ArchiveHandler");
+    Logger::log(LogLevel::Info, "Extracting archive: " + archive_path.filename().string() + " -> " + job.temp_dir.filename().string(), "ArchiveHandler");
 
     // extract with libarchive
     if (!extract_with_libarchive(archive_path, job.temp_dir)) {
-        Logger::log(LogLevel::Error, "Extraction failed for: " + archive_path, "ArchiveHandler");
+        Logger::log(LogLevel::Error, "Extraction failed for: " + archive_path.filename().string(), "ArchiveHandler");
         return job;
     }
 
@@ -297,7 +297,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
 
 // ---------- ArchiveHandler private helpers ----------
 
-ContainerFormat ArchiveHandler::detect_format(const std::string& path) {
+ContainerFormat ArchiveHandler::detect_format(const std::filesystem::path& path) {
     // try mime
     const std::string mime = MimeDetector::detect(path);
     if (!mime.empty()) {
@@ -322,12 +322,12 @@ ContainerFormat ArchiveHandler::detect_format(const std::string& path) {
     return ContainerFormat::Unknown;
 }
 
-bool ArchiveHandler::is_archive_file(const std::string& path, ContainerFormat& fmt_out) {
+bool ArchiveHandler::is_archive_file(const std::filesystem::path& path, ContainerFormat& fmt_out) {
     fmt_out = detect_format(path);
     return fmt_out != ContainerFormat::Unknown && can_read_format(fmt_out);
 }
 
-bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, const std::string& dest_dir) {
+bool ArchiveHandler::extract_with_libarchive(const std::filesystem::path& archive_path, const std::filesystem::path& dest_dir) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry = nullptr;
 
@@ -435,7 +435,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::string& archive_path, co
 
 
 
-bool ArchiveHandler::create_with_libarchive(const std::string& src_dir, const std::string& out_path, ContainerFormat fmt) {
+bool ArchiveHandler::create_with_libarchive(const std::filesystem::path& src_dir, const std::filesystem::path& out_path, ContainerFormat fmt) {
     archive* a = archive_write_new();
     if (!a) return false;
 

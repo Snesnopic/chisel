@@ -50,9 +50,8 @@ const char *OdfHandler::output_extension() const {
     }
 }
 
-OdfHandler OdfHandler::from_path(const std::string &path) {
-    std::filesystem::path p(path);
-    std::string ext = p.extension().string();
+OdfHandler OdfHandler::from_path(const std::filesystem::path &path) {
+    const std::string ext = path.extension().string();
     if (ext == ".odt") return OdfHandler(ContainerFormat::Odt);
     if (ext == ".ods") return OdfHandler(ContainerFormat::Ods);
     if (ext == ".odp") return OdfHandler(ContainerFormat::Odp);
@@ -61,9 +60,9 @@ OdfHandler OdfHandler::from_path(const std::string &path) {
     return OdfHandler(ContainerFormat::Unknown);
 }
 
-ContainerJob OdfHandler::prepare(const std::string &path) {
+ContainerJob OdfHandler::prepare(const std::filesystem::path &path) {
     const char *handler_name = handler_tag_for(fmt_);
-    Logger::log(LogLevel::Info, std::string("Preparing ODF container: ") + path, handler_name);
+    Logger::log(LogLevel::Info, std::string("Preparing ODF container: ") + path.filename().string(), handler_name);
 
     ContainerJob job;
     job.original_path = path;

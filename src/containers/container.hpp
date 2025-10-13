@@ -20,7 +20,7 @@ public:
     virtual ~IContainer() = default;
 
     // read container and extract files; put file names in ContainerJob.children
-    virtual ContainerJob prepare(const std::string& path) = 0;
+    virtual ContainerJob prepare(const std::filesystem::path& path) = 0;
 
     // write container with re-encoded files in settings.children
     virtual bool finalize(const ContainerJob &job, Settings& settings) = 0;

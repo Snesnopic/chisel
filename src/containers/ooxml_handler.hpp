@@ -1,11 +1,10 @@
-// ooxml_handler.hpp
 //
-// Generic handler for OOXML containers (DOCX, XLSX, PPTX)
+// Created by Giuseppe Francione on 06/10/25.
 //
 
-#pragma once
+#ifndef MONOLITH_OOXML_HANDLER_HPP
+#define MONOLITH_OOXML_HANDLER_HPP
 
-#include <string>
 #include "../containers/archive_handler.hpp"
 #include "../utils/archive_formats.hpp"
 
@@ -13,10 +12,11 @@ class OoxmlHandler final :public IContainer {
 public:
     explicit OoxmlHandler(const ContainerFormat fmt) : fmt_(fmt) {}
 
-    ContainerJob prepare(const std::string &path) override;
+    ContainerJob prepare(const std::filesystem::path &path) override;
 
     bool finalize(const ContainerJob &job, Settings &settings) override;
 
 private:
     ContainerFormat fmt_;
 };
+#endif //MONOLITH_OOXML_HANDLER_HPP

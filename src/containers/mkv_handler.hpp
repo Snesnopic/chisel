@@ -48,16 +48,16 @@ struct MkvJob : ContainerJob {
 
 class MkvHandler : public IContainer {
 public:
-    ContainerJob prepare(const std::string& path) override;
+    ContainerJob prepare(const std::filesystem::path& path) override;
 
     bool finalize(const ContainerJob &job, Settings& settings) override;
 
 private:
     // helper to extract tracks, attachments, metadata and chapters using ffmpeg
-    static bool extract_with_ffmpeg(const std::string& mkv_path, MkvJob& job);
+    static bool extract_with_ffmpeg(const std::filesystem::path& mkv_path, MkvJob& job);
 
     // helper to rebuild mkv with recompressed streams and preserved metadata
-    static bool create_with_ffmpeg(const MkvJob& job, const std::string& out_path, Settings& settings);
+    static bool create_with_ffmpeg(const MkvJob& job, const std::filesystem::path& out_path, Settings& settings);
 };
 
 #endif // MONOLITH_MKV_HANDLER_HPP

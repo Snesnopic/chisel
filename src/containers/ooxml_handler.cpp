@@ -1,6 +1,5 @@
-// ooxml_handler.cpp
 //
-// Generic handler for OOXML containers (DOCX, XLSX, PPTX)
+// Created by Giuseppe Francione on 06/10/25.
 //
 
 #include "ooxml_handler.hpp"
@@ -19,7 +18,7 @@
 #include "../utils/random_utils.hpp"
 
 // helper: map mime to containerformat using provided tables
-static ContainerFormat mime_to_container_format(const std::string &mime) {
+static ContainerFormat mime_to_container_format(const std::filesystem::path &mime) {
     auto it = mime_to_format.find(mime);
     if (it != mime_to_format.end()) {
         return it->second;
@@ -27,7 +26,7 @@ static ContainerFormat mime_to_container_format(const std::string &mime) {
     return ContainerFormat::Unknown;
 }
 
-static const char* handler_tag_for(ContainerFormat fmt) {
+static const char* handler_tag_for(const ContainerFormat fmt) {
     switch (fmt) {
         case ContainerFormat::Docx: return "OoxmlHandler(DOCX)";
         case ContainerFormat::Xlsx: return "OoxmlHandler(XLSX)";
@@ -45,9 +44,9 @@ static const char* ext_for(ContainerFormat fmt) {
     }
 }
 
-ContainerJob OoxmlHandler::prepare(const std::string &path) {
+ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
     const char* tag = handler_tag_for(fmt_);
-    Logger::log(LogLevel::Info, "Preparing OOXML handler: " + path, tag);
+    Logger::log(LogLevel::Info, "Preparing OOXML handler: " + path.filename().string(), tag);
 
     ContainerJob job;
     job.original_path = path;
