@@ -166,6 +166,9 @@ endif()
 
 # liblzma
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(XZ_NLS OFF CACHE BOOL "Turned off XZ translated man pages" FORCE)
+set(XZ_DOXYGEN OFF CACHE BOOL "Turned off XZ doxygen" FORCE)
+set(XZ_DOC OFF CACHE BOOL "Turned off XZ docs" FORCE)
 set(xz_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz")
 set(xz_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/xz-build")
 set(ENABLE_NLS OFF CACHE BOOL "" FORCE)
@@ -539,6 +542,7 @@ set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
 add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR})
 
 # libjxl
+set(JPEGXL_ENABLE_DOXYGEN OFF CACHE BOOL "Turned off JXL doxygen" FORCE)
 set(JPEGXL_ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_DEVTOOLS OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_PLUGINS OFF CACHE BOOL "" FORCE)
