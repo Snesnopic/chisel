@@ -12,13 +12,11 @@
 
 - [ ] Abstract common logic across encoders.
 - [ ] Make encoder classes more MIME-aware.
-- [ ] Support pipeline mode: chaining multiple encoders per MIME in addition to parallel mode.
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Begin support for using monolith as a library (public API, minimal dependencies).
 - [ ] Implement a UriHandler to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing encoders, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
-- [ ] Improve handling of SIGINT: design a safe mechanism to interrupt ongoing async tasks without leaving the system in an inconsistent state.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
 - [ ] Make `monolith` the only target in CMakeLists by marking all other dependencies `EXCLUDE_FROM_ALL`
 
