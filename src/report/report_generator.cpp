@@ -72,7 +72,7 @@ void print_console_report(const std::vector<Result>& results,
         max_before = std::max(max_before, std::to_string(r.size_before / 1024).size());
         max_after  = std::max(max_after,  std::to_string(r.size_after / 1024).size());
         double pct = r.success && r.size_before
-                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
+                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
                          : 0.0;
         const std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
         max_delta  = std::max(max_delta, strip_ansi(delta).size());
@@ -135,7 +135,7 @@ void print_console_report(const std::vector<Result>& results,
 
     for (const auto& r : sorted) {
         double pct = r.success && r.size_before
-                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / r.size_before)
+                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
                          : 0.0;
         std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
         std::string outcome = !r.success ? "\033[1;31mFAIL\033[0m"
@@ -210,12 +210,12 @@ void print_console_report(const std::vector<Result>& results,
 void export_csv_report(const std::vector<Result>& results,
                        const std::vector<ContainerResult>& container_results,
                        const std::filesystem::path& output_path,
-                       double total_seconds,
-                       EncodeMode mode) {
+                       const double total_seconds,
+                       const EncodeMode mode) {
     std::ofstream out(output_path);
     if (!out) return;
 
-    out << "File,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,Mode,Codecs,Error\n";
+    out << "File,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,Codecs,Error\n";
 
     for (const auto& r : results) {
         const double pct = r.success && r.size_before
@@ -231,12 +231,6 @@ void export_csv_report(const std::vector<Result>& results,
         for (size_t i = 0; i < r.codecs_used.size(); ++i) {
             codecs_str += r.codecs_used[i].first + ":" +
                           std::format("{:.2f}%", r.codecs_used[i].second);
-            if (i + 1 < r.codecs_used.size()) {
-                if (mode == EncodeMode::PIPE)
-                    codecs_str += " -> ";
-                else
-                    codecs_str += "; ";
-            }
         }
 
         out << '"' << r.filename << "\","
@@ -246,7 +240,6 @@ void export_csv_report(const std::vector<Result>& results,
             << pct << ","
             << r.seconds << ","
             << outcome << ","
-            << (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL") << ","
             << '"' << codecs_str << "\","
             << '"' << r.error_msg << "\"\n";
     }
@@ -264,7 +257,6 @@ void export_csv_report(const std::vector<Result>& results,
                 << '"' << c.error_msg << "\"\n";
         }
     }
-
-    out << "\n\nTotal amount of time:\n";
-    out << total_seconds << " seconds\n";
+    out << "\n\nTotal amount of time, Encoding mode used\n";
+    out << total_seconds << " seconds,"<< (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL")<<"\n";
 }

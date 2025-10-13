@@ -43,7 +43,7 @@ void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archi
 
     // detect format
     const auto mime = MimeDetector::detect(p.string());
-    auto fmt_it = mime_to_format.find(mime);
+    const auto fmt_it = mime_to_format.find(mime);
     if (fmt_it != mime_to_format.end() && can_read_format(fmt_it->second)) {
         auto handler = make_handler(fmt_it->second);
         auto job = handler->prepare(p.string());
@@ -59,7 +59,7 @@ void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archi
 }
 
 void collect_inputs(const std::vector<fs::path>& inputs,
-                    bool recursive,
+                    const bool recursive,
                     std::vector<fs::path>& files,
                     std::vector<ContainerJob>& archive_jobs, Settings &settings) {
     for (auto const& p : inputs) {
