@@ -37,7 +37,7 @@
 static std::atomic<bool> interrupted{false};
 
 void signal_handler(int sig) {
-    if (sig == SIGINT) {
+    if (sig == SIGINT || sig == SIGTERM) {
         if (!interrupted.load()) {
             Logger::log(LogLevel::Warning, "Stop detected. Killing current threads and saving results...", "main");
         } else {
@@ -167,12 +167,13 @@ int main(const int argc, char *argv[]) {
     ThreadPool pool(settings.num_threads);
     std::mutex results_mutex;
 
-    std::vector<std::future<void> > futures;
     size_t total_files = files.size();
+    std::atomic<size_t> done_count{0};
 
-    futures.reserve(files.size());
     for (auto const &in_path: files) {
-        futures.push_back(pool.enqueue([&, in_path] {
+        pool.enqueue([&, in_path](std::stop_token st) {
+            if (st.stop_requested() || interrupted.load()) return;
+
             const auto start = std::chrono::steady_clock::now();
             auto mime = MimeDetector::detect(in_path.string());
             if (mime.empty() || mime == "application/octet-stream") {
@@ -203,6 +204,7 @@ int main(const int argc, char *argv[]) {
                     bool pipeline_ok = true;
 
                     for (size_t idx = 0; idx < it->second.size(); ++idx) {
+                        if (st.stop_requested() || interrupted.load()) break;
                         tmp = make_temp_path(in_path.stem(), in_path.extension().string());
                         auto enc = it->second[idx]();
                         try {
@@ -258,6 +260,7 @@ int main(const int argc, char *argv[]) {
                     // parallel mode: old behaviour
                     std::string best_tmp;
                     for (size_t idx = 0; idx < it->second.size(); ++idx) {
+                        if (st.stop_requested() || interrupted.load()) break;
                         const auto enc = it->second[idx]();
                         fs::path tmp = make_temp_path(in_path.stem(), in_path.extension().string());
                         try {
@@ -318,39 +321,32 @@ int main(const int argc, char *argv[]) {
             }
 
             const auto end = std::chrono::steady_clock::now();
-            const double seconds = std::chrono::duration<double>(end - start).count();
-
-            const std::scoped_lock lock(results_mutex);
-            Result r;
-            r.filename = in_path.string();
-            r.mime = mime;
-            r.size_before = sz_before;
-            r.size_after = sz_after_best;
-            r.success = ok_any;
-            r.replaced = replaced;
-            r.seconds = seconds;
-            r.codecs_used = std::move(codecs_used);
-            r.error_msg = error_msg;
-            results.push_back(std::move(r)); {
+            const double seconds = std::chrono::duration<double>(end - start).count(); {
+                const std::scoped_lock lock(results_mutex);
+                Result r;
+                r.filename = in_path.string();
+                r.mime = mime;
+                r.size_before = sz_before;
+                r.size_after = sz_after_best;
+                r.success = ok_any;
+                r.replaced = replaced;
+                r.seconds = seconds;
+                r.codecs_used = std::move(codecs_used);
+                r.error_msg = error_msg;
+                results.push_back(std::move(r));
+            } {
                 static std::mutex print_mutex;
-                static std::atomic<size_t> count{0};
-                const size_t done = ++count;
                 const std::scoped_lock lock1(print_mutex);
-                auto now = std::chrono::steady_clock::now();
-                double elapsed = std::chrono::duration<double>(now - start_total).count();
+                const size_t done = ++done_count;
+                const auto now = std::chrono::steady_clock::now();
+                const double elapsed = std::chrono::duration<double>(now - start_total).count();
                 if (!settings.is_pipe) {
                     print_progress_bar(done, total_files, elapsed);
                 }
             }
-        }));
+        });
     }
-    // wait for all tasks to finish
-    for (auto &f: futures) {
-        f.get();
-        if (interrupted.load()) {
-            break;
-        }
-    }
+    pool.wait_idle();
 
     if (settings.is_pipe && !results[0].error_msg.empty()) {
         std::cerr<<"Encoding returner error " + results[0].error_msg;
