@@ -35,7 +35,7 @@ static const char* handler_tag_for(const ContainerFormat fmt) {
     }
 }
 
-static const char* ext_for(ContainerFormat fmt) {
+static const char* ext_for(const ContainerFormat fmt) {
     switch (fmt) {
         case ContainerFormat::Docx: return ".docx";
         case ContainerFormat::Xlsx: return ".xlsx";
@@ -58,7 +58,7 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
          fmt_ == ContainerFormat::Pptx ? "pptx_" : "ooxml_");
     std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (prefix + RandomUtils::random_suffix());
     std::filesystem::create_directories(temp_dir);
-    job.temp_dir = temp_dir.string();
+    job.temp_dir = temp_dir;
 
     archive *in = archive_read_new();
     archive_read_support_format_zip(in);
@@ -116,20 +116,20 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
         ofs.close();
 
         // decide if this entry is itself a container using mime detection
-        const std::string mime = MimeDetector::detect(out_path.string());
+        const std::string mime = MimeDetector::detect(out_path);
         const ContainerFormat fmt = mime_to_container_format(mime);
 
         if (fmt != ContainerFormat::Unknown && can_read_format(fmt)) {
             Logger::log(LogLevel::Debug, "Found nested container in OOXML: " + out_path.string() + " (" + mime + ")", tag);
             if (fmt == this->fmt_) {
                 OoxmlHandler nested(this->fmt_);
-                job.children.push_back(nested.prepare(out_path.string()));
+                job.children.push_back(nested.prepare(out_path));
             } else {
                 ArchiveHandler ah;
-                job.children.push_back(ah.prepare(out_path.string()));
+                job.children.push_back(ah.prepare(out_path));
             }
         } else {
-            job.file_list.push_back(out_path.string());
+            job.file_list.push_back(out_path);
         }
     }
 

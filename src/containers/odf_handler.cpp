@@ -145,13 +145,13 @@ ContainerJob OdfHandler::prepare(const std::filesystem::path &path) {
 
             if (inner_fmt == fmt_) {
                 OdfHandler nested(fmt_);
-                job.children.push_back(nested.prepare(out_path.string()));
+                job.children.push_back(nested.prepare(out_path));
             } else {
                 ArchiveHandler ah;
-                job.children.push_back(ah.prepare(out_path.string()));
+                job.children.push_back(ah.prepare(out_path));
             }
         } else {
-            job.file_list.push_back(out_path.string());
+            job.file_list.push_back(out_path);
         }
     }
 

@@ -155,11 +155,11 @@ ContainerJob ArchiveHandler::prepare(const std::filesystem::path &archive_path) 
         std::error_code ec;
         if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
             ContainerFormat inner_fmt;
-            if (is_archive_file(p.path().string(), inner_fmt)) {
+            if (is_archive_file(p.path(), inner_fmt)) {
                 Logger::log(LogLevel::Debug, "Found nested archive: " + p.path().string(), "ArchiveHandler");
-                job.children.push_back(prepare(p.path().string()));
+                job.children.push_back(prepare(p.path()));
             } else {
-                job.file_list.push_back(p.path().string());
+                job.file_list.push_back(p.path());
             }
         }
     }
@@ -222,7 +222,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     );
 
     // create archive with libarchive
-    if (!create_with_libarchive(job.temp_dir, tmp_archive.string(), out_fmt)) {
+    if (!create_with_libarchive(job.temp_dir, tmp_archive, out_fmt)) {
         Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), "ArchiveHandler");
         return false;
     }
@@ -306,14 +306,14 @@ ContainerFormat ArchiveHandler::detect_format(const std::filesystem::path& path)
     }
 
     // extension fallback
-    std::string ext = to_lower_copy(fs::path(path).extension().string());
+    std::string ext = to_lower_copy(path.extension().string());
     if (!ext.empty() && ext.front() == '.') ext.erase(0, 1);
     if (!ext.empty()) {
         if (auto parsed = parse_container_format(ext)) {
             return *parsed;
         }
         // double extension support: map tar.* to tar container
-        const auto fname = to_lower_copy(fs::path(path).filename().string());
+        const auto fname = to_lower_copy(path.filename().string());
         if (fname.ends_with(".tar.gz"))  return ContainerFormat::Tar;
         if (fname.ends_with(".tar.bz2")) return ContainerFormat::Tar;
         if (fname.ends_with(".tar.xz"))  return ContainerFormat::Tar;
