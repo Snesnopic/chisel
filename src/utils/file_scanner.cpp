@@ -4,11 +4,9 @@
 
 #include "file_scanner.hpp"
 #include "file_type.hpp"
-#include "archive_formats.hpp"
 #include "logger.hpp"
 #include <algorithm>
 #include <fstream>
-
 #include "mime_detector.hpp"
 #include "../containers/mkv_handler.hpp"
 #include "../containers/odf_handler.hpp"

@@ -5,7 +5,6 @@
 #include "../containers/archive_handler.hpp"
 #include "../utils/logger.hpp"
 #include "../utils/file_type.hpp"
-#include "../utils/archive_formats.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>

@@ -685,7 +685,6 @@ set(MONOLITH_SOURCES
         src/encoder/flac_encoder.hpp
         src/encoder/png_encoder.cpp
         src/encoder/png_encoder.hpp
-        src/utils/file_type.cpp
         src/utils/file_type.hpp
         src/utils/thread_pool.hpp
         src/utils/thread_pool.cpp
@@ -695,7 +694,6 @@ set(MONOLITH_SOURCES
         src/utils/logger.cpp
         src/containers/archive_handler.cpp
         src/containers/archive_handler.hpp
-        src/utils/archive_formats.hpp
         src/cli/cli_parser.cpp
         src/cli/cli_parser.hpp
         src/utils/file_scanner.cpp

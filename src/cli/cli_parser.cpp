@@ -4,7 +4,6 @@
 
 #include "cli_parser.hpp"
 #include "../utils/logger.hpp"
-#include  "../utils/archive_formats.hpp"
 #include "../containers/archive_handler.hpp"
 #include <unordered_map>
 #include <functional>

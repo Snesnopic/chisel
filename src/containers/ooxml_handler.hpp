@@ -6,7 +6,6 @@
 #define MONOLITH_OOXML_HANDLER_HPP
 
 #include "../containers/archive_handler.hpp"
-#include "../utils/archive_formats.hpp"
 
 class OoxmlHandler final :public IContainer {
 public:

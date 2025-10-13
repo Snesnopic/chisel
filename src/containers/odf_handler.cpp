@@ -5,7 +5,6 @@
 #include "odf_handler.hpp"
 #include "../utils/logger.hpp"
 #include "../utils/file_type.hpp"
-#include "../utils/archive_formats.hpp"
 #include "../containers/archive_handler.hpp"
 #include <archive.h>
 #include <archive_entry.h>
@@ -17,7 +16,7 @@
 #include "../utils/random_utils.hpp"
 #include "../utils/mime_detector.hpp"
 
-static const char *handler_tag_for(ContainerFormat fmt) {
+static const char *handler_tag_for(const ContainerFormat fmt) {
     switch (fmt) {
         case ContainerFormat::Odt: return "OdfHandler(ODT)";
         case ContainerFormat::Ods: return "OdfHandler(ODS)";
@@ -28,37 +27,6 @@ static const char *handler_tag_for(ContainerFormat fmt) {
     }
 }
 
-const char *OdfHandler::temp_prefix() const {
-    switch (fmt_) {
-        case ContainerFormat::Odt: return "odt_";
-        case ContainerFormat::Ods: return "ods_";
-        case ContainerFormat::Odp: return "odp_";
-        case ContainerFormat::Odg: return "odg_";
-        case ContainerFormat::Odf: return "odf_";
-        default: return "odf_";
-    }
-}
-
-const char *OdfHandler::output_extension() const {
-    switch (fmt_) {
-        case ContainerFormat::Odt: return ".odt";
-        case ContainerFormat::Ods: return ".ods";
-        case ContainerFormat::Odp: return ".odp";
-        case ContainerFormat::Odg: return ".odg";
-        case ContainerFormat::Odf: return ".odf";
-        default: return ".odf";
-    }
-}
-
-OdfHandler OdfHandler::from_path(const std::filesystem::path &path) {
-    const std::string ext = path.extension().string();
-    if (ext == ".odt") return OdfHandler(ContainerFormat::Odt);
-    if (ext == ".ods") return OdfHandler(ContainerFormat::Ods);
-    if (ext == ".odp") return OdfHandler(ContainerFormat::Odp);
-    if (ext == ".odg") return OdfHandler(ContainerFormat::Odg);
-    if (ext == ".odf") return OdfHandler(ContainerFormat::Odf);
-    return OdfHandler(ContainerFormat::Unknown);
-}
 
 ContainerJob OdfHandler::prepare(const std::filesystem::path &path) {
     const char *handler_name = handler_tag_for(fmt_);
@@ -69,7 +37,7 @@ ContainerJob OdfHandler::prepare(const std::filesystem::path &path) {
     job.format = fmt_;
 
     std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (
-                                    std::string(temp_prefix()) + RandomUtils::random_suffix());
+                                    container_format_to_string(job.format) + "_" + RandomUtils::random_suffix());
     std::filesystem::create_directories(temp_dir);
     job.temp_dir = temp_dir.string();
 
@@ -195,7 +163,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     fs::path src_path(job.original_path);
-    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + output_extension());
+    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + "." + container_format_to_string(fmt_));
 
     struct archive *out = archive_write_new();
     if (!out) {

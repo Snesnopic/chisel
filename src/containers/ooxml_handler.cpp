@@ -5,7 +5,6 @@
 #include "ooxml_handler.hpp"
 #include "../utils/logger.hpp"
 #include "../utils/file_type.hpp"
-#include "../utils/archive_formats.hpp"
 #include "../containers/archive_handler.hpp"
 #include <archive.h>
 #include <archive_entry.h>
@@ -17,15 +16,6 @@
 #include "../utils/mime_detector.hpp"
 #include "../utils/random_utils.hpp"
 
-// helper: map mime to containerformat using provided tables
-static ContainerFormat mime_to_container_format(const std::filesystem::path &mime) {
-    auto it = mime_to_format.find(mime);
-    if (it != mime_to_format.end()) {
-        return it->second;
-    }
-    return ContainerFormat::Unknown;
-}
-
 static const char* handler_tag_for(const ContainerFormat fmt) {
     switch (fmt) {
         case ContainerFormat::Docx: return "OoxmlHandler(DOCX)";
@@ -35,14 +25,6 @@ static const char* handler_tag_for(const ContainerFormat fmt) {
     }
 }
 
-static const char* ext_for(const ContainerFormat fmt) {
-    switch (fmt) {
-        case ContainerFormat::Docx: return ".docx";
-        case ContainerFormat::Xlsx: return ".xlsx";
-        case ContainerFormat::Pptx: return ".pptx";
-        default: return ".zip";
-    }
-}
 
 ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
     const char* tag = handler_tag_for(fmt_);
@@ -117,7 +99,7 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
 
         // decide if this entry is itself a container using mime detection
         const std::string mime = MimeDetector::detect(out_path);
-        const ContainerFormat fmt = mime_to_container_format(mime);
+        const ContainerFormat fmt = mime_to_format.find(mime)->second;
 
         if (fmt != ContainerFormat::Unknown && can_read_format(fmt)) {
             Logger::log(LogLevel::Debug, "Found nested container in OOXML: " + out_path.string() + " (" + mime + ")", tag);
@@ -171,7 +153,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     fs::path src_path(job.original_path);
-    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + ext_for(this->fmt_));
+    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + "." + container_format_to_string(this->fmt_));
 
     struct archive *out = archive_write_new();
     if (!out) {

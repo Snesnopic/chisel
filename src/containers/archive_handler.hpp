@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 #include "container.hpp"
-#include "../utils/archive_formats.hpp"
 #include "../cli/cli_parser.hpp"
 
 class ArchiveHandler final : public IContainer {

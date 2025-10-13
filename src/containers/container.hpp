@@ -4,9 +4,9 @@
 
 #ifndef MONOLITH_CONTAINER_HPP
 #define MONOLITH_CONTAINER_HPP
-#include <string>
+
 #include  "../cli/cli_parser.hpp"
-#include "../utils/archive_formats.hpp"
+#include "../utils/file_type.hpp"
 
 struct ContainerJob {
     std::filesystem::path original_path;
