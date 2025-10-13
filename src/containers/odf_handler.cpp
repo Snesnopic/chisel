@@ -174,7 +174,7 @@ ContainerJob OdfHandler::prepare(const std::string &path) {
 
 bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     const char *handler_name = handler_tag_for(fmt_);
-    Logger::log(LogLevel::Info, "Finalizing ODF container: " + job.original_path, handler_name);
+    Logger::log(LogLevel::Info, "Finalizing ODF container: " + job.original_path.filename().string(), handler_name);
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -190,7 +190,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
             ok = ah.finalize(child, settings);
         }
         if (!ok) {
-            Logger::log(LogLevel::Error, "Failed to finalize nested container: " + child.original_path, handler_name);
+            Logger::log(LogLevel::Error, "Failed to finalize nested container: " + child.original_path.filename().string(), handler_name);
             return false;
         }
     }
@@ -345,9 +345,9 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", handler_name);
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir.filename().string() + " (" + ec.message() + ")", handler_name);
     } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, handler_name);
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir.filename().string(), handler_name);
     }
 
     return true;

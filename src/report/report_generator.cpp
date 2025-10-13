@@ -192,9 +192,10 @@ void print_console_report(const std::vector<Result>& results,
             std::string delta = c.success ? std::format("{:.2f}%", pct) : "-";
             const auto size_before = c.size_before / 1024;
             const auto size_after = c.size_after / 1024;
+            const auto fileName = c.filename.filename().string();
             std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
                 std::make_format_args(
-                    c.filename,
+                    fileName,
                     c.format,
                     size_before,
                     size_after,

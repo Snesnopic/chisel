@@ -12,7 +12,7 @@
 enum class EncodeMode;
 
 struct Result {
-    std::string filename;       // full path or relative
+    std::filesystem::path filename;       // full path or relative
     std::string mime;           // detected mime
     uintmax_t size_before{};    // original size in bytes
     uintmax_t size_after{};     // recompressed size in bytes
@@ -24,7 +24,7 @@ struct Result {
 };
 
 struct ContainerResult {
-    std::string filename;
+    std::filesystem::path filename;
     std::string format;
     uintmax_t size_before{};
     uintmax_t size_after{};

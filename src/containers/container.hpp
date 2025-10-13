@@ -9,9 +9,9 @@
 #include "../utils/archive_formats.hpp"
 
 struct ContainerJob {
-    std::string original_path;
-    std::string temp_dir;
-    std::vector<std::string> file_list;
+    std::filesystem::path original_path;
+    std::filesystem::path temp_dir;
+    std::vector<std::filesystem::path> file_list;
     ContainerFormat format = ContainerFormat::Unknown;
     std::vector<ContainerJob> children;
 };

@@ -150,7 +150,7 @@ ContainerJob OoxmlHandler::prepare(const std::string &path) {
 
 bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     const char* tag = handler_tag_for(fmt_);
-    Logger::log(LogLevel::Info, "Finalizing OOXML container: " + job.original_path, tag);
+    Logger::log(LogLevel::Info, "Finalizing OOXML container: " + job.original_path.filename().string(), tag);
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -166,7 +166,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             child_ok = ah.finalize(child, settings);
         }
         if (!child_ok) {
-            Logger::log(LogLevel::Error, "Failed to finalize nested container: " + child.original_path, tag);
+            Logger::log(LogLevel::Error, "Failed to finalize nested container: " + child.original_path.filename().string(), tag);
             return false;
         }
     }
@@ -314,9 +314,9 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     // cleanup temp dir
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", tag);
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir.filename().string() + " (" + ec.message() + ")", tag);
     } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, tag);
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir.filename().string(), tag);
     }
 
     return true;

@@ -142,7 +142,7 @@ ContainerJob ArchiveHandler::prepare(const std::string &archive_path) {
         return job;
     }
 
-    Logger::log(LogLevel::Info, "Extracting archive: " + archive_path + " -> " + job.temp_dir, "ArchiveHandler");
+    Logger::log(LogLevel::Info, "Extracting archive: " + archive_path + " -> " + job.temp_dir.filename().string(), "ArchiveHandler");
 
     // extract with libarchive
     if (!extract_with_libarchive(archive_path, job.temp_dir)) {
@@ -178,7 +178,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     // finalize children first
     for (const auto& child : job.children) {
         if (!finalize(child, settings)) {
-            Logger::log(LogLevel::Error, "Finalize failed per nested archive: " + child.original_path, "ArchiveHandler");
+            Logger::log(LogLevel::Error, "Finalize failed per nested archive: " + child.original_path.filename().string(), "ArchiveHandler");
             return false;
         }
     }
@@ -199,7 +199,7 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
     } else {
         Logger::log(
             LogLevel::Info,
-            "Non writable format and no alternative format: left intact -> " + job.original_path,
+            "Non writable format and no alternative format: left intact -> " + job.original_path.filename().string(),
             "ArchiveHandler"
         );
         // clean temp folder
@@ -281,15 +281,15 @@ bool ArchiveHandler::finalize(const ContainerJob &job, Settings& settings) {
         );
     } else {
         fs::remove(tmp_archive, ec);
-        Logger::log(LogLevel::Debug, "No improvement for: " + job.original_path, "ArchiveHandler");
+        Logger::log(LogLevel::Debug, "No improvement for: " + job.original_path.filename().string(), "ArchiveHandler");
     }
 
     // clean temp dir
     fs::remove_all(job.temp_dir, ec);
     if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir + " (" + ec.message() + ")", "ArchiveHandler");
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + job.temp_dir.filename().string() + " (" + ec.message() + ")", "ArchiveHandler");
     } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir, "ArchiveHandler");
+        Logger::log(LogLevel::Debug, "Removed temp dir: " + job.temp_dir.filename().string(), "ArchiveHandler");
     }
 
     return true;
