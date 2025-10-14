@@ -144,7 +144,7 @@ void print_console_report(const std::vector<Result>& results,
         if (r.replaced && r.size_before > r.size_after)
             total_saved += r.size_before - r.size_after;
 
-        auto filenamecolwidth = truncate(r.filename, file_col_width);
+        auto filenamecolwidth = truncate(r.filename.filename().string(), file_col_width);
         auto sizeBefore = r.size_before / 1024;
         auto sizeAfter = r.size_after / 1024;
         std::cout << std::vformat(row_fmt,
@@ -234,7 +234,7 @@ void export_csv_report(const std::vector<Result>& results,
                           std::format("{:.2f}%", r.codecs_used[i].second);
         }
 
-        out << '"' << r.filename << "\","
+        out << '"' << r.filename.filename().string() << "\","
             << r.mime << ","
             << (r.size_before / 1024) << ","
             << (r.size_after / 1024) << ","
@@ -250,7 +250,7 @@ void export_csv_report(const std::vector<Result>& results,
             double pct = c.success && c.size_before
                          ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
                          : 0.0;
-            out << '"' << c.filename << "\","
+            out << '"' << c.filename.filename().string() << "\","
                 << c.format << ","
                 << (c.size_before / 1024) << ","
                 << (c.size_after / 1024) << ","
