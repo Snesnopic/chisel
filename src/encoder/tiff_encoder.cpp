@@ -12,7 +12,7 @@ TiffEncoder::TiffEncoder(const bool preserve_metadata) {
 }
 
 // helper: copy essential + metadata tags from in to out
-static void copy_tags_with_metadata(TIFF* in, TIFF* out) {
+static void copy_tags_with_metadata(TIFF* in, TIFF* out, const bool preserve_metadata) {
     unsigned int width, height;
     unsigned short spp, bps, photometric, planar;
 
@@ -35,31 +35,33 @@ static void copy_tags_with_metadata(TIFF* in, TIFF* out) {
     TIFFSetField(out, TIFFTAG_PREDICTOR, 2);
 
     // optional metadata
-    float xres, yres;
-    unsigned short resunit;
-    if (TIFFGetField(in, TIFFTAG_XRESOLUTION, &xres))
-        TIFFSetField(out, TIFFTAG_XRESOLUTION, xres);
-    if (TIFFGetField(in, TIFFTAG_YRESOLUTION, &yres))
-        TIFFSetField(out, TIFFTAG_YRESOLUTION, yres);
-    if (TIFFGetField(in, TIFFTAG_RESOLUTIONUNIT, &resunit))
-        TIFFSetField(out, TIFFTAG_RESOLUTIONUNIT, resunit);
+    if (preserve_metadata) {
+        float xres, yres;
+        unsigned short resunit;
+        if (TIFFGetField(in, TIFFTAG_XRESOLUTION, &xres))
+            TIFFSetField(out, TIFFTAG_XRESOLUTION, xres);
+        if (TIFFGetField(in, TIFFTAG_YRESOLUTION, &yres))
+            TIFFSetField(out, TIFFTAG_YRESOLUTION, yres);
+        if (TIFFGetField(in, TIFFTAG_RESOLUTIONUNIT, &resunit))
+            TIFFSetField(out, TIFFTAG_RESOLUTIONUNIT, resunit);
 
-    // icc profile
-    void const* icc_data = nullptr;
-    unsigned int icc_len = 0;
-    if (TIFFGetField(in, TIFFTAG_ICCPROFILE, &icc_len, &icc_data))
-        TIFFSetField(out, TIFFTAG_ICCPROFILE, icc_len, icc_data);
+        // icc profile
+        void const* icc_data = nullptr;
+        unsigned int icc_len = 0;
+        if (TIFFGetField(in, TIFFTAG_ICCPROFILE, &icc_len, &icc_data))
+            TIFFSetField(out, TIFFTAG_ICCPROFILE, icc_len, icc_data);
 
-    // exif ifd
-    toff_t exif_offset;
-    if (TIFFGetField(in, TIFFTAG_EXIFIFD, &exif_offset))
-        TIFFSetField(out, TIFFTAG_EXIFIFD, exif_offset);
+        // exif ifd
+        toff_t exif_offset;
+        if (TIFFGetField(in, TIFFTAG_EXIFIFD, &exif_offset))
+            TIFFSetField(out, TIFFTAG_EXIFIFD, exif_offset);
 
-    // xmp packet
-    void const* xmp_data = nullptr;
-    unsigned int xmp_len = 0;
-    if (TIFFGetField(in, TIFFTAG_XMLPACKET, &xmp_len, &xmp_data))
-        TIFFSetField(out, TIFFTAG_XMLPACKET, xmp_len, xmp_data);
+        // xmp packet
+        void const* xmp_data = nullptr;
+        unsigned int xmp_len = 0;
+        if (TIFFGetField(in, TIFFTAG_XMLPACKET, &xmp_len, &xmp_data))
+            TIFFSetField(out, TIFFTAG_XMLPACKET, xmp_len, xmp_data);
+    }
 
     // colormap (palette images)
     unsigned short* r; unsigned short* g; unsigned short* b;
@@ -88,7 +90,7 @@ bool TiffEncoder::recompress(const std::filesystem::path& input,
     // iterate over all directories (pages)
     do {
         TIFFCreateDirectory(out);
-        copy_tags_with_metadata(in, out);
+        copy_tags_with_metadata(in, out, preserve_metadata_);
 
         if (TIFFIsTiled(in)) {
             // tiled handling
