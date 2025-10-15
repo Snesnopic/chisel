@@ -262,7 +262,7 @@ set(ZSTD_BUILD_SHARED   OFF CACHE BOOL "" FORCE)
 
 set(zstd_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/build/cmake")
 set(zstd_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zstd-build")
-add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR})
+add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
 set(ZSTD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
@@ -313,7 +313,7 @@ set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 add_library(ZLIB::ZLIB ALIAS zlibstatic)
 
 get_target_property(_zlib_type zlibstatic TYPE)
@@ -339,7 +339,7 @@ else (
         set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
         set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-        add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+        add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 )
 endif ()
 
@@ -350,13 +350,13 @@ set(PNG_TESTS OFF CACHE BOOL "" FORCE)
 set(libpng_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libpng")
 set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
 
-add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR})
+add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libogg
 set(libogg_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libogg")
 set(libogg_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libogg-build")
 
-add_subdirectory(${libogg_SOURCE_DIR} ${libogg_BINARY_DIR})
+add_subdirectory(${libogg_SOURCE_DIR} ${libogg_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libFLAC
 set(BUILD_CXXLIBS OFF CACHE BOOL "" FORCE)
@@ -367,7 +367,7 @@ set(INSTALL_MANPAGES OFF CACHE BOOL "" FORCE)
 set(libflac_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libflac")
 set(libflac_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libflac-build")
 
-add_subdirectory(${libflac_SOURCE_DIR} ${libflac_BINARY_DIR})
+add_subdirectory(${libflac_SOURCE_DIR} ${libflac_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # If the lib provides a 'man' target we exclude it from all (same semantics as before)
 if(TARGET man)
@@ -397,7 +397,7 @@ set(WAVPACK_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(wavpack_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/wavpack")
 set(wavpack_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/wavpack-build")
 
-add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR})
+add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libarchive
 set(ENABLE_OPENSSL OFF CACHE BOOL "Disable OpenSSL in libarchive" FORCE)
@@ -417,7 +417,7 @@ set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
 set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
-add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR})
+add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
@@ -480,7 +480,7 @@ set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 # libEBML
 set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
-add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR})
+add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -488,7 +488,7 @@ list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
 set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
 
-add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR})
+add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
@@ -505,7 +505,7 @@ set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 set(libwebp_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libwebp")
 set(libwebp_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libwebp-build")
-add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR})
+add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR} EXCLUDE_FROM_ALL)
 add_library(thirdparty_webp ALIAS webp)
 add_library(thirdparty_webpdecoder ALIAS webpdecoder)
 add_library(thirdparty_webpdemux ALIAS webpdemux)
@@ -531,15 +531,12 @@ set(REQUIRE_CRYPTO_NATIVE ON CACHE BOOL "" FORCE)
 set(USE_IMPLICIT_CRYPTO OFF CACHE BOOL "" FORCE)
 set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "Disable qpdf CMake package export" FORCE)
 set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export" FORCE)
-if (NOT WIN32)
-    find_package(qpdf REQUIRED)
-endif()
-add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR})
+add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # zopfli
 set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
 set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
-add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR})
+add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libjxl
 set(JPEGXL_ENABLE_DOXYGEN OFF CACHE BOOL "Turned off JXL doxygen" FORCE)
@@ -552,7 +549,7 @@ set(JPEGXL_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(JPEGXL_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(libjxl_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libjxl")
 set(libjxl_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libjxl-build")
-add_subdirectory(${libjxl_SOURCE_DIR} ${libjxl_BINARY_DIR})
+add_subdirectory(${libjxl_SOURCE_DIR} ${libjxl_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libtiff
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -561,13 +558,13 @@ set(tiff-tests OFF CACHE BOOL "" FORCE)
 set(tiff-docs OFF CACHE BOOL "" FORCE)
 set(libtiff_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libtiff")
 set(libtiff_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libtiff-build")
-add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR})
+add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # sqlite3
 set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
 set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 
-add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR})
+add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libmseed
 set(libmseed_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmseed")
@@ -658,7 +655,7 @@ if(EXISTS "${MACLIB_HEADER}")
 endif()
 set(BUILD_UTIL FALSE CACHE BOOL "" FORCE)
 set(BUILD_SHARED FALSE CACHE BOOL "" FORCE)
-add_subdirectory(third_party/MACLib)
+add_subdirectory(third_party/MACLib EXCLUDE_FROM_ALL)
 target_include_directories(MAC PUBLIC
         third_party/MACLib/Shared
 )
