@@ -159,7 +159,7 @@ bool ApeEncoder::recompress(const std::filesystem::path &input,
         throw std::runtime_error("APE encoder start failed");
     }
 
-    const size_t chunk = 1 << 16;
+    constexpr size_t chunk = 1 << 16;
     size_t offset = 0;
     while (offset < ctx.pcm_bytes.size()) {
         const size_t n = std::min(chunk, ctx.pcm_bytes.size() - offset);

@@ -57,7 +57,7 @@ bool WavpackEncoder::recompress(const std::filesystem::path& input,
     config.bytes_per_sample = WavpackGetBytesPerSample(ctx_in);
     config.bits_per_sample  = WavpackGetBitsPerSample(ctx_in);
     config.num_channels     = WavpackGetNumChannels(ctx_in);
-    config.sample_rate      = WavpackGetSampleRate(ctx_in);
+    config.sample_rate      = static_cast<int32_t>(WavpackGetSampleRate(ctx_in));
     config.qmode            = 0;                  // PCM int
     config.block_samples    = 0;                  // let encoder decide
     config.flags            = 0;
