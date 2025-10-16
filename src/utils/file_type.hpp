@@ -185,12 +185,14 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     // archives
     {".zip",    "application/zip"},
     {".7z",     "application/x-7z-compressed"},
+    {".cb7",    "application/x-7z-compressed"},
     {".tar",    "application/x-tar"},
     {".gz",     "application/gzip"},
     {".bz2",    "application/x-bzip2"},
     {".xz",     "application/x-xz"},
     {".wim",    "application/x-ms-wim"},
     {".rar",    "application/vnd.rar"},
+    {".cbr",    "application/vnd.comicbook+rar"},
     {".iso",    "application/x-iso9660-image"},
     {".cpio",   "application/x-cpio"},
     {".lzma",   "application/x-lzma"},
@@ -215,19 +217,29 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".tiff",   "image/tiff"},
     {".webp",   "image/webp"},
     {".gif",    "image/gif"},
+    {".svg",    "image/svg+xml"},
 
-    // documents
-    {".pdf",    "application/pdf"},
+    // documents (office open xml)
     {".docx",   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
     {".xlsx",   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
     {".pptx",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+
+    // documents (legacy office)
+    {".doc",    "application/msword"},
+    {".xls",    "application/vnd.ms-excel"},
+    {".ppt",    "application/vnd.ms-powerpoint"},
+
+    // documents (open document format)
     {".odt",    "application/vnd.oasis.opendocument.text"},
     {".ods",    "application/vnd.oasis.opendocument.spreadsheet"},
     {".odp",    "application/vnd.oasis.opendocument.presentation"},
     {".odg",    "application/vnd.oasis.opendocument.graphics"},
     {".odf",    "application/vnd.oasis.opendocument.formula"},
+    {".pdf",    "application/pdf"},
+
+    // databases
     {".sqlite", "application/vnd.sqlite3"},
-    {".db",     "application/x-sqlite3"},
+    {".db",     "application/vnd.sqlite3"},
 
     // audio
     {".flac",   "audio/flac"},
@@ -236,7 +248,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".wvc",    "audio/x-wavpack"},
     {".mp3",    "audio/mpeg"},
     {".wav",    "audio/wav"},
-    {".ape",    "audio/ape"},
+    {".ape",    "audio/x-ape"},
 
     // video / containers
     {".mkv",    "video/x-matroska"},
