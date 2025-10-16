@@ -31,10 +31,15 @@ bool MkvEncoder::recompress(const std::filesystem::path &input,
 
     std::vector<std::string> args;
     args.emplace_back("mkclean");
+
     if (preserve_metadata_) {
-        args.emplace_back("--remux");
+        args.emplace_back("--optimize");
+        args.emplace_back("--keep-cues");
+    } else {
+        args.emplace_back("--optimize");
+        args.emplace_back("--unsafe");
     }
-    args.emplace_back("--optimize");
+    args.emplace_back("--quiet");
     args.push_back(temp_input.string());
     args.push_back(output.string());
     std::vector<char*> argv;
