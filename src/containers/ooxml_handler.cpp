@@ -34,17 +34,17 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
     job.original_path = path;
     job.format = fmt_;
 
-    std::string prefix =
+    const std::string prefix =
         (fmt_ == ContainerFormat::Docx ? "docx_" :
          fmt_ == ContainerFormat::Xlsx ? "xlsx_" :
          fmt_ == ContainerFormat::Pptx ? "pptx_" : "ooxml_");
-    std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (prefix + RandomUtils::random_suffix());
+    const std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / (prefix + RandomUtils::random_suffix());
     std::filesystem::create_directories(temp_dir);
     job.temp_dir = temp_dir;
 
     archive *in = archive_read_new();
     archive_read_support_format_zip(in);
-    int open_r = archive_read_open_filename(in, path.c_str(), 10240);
+    int open_r = archive_read_open_filename(in, path.string().c_str(), 10240);
     if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
         Logger::log(LogLevel::Error, "Failed to open OOXML for reading: " + std::string(archive_error_string(in)), tag);
         archive_read_free(in);
@@ -64,8 +64,8 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
             continue;
         }
 
-        std::string name = ename;
-        std::filesystem::path out_path = temp_dir / name;
+        const std::string name = ename;
+        const std::filesystem::path out_path = temp_dir / name;
         std::error_code ec;
         std::filesystem::create_directories(out_path.parent_path(), ec);
         if (ec) {
@@ -87,7 +87,7 @@ ContainerJob OoxmlHandler::prepare(const std::filesystem::path &path) {
         size_t size = 0;
         la_int64_t offset = 0;
         while (true) {
-            int rb = archive_read_data_block(in, &buff, &size, &offset);
+            const int rb = archive_read_data_block(in, &buff, &size, &offset);
             if (rb == ARCHIVE_EOF) break;
             if (rb != ARCHIVE_OK) {
                 Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), tag);
@@ -152,8 +152,8 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         }
     }
 
-    fs::path src_path(job.original_path);
-    fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + "." + container_format_to_string(this->fmt_));
+    const fs::path src_path(job.original_path);
+    const fs::path tmp_path = src_path.parent_path() / (src_path.stem().string() + "_tmp" + "." + container_format_to_string(this->fmt_));
 
     struct archive *out = archive_write_new();
     if (!out) {
@@ -162,7 +162,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     // set ZIP format and force deflate compression
-    int set_fmt = archive_write_set_format_zip(out);
+    const int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
@@ -173,7 +173,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
     archive_write_set_options(out, "compression=deflate");
 
-    int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
+    const int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
     }
@@ -184,9 +184,9 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     // ensure [Content_Types].xml is written first
-    std::vector<std::string> files_ordered;
+    std::vector<fs::path> files_ordered;
     auto it = std::find_if(job.file_list.begin(), job.file_list.end(),
-                           [](const std::string &f){ return fs::path(f).filename() == "[Content_Types].xml"; });
+                           [](const fs::path &f){ return f.filename() == "[Content_Types].xml"; });
     if (it != job.file_list.end()) {
         files_ordered.push_back(*it);
     }
@@ -203,10 +203,10 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         std::ifstream ifs(file, std::ios::binary);
         if (!ifs) {
-            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file, tag);
+            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), tag);
             continue;
         }
-        std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        const std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
         std::vector<unsigned char> final_data;
         const auto ext = rel.extension().string();
@@ -237,7 +237,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         archive_entry_set_perm(entry, 0644);
         archive_entry_set_mtime(entry, 0, 0); // determinism
 
-        int wh = archive_write_header(out, entry);
+        const int wh = archive_write_header(out, entry);
         if (wh == ARCHIVE_WARN) {
             Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), tag);
         }
@@ -251,7 +251,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
             return false;
         }
 
-        la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
+        const la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
         if (wrote < 0) {
             Logger::log(LogLevel::Error,
                         "Failed to write data for: " + rel.string() +
@@ -265,7 +265,7 @@ bool OoxmlHandler::finalize(const ContainerJob &job, Settings &settings) {
         archive_entry_free(entry);
     }
 
-    int close_w = archive_write_close(out);
+    const int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
         Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), tag);
         archive_write_free(out);

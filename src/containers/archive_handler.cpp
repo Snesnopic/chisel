@@ -335,7 +335,7 @@ bool ArchiveHandler::extract_with_libarchive(const std::filesystem::path& archiv
     archive_read_support_format_all(a);
     archive_read_set_options(a, "hdrcharset=UTF-8");
 
-    int r = archive_read_open_filename(a, archive_path.c_str(), 10240);
+    int r = archive_read_open_filename(a, archive_path.string().c_str(), 10240);
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }
@@ -500,7 +500,8 @@ bool ArchiveHandler::create_with_libarchive(const std::filesystem::path& src_dir
         return false;
     }
 
-    r = archive_write_open_filename(a, out_path.c_str());
+    r = archive_write_open_filename(a, out_path.string().c_str());
+
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveHandler");
     }

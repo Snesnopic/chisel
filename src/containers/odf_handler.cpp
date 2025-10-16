@@ -44,7 +44,7 @@ ContainerJob OdfHandler::prepare(const std::filesystem::path &path) {
     archive *in = archive_read_new();
     archive_read_support_format_zip(in);
 
-    int open_r = archive_read_open_filename(in, path.c_str(), 10240);
+    int open_r = archive_read_open_filename(in, path.string().c_str(), 10240);
     if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
         Logger::log(LogLevel::Error, std::string("Failed to open ODF for reading: ") + archive_error_string(in),
                     handler_name);
@@ -194,9 +194,9 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
     }
 
     // ensure "mimetype" is written first
-    std::vector<std::string> files_ordered;
+    std::vector<fs::path> files_ordered;
     auto it = std::find_if(job.file_list.begin(), job.file_list.end(),
-                           [](const std::string &f){ return fs::path(f).filename() == "mimetype"; });
+                           [](const fs::path &f){ return f.filename() == "mimetype"; });
     if (it != job.file_list.end()) {
         files_ordered.push_back(*it);
     }
@@ -213,7 +213,7 @@ bool OdfHandler::finalize(const ContainerJob &job, Settings &settings) {
 
         std::ifstream ifs(file, std::ios::binary);
         if (!ifs) {
-            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file, handler_name);
+            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), handler_name);
             continue;
         }
         std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
