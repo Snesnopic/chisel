@@ -8,6 +8,7 @@
 #include "../encoder/zopflipng_encoder.hpp"
 #include "../encoder/jpeg_encoder.hpp"
 #include "../encoder/jxl_encoder.hpp"
+#include "../encoder/mkv_encoder.hpp"
 #include "../encoder/mseed_encoder.hpp"
 #include "../encoder/sqlite_encoder.hpp"
 #include "../encoder/tiff_encoder.hpp"
@@ -75,6 +76,10 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
         [preserve_metadata] { return std::make_unique<ApeEncoder>(preserve_metadata); }
     };
     factories["audio/x-ape"] = factories["audio/ape"];
+
+    factories["video/x-matroska"] = {
+        [preserve_metadata] { return std::make_unique<MkvEncoder>(preserve_metadata); }
+    };
 
     return factories;
 }

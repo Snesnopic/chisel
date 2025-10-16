@@ -164,6 +164,9 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
     set(CMAKE_EXE_LINKER_FLAGS "${_new_exe_linker_flags}" CACHE STRING "Propagated linker flags for external projects" FORCE)
 endif()
 
+# libmkclean
+add_subdirectory("third_party/libmkclean")
+
 # liblzma
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(XZ_NLS OFF CACHE BOOL "Turned off XZ translated man pages" FORCE)
@@ -730,6 +733,8 @@ set(MONOLITH_SOURCES
         src/encoder/flexigif_encoder.hpp
         src/utils/mime_detector.cpp
         src/utils/mime_detector.hpp
+        src/encoder/mkv_encoder.cpp
+        src/encoder/mkv_encoder.hpp
 )
 if(NOT WIN32)
     list(APPEND MONOLITH_SOURCES
@@ -833,6 +838,7 @@ set(MONOLITH_LIBS
         jxl_threads
         tiff
         SQLite::SQLite3
+        mkclean_lib
 )
 if(NOT WIN32)
     list(APPEND MONOLITH_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib ${ZLIB_TARGET})

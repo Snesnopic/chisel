@@ -61,3 +61,6 @@
 [submodule "third_party/flexigif"]
 	path = third_party/flexigif
 	url = https://create.stephan-brumme.com/flexigif-lossless-gif-lzw-optimization/git
+[submodule "third_party/libmkclean"]
+	path = third_party/libmkclean
+	url = https://github.com/Snesnopic/libmkclean.git
