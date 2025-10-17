@@ -56,10 +56,10 @@ EncoderRegistry build_encoder_registry(const bool preserve_metadata) {
         [preserve_metadata] { return std::make_unique<WebpEncoder>(preserve_metadata); }
     };
     factories["image/x-webp"] = factories["image/webp"];
-
+    /*
     factories["application/pdf"] = {
         [preserve_metadata] { return std::make_unique<PdfEncoder>(preserve_metadata); }
-    };
+    };*/
 
     factories["application/vnd.fdsn.mseed"] = {
         [preserve_metadata] { return std::make_unique<MseedEncoder>(preserve_metadata); }

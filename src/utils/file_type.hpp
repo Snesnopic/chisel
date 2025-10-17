@@ -20,6 +20,7 @@ enum class ContainerFormat {
     Rar,
     Wim,
     //Mkv,
+    Pdf,
     Docx,
     Xlsx,
     Pptx,
@@ -62,6 +63,7 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/vnd.oasis.opendocument.text", ContainerFormat::Odt},
     { "application/vnd.oasis.opendocument.graphics", ContainerFormat::Odg },
     { "application/vnd.oasis.opendocument.formula",  ContainerFormat::Odf },
+    { "application/pdf",                ContainerFormat::Pdf},
     { "application/x-ms-wim",           ContainerFormat::Wim },
     { "application/epub+zip",           ContainerFormat::Epub },
     { "application/vnd.comicbook+zip",  ContainerFormat::Cbz },
@@ -85,6 +87,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::BZip2:    return "bz2";
         case ContainerFormat::Xz:       return "xz";
         case ContainerFormat::Wim:      return "wim";
+        case ContainerFormat::Pdf:    return "pdf";
         //case ContainerFormat::Mkv:      return "mkv";
         case ContainerFormat::Rar:      return "rar";
         case ContainerFormat::Docx:     return "docx";
@@ -138,6 +141,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "xpi")   return ContainerFormat::Xpi;
     if (s == "ora")   return ContainerFormat::Ora;
     if (s == "dwfx")  return ContainerFormat::Dwfx;
+    if (s == "pdf")   return ContainerFormat::Pdf;
     if (s == "xps" || s == "oxps") return ContainerFormat::Xps;
     if (s == "apk") return ContainerFormat::Apk;
     return std::nullopt;
@@ -174,6 +178,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Dwfx:
         case ContainerFormat::Xps:
         case ContainerFormat::Apk:
+        case ContainerFormat::Pdf:
             return true;
         default:
             return false;

@@ -11,6 +11,7 @@
 #include "../containers/mkv_handler.hpp"
 #include "../containers/odf_handler.hpp"
 #include "../containers/ooxml_handler.hpp"
+#include "../containers/pdf_handler.hpp"
 
 namespace fs = std::filesystem;
 
@@ -28,6 +29,8 @@ std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
         case ContainerFormat::Ods:
         case ContainerFormat::Odp:
             return std::make_unique<OdfHandler>(fmt);
+        case ContainerFormat::Pdf:
+            return std::make_unique<PdfHandler>(fmt);
         default:
             return std::make_unique<ArchiveHandler>();
     }

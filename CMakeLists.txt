@@ -735,6 +735,8 @@ set(MONOLITH_SOURCES
         src/utils/mime_detector.hpp
         src/encoder/mkv_encoder.cpp
         src/encoder/mkv_encoder.hpp
+        src/containers/pdf_handler.cpp
+        src/containers/pdf_handler.hpp
 )
 if(NOT WIN32)
     list(APPEND MONOLITH_SOURCES
