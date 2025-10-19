@@ -64,7 +64,7 @@ void print_console_report(const std::vector<Result>& results,
     size_t max_time = 10;
     size_t max_result = 10;
     size_t max_error = 5;
-    #ifdef max  //this is the dumbest shit i've ever had to do
+    #ifdef max
     #undef max
     #endif
     for (const auto& r : results) {
@@ -120,7 +120,9 @@ void print_console_report(const std::vector<Result>& results,
 
     uintmax_t total_saved = 0;
     auto sorted = results;
-    std::ranges::sort(sorted, [](const auto& a, const auto& b) { return a.filename < b.filename; });
+    std::ranges::sort(sorted, [](const auto& a, const auto& b) {
+        return a.file.path < b.file.path;
+    });
 
     // row formatting
     auto row_fmt = std::string("{:<") + std::to_string(file_col_width) + "}"
@@ -144,7 +146,11 @@ void print_console_report(const std::vector<Result>& results,
         if (r.replaced && r.size_before > r.size_after)
             total_saved += r.size_before - r.size_after;
 
-        auto filenamecolwidth = truncate(r.filename.filename().string(), file_col_width);
+        auto filenamecolwidth = truncate(r.file.path.filename().string(), file_col_width);
+        if (r.file.container_origin) {
+            filenamecolwidth = "  ↳ " + filenamecolwidth;
+        }
+
         auto sizeBefore = r.size_before / 1024;
         auto sizeAfter = r.size_after / 1024;
         std::cout << std::vformat(row_fmt,
@@ -190,7 +196,7 @@ void print_console_report(const std::vector<Result>& results,
                          ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
                          : 0.0;
             std::string delta = c.success ? std::format("{:.2f}%", pct) : "-";
-            const auto size_before = c.size_before / 1024;
+const auto size_before = c.size_before / 1024;
             const auto size_after = c.size_after / 1024;
             const auto fileName = c.filename.filename().string();
             std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
@@ -216,7 +222,7 @@ void export_csv_report(const std::vector<Result>& results,
     std::ofstream out(output_path);
     if (!out) return;
 
-    out << "File,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,Codecs,Error\n";
+    out << "File,Container,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,Codecs,Error\n";
 
     for (const auto& r : results) {
         const double pct = r.success && r.size_before
@@ -234,7 +240,8 @@ void export_csv_report(const std::vector<Result>& results,
                           std::format("{:.2f}%", r.codecs_used[i].second);
         }
 
-        out << '"' << r.filename.filename().string() << "\","
+        out << '"' << r.file.path.filename().string() << "\","
+            << '"' << r.file.container_origin->filename().string() << "\","
             << r.mime << ","
             << (r.size_before / 1024) << ","
             << (r.size_after / 1024) << ","
@@ -258,6 +265,8 @@ void export_csv_report(const std::vector<Result>& results,
                 << '"' << c.error_msg << "\"\n";
         }
     }
-    out << "\n\nTotal amount of time, Encoding mode used\n";
-    out << total_seconds << " seconds,"<< (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL")<<"\n";
+
+    out << "\n\nTotal amount of time,Encoding mode used\n";
+    out << total_seconds << " seconds,"
+        << (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL") << "\n";
 }
