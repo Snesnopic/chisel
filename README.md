@@ -1,13 +1,13 @@
-# monolith
+# chisel
 
-**monolith** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform monolithic binary.  
+**chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform monolithic binary.  
 It focuses on lossless recompression of various file formats by integrating multiple specialized encoders, with a strict emphasis on reproducibility, static linking, and Unix‑orthodox CLI behavior.
 
 ---
 
 ## Requirements
 
-To build **monolith** you need only a few system tools. All other libraries are automatically fetched and built by CMake or installed through your system package manager.
+To build **chisel** you need only a few system tools. All other libraries are automatically fetched and built by CMake or installed through your system package manager.
 
 ### Linux
 - CMake ≥ 3.20
@@ -55,7 +55,7 @@ Dependencies will be resolved automatically through vcpkg when configuring with 
 
 ---
 
-## Building monolith
+## Building chisel
 
 ### Linux / macOS
 ```bash
@@ -80,10 +80,10 @@ cmake --build build --config Release
 
 ## Usage
 
-`./monolith <file-or-directory>... [options]`
+`./chisel <file-or-directory>... [options]`
 
 **Options:**
-- `--dry-run`                  Use monolith without replacing original files.
+- `--dry-run`                  Use chisel without replacing original files.
 - `--no-meta`                  Do not preserve metadata in recompressed files.
 - `--recursive`                Process directories recursively.
 - `--threads N`                Number of worker threads to use (default: half of available cores).
@@ -102,7 +102,7 @@ cmake --build build --config Release
   If not specified, such archives are left untouched.
 
 **Pipe mode:**
-- If `-` is given as the only input, monolith reads a single file from stdin and writes the optimized result to stdout.
+- If `-` is given as the only input, chisel reads a single file from stdin and writes the optimized result to stdout.
 - In this mode:
   - Only one input (`-`) is allowed, not mixed with other files.
   - No progress bar or CSV/console report is generated.
@@ -110,11 +110,11 @@ cmake --build build --config Release
   - Errors and warnings are printed to stderr.
 
 **Examples:**
-- `./monolith file.jpg dir/ --recursive --threads 4`
-- `./monolith archive.zip`
-- `./monolith archive.rar --recompress-unencodable 7z`
-- `./monolith dir/ -o report.csv`
-- `cat file.png | ./monolith - > out.png`
+- `./chisel file.jpg dir/ --recursive --threads 4`
+- `./chisel archive.zip`
+- `./chisel archive.rar --recompress-unencodable 7z`
+- `./chisel dir/ -o report.csv`
+- `cat file.png | ./chisel - > out.png`
 
 ---
 

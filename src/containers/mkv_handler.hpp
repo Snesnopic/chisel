@@ -2,8 +2,8 @@
 // created by giuseppe francione on 25/09/25
 //
 
-#ifndef MONOLITH_MKV_HANDLER_HPP
-#define MONOLITH_MKV_HANDLER_HPP
+#ifndef CHISEL_MKV_HANDLER_HPP
+#define CHISEL_MKV_HANDLER_HPP
 
 #include <string>
 #include <vector>
@@ -60,4 +60,4 @@ private:
     static bool create_with_ffmpeg(const MkvJob& job, const std::filesystem::path& out_path, Settings& settings);
 };
 
-#endif // MONOLITH_MKV_HANDLER_HPP
+#endif // CHISEL_MKV_HANDLER_HPP

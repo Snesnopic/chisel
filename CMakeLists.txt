@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(monolith VERSION 0.1 LANGUAGES C CXX)
+project(chisel VERSION 0.1 LANGUAGES C CXX)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
@@ -22,82 +22,82 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
-option(MONOLITH_USE_THINLTO "Prefer -flto=thin when available" ON)
+option(CHISEL_USE_THINLTO "Prefer -flto=thin when available" ON)
 
-set(MONOLITH_LTO_FLAG "")
-if(MONOLITH_USE_THINLTO)
-    check_c_compiler_flag("-flto=thin" MONOLITH_C_FLTO_THIN)
-    check_cxx_compiler_flag("-flto=thin" MONOLITH_CXX_FLTO_THIN)
-    if(MONOLITH_C_FLTO_THIN AND MONOLITH_CXX_FLTO_THIN)
-        set(MONOLITH_LTO_FLAG "-flto=thin")
+set(CHISEL_LTO_FLAG "")
+if(CHISEL_USE_THINLTO)
+    check_c_compiler_flag("-flto=thin" CHISEL_C_FLTO_THIN)
+    check_cxx_compiler_flag("-flto=thin" CHISEL_CXX_FLTO_THIN)
+    if(CHISEL_C_FLTO_THIN AND CHISEL_CXX_FLTO_THIN)
+        set(CHISEL_LTO_FLAG "-flto=thin")
     endif()
 endif()
 
-if(MONOLITH_LTO_FLAG STREQUAL "")
-    check_c_compiler_flag("-flto" MONOLITH_C_FLTO)
-    check_cxx_compiler_flag("-flto" MONOLITH_CXX_FLTO)
-    if(MONOLITH_C_FLTO AND MONOLITH_CXX_FLTO)
-        set(MONOLITH_LTO_FLAG "-flto")
+if(CHISEL_LTO_FLAG STREQUAL "")
+    check_c_compiler_flag("-flto" CHISEL_C_FLTO)
+    check_cxx_compiler_flag("-flto" CHISEL_CXX_FLTO)
+    if(CHISEL_C_FLTO AND CHISEL_CXX_FLTO)
+        set(CHISEL_LTO_FLAG "-flto")
     endif()
 endif()
 
 # check for linker plugin flag (helps with LTO)
-check_c_compiler_flag("-fuse-linker-plugin" MONOLITH_C_FUSE_PLUGIN)
-check_cxx_compiler_flag("-fuse-linker-plugin" MONOLITH_CXX_FUSE_PLUGIN)
-if(MONOLITH_C_FUSE_PLUGIN AND MONOLITH_CXX_FUSE_PLUGIN)
-    set(MONOLITH_FUSE_LINKER_PLUGIN_FLAG "-fuse-linker-plugin")
+check_c_compiler_flag("-fuse-linker-plugin" CHISEL_C_FUSE_PLUGIN)
+check_cxx_compiler_flag("-fuse-linker-plugin" CHISEL_CXX_FUSE_PLUGIN)
+if(CHISEL_C_FUSE_PLUGIN AND CHISEL_CXX_FUSE_PLUGIN)
+    set(CHISEL_FUSE_LINKER_PLUGIN_FLAG "-fuse-linker-plugin")
 else()
-    set(MONOLITH_FUSE_LINKER_PLUGIN_FLAG "")
+    set(CHISEL_FUSE_LINKER_PLUGIN_FLAG "")
 endif()
 
 # --- DEFINE FLAGS AS LISTS (not a single quoted string) ---------------------
 # use list form so add_compile_options expands to multiple args correctly
 if(WIN32 AND NOT MSVC)
     add_compile_options(-msse2)
-    set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
+    set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
 else()
-    set(MONOLITH_COMMON_OPT_FLAGS /Gy /Gw)
+    set(CHISEL_COMMON_OPT_FLAGS /Gy /Gw)
 endif()
 if(NOT WIN32)
-set(MONOLITH_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
+set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
 endif()
 # linker flags: platform-appropriate list
 if(APPLE)
     # macOS linker: dead_strip removes unused code
-    set(MONOLITH_COMMON_LINK_FLAGS -Wl,-dead_strip)
+    set(CHISEL_COMMON_LINK_FLAGS -Wl,-dead_strip)
 elseif(WIN32)
-    set(MONOLITH_COMMON_LINK_FLAGS)
+    set(CHISEL_COMMON_LINK_FLAGS)
 else()
-    set(MONOLITH_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed)
+    set(CHISEL_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed)
 endif()
 
 # end lists -----------------------------------------------------------------
-if(MONOLITH_LTO_FLAG)
-    message(STATUS "monolith: using LTO flag = ${MONOLITH_LTO_FLAG}")
-    # MONOLITH_LINK_FLAGS is a list too
-    set(MONOLITH_LINK_FLAGS ${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG} ${MONOLITH_COMMON_LINK_FLAGS})
+if(CHISEL_LTO_FLAG)
+    message(STATUS "chisel: using LTO flag = ${CHISEL_LTO_FLAG}")
+    # CHISEL_LINK_FLAGS is a list too
+    set(CHISEL_LINK_FLAGS ${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG} ${CHISEL_COMMON_LINK_FLAGS})
 else()
-    message(STATUS "monolith: LTO not available on this compiler")
-    set(MONOLITH_LINK_FLAGS ${MONOLITH_COMMON_LINK_FLAGS})
+    message(STATUS "chisel: LTO not available on this compiler")
+    set(CHISEL_LINK_FLAGS ${CHISEL_COMMON_LINK_FLAGS})
 endif()
 
-# MONOLITH_PROPAGATE_* exclude -flto to avoid breaking subproject checks, keep lists
-set(MONOLITH_PROPAGATE_C_FLAGS ${MONOLITH_COMMON_OPT_FLAGS})
-set(MONOLITH_PROPAGATE_CXX_FLAGS ${MONOLITH_COMMON_OPT_FLAGS})
-set(MONOLITH_PROPAGATE_LINK_FLAGS ${MONOLITH_COMMON_LINK_FLAGS})
+# CHISEL_PROPAGATE_* exclude -flto to avoid breaking subproject checks, keep lists
+set(CHISEL_PROPAGATE_C_FLAGS ${CHISEL_COMMON_OPT_FLAGS})
+set(CHISEL_PROPAGATE_CXX_FLAGS ${CHISEL_COMMON_OPT_FLAGS})
+set(CHISEL_PROPAGATE_LINK_FLAGS ${CHISEL_COMMON_LINK_FLAGS})
 
 # For cache variables we need a space-separated string: replace ';' with ' '
-string(REPLACE ";" " " MONOLITH_PROPAGATE_C_FLAGS_STR "${MONOLITH_PROPAGATE_C_FLAGS}")
-string(REPLACE ";" " " MONOLITH_PROPAGATE_CXX_FLAGS_STR "${MONOLITH_PROPAGATE_CXX_FLAGS}")
-string(REPLACE ";" " " MONOLITH_PROPAGATE_LINK_FLAGS_STR "${MONOLITH_PROPAGATE_LINK_FLAGS}")
+string(REPLACE ";" " " CHISEL_PROPAGATE_C_FLAGS_STR "${CHISEL_PROPAGATE_C_FLAGS}")
+string(REPLACE ";" " " CHISEL_PROPAGATE_CXX_FLAGS_STR "${CHISEL_PROPAGATE_CXX_FLAGS}")
+string(REPLACE ";" " " CHISEL_PROPAGATE_LINK_FLAGS_STR "${CHISEL_PROPAGATE_LINK_FLAGS}")
 
-message(STATUS "monolith: propagate C flags (no-LTO) = ${MONOLITH_PROPAGATE_C_FLAGS_STR}")
-message(STATUS "monolith: propagate link flags (no-LTO) = ${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+message(STATUS "chisel: propagate C flags (no-LTO) = ${CHISEL_PROPAGATE_C_FLAGS_STR}")
+message(STATUS "chisel: propagate link flags (no-LTO) = ${CHISEL_PROPAGATE_LINK_FLAGS_STR}")
 
 # Prepare environment variables for autotools builds (ExternalProject)
-set(EXTERNAL_AUTOTOOLS_CFLAGS "${MONOLITH_PROPAGATE_C_FLAGS_STR}")
-set(EXTERNAL_AUTOTOOLS_CXXFLAGS "${MONOLITH_PROPAGATE_CXX_FLAGS_STR}")
-set(EXTERNAL_AUTOTOOLS_LDFLAGS "${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+set(EXTERNAL_AUTOTOOLS_CFLAGS "${CHISEL_PROPAGATE_C_FLAGS_STR}")
+set(EXTERNAL_AUTOTOOLS_CXXFLAGS "${CHISEL_PROPAGATE_CXX_FLAGS_STR}")
+set(EXTERNAL_AUTOTOOLS_LDFLAGS "${CHISEL_PROPAGATE_LINK_FLAGS_STR}")
 # ---------------------------------------------------------------------------
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -114,13 +114,13 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
         add_compile_options(/O2 /GL /W4)
     else()
-        # add list flags safely; MONOLITH_COMMON_OPT_FLAGS is a list and expands properly
-        add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
-        if(MONOLITH_LTO_FLAG)
-            add_compile_options(${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG})
+        # add list flags safely; CHISEL_COMMON_OPT_FLAGS is a list and expands properly
+        add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
+        if(CHISEL_LTO_FLAG)
+            add_compile_options(${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG})
         endif()
-        # MONOLITH_LINK_FLAGS is a list
-        add_link_options(${MONOLITH_LINK_FLAGS})
+        # CHISEL_LINK_FLAGS is a list
+        add_link_options(${CHISEL_LINK_FLAGS})
     endif()
     if(NOT MINGW)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -132,11 +132,11 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
         add_compile_options(/O1 /GL /W4)
         add_link_options(/LTCG)
     else()
-        add_compile_options(-Oz -Wall -Wextra -Wpedantic ${MONOLITH_COMMON_OPT_FLAGS})
-        if(MONOLITH_LTO_FLAG)
-            add_compile_options(${MONOLITH_LTO_FLAG} ${MONOLITH_FUSE_LINKER_PLUGIN_FLAG})
+        add_compile_options(-Oz -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
+        if(CHISEL_LTO_FLAG)
+            add_compile_options(${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG})
         endif()
-        add_link_options(${MONOLITH_LINK_FLAGS})
+        add_link_options(${CHISEL_LINK_FLAGS})
     endif()
     if(NOT MINGW)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -150,9 +150,9 @@ include(ExternalProject)
 # Export propagated flags into CMake cache so FetchContent subprojects inherit them.
 # NOTE: we intentionally do NOT include -flto in these propagated strings to avoid
 # confusing subprojects' try_compile/try_run checks.
-set(_new_c_flags "${CMAKE_C_FLAGS} ${MONOLITH_PROPAGATE_C_FLAGS_STR}")
-set(_new_cxx_flags "${CMAKE_CXX_FLAGS} ${MONOLITH_PROPAGATE_CXX_FLAGS_STR}")
-set(_new_exe_linker_flags "${CMAKE_EXE_LINKER_FLAGS} ${MONOLITH_PROPAGATE_LINK_FLAGS_STR}")
+set(_new_c_flags "${CMAKE_C_FLAGS} ${CHISEL_PROPAGATE_C_FLAGS_STR}")
+set(_new_cxx_flags "${CMAKE_CXX_FLAGS} ${CHISEL_PROPAGATE_CXX_FLAGS_STR}")
+set(_new_exe_linker_flags "${CMAKE_EXE_LINKER_FLAGS} ${CHISEL_PROPAGATE_LINK_FLAGS_STR}")
 
 if(NOT "${_new_c_flags}" STREQUAL "")
     set(CMAKE_C_FLAGS "${_new_c_flags}" CACHE STRING "Propagated C flags for external projects" FORCE)
@@ -677,8 +677,8 @@ if(WIN32)
     endif()
 endif()
 
-# monolith
-set(MONOLITH_SOURCES
+# chisel
+set(CHISEL_SOURCES
         src/main.cpp
         src/encoder/encoder.hpp
         src/encoder/flac_encoder.cpp
@@ -739,44 +739,44 @@ set(MONOLITH_SOURCES
         src/containers/pdf_handler.hpp
 )
 if(NOT WIN32)
-    list(APPEND MONOLITH_SOURCES
+    list(APPEND CHISEL_SOURCES
             src/encoder/gif_encoder.cpp
             src/encoder/gif_encoder.hpp
     )
 endif()
 
-add_executable(monolith ${MONOLITH_SOURCES})
+add_executable(chisel ${CHISEL_SOURCES})
 
 if(WIN32)
-    target_compile_definitions(monolith PRIVATE LIBARCHIVE_STATIC)
-    target_compile_definitions(monolith PRIVATE PLATFORM_WINDOWS)
+    target_compile_definitions(chisel PRIVATE LIBARCHIVE_STATIC)
+    target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
 elseif(APPLE)
-    target_compile_definitions(monolith PRIVATE PLATFORM_APPLE)
+    target_compile_definitions(chisel PRIVATE PLATFORM_APPLE)
 elseif(UNIX)
-    target_compile_definitions(monolith PRIVATE PLATFORM_LINUX)
+    target_compile_definitions(chisel PRIVATE PLATFORM_LINUX)
 endif()
-add_dependencies(monolith libmseed)
-target_include_directories(monolith PRIVATE ${libmseed_SOURCE_DIR})
+add_dependencies(chisel libmseed)
+target_include_directories(chisel PRIVATE ${libmseed_SOURCE_DIR})
 
 target_include_directories(matroska PRIVATE
         ${libmatroska_BINARY_DIR}
         ${libebml_BINARY_DIR}
 )
-target_include_directories(monolith PRIVATE
+target_include_directories(chisel PRIVATE
         ${libmatroska_BINARY_DIR}
         ${libebml_BINARY_DIR}
 )
 
-add_dependencies(monolith mozjpeg ${ZLIB_TARGET})
+add_dependencies(chisel mozjpeg ${ZLIB_TARGET})
 if(NOT WIN32)
-    add_dependencies(monolith libmagic)
-    target_include_directories(monolith PRIVATE ${LIBMAGIC_INCLUDE_DIR})
+    add_dependencies(chisel libmagic)
+    target_include_directories(chisel PRIVATE ${LIBMAGIC_INCLUDE_DIR})
 endif()
 
 target_include_directories(matroska PRIVATE
         ${libebml_BINARY_DIR}
 )
-target_include_directories(monolith PRIVATE
+target_include_directories(chisel PRIVATE
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
         ${libpng_SOURCE_DIR}
@@ -792,16 +792,16 @@ target_include_directories(monolith PRIVATE
 )
 
 if(NOT WIN32)
-    target_link_directories(monolith PRIVATE ${LIBMAGIC_LIB_DIR})
+    target_link_directories(chisel PRIVATE ${LIBMAGIC_LIB_DIR})
 endif()
-target_link_directories(monolith PRIVATE ${MOZJPEG_LIB_DIR})
+target_link_directories(chisel PRIVATE ${MOZJPEG_LIB_DIR})
 
-target_include_directories(monolith PRIVATE
+target_include_directories(chisel PRIVATE
         ${qpdf_SOURCE_DIR}/include
         ${qpdf_BINARY_DIR}/include
 )
 
-target_include_directories(monolith PRIVATE
+target_include_directories(chisel PRIVATE
         ${zopfli_SOURCE_DIR}/include
         ${zopfli_BINARY_DIR}/include
 )
@@ -809,7 +809,7 @@ target_include_directories(monolith PRIVATE
 if(NOT WIN32)
     add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
     add_dependencies(embed_magic_header libmagic)
-    add_dependencies(monolith embed_magic_header)
+    add_dependencies(chisel embed_magic_header)
 endif()
 
 
@@ -819,7 +819,7 @@ target_include_directories(zopflipng PUBLIC
 )
 
 # common libraries for all platforms
-set(MONOLITH_LIBS
+set(CHISEL_LIBS
         FLAC
         MAC
         png_static
@@ -843,21 +843,21 @@ set(MONOLITH_LIBS
         mkclean_lib
 )
 if(NOT WIN32)
-    list(APPEND MONOLITH_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib ${ZLIB_TARGET})
+    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib ${ZLIB_TARGET})
 endif()
 
 if(UNIX)
-    list(APPEND MONOLITH_LIBS
+    list(APPEND CHISEL_LIBS
             ${LIBMAGIC_LIB}
     )
 elseif(WIN32)
-    list(APPEND MONOLITH_LIBS
+    list(APPEND CHISEL_LIBS
             libmseed
             ZLIB::ZLIB
     )
 endif()
-target_compile_features(monolith PRIVATE cxx_std_23)
+target_compile_features(chisel PRIVATE cxx_std_23)
 
-target_link_libraries(monolith PRIVATE ${MONOLITH_LIBS})
+target_link_libraries(chisel PRIVATE ${CHISEL_LIBS})
 
 # End of file

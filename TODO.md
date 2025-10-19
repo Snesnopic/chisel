@@ -1,4 +1,4 @@
-# TODO List – Monolith Project
+# TODO List – Chisel Project
 
 ## Testing
 
@@ -13,7 +13,7 @@
 - [ ] Abstract common logic across encoders.
 - [ ] Make encoder classes more MIME-aware.
 - [ ] Normalize MIME detection and extension mapping.
-- [ ] Begin support for using monolith as a library (public API, minimal dependencies).
+- [ ] Begin support for using chisel as a library (public API, minimal dependencies).
 - [ ] Implement a UriHandler to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing encoders, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Unify and simplify the way compiler and linker flags are passed across platforms.

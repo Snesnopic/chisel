@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 19/09/25.
 //
 
-#ifndef MONOLITH_ARCHIVE_HANDLER_HPP
-#define MONOLITH_ARCHIVE_HANDLER_HPP
+#ifndef CHISEL_ARCHIVE_HANDLER_HPP
+#define CHISEL_ARCHIVE_HANDLER_HPP
 
 #include <string>
 #include <vector>
@@ -41,4 +41,4 @@ private:
     static bool is_archive_file(const std::filesystem::path& path, ContainerFormat& fmt_out);
 };
 
-#endif // MONOLITH_ARCHIVE_HANDLER_HPP
+#endif // CHISEL_ARCHIVE_HANDLER_HPP

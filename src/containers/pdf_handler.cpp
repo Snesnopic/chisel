@@ -289,7 +289,7 @@ st.temp_dir = job.temp_dir;
 
 // helper: create a portable unique temp dir for a given input file
 std::filesystem::path PdfHandler::make_temp_dir_for(const std::filesystem::path& input) {
-    const auto base_tmp = std::filesystem::temp_directory_path() / "monolith-pdf";
+    const auto base_tmp = std::filesystem::temp_directory_path() / "chisel-pdf";
     std::error_code ec;
     std::filesystem::create_directories(base_tmp, ec);
 

@@ -111,11 +111,11 @@ std::filesystem::path MimeDetector::get_magic_file_path()
 #ifdef __APPLE__
     const char* home = getenv("HOME");
     return std::filesystem::path(home ? home : ".") /
-        "Library/Application Support/monolith/magic.mgc";
+        "Library/Application Support/chisel/magic.mgc";
 #else
     const char* home = getenv("HOME");
     return std::filesystem::path(home ? home : ".") /
-        ".local/share/monolith/magic.mgc";
+        ".local/share/chisel/magic.mgc";
 #endif
 }
 

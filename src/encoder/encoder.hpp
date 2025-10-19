@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
-#ifndef MONOLITH_ENCODER_HPP
-#define MONOLITH_ENCODER_HPP
+#ifndef CHISEL_ENCODER_HPP
+#define CHISEL_ENCODER_HPP
 
 #include <string>
 #include <filesystem>
@@ -29,4 +29,4 @@ public:
 protected:
     bool preserve_metadata_ = true;
 };
-#endif //MONOLITH_ENCODER_HPP
+#endif //CHISEL_ENCODER_HPP

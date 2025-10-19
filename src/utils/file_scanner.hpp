@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 20/09/25.
 //
 
-#ifndef MONOLITH_FILE_SCANNER_HPP
-#define MONOLITH_FILE_SCANNER_HPP
+#ifndef CHISEL_FILE_SCANNER_HPP
+#define CHISEL_FILE_SCANNER_HPP
 
 #include <vector>
 #include <filesystem>
@@ -28,4 +28,4 @@ std::unique_ptr<IContainer> make_handler(ContainerFormat fmt);
 
 
 
-#endif //MONOLITH_FILE_SCANNER_HPP
+#endif //CHISEL_FILE_SCANNER_HPP

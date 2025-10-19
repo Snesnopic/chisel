@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 20/09/25.
 //
 
-#ifndef MONOLITH_REPORT_GENERATOR_HPP
-#define MONOLITH_REPORT_GENERATOR_HPP
+#ifndef CHISEL_REPORT_GENERATOR_HPP
+#define CHISEL_REPORT_GENERATOR_HPP
 
 #include <vector>
 #include <string>
@@ -48,4 +48,4 @@ void export_csv_report(const std::vector<Result>& results,
 
 unsigned get_terminal_width();
 
-#endif //MONOLITH_REPORT_GENERATOR_HPP
+#endif //CHISEL_REPORT_GENERATOR_HPP

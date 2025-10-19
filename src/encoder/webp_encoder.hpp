@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 25/09/25.
 //
 
-#ifndef MONOLITH_WEBP_ENCODER_HPP
-#define MONOLITH_WEBP_ENCODER_HPP
+#ifndef CHISEL_WEBP_ENCODER_HPP
+#define CHISEL_WEBP_ENCODER_HPP
 
 #include <filesystem>
 #include "encoder.hpp"
@@ -21,4 +21,4 @@ public:
 
 };
 
-#endif //MONOLITH_WEBP_ENCODER_HPP
+#endif //CHISEL_WEBP_ENCODER_HPP

@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 16/10/25.
 //
 
-#ifndef MONOLITH_MKV_ENCODER_HPP
-#define MONOLITH_MKV_ENCODER_HPP
+#ifndef CHISEL_MKV_ENCODER_HPP
+#define CHISEL_MKV_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -25,4 +25,4 @@ public:
     [[nodiscard]] std::string name() const override { return "MkvEncoder"; }
 };
 
-#endif //MONOLITH_MKV_ENCODER_HPP
+#endif //CHISEL_MKV_ENCODER_HPP

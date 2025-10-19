@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
-#ifndef MONOLITH_FILE_TYPE_HPP
-#define MONOLITH_FILE_TYPE_HPP
+#ifndef CHISEL_FILE_TYPE_HPP
+#define CHISEL_FILE_TYPE_HPP
 
 #include <string>
 #include <unordered_map>
@@ -265,4 +265,4 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
 
 
 
-#endif //MONOLITH_FILE_TYPE_HPP
+#endif //CHISEL_FILE_TYPE_HPP

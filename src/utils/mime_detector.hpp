@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 11/10/25.
 //
 
-#ifndef MONOLITH_MIME_DETECTOR_HPP
-#define MONOLITH_MIME_DETECTOR_HPP
+#ifndef CHISEL_MIME_DETECTOR_HPP
+#define CHISEL_MIME_DETECTOR_HPP
 #include <filesystem>
 
 class MimeDetector {
@@ -14,4 +14,4 @@ public:
     static std::filesystem::path get_magic_file_path();
 };
 
-#endif //MONOLITH_MIME_DETECTOR_HPP
+#endif //CHISEL_MIME_DETECTOR_HPP

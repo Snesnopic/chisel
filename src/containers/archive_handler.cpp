@@ -25,7 +25,7 @@ namespace {
 std::string make_temp_dir() {
     const auto base = fs::temp_directory_path();
     const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
-    fs::path dir = base / ("monolith_" + std::to_string(now) + "_" + RandomUtils::random_suffix());
+    fs::path dir = base / ("chisel_" + std::to_string(now) + "_" + RandomUtils::random_suffix());
     fs::create_directories(dir);
     return dir.string();
 }

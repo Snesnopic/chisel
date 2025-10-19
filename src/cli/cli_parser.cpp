@@ -17,7 +17,7 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         std::cerr << "Usage:\n"
                   << "  " << argv[0] << " <file_or_directory>... [options]\n\n"
                   << "Options:\n"
-                  << "  --dry-run                  Use monolith without replacing original files.\n"
+                  << "  --dry-run                  Use chisel without replacing original files.\n"
                   << "  --no-meta                  Don't preserve files metadata.\n"
                   << "  --recursive                Recursively scan input folders.\n"
                   << "  --threads N                Threads to use for parallel encoding.\n"

@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 16/10/25.
 //
 
-#ifndef MONOLITH_PDF_HANDLER_HPP
-#define MONOLITH_PDF_HANDLER_HPP
+#ifndef CHISEL_PDF_HANDLER_HPP
+#define CHISEL_PDF_HANDLER_HPP
 
 #include "container.hpp"
 #include <filesystem>
@@ -38,4 +38,4 @@ private:
     static void cleanup_temp_dir(const std::filesystem::path& dir);
 };
 
-#endif // MONOLITH_PDF_HANDLER_HPP
+#endif // CHISEL_PDF_HANDLER_HPP

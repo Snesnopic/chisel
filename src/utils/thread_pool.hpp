@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
-#ifndef MONOLITH_THREAD_POOL_HPP
-#define MONOLITH_THREAD_POOL_HPP
+#ifndef CHISEL_THREAD_POOL_HPP
+#define CHISEL_THREAD_POOL_HPP
 
 #include <vector>
 #include <queue>
@@ -48,4 +48,4 @@ private:
     std::vector<std::jthread> workers_;
 };
 
-#endif // MONOLITH_THREAD_POOL_HPP
+#endif // CHISEL_THREAD_POOL_HPP

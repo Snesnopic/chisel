@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 01/10/25.
 //
 
-#ifndef MONOLITH_SQLITE_ENCODER_HPP
-#define MONOLITH_SQLITE_ENCODER_HPP
+#ifndef CHISEL_SQLITE_ENCODER_HPP
+#define CHISEL_SQLITE_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -24,4 +24,4 @@ public:
 
 };
 
-#endif //MONOLITH_SQLITE_ENCODER_HPP
+#endif //CHISEL_SQLITE_ENCODER_HPP

@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 19/09/25.
 //
 
-#ifndef MONOLITH_LOGGER_HPP
-#define MONOLITH_LOGGER_HPP
+#ifndef CHISEL_LOGGER_HPP
+#define CHISEL_LOGGER_HPP
 
 #include <string>
 #include <mutex>
@@ -31,4 +31,4 @@ private:
     std::mutex mutex_;
 };
 
-#endif // MONOLITH_LOGGER_HPP
+#endif // CHISEL_LOGGER_HPP

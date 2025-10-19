@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 07/10/25.
 //
 
-#ifndef MONOLITH_GIF_ENCODER_HPP
-#define MONOLITH_GIF_ENCODER_HPP
+#ifndef CHISEL_GIF_ENCODER_HPP
+#define CHISEL_GIF_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -21,4 +21,4 @@ public:
 
 };
 
-#endif //MONOLITH_GIF_ENCODER_HPP
+#endif //CHISEL_GIF_ENCODER_HPP

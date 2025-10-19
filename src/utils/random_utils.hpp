@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 07/10/25.
 //
 
-#ifndef MONOLITH_RANDOM_UTILS_H
-#define MONOLITH_RANDOM_UTILS_H
+#ifndef CHISEL_RANDOM_UTILS_H
+#define CHISEL_RANDOM_UTILS_H
 
 #include <random>
 #include <string>
@@ -14,4 +14,4 @@ namespace RandomUtils {
     std::string random_suffix();
 }
 
-#endif //MONOLITH_RANDOM_UTILS_H
+#endif //CHISEL_RANDOM_UTILS_H

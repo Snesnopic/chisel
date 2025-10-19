@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 21/09/25.
 //
 
-#ifndef MONOLITH_CONTAINER_HPP
-#define MONOLITH_CONTAINER_HPP
+#ifndef CHISEL_CONTAINER_HPP
+#define CHISEL_CONTAINER_HPP
 
 #include  "../cli/cli_parser.hpp"
 #include "../utils/file_type.hpp"
@@ -27,4 +27,4 @@ public:
 
 };
 
-#endif //MONOLITH_CONTAINER_HPP
+#endif //CHISEL_CONTAINER_HPP

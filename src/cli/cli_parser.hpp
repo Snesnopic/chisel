@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 20/09/25.
 //
 
-#ifndef MONOLITH_CLI_PARSER_HPP
-#define MONOLITH_CLI_PARSER_HPP
+#ifndef CHISEL_CLI_PARSER_HPP
+#define CHISEL_CLI_PARSER_HPP
 
 #include <string>
 #include <vector>
@@ -34,4 +34,4 @@ struct Settings {
 
 bool parse_arguments(int argc, char** argv, Settings& settings);
 
-#endif //MONOLITH_CLI_PARSER_HPP
+#endif //CHISEL_CLI_PARSER_HPP

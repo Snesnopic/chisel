@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 06/10/25.
 //
 
-#ifndef MONOLITH_ODF_HANDLER_HPP
-#define MONOLITH_ODF_HANDLER_HPP
+#ifndef CHISEL_ODF_HANDLER_HPP
+#define CHISEL_ODF_HANDLER_HPP
 
 #include <string>
 #include "../containers/archive_handler.hpp"
@@ -18,4 +18,4 @@ public:
 private:
     ContainerFormat fmt_;
 };
-#endif //MONOLITH_ODF_HANDLER_HPP
+#endif //CHISEL_ODF_HANDLER_HPP

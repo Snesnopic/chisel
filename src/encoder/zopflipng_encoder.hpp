@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 28/09/25.
 //
 
-#ifndef MONOLITH_ZOPFLIPNG_ENCODER_HPP
-#define MONOLITH_ZOPFLIPNG_ENCODER_HPP
+#ifndef CHISEL_ZOPFLIPNG_ENCODER_HPP
+#define CHISEL_ZOPFLIPNG_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -23,4 +23,4 @@ public:
     static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char> &input);
 };
 
-#endif //MONOLITH_ZOPFLIPNG_ENCODER_HPP
+#endif //CHISEL_ZOPFLIPNG_ENCODER_HPP

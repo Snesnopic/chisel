@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 09/10/25.
 //
 
-#ifndef MONOLITH_APE_ENCODER_HPP
-#define MONOLITH_APE_ENCODER_HPP
+#ifndef CHISEL_APE_ENCODER_HPP
+#define CHISEL_APE_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -20,4 +20,4 @@ public:
     [[nodiscard]] std::string name() const override { return "ApeEncoder"; }
 };
 
-#endif //MONOLITH_APE_ENCODER_HPP
+#endif //CHISEL_APE_ENCODER_HPP

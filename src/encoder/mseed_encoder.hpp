@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 05/10/25.
 //
 
-#ifndef MONOLITH_MSEED_ENCODER_HPP
-#define MONOLITH_MSEED_ENCODER_HPP
+#ifndef CHISEL_MSEED_ENCODER_HPP
+#define CHISEL_MSEED_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <string>
@@ -29,4 +29,4 @@ private:
     static int choose_reclen(const MS3Record *msr, size_t sample_count);
 };
 
-#endif // MONOLITH_MSEED_ENCODER_HPP
+#endif // CHISEL_MSEED_ENCODER_HPP

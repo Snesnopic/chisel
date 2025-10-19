@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
-#ifndef MONOLITH_JPEG_ENCODER_HPP
-#define MONOLITH_JPEG_ENCODER_HPP
+#ifndef CHISEL_JPEG_ENCODER_HPP
+#define CHISEL_JPEG_ENCODER_HPP
 
 #include <filesystem>
 #include "encoder.hpp"
@@ -20,4 +20,4 @@ public:
     [[nodiscard]] std::string name() const override { return "JpegEncoder"; }
 
 };
-#endif //MONOLITH_JPEG_ENCODER_HPP
+#endif //CHISEL_JPEG_ENCODER_HPP

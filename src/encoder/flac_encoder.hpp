@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
-#ifndef MONOLITH_FLAC_ENCODER_HPP
-#define MONOLITH_FLAC_ENCODER_HPP
+#ifndef CHISEL_FLAC_ENCODER_HPP
+#define CHISEL_FLAC_ENCODER_HPP
 
 #include "encoder.hpp"
 #include <filesystem>
@@ -20,4 +20,4 @@ public:
     [[nodiscard]] std::string name() const override { return "FlacEncoder"; }
 };
 
-#endif //MONOLITH_FLAC_ENCODER_HPP
+#endif //CHISEL_FLAC_ENCODER_HPP

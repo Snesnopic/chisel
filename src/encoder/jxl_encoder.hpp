@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 30/09/25.
 //
 
-#ifndef MONOLITH_JXL_ENCODER_HPP
-#define MONOLITH_JXL_ENCODER_HPP
+#ifndef CHISEL_JXL_ENCODER_HPP
+#define CHISEL_JXL_ENCODER_HPP
 
 #include <filesystem>
 #include "encoder.hpp"
@@ -22,4 +22,4 @@ public:
 
 };
 
-#endif //MONOLITH_JXL_ENCODER_HPP
+#endif //CHISEL_JXL_ENCODER_HPP
