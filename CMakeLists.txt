@@ -737,6 +737,43 @@ set(CHISEL_SOURCES
         src/encoder/mkv_encoder.hpp
         src/containers/pdf_handler.cpp
         src/containers/pdf_handler.hpp
+        src/processors/processor.hpp
+        src/processors/flac_processor.cpp
+        src/processors/flac_processor.hpp
+        src/processors/png_processor.cpp
+        src/processors/png_processor.hpp
+        src/processors/zopflipng_processor.cpp
+        src/processors/zopflipng_processor.hpp
+        src/processors/mkv_processor.cpp
+        src/processors/mkv_processor.hpp
+        src/processors/archive_processor.cpp
+        src/processors/archive_processor.hpp
+        src/processors/pdf_processor.cpp
+        src/processors/pdf_processor.hpp
+        src/processors/gif_processor.cpp
+        src/processors/gif_processor.hpp
+        src/processors/flexigif_processor.cpp
+        src/processors/flexigif_processor.hpp
+        src/processors/ape_processor.cpp
+        src/processors/ape_processor.hpp
+        src/processors/jpeg_processor.cpp
+        src/processors/jpeg_processor.hpp
+        src/processors/jxl_processor.cpp
+        src/processors/jxl_processor.hpp
+        src/processors/mseed_processor.cpp
+        src/processors/mseed_processor.hpp
+        src/processors/sqlite_processor.cpp
+        src/processors/sqlite_processor.hpp
+        src/processors/tiff_processor.cpp
+        src/processors/tiff_processor.hpp
+        src/processors/wavpack_processor.cpp
+        src/processors/wavpack_processor.hpp
+        src/processors/webp_processor.cpp
+        src/processors/webp_processor.hpp
+        src/processors/ooxml_processor.cpp
+        src/processors/ooxml_processor.hpp
+        src/processors/odf_processor.cpp
+        src/processors/odf_processor.hpp
 )
 if(NOT WIN32)
     list(APPEND CHISEL_SOURCES
