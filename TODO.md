@@ -18,14 +18,12 @@
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
-- [ ] Make `monolith` the only target in CMakeLists by marking all other dependencies `EXCLUDE_FROM_ALL`
 
 ## FLAC
 
 - [ ] Verify maximum compression parameters compatible with `streamable_subset=false`.
 - [ ] Improve metadata handling: ensure valid STREAMINFO and preserve PICTURE blocks.
 - [ ] Optional support for tag editing and Vorbis comment manipulation.
-- [ ] Add streaming-mode encoder to avoid full PCM buffering for large files.
 - [ ] Implement brute-force recompression across presets 0–8 and select the smallest output.
 
 ## WavPack
@@ -47,12 +45,10 @@
 
 ## GIF
 
-- [ ] On Windows, `gifsicle` is currently unavailable: mark it as unsupported.
 - [ ] Plan a fork of `gifsicle` to refactor away global variables and enable true multi-threaded `GifEncoder` execution.
 
 ## PDF
 
-- [ ] Convert current encoder to an IContainer, to expose and compress internal pdf attachments.
 - [ ] Investigate **pdfsizeopt** techniques (image recompression, font unification, metadata stripping)  
   ↳ <https://github.com/pts/pdfsizeopt>
 
@@ -113,7 +109,6 @@
 ## Build / CI
 
 - [ ] Fix compilation issues on Windows (ensure reproducible builds).
-- [ ] Ensure all third-party libraries are linked statically.
 - [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
 - [ ] On MinGW, enforce fully static builds (no runtime DLL dependencies).
 - [ ] Review linker flags and explore options to reduce final binary size (e.g. `-Wl,--gc-sections`, `-s` for stripping symbols, or platform-specific equivalents).
@@ -127,4 +122,3 @@
 - [ ] Improve logging granularity and structured output for CI integration.
 - [ ] Investigate which apt/brew packages are actually needed for compiling.
 - [ ] Future: implement a general XML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
-- [ ] Improve readability of reports and logs: avoid printing full absolute paths for deeply nested files or files extracted from archives, to prevent overly long and unreadable output.
