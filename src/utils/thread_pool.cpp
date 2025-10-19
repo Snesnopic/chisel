@@ -8,7 +8,7 @@ ThreadPool::ThreadPool(unsigned threads) {
     if (threads == 0) threads = 1;
     workers_.reserve(threads);
     for (unsigned i = 0; i < threads; ++i) {
-        workers_.emplace_back([this](std::stop_token st) {
+        workers_.emplace_back([this](const std::stop_token& st) {
             for (;;) {
                 std::function<void(std::stop_token)> task;
                 {

@@ -128,7 +128,7 @@ int main(const int argc, char *argv[]) {
 
     auto factories = build_encoder_registry(settings.preserve_metadata);
 
-    std::vector<fs::path> files;
+    std::vector<InputFile> files;
     std::vector<ContainerJob> container_jobs;
 
     collect_inputs(settings.inputs, settings.recursive, files, container_jobs, settings);
@@ -153,8 +153,8 @@ int main(const int argc, char *argv[]) {
         print_progress_bar(0, files.size(), std::abs(elapsed));
     }
     std::ranges::sort(files,
-                      [](const auto &a, const auto &b) {
-                          return a.native() < b.native();
+                      [](const InputFile &a, const InputFile &b) {
+                          return a.path.native() < b.path.native();
                       });
 
     if (settings.num_threads > files.size()) {
@@ -170,19 +170,19 @@ int main(const int argc, char *argv[]) {
     size_t total_files = files.size();
     std::atomic<size_t> done_count{0};
 
-    for (auto const &in_path: files) {
-        pool.enqueue([&, in_path](std::stop_token st) {
+    for (auto const &input: files) {
+        pool.enqueue([&, input](const std::stop_token& st) {
             if (st.stop_requested() || interrupted.load()) return;
 
             const auto start = std::chrono::steady_clock::now();
-            auto mime = MimeDetector::detect(in_path.string());
+            auto mime = MimeDetector::detect(input.path.string());
             if (mime.empty() || mime == "application/octet-stream") {
-                std::string ext = in_path.extension().string();
+                std::string ext = input.path.extension().string();
                 std::ranges::transform(ext, ext.begin(), ::tolower);
                 auto ext_it = ext_to_mime.find(ext);
                 if (ext_it != ext_to_mime.end()) {
                     Logger::log(LogLevel::Debug,
-                                "MIME fallback: " + in_path.string() +
+                                "MIME fallback: " + input.path.string() +
                                 " detected as " + ext_it->second + " from extension " + ext,
                                 "file_scanner");
                     mime = ext_it->second;
@@ -190,7 +190,7 @@ int main(const int argc, char *argv[]) {
             }
             const auto it = factories.find(mime);
 
-            const uintmax_t sz_before = fs::file_size(in_path);
+            const uintmax_t sz_before = fs::file_size(input.path);
             uintmax_t sz_after_best = sz_before;
             bool ok_any = false, replaced = false;
             std::vector<std::pair<std::string, double> > codecs_used;
@@ -199,13 +199,13 @@ int main(const int argc, char *argv[]) {
             if (it != factories.end()) {
                 if (settings.encode_mode == EncodeMode::PIPE) {
                     // pipeline mode: apply encoders in sequence
-                    fs::path current = in_path;
+                    fs::path current = input.path;
                     fs::path tmp;
                     bool pipeline_ok = true;
 
                     for (size_t idx = 0; idx < it->second.size(); ++idx) {
                         if (st.stop_requested() || interrupted.load()) break;
-                        tmp = make_temp_path(in_path.stem(), in_path.extension().string());
+                        tmp = make_temp_path(input.path.stem(), input.path.extension().string());
                         auto enc = it->second[idx]();
                         try {
                             bool ok = enc->recompress(current, tmp);
@@ -220,7 +220,7 @@ int main(const int argc, char *argv[]) {
                                              : 0.0;
                             codecs_used.emplace_back(enc->name(), pct);
 
-                            if (current != in_path && fs::exists(current))
+                            if (current != input.path && fs::exists(current))
                                 fs::remove(current);
                             current = tmp;
                         } catch (const std::exception &e) {
@@ -240,7 +240,7 @@ int main(const int argc, char *argv[]) {
                         const uintmax_t sz_after = fs::file_size(current);
                         if (sz_after < sz_before && !settings.dry_run) {
                             try {
-                                fs::rename(current, in_path);
+                                fs::rename(current, input.path);
                                 replaced = true;
                                 ok_any = true;
                                 sz_after_best = sz_after;
@@ -252,7 +252,7 @@ int main(const int argc, char *argv[]) {
                                 error_msg = e.what();
                             }
                         } else {
-                            if (current != in_path && fs::exists(current))
+                            if (current != input.path && fs::exists(current))
                                 fs::remove(current);
                         }
                     }
@@ -262,9 +262,9 @@ int main(const int argc, char *argv[]) {
                     for (size_t idx = 0; idx < it->second.size(); ++idx) {
                         if (st.stop_requested() || interrupted.load()) break;
                         const auto enc = it->second[idx]();
-                        fs::path tmp = make_temp_path(in_path.stem(), in_path.extension().string());
+                        fs::path tmp = make_temp_path(input.path.stem(), input.path.extension().string());
                         try {
-                            const bool ok = enc->recompress(in_path, tmp.string());
+                            const bool ok = enc->recompress(input.path, tmp.string());
                             if (ok && fs::exists(tmp)) {
                                 const uintmax_t sz_after = fs::file_size(tmp);
                                 double pct = sz_before > 0
@@ -301,7 +301,7 @@ int main(const int argc, char *argv[]) {
 
                     if (ok_any && sz_after_best < sz_before && !settings.dry_run) {
                         try {
-                            fs::rename(best_tmp, in_path);
+                            fs::rename(best_tmp, input.path);
                             replaced = true;
                         } catch (const std::exception &e) {
                             Logger::log(LogLevel::Error,
@@ -316,7 +316,7 @@ int main(const int argc, char *argv[]) {
                 }
             } else {
                 Logger::log(LogLevel::Warning,
-                            "No encoder for " + in_path.string() + " (" + mime + ")", "main");
+                            "No encoder for " + input.path.string() + " (" + mime + ")", "main");
                 error_msg = "No encoder available";
             }
 
@@ -324,7 +324,7 @@ int main(const int argc, char *argv[]) {
             const double seconds = std::chrono::duration<double>(end - start).count(); {
                 const std::scoped_lock lock(results_mutex);
                 Result r;
-                r.filename = in_path.string();
+                r.file = input;
                 r.mime = mime;
                 r.size_before = sz_before;
                 r.size_after = sz_after_best;

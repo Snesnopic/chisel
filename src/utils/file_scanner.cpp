@@ -36,7 +36,7 @@ std::unique_ptr<IContainer> make_handler(const ContainerFormat fmt) {
     }
 }
 
-void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archive_jobs, std::filesystem::path const &p) {
+void process_file(std::vector<InputFile> &files, std::vector<ContainerJob> &archive_jobs, std::filesystem::path const &p) {
     // skip junk
     auto lower = p.filename().string();
     std::ranges::transform(lower, lower.begin(), ::tolower);
@@ -51,17 +51,17 @@ void process_file(std::vector<fs::path> &files, std::vector<ContainerJob> &archi
         if (!job.file_list.empty() || !job.children.empty()) {
             archive_jobs.push_back(job);
             for (const auto& f : job.file_list) {
-                files.emplace_back(f);
+                files.push_back({f,p});
             }
         }
     } else {
-        files.push_back(p);
+        files.push_back({p,std::nullopt});
     }
 }
 
 void collect_inputs(const std::vector<fs::path>& inputs,
                     const bool recursive,
-                    std::vector<fs::path>& files,
+                    std::vector<InputFile>& files,
                     std::vector<ContainerJob>& archive_jobs, Settings &settings) {
     for (auto const& p : inputs) {
         if (p == "-") {
@@ -69,7 +69,7 @@ void collect_inputs(const std::vector<fs::path>& inputs,
             std::ofstream out(tmp, std::ios::binary);
             out << std::cin.rdbuf();
             out.close();
-            files.push_back(tmp);
+            files.push_back({tmp, std::nullopt});
             settings.is_pipe = true;
             continue;
         }

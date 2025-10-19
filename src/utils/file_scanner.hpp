@@ -10,9 +10,14 @@
 #include "random_utils.hpp"
 #include "../containers/archive_handler.hpp"
 
+struct InputFile {
+    std::filesystem::path path;
+    std::optional<std::filesystem::path> container_origin;
+};
+
 void collect_inputs(const std::vector<std::filesystem::path>& inputs,
                     bool recursive,
-                    std::vector<std::filesystem::path>& files,
+                    std::vector<InputFile>& files,
                     std::vector<ContainerJob>& archive_jobs, Settings& settings);
 
 inline std::filesystem::path make_temp_path(const std::filesystem::path &stem, const std::string &ext) {
@@ -20,5 +25,7 @@ inline std::filesystem::path make_temp_path(const std::filesystem::path &stem, c
            std::filesystem::path(stem.string() + "_tmp" + RandomUtils::random_suffix() + ext);
 }
 std::unique_ptr<IContainer> make_handler(ContainerFormat fmt);
+
+
 
 #endif //MONOLITH_FILE_SCANNER_HPP
