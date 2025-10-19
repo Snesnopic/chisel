@@ -13,10 +13,9 @@
 #include <string_view>
 #include <stdexcept>
 
-namespace chisel {
-
-// forward declare container format enum
 enum class ContainerFormat;
+
+namespace chisel {
 
 // structure to hold information about content extracted by a processor
 struct ExtractedContent {
