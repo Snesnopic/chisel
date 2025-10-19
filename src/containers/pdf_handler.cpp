@@ -18,6 +18,7 @@
 #include "zlib_container.h"
 
 // helper: custom streambuf to redirect qpdf messages into our logger
+
 struct LoggerStreamBuf final : std::stringbuf {
     LogLevel level;
     std::string module;
@@ -137,9 +138,8 @@ ContainerJob PdfHandler::prepare(const std::filesystem::path& path) {
     job.temp_dir = make_temp_dir_for(path);
 
     QPDF pdf;
-    LoggerStreamBuf err_buf{LogLevel::Error, "PdfHandler"};
     std::ostream warn_os(nullptr);
-    std::ostream err_os(&err_buf);
+    std::ostream err_os(nullptr);
     auto qlogger = QPDFLogger::create();
     qlogger->setOutputStreams(&warn_os, &err_os);
     pdf.setLogger(qlogger);
@@ -201,10 +201,8 @@ st.temp_dir = job.temp_dir;
         QPDF pdf;
 
         // redirect qpdf logs
-        LoggerStreamBuf warn_buf{LogLevel::Warning, "PdfHandler"};
-        LoggerStreamBuf err_buf{LogLevel::Error, "PdfHandler"};
-        std::ostream warn_os(&warn_buf);
-        std::ostream err_os(&err_buf);
+        std::ostream warn_os(nullptr);
+        std::ostream err_os(nullptr);
         auto qlogger = QPDFLogger::create();
         qlogger->setOutputStreams(&warn_os, &err_os);
         pdf.setLogger(qlogger);
