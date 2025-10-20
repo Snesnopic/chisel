@@ -22,6 +22,7 @@ struct ExtractedContent {
     std::filesystem::path original_path;                // path to the original container file that was processed
     std::filesystem::path temp_dir;                     // dedicated temporary directory holding the extracted files
     std::vector<std::filesystem::path> extracted_files; // list of absolute paths to the files extracted into temp_dir
+    ContainerFormat format;
     // processors can add custom, format-specific context here if needed for finalize_extraction
 };
 
