@@ -25,7 +25,8 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  --regenerate-magic         Re-install libmagic file-detection database.\n"
                   << "  --recompress-unencodable FORMAT\n"
                   << "                             Recompress archives that can be opened but not recompressed\n"
-                  << "                             into a different format (zip, 7z, tar, gz, bz2, xz, wim).\n\n"
+                  << "                             into a different format (zip, 7z, tar, gz, bz2, xz, wim).\n"
+                  << "  --verify-checksums         Verify raw checksums before replacing files.\n\n"
                   << "Examples:\n"
                   << "  " << argv[0] << " file.jpg dir/ --recursive --threads 4\n"
                   << "  " << argv[0] << " archive.zip\n"
@@ -34,7 +35,6 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         return false;
     }
 
-    // default: metà dei core disponibili
     settings.num_threads = std::max(1U, std::thread::hardware_concurrency() / 2);
 
     using FlagHandler = std::function<void(int&, char**)>;
@@ -49,7 +49,11 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
     };
 
     flag_map["--log-level"] = [&](int& i, char** args) {
-        settings.log_level = args[++i]; // salva stringa, sarà interpretata nel main
+        settings.log_level = args[++i];
+    };
+
+    flag_map["--verify-checksums"] = [&](const int&, char**) {
+        settings.verify_checksums = true;
     };
 
     flag_map["--recompress-unencodable"] = [&](int &i, char **args) {

@@ -47,7 +47,6 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MkvProcessor>());
 }
 
-// ritorna tutti i processor che supportano un certo MIME
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
     std::vector<IProcessor*> result;
     for (const auto& proc_ptr : processors_) {
@@ -60,7 +59,6 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime
     return result;
 }
 
-// ritorna tutti i processor che supportano una certa estensione (case-insensitive)
 std::vector<IProcessor*> ProcessorRegistry::find_by_extension(const std::string& ext) const {
     std::vector<IProcessor*> result;
     if (ext.empty() || ext[0] != '.') return result;
