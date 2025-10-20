@@ -3,7 +3,7 @@
 //
 
 #include "file_scanner.hpp"
-#include "logger.hpp"
+#include "../../libchisel/include/logger.hpp"
 #include <fstream>
 #include <iostream>
 

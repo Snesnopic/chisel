@@ -9,14 +9,9 @@
 #include <vector>
 #include <filesystem>
 #include <optional>
-
+#include "../../libchisel/include/processor_executor.hpp"
 
 enum class ContainerFormat;
-
-enum class EncodeMode {
-    PIPE,      // one encoder output is the next one's output
-    PARALLEL   // all encoders on the original file
-};
 
 struct Settings {
     bool preserve_metadata = true;

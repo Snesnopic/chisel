@@ -5,7 +5,7 @@
 #ifndef CHISEL_FILE_LOG_SINK_HPP
 #define CHISEL_FILE_LOG_SINK_HPP
 
-#include "log_sink.hpp"
+#include "../../libchisel/include/log_sink.hpp"
 #include <fstream>
 #include <mutex>
 #include <string>

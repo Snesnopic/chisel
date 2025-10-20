@@ -3,7 +3,7 @@
 //
 
 #include "cli_parser.hpp"
-#include "../utils/file_type.hpp"
+#include "../../libchisel/include/file_type.hpp"
 #include <unordered_map>
 #include <functional>
 #include <algorithm>

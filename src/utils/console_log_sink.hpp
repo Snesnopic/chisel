@@ -5,7 +5,7 @@
 #ifndef CHISEL_CONSOLE_LOG_SINK_HPP
 #define CHISEL_CONSOLE_LOG_SINK_HPP
 
-#include "log_sink.hpp"
+#include "../../libchisel/include/log_sink.hpp"
 #include <iostream>
 
 class ConsoleLogSink final : public ILogSink {

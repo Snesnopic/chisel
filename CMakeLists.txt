@@ -680,72 +680,72 @@ endif()
 # chisel
 set(CHISEL_SOURCES
         src/main.cpp
-        src/utils/file_type.hpp
-        src/utils/thread_pool.hpp
-        src/utils/thread_pool.cpp
-        src/utils/logger.hpp
-        src/utils/logger.cpp
+        libchisel/include/file_type.hpp
+        libchisel/include/thread_pool.hpp
+        libchisel/src/utils/thread_pool.cpp
+        libchisel/include/logger.hpp
+        libchisel/src/utils/logger.cpp
         src/cli/cli_parser.cpp
         src/cli/cli_parser.hpp
         src/utils/file_scanner.cpp
         src/utils/file_scanner.hpp
         src/report/report_generator.cpp
         src/report/report_generator.hpp
-        src/utils/random_utils.cpp
-        src/utils/random_utils.hpp
-        src/utils/mime_detector.cpp
-        src/utils/mime_detector.hpp
-        src/processors/processor.hpp
-        src/processors/flac_processor.cpp
-        src/processors/flac_processor.hpp
-        src/processors/png_processor.cpp
-        src/processors/png_processor.hpp
-        src/processors/zopflipng_processor.cpp
-        src/processors/zopflipng_processor.hpp
-        src/processors/mkv_processor.cpp
-        src/processors/mkv_processor.hpp
-        src/processors/archive_processor.cpp
-        src/processors/archive_processor.hpp
-        src/processors/pdf_processor.cpp
-        src/processors/pdf_processor.hpp
-        src/processors/flexigif_processor.cpp
-        src/processors/flexigif_processor.hpp
-        src/processors/ape_processor.cpp
-        src/processors/ape_processor.hpp
-        src/processors/jpeg_processor.cpp
-        src/processors/jpeg_processor.hpp
-        src/processors/jxl_processor.cpp
-        src/processors/jxl_processor.hpp
-        src/processors/mseed_processor.cpp
-        src/processors/mseed_processor.hpp
-        src/processors/sqlite_processor.cpp
-        src/processors/sqlite_processor.hpp
-        src/processors/tiff_processor.cpp
-        src/processors/tiff_processor.hpp
-        src/processors/wavpack_processor.cpp
-        src/processors/wavpack_processor.hpp
-        src/processors/webp_processor.cpp
-        src/processors/webp_processor.hpp
-        src/processors/ooxml_processor.cpp
-        src/processors/ooxml_processor.hpp
-        src/processors/odf_processor.cpp
-        src/processors/odf_processor.hpp
-        src/utils/processor_registry.cpp
-        src/utils/processor_registry.hpp
-        src/utils/processor_executor.cpp
-        src/utils/processor_executor.hpp
-        src/utils/log_sink.hpp
-        src/utils/logger.cpp
-        src/utils/logger.hpp
+        libchisel/src/utils/random_utils.cpp
+        libchisel/include/random_utils.hpp
+        libchisel/src/utils/mime_detector.cpp
+        libchisel/include/mime_detector.hpp
+        libchisel/include/processor.hpp
+        libchisel/src/processors/flac_processor.cpp
+        libchisel/include/flac_processor.hpp
+        libchisel/src/processors/png_processor.cpp
+        libchisel/include/png_processor.hpp
+        libchisel/src/processors/zopflipng_processor.cpp
+        libchisel/include/zopflipng_processor.hpp
+        libchisel/src/processors/mkv_processor.cpp
+        libchisel/include/mkv_processor.hpp
+        libchisel/src/processors/archive_processor.cpp
+        libchisel/include/archive_processor.hpp
+        libchisel/src/processors/pdf_processor.cpp
+        libchisel/include/pdf_processor.hpp
+        libchisel/src/processors/flexigif_processor.cpp
+        libchisel/include/flexigif_processor.hpp
+        libchisel/src/processors/ape_processor.cpp
+        libchisel/include/ape_processor.hpp
+        libchisel/src/processors/jpeg_processor.cpp
+        libchisel/include/jpeg_processor.hpp
+        libchisel/src/processors/jxl_processor.cpp
+        libchisel/include/jxl_processor.hpp
+        libchisel/src/processors/mseed_processor.cpp
+        libchisel/include/mseed_processor.hpp
+        libchisel/src/processors/sqlite_processor.cpp
+        libchisel/include/sqlite_processor.hpp
+        libchisel/src/processors/tiff_processor.cpp
+        libchisel/include/tiff_processor.hpp
+        libchisel/src/processors/wavpack_processor.cpp
+        libchisel/include/wavpack_processor.hpp
+        libchisel/src/processors/webp_processor.cpp
+        libchisel/include/webp_processor.hpp
+        libchisel/src/processors/ooxml_processor.cpp
+        libchisel/include/ooxml_processor.hpp
+        libchisel/src/processors/odf_processor.cpp
+        libchisel/include/odf_processor.hpp
+        libchisel/src/utils/processor_registry.cpp
+        libchisel/include/processor_registry.hpp
+        libchisel/src/utils/processor_executor.cpp
+        libchisel/include/processor_executor.hpp
+        libchisel/include/log_sink.hpp
+        libchisel/src/utils/logger.cpp
+        libchisel/include/logger.hpp
         src/utils/console_log_sink.hpp
         src/utils/file_log_sink.hpp
-        src/utils/events.hpp
-        src/utils/event_bus.hpp
+        libchisel/include/events.hpp
+        libchisel/include/event_bus.hpp
 )
 if(NOT WIN32)
     list(APPEND CHISEL_SOURCES
-            src/processors/gif_processor.cpp
-            src/processors/gif_processor.hpp
+            libchisel/src/processors/gif_processor.cpp
+            libchisel/include/gif_processor.hpp
     )
 endif()
 
