@@ -499,7 +499,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
 
     // Detect format
     content.format = detect_format(input_path);
-
+    /*
     if (content.format == ContainerFormat::Xpi) {
         std::cerr << "WARNING: Recompressing .xpi will invalidate its digital signature.\n"
                      "You must re-sign the extension to install it.\n" << std::endl;
@@ -507,7 +507,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     if (content.format == ContainerFormat::Apk) {
         std::cerr << "WARNING: Recompressing .apk will invalidate its digital signature.\n"
                      "You must re-sign the APK to install it.\n" << std::endl;
-    }
+    }*/
 
     if (!can_read_format(content.format)) {
         Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + input_path.filename().string(), processor_tag());
@@ -609,13 +609,14 @@ void ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
             backup_path += ".bak";
             std::error_code bec;
             fs::copy_file(content.original_path, backup_path, fs::copy_options::overwrite_existing, bec);
+            /*
             if (!bec) {
                 std::cerr << "Backup of original " << content.original_path
                           << " saved to " << backup_path << "\n";
             } else {
                 std::cerr << "WARNING: Failed to create backup for "
                           << content.original_path << " (" << bec.message() << ")\n";
-            }
+            }*/
         }
 
         fs::rename(tmp_archive, final_path, ec);

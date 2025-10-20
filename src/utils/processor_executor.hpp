@@ -17,6 +17,7 @@
 #include <thread>
 #include <mutex>
 
+#include "event_bus.hpp"
 #include "thread_pool.hpp"
 
 namespace chisel {
@@ -32,6 +33,7 @@ namespace chisel {
                                      bool preserve_metadata,
                                      ContainerFormat format,
                                      bool verify_checksums,
+                                     EventBus& bus,
                                      unsigned threads = std::thread::hardware_concurrency());
 
 
@@ -58,6 +60,7 @@ namespace chisel {
 
         std::mutex log_mutex_;
         ThreadPool pool_;
+        EventBus& event_bus_;
     };
 
 } // namespace chisel

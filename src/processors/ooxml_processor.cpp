@@ -5,7 +5,6 @@
 #include "ooxml_processor.hpp"
 #include "../utils/random_utils.hpp"
 #include "../utils/file_type.hpp"
-#include "../encoder/zopflipng_encoder.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -13,11 +12,25 @@
 #include <vector>
 #include <algorithm>
 #include <system_error>
+#include "zlib_container.h"
 
 namespace chisel {
 
 namespace fs = std::filesystem;
+    std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
+        ZopfliOptions opts;
+        ZopfliInitOptions(&opts);
+        opts.numiterations = 15;
+        opts.blocksplitting = 1;
 
+        unsigned char* out_data = nullptr;
+        size_t out_size = 0;
+        ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
+
+        std::vector<unsigned char> result(out_data, out_data + out_size);
+        free(out_data);
+        return result;
+    }
 static const char* processor_tag() {
     return "OOXMLProcessor";
 }
@@ -59,6 +72,8 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
         (ext == ".docx" ? "docx_" :
          ext == ".xlsx" ? "xlsx_" :
          ext == ".pptx" ? "pptx_" : "ooxml_");
+
+    content.format = parse_container_format(prefix.substr(1, prefix.size())).value();
 
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
@@ -206,7 +221,7 @@ void OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
 
         // recompress only PNG/JPG images, leave XML and others untouched
         if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-            final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
+            final_data = recompress_with_zopfli(buf);
             Logger::log(LogLevel::Debug,
                         "Recompressed image: " + rel.string() + " (" +
                         std::to_string(buf.size()) + " -> " +

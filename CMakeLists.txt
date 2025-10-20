@@ -178,7 +178,7 @@ set(ENABLE_NLS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
+#set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
 add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
 
 target_include_directories(liblzma INTERFACE
@@ -622,7 +622,7 @@ add_library(giflib STATIC
         third_party/gifsicle/src/giftoc.c
         third_party/gifsicle/src/gifunopt.c
         # third_party/gifsicle/src/gifview.c
-        third_party/gifsicle/src/gifwrite.c
+        # third_party/gifsicle/src/gifwrite.c
         third_party/gifsicle/src/kcolor.c
         third_party/gifsicle/src/merge.c
         third_party/gifsicle/src/optimize.c
@@ -680,63 +680,21 @@ endif()
 # chisel
 set(CHISEL_SOURCES
         src/main.cpp
-        src/encoder/encoder.hpp
-        src/encoder/flac_encoder.cpp
-        src/encoder/flac_encoder.hpp
-        src/encoder/png_encoder.cpp
-        src/encoder/png_encoder.hpp
         src/utils/file_type.hpp
         src/utils/thread_pool.hpp
         src/utils/thread_pool.cpp
-        src/encoder/jpeg_encoder.cpp
-        src/encoder/jpeg_encoder.hpp
         src/utils/logger.hpp
         src/utils/logger.cpp
-        src/containers/archive_handler.cpp
-        src/containers/archive_handler.hpp
         src/cli/cli_parser.cpp
         src/cli/cli_parser.hpp
         src/utils/file_scanner.cpp
         src/utils/file_scanner.hpp
         src/report/report_generator.cpp
         src/report/report_generator.hpp
-        src/containers/container.hpp
-        src/containers/mkv_handler.cpp
-        src/containers/mkv_handler.hpp
-        src/encoder/wavpack_encoder.cpp
-        src/encoder/wavpack_encoder.hpp
-        src/encoder/webp_encoder.cpp
-        src/encoder/webp_encoder.hpp
-        src/encoder/pdf_encoder.cpp
-        src/encoder/pdf_encoder.hpp
-        src/encoder/zopflipng_encoder.cpp
-        src/encoder/zopflipng_encoder.hpp
-        src/encoder/jxl_encoder.cpp
-        src/encoder/jxl_encoder.hpp
-        src/encoder/tiff_encoder.cpp
-        src/encoder/tiff_encoder.hpp
-        src/encoder/sqlite_encoder.cpp
-        src/encoder/sqlite_encoder.hpp
-        src/utils/encoder_registry.cpp
-        src/utils/encoder_registry.hpp
-        src/encoder/mseed_encoder.cpp
-        src/encoder/mseed_encoder.hpp
-        src/containers/odf_handler.cpp
-        src/containers/odf_handler.hpp
-        src/containers/ooxml_handler.cpp
-        src/containers/ooxml_handler.hpp
         src/utils/random_utils.cpp
         src/utils/random_utils.hpp
-        src/encoder/ape_encoder.cpp
-        src/encoder/ape_encoder.hpp
-        src/encoder/flexigif_encoder.cpp
-        src/encoder/flexigif_encoder.hpp
         src/utils/mime_detector.cpp
         src/utils/mime_detector.hpp
-        src/encoder/mkv_encoder.cpp
-        src/encoder/mkv_encoder.hpp
-        src/containers/pdf_handler.cpp
-        src/containers/pdf_handler.hpp
         src/processors/processor.hpp
         src/processors/flac_processor.cpp
         src/processors/flac_processor.hpp
@@ -750,8 +708,6 @@ set(CHISEL_SOURCES
         src/processors/archive_processor.hpp
         src/processors/pdf_processor.cpp
         src/processors/pdf_processor.hpp
-        src/processors/gif_processor.cpp
-        src/processors/gif_processor.hpp
         src/processors/flexigif_processor.cpp
         src/processors/flexigif_processor.hpp
         src/processors/ape_processor.cpp
@@ -779,13 +735,17 @@ set(CHISEL_SOURCES
         src/utils/processor_executor.cpp
         src/utils/processor_executor.hpp
         src/utils/log_sink.hpp
-        src/utils/logger_2.cpp
-        src/utils/logger_2.hpp
+        src/utils/logger.cpp
+        src/utils/logger.hpp
+        src/utils/console_log_sink.hpp
+        src/utils/file_log_sink.hpp
+        src/utils/events.hpp
+        src/utils/event_bus.hpp
 )
 if(NOT WIN32)
     list(APPEND CHISEL_SOURCES
-            src/encoder/gif_encoder.cpp
-            src/encoder/gif_encoder.hpp
+            src/processors/gif_processor.cpp
+            src/processors/gif_processor.hpp
     )
 endif()
 

@@ -7,25 +7,10 @@
 
 #include <vector>
 #include <filesystem>
-#include "random_utils.hpp"
-#include "../containers/archive_handler.hpp"
 
-struct InputFile {
-    std::filesystem::path path;
-    std::optional<std::filesystem::path> container_origin;
-};
-
-void collect_inputs(const std::vector<std::filesystem::path>& inputs,
+std::vector<std::filesystem::path>
+collect_input_files(const std::vector<std::filesystem::path>& inputs,
                     bool recursive,
-                    std::vector<InputFile>& files,
-                    std::vector<ContainerJob>& archive_jobs, Settings& settings);
-
-inline std::filesystem::path make_temp_path(const std::filesystem::path &stem, const std::string &ext) {
-    return std::filesystem::temp_directory_path() /
-           std::filesystem::path(stem.string() + "_tmp" + RandomUtils::random_suffix() + ext);
-}
-std::unique_ptr<IContainer> make_handler(ContainerFormat fmt);
-
-
+                    bool& is_pipe);
 
 #endif //CHISEL_FILE_SCANNER_HPP

@@ -121,7 +121,7 @@ void print_console_report(const std::vector<Result>& results,
     uintmax_t total_saved = 0;
     auto sorted = results;
     std::ranges::sort(sorted, [](const auto& a, const auto& b) {
-        return a.file.path < b.file.path;
+        return a.path < b.path;
     });
 
     // row formatting
@@ -146,8 +146,8 @@ void print_console_report(const std::vector<Result>& results,
         if (r.replaced && r.size_before > r.size_after)
             total_saved += r.size_before - r.size_after;
 
-        auto filenamecolwidth = truncate(r.file.path.filename().string(), file_col_width);
-        if (r.file.container_origin) {
+        auto filenamecolwidth = truncate(r.path.filename().string(), file_col_width);
+        if (r.container_origin) {
             filenamecolwidth = "  ↳ " + filenamecolwidth;
         }
 
@@ -240,8 +240,8 @@ void export_csv_report(const std::vector<Result>& results,
                           std::format("{:.2f}%", r.codecs_used[i].second);
         }
 
-        out << '"' << r.file.path.filename().string() << "\","
-            << '"' << r.file.container_origin->filename().string() << "\","
+        out << '"' << r.path.filename().string() << "\","
+            << '"' << r.container_origin->filename().string() << "\","
             << r.mime << ","
             << (r.size_before / 1024) << ","
             << (r.size_after / 1024) << ","

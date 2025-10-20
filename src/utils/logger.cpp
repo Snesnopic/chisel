@@ -1,39 +1,23 @@
 //
-// Created by Giuseppe Francione on 19/09/25.
+// Created by Giuseppe Francione on 20/10/25.
 //
 
 #include "logger.hpp"
 
-void Logger::set_level(const LogLevel level) {
-    instance().level_ = level;
+
+std::unique_ptr<ILogSink> Logger::sink_ = nullptr;
+std::mutex Logger::mtx_;
+
+void Logger::set_sink(std::unique_ptr<ILogSink> sink) {
+    std::lock_guard lock(mtx_);
+    sink_ = std::move(sink);
 }
 
-void Logger::enable(const bool enabled) {
-    instance().enabled_ = enabled;
-}
-
-void Logger::log(const LogLevel level, const std::string &msg, const std::string &source) {
-    auto &inst = instance();
-    if (!inst.enabled_ || level < inst.level_) return;
-
-    std::scoped_lock lock(inst.mutex_);
-    std::ostream &out = (level == LogLevel::Error) ? std::cerr : std::cout;
-    out << "[" << level_to_string(level) << "]";
-    if (!source.empty()) out << "[" << source << "]";
-    out << " " << msg << "\n";
-}
-
-Logger &Logger::instance() {
-    static Logger inst;
-    return inst;
-}
-
-const char *Logger::level_to_string(const LogLevel level) {
-    switch (level) {
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        default: return "";
+void Logger::log(const LogLevel level,
+                  const std::string_view msg,
+                  const std::string_view tag) {
+    std::lock_guard lock(mtx_);
+    if (sink_) {
+        sink_->log(level, msg, tag);
     }
 }

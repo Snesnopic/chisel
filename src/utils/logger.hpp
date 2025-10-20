@@ -1,34 +1,25 @@
 //
-// Created by Giuseppe Francione on 19/09/25.
+// Created by Giuseppe Francione on 20/10/25.
 //
 
 #ifndef CHISEL_LOGGER_HPP
 #define CHISEL_LOGGER_HPP
 
-#include <string>
+#include "log_sink.hpp"
+#include <memory>
 #include <mutex>
-#include <iostream>
-
-enum class LogLevel { Debug, Info, Warning, Error, None };
 
 class Logger {
 public:
-    static void set_level(LogLevel level);
-
-    static void enable(bool enabled);
-
-    static void log(LogLevel level, const std::string &msg, const std::string &source = "");
+    static void set_sink(std::unique_ptr<ILogSink> sink);
+    static void log(LogLevel level,
+                    std::string_view msg,
+                    std::string_view tag = "chisel");
 
 private:
-    Logger() = default;
-
-    static Logger &instance();
-
-    static const char *level_to_string(LogLevel level);
-
-    LogLevel level_ = LogLevel::Error;
-    bool enabled_ = true;
-    std::mutex mutex_;
+    static std::unique_ptr<ILogSink> sink_;
+    static std::mutex mtx_;
 };
 
-#endif // CHISEL_LOGGER_HPP
+
+#endif //CHISEL_LOGGER_HPP

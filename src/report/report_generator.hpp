@@ -8,12 +8,13 @@
 #include <vector>
 #include <string>
 #include <filesystem>
-#include "../utils/file_scanner.hpp"
+#include <optional>
 
 enum class EncodeMode;
 
 struct Result {
-    InputFile file;
+    std::filesystem::path path;
+    std::optional<std::filesystem::path> container_origin;
     std::string mime;           // detected mime
     uintmax_t size_before{};    // original size in bytes
     uintmax_t size_after{};     // recompressed size in bytes

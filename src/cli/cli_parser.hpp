@@ -29,6 +29,7 @@ struct Settings {
     std::filesystem::path output_csv;
     bool is_pipe = false;
     bool regenerate_magic = false;
+    bool verify_checksums = false;
     EncodeMode encode_mode = EncodeMode::PIPE;
 };
 

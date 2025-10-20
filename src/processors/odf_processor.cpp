@@ -5,7 +5,6 @@
 #include "odf_processor.hpp"
 #include "../utils/logger.hpp"
 #include "../utils/random_utils.hpp"
-#include "../encoder/zopflipng_encoder.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -14,10 +13,27 @@
 #include <vector>
 #include <algorithm>
 
+#include "zlib_container.h"
+#include "zopfli.h"
+#include "../utils/file_type.hpp"
+
 namespace chisel {
 
 namespace fs = std::filesystem;
+    std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
+        ZopfliOptions opts;
+        ZopfliInitOptions(&opts);
+        opts.numiterations = 15;
+        opts.blocksplitting = 1;
 
+        unsigned char* out_data = nullptr;
+        size_t out_size = 0;
+        ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
+
+        std::vector<unsigned char> result(out_data, out_data + out_size);
+        free(out_data);
+        return result;
+    }
 static const char* processor_tag() {
     return "ODFProcessor";
 }
@@ -59,6 +75,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
          ext == ".ods" ? "ods_" :
          ext == ".odp" ? "odp_" :
          ext == ".odg" ? "odg_" : "odf_");
+    content.format = parse_container_format(prefix.substr(1, prefix.size())).value();
 
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
@@ -145,7 +162,7 @@ void OdfProcessor::finalize_extraction(const ExtractedContent& content,
     const fs::path tmp_path = src_path.parent_path() /
                               (src_path.stem().string() + "_tmp" + src_path.extension().string());
 
-    struct archive* out = archive_write_new();
+    archive* out = archive_write_new();
     if (!out) {
         Logger::log(LogLevel::Error, "archive_write_new failed", processor_tag());
         throw std::runtime_error("ODFProcessor: archive_write_new failed");
@@ -204,7 +221,7 @@ void OdfProcessor::finalize_extraction(const ExtractedContent& content,
             Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", processor_tag());
             archive_write_set_options(out, "compression=store");
         } else if (ext == ".xml") {
-            final_data = ZopfliPngEncoder::recompress_with_zopfli(buf);
+            final_data = recompress_with_zopfli(buf);
             Logger::log(LogLevel::Debug, "Recompressed XML with Zopfli: " + rel.string(), processor_tag());
             archive_write_set_options(out, "compression=deflate");
         } else {
