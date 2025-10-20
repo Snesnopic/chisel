@@ -774,6 +774,13 @@ set(CHISEL_SOURCES
         src/processors/ooxml_processor.hpp
         src/processors/odf_processor.cpp
         src/processors/odf_processor.hpp
+        src/utils/processor_registry.cpp
+        src/utils/processor_registry.hpp
+        src/utils/processor_executor.cpp
+        src/utils/processor_executor.hpp
+        src/utils/log_sink.hpp
+        src/utils/logger_2.cpp
+        src/utils/logger_2.hpp
 )
 if(NOT WIN32)
     list(APPEND CHISEL_SOURCES
