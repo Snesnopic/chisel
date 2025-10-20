@@ -13,7 +13,7 @@
 
 namespace chisel {
 
-    class ZopflipngProcessor final : public IProcessor {
+    class ZopfliPngProcessor final : public IProcessor {
     public:
         // --- self-description ---
         [[nodiscard]] std::string_view get_name() const noexcept override {

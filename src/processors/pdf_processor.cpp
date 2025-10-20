@@ -16,6 +16,7 @@
 #include <chrono>
 #include "zlib_container.h"
 #include "zopfli.h"
+#include "../utils/file_type.hpp"
 
 namespace {
 
@@ -163,7 +164,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
             info.decodable = true;
         } catch (QPDFExc&) {
             buf = obj.getRawStreamData();
-data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
+            data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
             info.decodable = false;
         }
 
@@ -179,6 +180,7 @@ data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
     }
 
     state_[content.original_path] = std::move(st);
+    content.format = ContainerFormat::Pdf;
     return content;
 }
 

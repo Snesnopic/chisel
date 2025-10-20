@@ -20,20 +20,6 @@
 namespace chisel {
 
 namespace fs = std::filesystem;
-    std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
-        ZopfliOptions opts;
-        ZopfliInitOptions(&opts);
-        opts.numiterations = 15;
-        opts.blocksplitting = 1;
-
-        unsigned char* out_data = nullptr;
-        size_t out_size = 0;
-        ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
-
-        std::vector<unsigned char> result(out_data, out_data + out_size);
-        free(out_data);
-        return result;
-    }
 static const char* processor_tag() {
     return "ODFProcessor";
 }
@@ -221,7 +207,18 @@ void OdfProcessor::finalize_extraction(const ExtractedContent& content,
             Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", processor_tag());
             archive_write_set_options(out, "compression=store");
         } else if (ext == ".xml") {
-            final_data = recompress_with_zopfli(buf);
+            ZopfliOptions opts;
+            ZopfliInitOptions(&opts);
+            opts.numiterations = 15;
+            opts.blocksplitting = 1;
+            unsigned char* out_data = nullptr;
+            size_t out_size = 0;
+            ZopfliZlibCompress(&opts, buf.data(), buf.size(), &out_data, &out_size);
+
+            std::vector<unsigned char> result(out_data, out_data + out_size);
+            free(out_data);
+            final_data = result;
+
             Logger::log(LogLevel::Debug, "Recompressed XML with Zopfli: " + rel.string(), processor_tag());
             archive_write_set_options(out, "compression=deflate");
         } else {

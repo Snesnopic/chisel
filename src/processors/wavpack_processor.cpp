@@ -11,7 +11,7 @@
 
 namespace chisel {
 
-void WavpackProcessor::recompress(const std::filesystem::path& input,
+void WavPackProcessor::recompress(const std::filesystem::path& input,
                                   const std::filesystem::path& output,
                                   bool preserve_metadata) {
     Logger::log(LogLevel::Info, "Starting WavPack recompression: " + input.string(), "wavpack_processor");
@@ -124,7 +124,7 @@ void WavpackProcessor::recompress(const std::filesystem::path& input,
     Logger::log(LogLevel::Info, "WavPack recompression completed: " + output.string(), "wavpack_processor");
 }
 
-std::string WavpackProcessor::get_raw_checksum(const std::filesystem::path&) const {
+std::string WavPackProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw WavPack data
     return "";
 }

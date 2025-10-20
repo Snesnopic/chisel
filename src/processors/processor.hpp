@@ -17,26 +17,32 @@ enum class ContainerFormat;
 
 namespace chisel {
 
-// structure to hold information about content extracted by a processor
+/**
+ * @brief Holds information about content extracted by a processor.
+ *
+ * This structure is returned by processors that can extract container
+ * contents (e.g. archives, multimedia containers). It provides the
+ * temporary directory and the list of extracted files, which will later
+ * be reassembled by finalize_extraction().
+ */
 struct ExtractedContent {
-    std::filesystem::path original_path;                // path to the original container file that was processed
-    std::filesystem::path temp_dir;                     // dedicated temporary directory holding the extracted files
-    std::vector<std::filesystem::path> extracted_files; // list of absolute paths to the files extracted into temp_dir
-    ContainerFormat format;
-    // processors can add custom, format-specific context here if needed for finalize_extraction
+    std::filesystem::path original_path;                ///< Path to the original container file
+    std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
+    std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
+    ContainerFormat format;                             ///< Format of the container
+    // Processors may add custom, format-specific context if needed
 };
 
 /**
- * @brief interface for a file processing module in chisel.
+ * @brief Interface for a file processing module in chisel.
  *
- * each implementation targets a specific file format (or a group of related formats).
- * it must be self-descriptive about the formats it handles (mime types, extensions)
+ * Each implementation targets a specific file format (or a group of related formats).
+ * It must be self-descriptive about the formats it handles (MIME types, extensions)
  * and declare its capabilities (direct recompression, content extraction).
- * it provides the core methods to perform these optimization operations.
  *
- * implementations should be stateless regarding the files being processed. any required
- * state should be specific to single operation being performed. the ProcessorRegistry
- * creates a new instance for each operation to ensure thread safety and isolation.
+ * Implementations should be stateless regarding the files being processed.
+ * Any required state should be specific to a single operation. The ProcessorRegistry
+ * owns processor instances and ensures they are reused safely.
  */
 class IProcessor {
 public:
@@ -44,50 +50,61 @@ public:
 
     // --- self-description ---
 
+    /// @return Human-readable name of the processor (e.g. "PNG", "FLAC").
     [[nodiscard]] virtual std::string_view get_name() const noexcept = 0;
 
+    /// @return List of supported MIME types (e.g. "image/png").
     [[nodiscard]] virtual std::span<const std::string_view, std::dynamic_extent>
     get_supported_mime_types() const noexcept = 0;
 
+    /// @return List of supported file extensions (e.g. ".png").
     [[nodiscard]] virtual std::span<const std::string_view, std::dynamic_extent>
     get_supported_extensions() const noexcept = 0;
 
     // --- capabilities ---
 
+    /// @return True if this processor can perform direct recompression.
     [[nodiscard]] virtual bool can_recompress() const noexcept = 0;
+
+    /// @return True if this processor can extract container contents.
     [[nodiscard]] virtual bool can_extract_contents() const noexcept = 0;
 
     // --- operations ---
 
     /**
-     * @brief performs direct, lossless recompression if supported (can_recompress() is true).
-     * @param input_path path to the original file.
-     * @param output_path path where the optimized file should be written.
-     * @param preserve_metadata whether to preserve metadata blocks.
+     * @brief Perform direct, lossless recompression if supported.
+     * @param input_path Path to the original file.
+     * @param output_path Path where the optimized file should be written.
+     * @param preserve_metadata Whether to preserve metadata blocks.
      */
     virtual void recompress(const std::filesystem::path& input_path,
                             const std::filesystem::path& output_path,
                             bool preserve_metadata) = 0;
 
     /**
-     * @brief extracts processable internal contents if supported (can_extract_contents() is true).
-     * @param input_path path to the container file.
-     * @return std::optional<ExtractedContent> with details about extracted files and temp dir,
+     * @brief Extract processable internal contents if supported.
+     * @param input_path Path to the container file.
+     * @return ExtractedContent with details about extracted files and temp dir,
      *         or std::nullopt if no processable content was found.
      */
     virtual std::optional<ExtractedContent> prepare_extraction(
         const std::filesystem::path& input_path) = 0;
 
     /**
-     * @brief rebuilds the original container file after its internal contents have potentially been modified.
-     * @param content the ExtractedContent struct returned by prepare_extraction.
-     * @param target_format target format, if the current one can't be re-written.
+     * @brief Rebuild the original container file after its contents have been modified.
+     * @param content The ExtractedContent struct returned by prepare_extraction().
+     * @param target_format Target format, if the current one cannot be re-written.
      */
     virtual void finalize_extraction(const ExtractedContent& content,
                                      ContainerFormat target_format) = 0;
 
     // --- integrity check ---
 
+    /**
+     * @brief Compute a raw checksum of the file.
+     * @param file_path Path to the file.
+     * @return Checksum string (algorithm is processor-specific).
+     */
     [[nodiscard]] virtual std::string get_raw_checksum(const std::filesystem::path& file_path) const = 0;
 };
 

@@ -15,13 +15,13 @@ public:
              const std::string_view tag) override {
         switch (level) {
             case LogLevel::Debug:
-                std::cout << "[DEBUG][" << tag << "] " << message << std::endl;
+                //std::cout << "[DEBUG][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Info:
-                std::cout << "[INFO ][" << tag << "] " << message << std::endl;
+                //std::cout << "[INFO ][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Warning:
-                std::cerr << "[WARN ][" << tag << "] " << message << std::endl;
+                //std::cerr << "[WARN ][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Error:
                 std::cerr << "[ERROR][" << tag << "] " << message << std::endl;

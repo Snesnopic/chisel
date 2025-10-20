@@ -10,7 +10,7 @@
 
 namespace chisel {
 
-void FlexigifProcessor::recompress(const std::filesystem::path& input,
+void FlexiGifProcessor::recompress(const std::filesystem::path& input,
                                    const std::filesystem::path& output,
                                    bool /*preserve_metadata*/) {
     Logger::log(LogLevel::Info,
@@ -96,7 +96,7 @@ void FlexigifProcessor::recompress(const std::filesystem::path& input,
     }
 }
 
-std::string FlexigifProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
+std::string FlexiGifProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
     // TODO: implement checksum of raw GIF data
     return "";
 }

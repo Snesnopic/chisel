@@ -3,21 +3,21 @@
 //
 
 #include "processor_executor.hpp"
-
 #include "file_type.hpp"
 #include "mime_detector.hpp"
 #include "../utils/thread_pool.hpp"
 #include "../utils/logger.hpp"
 #include "events.hpp"
 #include "event_bus.hpp"
-
 #include <filesystem>
 #include <future>
-#include <optional>
 #include <vector>
 #include <stack>
 #include <string>
 #include <chrono>
+#include "../cli/cli_parser.hpp"
+
+namespace fs = std::filesystem;
 
 namespace chisel {
 
@@ -25,6 +25,7 @@ ProcessorExecutor::ProcessorExecutor(ProcessorRegistry& registry,
                                      const bool preserve_metadata,
                                      const ContainerFormat format,
                                      const bool verify_checksums,
+                                     EncodeMode mode,
                                      EventBus& bus,
                                      const unsigned threads)
     : registry_(registry),
@@ -32,35 +33,33 @@ ProcessorExecutor::ProcessorExecutor(ProcessorRegistry& registry,
       verify_checksums_(verify_checksums),
       format_(format),
       pool_(threads),
-      event_bus_(bus) {}
+      event_bus_(bus),
+      mode_(mode) {}
 
-void ProcessorExecutor::process(const std::vector<std::filesystem::path>& inputs) {
+void ProcessorExecutor::process(const std::vector<fs::path>& inputs) {
     for (const auto& path : inputs) {
         analyze_path(path);
     }
-
     process_work_list();
-
     finalize_containers();
 }
 
-void ProcessorExecutor::analyze_path(const std::filesystem::path& path) {
+void ProcessorExecutor::analyze_path(const fs::path& path) {
     event_bus_.publish(FileAnalyzeStartEvent{path});
 
     auto mime = MimeDetector::detect(path);
-    auto proc = registry_.find_by_mime(mime);
-
-    if (!proc) {
-        proc = registry_.find_by_extension(path.extension().string());
+    auto procs = registry_.find_by_mime(mime);
+    if (procs.empty()) {
+        procs = registry_.find_by_extension(path.extension().string());
     }
 
-    if (!proc) {
-        Logger::log(LogLevel::Warning, "Nessun processor per " + path.string(), "Executor");
+    if (procs.empty()) {
+        Logger::log(LogLevel::Warning, "no processor for " + path.string(), "Executor");
         event_bus_.publish(FileAnalyzeSkippedEvent{path, "Unsupported format"});
         return;
     }
 
-    IProcessor* processor = *proc;
+    IProcessor* processor = procs.front();
 
     if (processor->can_extract_contents()) {
         auto content = processor->prepare_extraction(path);
@@ -71,14 +70,14 @@ void ProcessorExecutor::analyze_path(const std::filesystem::path& path) {
             }
             event_bus_.publish(FileAnalyzeCompleteEvent{path, true, false});
         } else {
-            Logger::log(LogLevel::Error, "prepare_extraction ha fallito per " + path.string(), "Executor");
+            Logger::log(LogLevel::Error, "prepare_extraction failed for " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
         }
     } else if (processor->can_recompress()) {
         work_list_.push_back(path);
         event_bus_.publish(FileAnalyzeCompleteEvent{path, false, true});
     } else {
-        Logger::log(LogLevel::Debug, "File ignorato: " + path.string(), "Executor");
+        Logger::log(LogLevel::Debug, "file ignored: " + path.string(), "Executor");
         event_bus_.publish(FileAnalyzeSkippedEvent{path, "No operations available"});
     }
 }
@@ -88,66 +87,144 @@ void ProcessorExecutor::process_work_list() {
         pool_.enqueue([this, file](const std::stop_token& st) {
             event_bus_.publish(FileProcessStartEvent{file});
 
-            auto proc = registry_.find_by_extension(file.extension().string());
-            if (!proc) {
-                const auto mime = MimeDetector::detect(file);
-                proc = registry_.find_by_mime(mime);
-                if (!proc) {
-                    Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessSkippedEvent{file, "Unsupported format"});
-                    return;
-                }
+            // collect all candidates
+            auto candidates = registry_.find_by_mime(MimeDetector::detect(file));
+            if (candidates.empty()) {
+                candidates = registry_.find_by_extension(file.extension().string());
+            }
+            if (candidates.empty()) {
+                Logger::log(LogLevel::Warning, "no processor for " + file.string(), "Executor");
+                event_bus_.publish(FileProcessSkippedEvent{file, "Unsupported format"});
+                return;
             }
 
-            std::filesystem::path tmp = file;
-            tmp += ".tmp";
+            auto safe_size = [](const fs::path& p) {
+                std::error_code ec;
+                auto s = fs::file_size(p, ec);
+                return ec ? 0ull : s;
+            };
 
             try {
-                IProcessor* processor = *proc;
+                const auto orig_size = safe_size(file);
                 auto start = std::chrono::steady_clock::now();
 
-                processor->recompress(file, tmp, verify_checksums_);
+                if (mode_ == EncodeMode::PIPE) {
+                    fs::path current = file;
+                    fs::path last_tmp;
+                    bool pipeline_ok = true;
 
-                auto end = std::chrono::steady_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-                std::error_code ec;
-                auto orig_size = std::filesystem::file_size(file, ec);
-                if (ec) orig_size = 0;
-                auto new_size  = std::filesystem::file_size(tmp, ec);
-                if (ec) new_size = 0;
-
-                bool replaced = false;
-                if (new_size > 0 && (orig_size == 0 || new_size < orig_size)) {
-                    std::filesystem::rename(tmp, file, ec);
-                    if (ec) {
-                        Logger::log(LogLevel::Error, "Rename failed: " + file.string() + " (" + ec.message() + ")", "Executor");
-                        std::filesystem::remove(tmp, ec);
-                        event_bus_.publish(FileProcessErrorEvent{file, "Rename failed: " + ec.message()});
-                    } else {
-                        replaced = true;
-                        Logger::log(LogLevel::Info, "Recompressed: " + file.string() +
-                                                     " (" + std::to_string(orig_size) + " -> " +
-                                                     std::to_string(new_size) + " bytes)", "Executor");
-                        event_bus_.publish(FileProcessCompleteEvent{file, orig_size, new_size, replaced, duration});
+                    for (size_t i = 0; i < candidates.size(); ++i) {
+                        fs::path tmp = file;
+                        tmp += ".pipe." + std::to_string(i) + ".tmp";
+                        candidates[i]->recompress(current, tmp, verify_checksums_);
+                        auto sz = safe_size(tmp);
+                        if (sz == 0) {
+                            pipeline_ok = false;
+                            std::error_code ec;
+                            fs::remove(tmp, ec);
+                            break;
+                        }
+                        if (current != file) {
+                            std::error_code ec;
+                            fs::remove(current, ec);
+                        }
+                        current = tmp;
+                        last_tmp = tmp;
                     }
-                } else {
-                    std::filesystem::remove(tmp, ec);
-                    Logger::log(LogLevel::Debug, "No improvement: " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
-                }
-            } catch (const std::exception& e) {
-                Logger::log(LogLevel::Error, "Errore su " + file.string() + ": " + std::string(e.what()), "Executor");
-                event_bus_.publish(FileProcessErrorEvent{file, e.what()});
 
-                std::error_code ec;
-                tmp = file;
-                tmp += ".tmp";
-                std::filesystem::remove(tmp, ec);
+                    auto end = std::chrono::steady_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+                    if (pipeline_ok && !last_tmp.empty()) {
+                        auto new_size = safe_size(last_tmp);
+                        if (new_size > 0 && new_size < orig_size) {
+                            std::error_code ec;
+                            fs::rename(last_tmp, file, ec);
+                            if (ec) {
+                                Logger::log(LogLevel::Error, "rename failed: " + file.string() + " (" + ec.message() + ")", "Executor");
+                                fs::remove(last_tmp, ec);
+                                event_bus_.publish(FileProcessErrorEvent{file, "Rename failed: " + ec.message()});
+                            } else {
+                                event_bus_.publish(FileProcessCompleteEvent{file, orig_size, new_size, true, duration});
+                            }
+                        } else {
+                            std::error_code ec;
+                            fs::remove(last_tmp, ec);
+                            event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                        }
+                    } else {
+                        event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
+                    }
+
+                } else { // parallel
+                    struct Result {
+                        fs::path tmp;
+                        uintmax_t size{};
+                        bool success{false};
+                    };
+                    std::vector<Result> results;
+
+                    for (size_t i = 0; i < candidates.size(); ++i) {
+                        fs::path tmp = file;
+                        tmp += ".cand." + std::to_string(i) + ".tmp";
+                        Result r{tmp, 0, false};
+                        try {
+                            candidates[i]->recompress(file, tmp, verify_checksums_);
+                            auto sz = safe_size(tmp);
+                            if (sz > 0) {
+                                r.size = sz;
+                                r.success = true;
+                            } else {
+                                std::error_code ec;
+                                fs::remove(tmp, ec);
+                            }
+                        } catch (...) {
+                            std::error_code ec;
+                            fs::remove(tmp, ec);
+                        }
+                        results.push_back(r);
+                    }
+
+                    auto end = std::chrono::steady_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+                    auto best_it = std::min_element(results.begin(), results.end(),
+                        [](const Result& a, const Result& b) {
+                            if (a.success != b.success) return a.success && !b.success;
+                            return a.size < b.size;
+                        });
+
+                    if (best_it != results.end() && best_it->success && best_it->size < orig_size) {
+                        std::error_code ec;
+                        fs::rename(best_it->tmp, file, ec);
+                        if (ec) {
+                            Logger::log(LogLevel::Error, "rename failed: " + file.string() + " (" + ec.message() + ")", "Executor");
+                            fs::remove(best_it->tmp, ec);
+                            event_bus_.publish(FileProcessErrorEvent{file, "Rename failed: " + ec.message()});
+                        } else {
+                            for (const auto& r : results) {
+                                if (r.tmp != best_it->tmp) {
+                                    std::error_code ec2;
+                                    fs::remove(r.tmp, ec2);
+                                }
+                            }
+                            event_bus_.publish(FileProcessCompleteEvent{file, orig_size, best_it->size, true, duration});
+                        }
+                    } else {
+                        for (const auto& r : results) {
+                            std::error_code ec;
+                            fs::remove(r.tmp, ec);
+                        }
+                        event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                    }
+                }
+
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Error, "error on " + file.string() + ": " + std::string(e.what()), "Executor");
+                event_bus_.publish(FileProcessErrorEvent{file, e.what()});
             }
         });
     }
-
     pool_.wait_idle();
 }
 
@@ -158,19 +235,19 @@ void ProcessorExecutor::finalize_containers() {
 
         event_bus_.publish(ContainerFinalizeStartEvent{content.original_path});
 
-        auto proc = registry_.find_by_extension(content.original_path.extension().string());
-        if (!proc) {
-            auto mime = MimeDetector::detect(content.original_path);
-            proc = registry_.find_by_mime(mime);
-            if (!proc) {
-                Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(), "Executor");
-                event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Unsupported format"});
-                continue;
-            }
+        auto procs = registry_.find_by_mime(MimeDetector::detect(content.original_path));
+        if (procs.empty()) {
+            procs = registry_.find_by_extension(content.original_path.extension().string());
+        }
+        if (procs.empty()) {
+            Logger::log(LogLevel::Warning, "no processor to finalize: " + content.original_path.string(), "Executor");
+            event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Unsupported format"});
+            continue;
         }
 
         try {
-            (*proc)->finalize_extraction(content, format_);
+            // use the first processor found to finalize
+            procs.front()->finalize_extraction(content, format_);
 
             std::error_code ec;
             auto final_size = std::filesystem::file_size(content.original_path, ec);

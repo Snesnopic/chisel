@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 namespace chisel {
 
-void ZopflipngProcessor::recompress(const fs::path& input,
+void ZopfliPngProcessor::recompress(const fs::path& input,
                                     const fs::path& output,
                                     bool preserve_metadata) {
     Logger::log(LogLevel::Info, "Starting PNG optimization with ZopfliPNG: " + input.string(), "zopflipng_processor");
@@ -66,7 +66,7 @@ void ZopflipngProcessor::recompress(const fs::path& input,
     }
 }
 
-std::vector<unsigned char> ZopflipngProcessor::recompress_with_zopfli(const std::vector<unsigned char>& input) {
+std::vector<unsigned char> ZopfliPngProcessor::recompress_with_zopfli(const std::vector<unsigned char>& input) {
     ZopfliOptions opts;
     ZopfliInitOptions(&opts);
     opts.numiterations = 15;
@@ -81,7 +81,7 @@ std::vector<unsigned char> ZopflipngProcessor::recompress_with_zopfli(const std:
     return result;
 }
 
-std::string ZopflipngProcessor::get_raw_checksum(const std::filesystem::path&) const {
+std::string ZopfliPngProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw PNG data
     return "";
 }

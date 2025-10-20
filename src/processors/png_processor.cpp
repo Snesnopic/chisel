@@ -311,8 +311,8 @@ namespace chisel {
                 // prepare writer
                 const unique_FILE fp_out(std::fopen(output.string().c_str(), "wb"));
                 if (!fp_out) {
-                    Logger::log(LogLevel::Error, "cannot open PNG output: " + output.string(), "png_encoder");
-                    throw std::runtime_error("cannot open PNG output");
+                    Logger::log(LogLevel::Error, "Cannot open PNG output: " + output.string(), "png_encoder");
+                    throw std::runtime_error("Cannot open PNG output");
                 }
 
                 PngWrite wr;

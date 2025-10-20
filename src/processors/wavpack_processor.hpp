@@ -13,7 +13,7 @@
 
 namespace chisel {
 
-    class WavpackProcessor final : public IProcessor {
+    class WavPackProcessor final : public IProcessor {
     public:
         // --- self-description ---
         [[nodiscard]] std::string_view get_name() const noexcept override {

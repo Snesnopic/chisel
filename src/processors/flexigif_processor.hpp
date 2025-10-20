@@ -13,7 +13,7 @@
 
 namespace chisel {
 
-    class FlexigifProcessor final : public IProcessor {
+    class FlexiGifProcessor final : public IProcessor {
     public:
         // --- self-description ---
         [[nodiscard]] std::string_view get_name() const noexcept override {

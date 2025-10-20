@@ -178,7 +178,7 @@ set(ENABLE_NLS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-#set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
+set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
 add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
 
 target_include_directories(liblzma INTERFACE
@@ -622,7 +622,7 @@ add_library(giflib STATIC
         third_party/gifsicle/src/giftoc.c
         third_party/gifsicle/src/gifunopt.c
         # third_party/gifsicle/src/gifview.c
-        # third_party/gifsicle/src/gifwrite.c
+        third_party/gifsicle/src/gifwrite.c
         third_party/gifsicle/src/kcolor.c
         third_party/gifsicle/src/merge.c
         third_party/gifsicle/src/optimize.c
