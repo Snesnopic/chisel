@@ -679,18 +679,18 @@ endif()
 
 # chisel
 set(CHISEL_SOURCES
-        src/main.cpp
+        chisel_cli/main.cpp
         libchisel/include/file_type.hpp
         libchisel/include/thread_pool.hpp
         libchisel/src/utils/thread_pool.cpp
         libchisel/include/logger.hpp
         libchisel/src/utils/logger.cpp
-        src/cli/cli_parser.cpp
-        src/cli/cli_parser.hpp
-        src/utils/file_scanner.cpp
-        src/utils/file_scanner.hpp
-        src/report/report_generator.cpp
-        src/report/report_generator.hpp
+        chisel_cli/cli/cli_parser.cpp
+        chisel_cli/cli/cli_parser.hpp
+        chisel_cli/utils/file_scanner.cpp
+        chisel_cli/utils/file_scanner.hpp
+        chisel_cli/report/report_generator.cpp
+        chisel_cli/report/report_generator.hpp
         libchisel/src/utils/random_utils.cpp
         libchisel/include/random_utils.hpp
         libchisel/src/utils/mime_detector.cpp
@@ -737,8 +737,8 @@ set(CHISEL_SOURCES
         libchisel/include/log_sink.hpp
         libchisel/src/utils/logger.cpp
         libchisel/include/logger.hpp
-        src/utils/console_log_sink.hpp
-        src/utils/file_log_sink.hpp
+        chisel_cli/utils/console_log_sink.hpp
+        chisel_cli/utils/file_log_sink.hpp
         libchisel/include/events.hpp
         libchisel/include/event_bus.hpp
 )
