@@ -351,7 +351,7 @@ else ()
     set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
     set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
     set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
+    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
 endif ()
 
 # libpng
@@ -688,9 +688,10 @@ set(CHISEL_LIBS
         tiff
         SQLite::SQLite3
         mkclean_lib
+        zlibstatic
 )
 if(NOT WIN32)
-    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib ${ZLIB_TARGET})
+    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
 endif()
 
 if(UNIX)

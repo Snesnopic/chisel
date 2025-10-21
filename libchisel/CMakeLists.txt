@@ -1,5 +1,3 @@
-# libchisel/CMakeLists.txt
-
 set(LIBCHISEL_SOURCES
         include/ape_processor.hpp
         include/archive_processor.hpp
@@ -48,7 +46,6 @@ set(LIBCHISEL_SOURCES
         src/processors/wavpack_processor.cpp
         src/processors/webp_processor.cpp
         src/processors/zopflipng_processor.cpp
-        # Aggiungi gif_processor condizionalmente
         src/utils/logger.cpp
         src/utils/mime_detector.cpp
         src/utils/processor_executor.cpp
@@ -60,25 +57,17 @@ if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
 endif()
 
-# --- Definizione Libreria ---
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
-# --- Include Directories ---
 target_include_directories(libchisel
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        # Aggiungi qui gli include delle librerie terze USATI DIRETTAMENTE
-        # negli header pubblici di libchisel (es. processor.hpp se include tipi esterni)
-        # Esempio: ${libpng_SOURCE_DIR}
         PRIVATE
         src
-        # Aggiungi qui include di librerie terze usati SOLO nei .cpp di libchisel
-        # Esempio: ${JPEG_INCLUDE_DIR}
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
         ${libpng_SOURCE_DIR}
         ${libpng_BINARY_DIR}
-        # ${MOZJPEG_INCLUDE_DIR} # Probabilmente non serve, mozjpeg è header-only? Verifica
         ${JPEG_INCLUDE_DIR}
         ${libarchive_SOURCE_DIR}/libarchive
         ${libarchive_BINARY_DIR}/libarchive
@@ -90,20 +79,19 @@ target_include_directories(libchisel
         ${qpdf_BINARY_DIR}/include
         ${zopfli_SOURCE_DIR}/include
         ${zopfli_BINARY_DIR}/include
-        ${zopfli_SOURCE_DIR}/src/zopflipng # Per zopflipng_processor
-        ${zopfli_SOURCE_DIR}/src/zopfli    # Per zopflipng_processor
+        ${zopfli_SOURCE_DIR}/src/zopflipng
+        ${zopfli_SOURCE_DIR}/src/zopfli
         ${libmseed_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
         ${CMAKE_SOURCE_DIR}/third_party/flexigif
 )
 if(NOT WIN32)
     target_include_directories(libchisel PRIVATE
-            ${LIBMAGIC_INCLUDE_DIR} # Per mime_detector
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include # Per GifProcessor
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src     # Per GifProcessor
+            ${LIBMAGIC_INCLUDE_DIR}
+            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include
+            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
     )
 endif()
-
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
 
@@ -112,37 +100,34 @@ if(WIN32)
     target_compile_definitions(libchisel PUBLIC LIBARCHIVE_STATIC PLATFORM_WINDOWS)
 elseif(APPLE)
     target_compile_definitions(libchisel PUBLIC PLATFORM_APPLE)
-elseif(UNIX AND NOT APPLE) # Assumendo Linux/Altri Unix
+elseif(UNIX AND NOT APPLE)
     target_compile_definitions(libchisel PUBLIC PLATFORM_LINUX)
 endif()
 
-# --- Dipendenze Build ---
-# Assicurati che le librerie terze siano costruite prima di libchisel
-add_dependencies(libchisel mozjpeg ${ZLIB_TARGET}) # Esempio ZLIB_TARGET da verificare
+add_dependencies(libchisel zlibstatic)
+add_dependencies(libchisel mozjpeg)
 add_dependencies(libchisel mkclean_lib)
 add_dependencies(libchisel liblzma)
-add_dependencies(libchisel libzstd_static) # Nome target zstd
-add_dependencies(libchisel png_static) # Nome target libpng
-add_dependencies(libchisel ogg)        # Nome target libogg
-add_dependencies(libchisel FLAC)       # Nome target libflac
+add_dependencies(libchisel libzstd_static)
+add_dependencies(libchisel png_static)
+add_dependencies(libchisel ogg)
+add_dependencies(libchisel FLAC)
 add_dependencies(libchisel flexigif)
 add_dependencies(libchisel wavpack)
-add_dependencies(libchisel archive_static) # Nome target libarchive
-add_dependencies(libchisel ebml)       # Nome target libebml
-add_dependencies(libchisel matroska)   # Nome target libmatroska
-add_dependencies(libchisel thirdparty_webp thirdparty_webpdecoder thirdparty_webpdemux thirdparty_webpmux) # Target libwebp
-add_dependencies(libchisel libqpdf)     # Nome target qpdf
-add_dependencies(libchisel libzopfli libzopflipng) # Target zopfli
-add_dependencies(libchisel jxl jxl_threads) # Target libjxl
-add_dependencies(libchisel tiff)       # Nome target libtiff
-add_dependencies(libchisel SQLite::SQLite3) # Target sqlite3
-add_dependencies(libchisel MAC)        # Nome target MACLib
+add_dependencies(libchisel archive_static)
+add_dependencies(libchisel ebml)
+add_dependencies(libchisel matroska)
+add_dependencies(libchisel thirdparty_webp thirdparty_webpdecoder thirdparty_webpdemux thirdparty_webpmux)
+add_dependencies(libchisel libqpdf)
+add_dependencies(libchisel libzopfli libzopflipng)
+add_dependencies(libchisel jxl jxl_threads)
+add_dependencies(libchisel tiff)
+add_dependencies(libchisel SQLite::SQLite3)
+add_dependencies(libchisel MAC)
 
 if(NOT WIN32)
-    add_dependencies(libchisel libmagic) # Dipendenza da ExternalProject libmagic
-    add_dependencies(libchisel embed_magic_header) # Target definito nel root
-    add_dependencies(libchisel libmseed) # Dipendenza da ExternalProject libmseed
-    add_dependencies(libchisel giflib)   # Libreria Gifsicle
+    add_dependencies(libchisel libmagic)
+    add_dependencies(libchisel embed_magic_header)
+    add_dependencies(libchisel libmseed)
+    add_dependencies(libchisel giflib)
 endif()
-
-# End of file (libchisel)
