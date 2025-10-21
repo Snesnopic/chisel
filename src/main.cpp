@@ -21,7 +21,7 @@
 #include "../libchisel/include/mime_detector.hpp"
 
 // simple progress bar printer
-inline void print_progress_bar(size_t done, size_t total, double elapsed_seconds) {
+inline void print_progress_bar(const size_t done, const size_t total, double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
     const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
@@ -69,7 +69,9 @@ int main(int argc, char* argv[]) {
     }
 
     // set console logger
-    Logger::set_sink(std::make_unique<ConsoleLogSink>());
+    auto sink = std::make_unique<ConsoleLogSink>();
+    sink->log_level = Logger::string_to_level(settings.log_level);
+    Logger::set_sink(std::unique_ptr<ILogSink>(sink.get()));
 
     // registry of processors and event bus
     ProcessorRegistry registry;
@@ -105,8 +107,8 @@ int main(int argc, char* argv[]) {
 
     // generic handler for "finished" events to update progress bar
     auto on_finish = [&](auto&&) {
-        size_t current = ++done;
-        double elapsed = std::chrono::duration<double>(
+        const size_t current = ++done;
+        const double elapsed = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_total).count();
         print_progress_bar(current, total, elapsed);
     };
@@ -123,7 +125,7 @@ int main(int argc, char* argv[]) {
         r.size_after = e.new_size;
         r.success = true;
         r.replaced = e.replaced;
-        r.seconds = e.duration.count() / 1000.0;
+        r.seconds = static_cast<double>(e.duration.count()) / 1000.0;
         results.push_back(std::move(r));
 
         on_finish(e);

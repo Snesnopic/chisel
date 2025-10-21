@@ -6,6 +6,7 @@
 #define CHISEL_FILE_LOG_SINK_HPP
 
 #include "../../libchisel/include/log_sink.hpp"
+#include "../../libchisel/include/logger.hpp"
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -21,7 +22,7 @@ public:
         if (!out_.is_open()) return;
 
         std::lock_guard lock(mtx_);
-        out_ << "[" << level_to_string(level) << "]";
+        out_ << "[" << Logger::level_to_string(level) << "]";
         if (!tag.empty()) out_ << "[" << tag << "]";
         out_ << " " << message << "\n";
         out_.flush();
@@ -31,15 +32,6 @@ private:
     std::ofstream out_;
     std::mutex mtx_;
 
-    static const char* level_to_string(LogLevel level) {
-        switch (level) {
-            case LogLevel::Debug:   return "DEBUG";
-            case LogLevel::Info:    return "INFO";
-            case LogLevel::Warning: return "WARN";
-            case LogLevel::Error:   return "ERROR";
-        }
-        return "";
-    }
 };
 
 #endif // CHISEL_FILE_LOG_SINK_HPP

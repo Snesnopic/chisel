@@ -8,6 +8,7 @@
 #include "log_sink.hpp"
 #include <memory>
 #include <mutex>
+#include <string>
 
 /**
  * @brief Static logging facade for chisel.
@@ -33,6 +34,25 @@ public:
                     std::string_view msg,
                     std::string_view tag = "chisel");
 
+    static const char* level_to_string(const LogLevel level) {
+        switch (level) {
+            case LogLevel::Debug:   return "DEBUG";
+            case LogLevel::Info:    return "INFO";
+            case LogLevel::Warning: return "WARN";
+            case LogLevel::Error:   return "ERROR";
+        }
+        return "";
+    }
+
+    static LogLevel string_to_level(const std::string& level) {
+        if (level == "DEBUG")
+            return LogLevel::Debug;
+        if (level == "INFO")
+            return LogLevel::Info;
+        if (level == "WARNING")
+            return LogLevel::Warning;
+        return LogLevel::Error;
+    }
 private:
     static std::unique_ptr<ILogSink> sink_; ///< Active sink
     static std::mutex mtx_;                 ///< Protects sink access

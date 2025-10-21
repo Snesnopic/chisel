@@ -17,7 +17,7 @@ static bool is_junk(const fs::path& p) {
 
 std::vector<fs::path>
 collect_input_files(const std::vector<fs::path>& inputs,
-                    bool recursive,
+                    const bool recursive,
                     bool& is_pipe) {
     std::vector<fs::path> result;
 
