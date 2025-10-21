@@ -10,15 +10,15 @@
 #include <format>
 #include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
-#include "../libchisel/include/processor_registry.hpp"
-#include "../libchisel/include/processor_executor.hpp"
-#include "../libchisel/include/event_bus.hpp"
-#include "../libchisel/include/events.hpp"
+#include "../../libchisel/include/processor_registry.hpp"
+#include "../../libchisel/include/processor_executor.hpp"
+#include "../../libchisel/include/event_bus.hpp"
+#include "../../libchisel/include/events.hpp"
 #include "utils/console_log_sink.hpp"
 #include "utils/file_scanner.hpp"
-#include "../libchisel/include/logger.hpp"
-#include "../libchisel/include/file_type.hpp"
-#include "../libchisel/include/mime_detector.hpp"
+#include "../../libchisel/include/logger.hpp"
+#include "../../libchisel/include/file_type.hpp"
+#include "../../libchisel/include/mime_detector.hpp"
 
 // simple progress bar printer
 inline void print_progress_bar(const size_t done, const size_t total, double elapsed_seconds) {

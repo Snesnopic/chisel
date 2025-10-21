@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.20)
 
 project(chisel VERSION 0.1 LANGUAGES C CXX)
@@ -59,7 +60,7 @@ else()
     set(CHISEL_COMMON_OPT_FLAGS /Gy /Gw)
 endif()
 if(NOT WIN32)
-set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
+    set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden)
 endif()
 # linker flags: platform-appropriate list
 if(APPLE)
@@ -165,6 +166,15 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
 endif()
 
 # libmkclean
+set(_helpers_cmake "${CMAKE_SOURCE_DIR}/third_party/libmkclean/corec/corec/helpers/CMakeLists.txt")
+if(EXISTS "${_helpers_cmake}")
+    file(READ "${_helpers_cmake}" _contents)
+    string(REPLACE "add_subdirectory(zlib)" "# add_subdirectory(zlib)" _patched "${_contents}")
+    if(NOT _contents STREQUAL _patched)
+        file(WRITE "${_helpers_cmake}" "${_patched}")
+        message(STATUS "Patched libmkclean/helpers/CMakeLists.txt to disable internal zlib")
+    endif()
+endif()
 add_subdirectory("third_party/libmkclean")
 
 # liblzma
@@ -194,11 +204,7 @@ set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
 set(LZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "lzma include" FORCE)
 
 # ----- robust search for liblzma static artifact -----
-# look in common build/install locations for liblzma*.a (recursively),
-# then set LZMA_STATIC_LIB and related cache vars for downstream projects.
-
 if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
-    # candidate roots where a static lib might be produced
     set(_lzma_search_roots
             "${CMAKE_BINARY_DIR}/third_party/xz-build"
             "${CMAKE_BINARY_DIR}/third_party/xz"
@@ -207,11 +213,9 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
             "${CMAKE_SOURCE_DIR}/third_party/xz/lib"
             "${CMAKE_BINARY_DIR}/xz-build/"
     )
-
     set(_found_lzma "")
     foreach(_root IN LISTS _lzma_search_roots)
         if (EXISTS "${_root}")
-            # recursive glob for liblzma*.a under candidate root
             file(GLOB_RECURSE _candidates
                     RELATIVE "${_root}"
                     "${_root}/**/liblzma*.a"
@@ -234,10 +238,8 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
     endif()
     if (_found_lzma)
         message(STATUS "found liblzma static: ${_found_lzma}")
-        # expose as cache vars so consumers (libtiff, libarchive) can use them
         set(LZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
         set(LIBLZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
-        # try to guess include dir (common location)
         if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api")
             set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
             set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
@@ -245,13 +247,10 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
             set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
             set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
         endif()
-        # also set variables some Find modules look for
         set(LZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
         set(LIBLZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
-
         set(LZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
         set(LIBLZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
-
         set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
         set(LIBLZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
     else()
@@ -262,11 +261,9 @@ endif()
 # zstd
 set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_SHARED   OFF CACHE BOOL "" FORCE)
-
 set(zstd_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/build/cmake")
 set(zstd_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zstd-build")
 add_subdirectory(${zstd_SOURCE_DIR} ${zstd_BINARY_DIR} EXCLUDE_FROM_ALL)
-
 set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
 set(ZSTD_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zstd/lib" CACHE PATH "" FORCE)
 set(ZSTD_INCLUDE_DIRS "${ZSTD_INCLUDE_DIR}" CACHE PATH "" FORCE)
@@ -285,7 +282,8 @@ if(NOT WIN32)
             INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
             BUILD_BYPRODUCTS
-            ${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc
+                ${CMAKE_BINARY_DIR}/libmagic-install/lib/libmagic.a
+                ${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc
             CONFIGURE_ENV CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS} CXXFLAGS=${EXTERNAL_AUTOTOOLS_CXXFLAGS} LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}
     )
 
@@ -295,7 +293,7 @@ if(NOT WIN32)
 
     # --- Embed compressed magic.mgc as header ---
     set(MAGIC_SRC "${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc")
-    set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/src/utils/magic.mgc.h")
+    set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/libchisel/include/magic.mgc.h")
     set(MAGIC_COMPRESSED "${CMAKE_BINARY_DIR}/magic.mgc.gz")
 
     add_custom_command(
@@ -307,43 +305,53 @@ if(NOT WIN32)
             BYPRODUCTS ${MAGIC_COMPRESSED}
             COMMENT "Generating embedded magic.mgc.h"
     )
+
+    add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
+    add_dependencies(embed_magic_header libmagic)
+    set(LIBMAGIC_INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install)
+    file(MAKE_DIRECTORY ${LIBMAGIC_INSTALL_DIR}/include)
+
+    add_library(LIBMAGIC STATIC IMPORTED GLOBAL)
+    set_target_properties(LIBMAGIC PROPERTIES
+            IMPORTED_LOCATION ${LIBMAGIC_INSTALL_DIR}/lib/libmagic.a
+            INTERFACE_INCLUDE_DIRECTORIES ${LIBMAGIC_INSTALL_DIR}/include
+    )
+
+    add_dependencies(LIBMAGIC libmagic)
 endif()
 
 # zlib
 if (WIN32)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
+    set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
 
-add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
-add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    get_target_property(_zlib_type zlibstatic TYPE)
+    if(_zlib_type STREQUAL "STATIC_LIBRARY")
+        set(_zlib_location $<TARGET_FILE:zlibstatic>)
+    endif()
 
-get_target_property(_zlib_type zlibstatic TYPE)
-if(_zlib_type STREQUAL "STATIC_LIBRARY")
-    set(_zlib_location $<TARGET_FILE:zlibstatic>)
-endif()
+    set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
+    set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dirs")
+    if(MSVC)
+        set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
+    else()
+        set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libzlibstatic.a" CACHE FILEPATH "zlib library")
+    endif()
+    set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
+    set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
 
-set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dirs")
-if(MSVC)
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
-else()
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libzlibstatic.a" CACHE FILEPATH "zlib library")
-endif()
-set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
-set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
-
-set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
-else (
-        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-        set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-        set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-        set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-
-        add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
-)
+    set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
+    set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
+else ()
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
+    set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif ()
 
 # libpng
@@ -352,13 +360,11 @@ set(PNG_STATIC ON CACHE BOOL "" FORCE)
 set(PNG_TESTS OFF CACHE BOOL "" FORCE)
 set(libpng_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libpng")
 set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
-
 add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libogg
 set(libogg_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libogg")
 set(libogg_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libogg-build")
-
 add_subdirectory(${libogg_SOURCE_DIR} ${libogg_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libFLAC
@@ -369,27 +375,16 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(INSTALL_MANPAGES OFF CACHE BOOL "" FORCE)
 set(libflac_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libflac")
 set(libflac_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libflac-build")
-
 add_subdirectory(${libflac_SOURCE_DIR} ${libflac_BINARY_DIR} EXCLUDE_FROM_ALL)
-
-# If the lib provides a 'man' target we exclude it from all (same semantics as before)
 if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
 # flexiGIF
 set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
-
-file(GLOB FLEXIGIF_SOURCES
-        ${FLEXIGIF_DIR}/*.cpp
-)
-
+file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
 add_library(flexigif STATIC ${FLEXIGIF_SOURCES})
-
-target_include_directories(flexigif PUBLIC
-        ${FLEXIGIF_DIR}
-)
-
+target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
 target_compile_features(flexigif PUBLIC cxx_std_11)
 
 # wavpack
@@ -399,7 +394,6 @@ set(WAVPACK_BUILD_DOCS OFF CACHE BOOL "Build documentation" FORCE)
 set(WAVPACK_BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(wavpack_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/wavpack")
 set(wavpack_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/wavpack-build")
-
 add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libarchive
@@ -424,15 +418,11 @@ add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_
 
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
-
 if(MSVC)
-    # MSVC: la build di mozjpeg produce jpeg-static.lib
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/jpeg-static.lib")
 elseif(MINGW)
-    # MinGW: produce libjpeg.a
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 else()
-    # Linux/macOS: produce libjpeg.a
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 endif()
 
@@ -484,13 +474,14 @@ set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
 add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
-
+target_include_directories(ebml PUBLIC
+        ${libebml_BINARY_DIR}
+)
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # libMatroska
 set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
 set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
-
 add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libwebp
@@ -505,7 +496,6 @@ set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
 set(libwebp_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libwebp")
 set(libwebp_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libwebp-build")
 add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -566,7 +556,6 @@ add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR} EXCLUDE_FROM_ALL)
 # sqlite3
 set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
 set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
-
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libmseed
@@ -606,45 +595,43 @@ else()
 endif()
 
 # gifsicle
-if(NOT WIN32) # we need to fork gifsicle and fix some stuff manually
-configure_file(
-        ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/win32cfg.h
-        ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/config.h
-        COPYONLY
-)
-add_library(giflib STATIC
-        third_party/gifsicle/src/clp.c
-        third_party/gifsicle/src/fmalloc.c
-        third_party/gifsicle/src/gifdiff.c
-        third_party/gifsicle/src/giffunc.c
-        third_party/gifsicle/src/gifread.c
-        # third_party/gifsicle/src/gifsicle.c
-        third_party/gifsicle/src/giftoc.c
-        third_party/gifsicle/src/gifunopt.c
-        # third_party/gifsicle/src/gifview.c
-        third_party/gifsicle/src/gifwrite.c
-        third_party/gifsicle/src/kcolor.c
-        third_party/gifsicle/src/merge.c
-        third_party/gifsicle/src/optimize.c
-        # third_party/gifsicle/src/opttemplate.c
-        third_party/gifsicle/src/quantize.c
-        third_party/gifsicle/src/strerror.c
-        third_party/gifsicle/src/support.c
-        third_party/gifsicle/src/ungifwrt.c
-)
-if(WIN32)
-    target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
+if(NOT WIN32)
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/win32cfg.h
+            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/config.h
+            COPYONLY
+    )
+    add_library(giflib STATIC
+            third_party/gifsicle/src/clp.c
+            third_party/gifsicle/src/fmalloc.c
+            third_party/gifsicle/src/gifdiff.c
+            third_party/gifsicle/src/giffunc.c
+            third_party/gifsicle/src/gifread.c
+            # third_party/gifsicle/src/gifsicle.c
+            third_party/gifsicle/src/giftoc.c
+            third_party/gifsicle/src/gifunopt.c
+            # third_party/gifsicle/src/gifview.c
+            third_party/gifsicle/src/gifwrite.c
+            third_party/gifsicle/src/kcolor.c
+            third_party/gifsicle/src/merge.c
+            third_party/gifsicle/src/optimize.c
+            # third_party/gifsicle/src/opttemplate.c
+            third_party/gifsicle/src/quantize.c
+            third_party/gifsicle/src/strerror.c
+            third_party/gifsicle/src/support.c
+            third_party/gifsicle/src/ungifwrt.c
+    )
+    if(WIN32)
+        target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
+    endif()
+    target_include_directories(giflib PUBLIC
+            third_party/gifsicle/include
+            third_party/gifsicle/src
+    )
 endif()
-target_include_directories(giflib PUBLIC
-        third_party/gifsicle/include
-        third_party/gifsicle/src
-)
-endif()
+
 # Monkey's Audio
-
-# --- Patch MACLib.h to include All.h if missing ---
 set(MACLIB_HEADER "${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared/MACLib.h")
-
 if(EXISTS "${MACLIB_HEADER}")
     file(READ "${MACLIB_HEADER}" MACLIB_CONTENTS)
     string(FIND "${MACLIB_CONTENTS}" "#include \"All.h\"" _found)
@@ -659,170 +646,26 @@ endif()
 set(BUILD_UTIL FALSE CACHE BOOL "" FORCE)
 set(BUILD_SHARED FALSE CACHE BOOL "" FORCE)
 add_subdirectory(third_party/MACLib EXCLUDE_FROM_ALL)
-target_include_directories(MAC PUBLIC
-        third_party/MACLib/Shared
-)
+target_include_directories(MAC PUBLIC third_party/MACLib/Shared)
 if(WIN32)
     target_compile_definitions(MAC PRIVATE NO_MFC)
-        set(MACLIB_STDAFX "${CMAKE_SOURCE_DIR}/third_party/MACLib/Source/MacDll/stdafx.h")
-
+    set(MACLIB_STDAFX "${CMAKE_SOURCE_DIR}/third_party/MACLib/Source/MacDll/stdafx.h")
     if(EXISTS "${MACLIB_STDAFX}")
         file(READ "${MACLIB_STDAFX}" _contents)
-
         string(REPLACE "#include <afxwin.h>"  "//#include <afxwin.h>"  _contents "${_contents}")
         string(REPLACE "#include <afxext.h>"  "//#include <afxext.h>"  _contents "${_contents}")
         string(REPLACE "#include \"MFCGlobals.h\"" "//#include \"MFCGlobals.h\"" _contents "${_contents}")
-
         file(WRITE "${MACLIB_STDAFX}" "${_contents}")
     endif()
 endif()
 
-# chisel
-set(CHISEL_SOURCES
-        chisel_cli/main.cpp
-        libchisel/include/file_type.hpp
-        libchisel/include/thread_pool.hpp
-        libchisel/src/utils/thread_pool.cpp
-        libchisel/include/logger.hpp
-        libchisel/src/utils/logger.cpp
-        chisel_cli/cli/cli_parser.cpp
-        chisel_cli/cli/cli_parser.hpp
-        chisel_cli/utils/file_scanner.cpp
-        chisel_cli/utils/file_scanner.hpp
-        chisel_cli/report/report_generator.cpp
-        chisel_cli/report/report_generator.hpp
-        libchisel/src/utils/random_utils.cpp
-        libchisel/include/random_utils.hpp
-        libchisel/src/utils/mime_detector.cpp
-        libchisel/include/mime_detector.hpp
-        libchisel/include/processor.hpp
-        libchisel/src/processors/flac_processor.cpp
-        libchisel/include/flac_processor.hpp
-        libchisel/src/processors/png_processor.cpp
-        libchisel/include/png_processor.hpp
-        libchisel/src/processors/zopflipng_processor.cpp
-        libchisel/include/zopflipng_processor.hpp
-        libchisel/src/processors/mkv_processor.cpp
-        libchisel/include/mkv_processor.hpp
-        libchisel/src/processors/archive_processor.cpp
-        libchisel/include/archive_processor.hpp
-        libchisel/src/processors/pdf_processor.cpp
-        libchisel/include/pdf_processor.hpp
-        libchisel/src/processors/flexigif_processor.cpp
-        libchisel/include/flexigif_processor.hpp
-        libchisel/src/processors/ape_processor.cpp
-        libchisel/include/ape_processor.hpp
-        libchisel/src/processors/jpeg_processor.cpp
-        libchisel/include/jpeg_processor.hpp
-        libchisel/src/processors/jxl_processor.cpp
-        libchisel/include/jxl_processor.hpp
-        libchisel/src/processors/mseed_processor.cpp
-        libchisel/include/mseed_processor.hpp
-        libchisel/src/processors/sqlite_processor.cpp
-        libchisel/include/sqlite_processor.hpp
-        libchisel/src/processors/tiff_processor.cpp
-        libchisel/include/tiff_processor.hpp
-        libchisel/src/processors/wavpack_processor.cpp
-        libchisel/include/wavpack_processor.hpp
-        libchisel/src/processors/webp_processor.cpp
-        libchisel/include/webp_processor.hpp
-        libchisel/src/processors/ooxml_processor.cpp
-        libchisel/include/ooxml_processor.hpp
-        libchisel/src/processors/odf_processor.cpp
-        libchisel/include/odf_processor.hpp
-        libchisel/src/utils/processor_registry.cpp
-        libchisel/include/processor_registry.hpp
-        libchisel/src/utils/processor_executor.cpp
-        libchisel/include/processor_executor.hpp
-        libchisel/include/log_sink.hpp
-        libchisel/src/utils/logger.cpp
-        libchisel/include/logger.hpp
-        chisel_cli/utils/console_log_sink.hpp
-        chisel_cli/utils/file_log_sink.hpp
-        libchisel/include/events.hpp
-        libchisel/include/event_bus.hpp
-)
-if(NOT WIN32)
-    list(APPEND CHISEL_SOURCES
-            libchisel/src/processors/gif_processor.cpp
-            libchisel/include/gif_processor.hpp
-    )
-endif()
-
-add_executable(chisel ${CHISEL_SOURCES})
-
-if(WIN32)
-    target_compile_definitions(chisel PRIVATE LIBARCHIVE_STATIC)
-    target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
-elseif(APPLE)
-    target_compile_definitions(chisel PRIVATE PLATFORM_APPLE)
-elseif(UNIX)
-    target_compile_definitions(chisel PRIVATE PLATFORM_LINUX)
-endif()
-add_dependencies(chisel libmseed)
-target_include_directories(chisel PRIVATE ${libmseed_SOURCE_DIR})
-
-target_include_directories(matroska PRIVATE
-        ${libmatroska_BINARY_DIR}
-        ${libebml_BINARY_DIR}
-)
-target_include_directories(chisel PRIVATE
-        ${libmatroska_BINARY_DIR}
-        ${libebml_BINARY_DIR}
-)
-
-add_dependencies(chisel mozjpeg ${ZLIB_TARGET})
-if(NOT WIN32)
-    add_dependencies(chisel libmagic)
-    target_include_directories(chisel PRIVATE ${LIBMAGIC_INCLUDE_DIR})
-endif()
-
-target_include_directories(matroska PRIVATE
-        ${libebml_BINARY_DIR}
-)
-target_include_directories(chisel PRIVATE
-        ${libflac_SOURCE_DIR}/include
-        ${libflac_BINARY_DIR}/include
-        ${libpng_SOURCE_DIR}
-        ${libpng_BINARY_DIR}
-        ${MOZJPEG_INCLUDE_DIR}
-        ${JPEG_INCLUDE}
-        ${libarchive_SOURCE_DIR}/libarchive
-        ${libarchive_BINARY_DIR}/libarchive
-        ${libogg_SOURCE_DIR}/include
-        ${libogg_BINARY_DIR}/include
-        ${libebml_SOURCE_DIR}
-        ${libmatroska_SOURCE_DIR}/src
-)
-
-if(NOT WIN32)
-    target_link_directories(chisel PRIVATE ${LIBMAGIC_LIB_DIR})
-endif()
-target_link_directories(chisel PRIVATE ${MOZJPEG_LIB_DIR})
-
-target_include_directories(chisel PRIVATE
-        ${qpdf_SOURCE_DIR}/include
-        ${qpdf_BINARY_DIR}/include
-)
-
-target_include_directories(chisel PRIVATE
-        ${zopfli_SOURCE_DIR}/include
-        ${zopfli_BINARY_DIR}/include
-)
-
-if(NOT WIN32)
-    add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
-    add_dependencies(embed_magic_header libmagic)
-    add_dependencies(chisel embed_magic_header)
-endif()
-
-
+# zopfli include hint for targets (safe to keep)
 target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopflipng
         ${zopfli_SOURCE_DIR}/src/zopfli
 )
 
-# common libraries for all platforms
+# common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
         MAC
@@ -852,7 +695,7 @@ endif()
 
 if(UNIX)
     list(APPEND CHISEL_LIBS
-            ${LIBMAGIC_LIB}
+            LIBMAGIC
     )
 elseif(WIN32)
     list(APPEND CHISEL_LIBS
@@ -860,8 +703,6 @@ elseif(WIN32)
             ZLIB::ZLIB
     )
 endif()
-target_compile_features(chisel PRIVATE cxx_std_23)
 
-target_link_libraries(chisel PRIVATE ${CHISEL_LIBS})
-
-# End of file
+add_subdirectory(libchisel)
+add_subdirectory(chisel_cli)
