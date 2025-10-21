@@ -64,3 +64,4 @@
 [submodule "third_party/libmkclean"]
 	path = third_party/libmkclean
 	url = https://github.com/Snesnopic/libmkclean.git
+	branch = no-zlib

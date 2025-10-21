@@ -169,15 +169,6 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
 endif()
 
 # libmkclean
-set(_file "${CMAKE_SOURCE_DIR}/third_party/libmkclean/corec/corec/helpers/CMakeLists.txt")
-if(EXISTS "${_mkclean_helper_cmakelist}")
-    file(READ "${_mkclean_helper_cmakelist}" _mkclean_helper_content)
-    string(REPLACE "add_subdirectory(zlib)" "# add_subdirectory(zlib) # Patched by Chisel build" _patched_content "${_mkclean_helper_content}")
-    file(WRITE "${_mkclean_helper_cmakelist}" "${_patched_content}")
-    message(STATUS "Patched ${_mkclean_helper_cmakelist} to remove internal zlib dependency.")
-else()
-    message(WARNING "Could not find libmkclean helper CMakeLists to patch at ${_mkclean_helper_cmakelist}")
-endif()
 add_subdirectory("third_party/libmkclean")
 
 # liblzma
