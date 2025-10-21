@@ -303,7 +303,7 @@ if(NOT WIN32)
                 OUTPUT ${MAGIC_HEADER}
                 COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
                 COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
-                COMMAND xxd -i embedded_magic_mgc ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
+                COMMAND xxd -i ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
                 DEPENDS ${MAGIC_SRC}
                 BYPRODUCTS ${MAGIC_COMPRESSED}
                 COMMENT "Generating embedded magic.mgc.h"
