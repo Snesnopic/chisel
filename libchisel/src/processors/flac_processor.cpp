@@ -7,6 +7,7 @@
 #include <FLAC/all.h>
 #include <stdexcept>
 #include <cstdlib>
+#include <sstream>
 
 namespace chisel {
 
@@ -185,8 +186,20 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 }
 
 std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
-    //TODO: return chcecksum of raw data
-    return "";
+    FLAC__StreamMetadata* metadata = nullptr;
+
+    if (!FLAC__metadata_get_streaminfo(file_path.string().c_str(), metadata)) {
+        throw std::runtime_error("Failed to read STREAMINFO from FLAC file: " + file_path.string());
+    }
+
+    std::ostringstream oss;
+    for (int i = 0; i < 16; ++i) {
+        oss << std::hex << std::setw(2) << std::setfill('0')
+            << static_cast<int>(metadata->data.stream_info.md5sum[i]);
+    }
+
+    FLAC__metadata_object_delete(metadata);
+    return oss.str();
 }
 
 } // namespace chisel
