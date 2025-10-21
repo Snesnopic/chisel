@@ -6,7 +6,7 @@ project(chisel VERSION 0.1 LANGUAGES C CXX)
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
-if (WIN32)
+if (WIN32 OR NOT APPLE)
     add_compile_definitions(HAVE_UINTPTR_T=1 HAVE_STDINT_H=1 HAVE_INTTYPES_H=1)
 endif()
 cmake_policy(SET CMP0069 NEW)
@@ -115,8 +115,11 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
         add_compile_options(/O2 /GL /W4)
     else()
-        # add list flags safely; CHISEL_COMMON_OPT_FLAGS is a list and expands properly
-        add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
+        if(APPLE)
+            add_compile_options(-O3 -march=native -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
+        else()
+            add_compile_options(-O3 -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
+        endif()
         if(CHISEL_LTO_FLAG)
             add_compile_options(${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG})
         endif()
@@ -166,14 +169,14 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
 endif()
 
 # libmkclean
-set(_helpers_cmake "${CMAKE_SOURCE_DIR}/third_party/libmkclean/corec/corec/helpers/CMakeLists.txt")
-if(EXISTS "${_helpers_cmake}")
-    file(READ "${_helpers_cmake}" _contents)
-    string(REPLACE "add_subdirectory(zlib)" "# add_subdirectory(zlib)" _patched "${_contents}")
-    if(NOT _contents STREQUAL _patched)
-        file(WRITE "${_helpers_cmake}" "${_patched}")
-        message(STATUS "Patched libmkclean/helpers/CMakeLists.txt to disable internal zlib")
-    endif()
+set(_file "${CMAKE_SOURCE_DIR}/third_party/libmkclean/corec/corec/helpers/CMakeLists.txt")
+if(EXISTS "${_file}")
+    file(READ "${_file}" _contents)
+    string(REPLACE "\r\n" "\n" _contents "${_contents}")
+    string(REGEX MATCH ".*\n" _first_line "${_contents}")
+    string(REGEX REPLACE ".*\n" "" _rest "${_contents}")
+    set(_new_first_line "# add_subdirectory(zlib)\n")
+    file(WRITE "${_file}" "${_new_first_line}${_rest}")
 endif()
 add_subdirectory("third_party/libmkclean")
 
@@ -280,7 +283,6 @@ if(NOT WIN32)
             INSTALL_COMMAND make install
             BUILD_IN_SOURCE 1
             INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
             BUILD_BYPRODUCTS
                 ${CMAKE_BINARY_DIR}/libmagic-install/lib/libmagic.a
                 ${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc
@@ -295,7 +297,7 @@ if(NOT WIN32)
     set(MAGIC_SRC "${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc")
     set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/libchisel/include/magic.mgc.h")
     set(MAGIC_COMPRESSED "${CMAKE_BINARY_DIR}/magic.mgc.gz")
-
+    if(APPLE)
     add_custom_command(
             OUTPUT ${MAGIC_HEADER}
             COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
@@ -305,7 +307,17 @@ if(NOT WIN32)
             BYPRODUCTS ${MAGIC_COMPRESSED}
             COMMENT "Generating embedded magic.mgc.h"
     )
-
+    else ()
+        add_custom_command(
+                OUTPUT ${MAGIC_HEADER}
+                COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
+                COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
+                COMMAND xxd -i embedded_magic_mgc ${MAGIC_COMPRESSED} ${MAGIC_HEADER}
+                DEPENDS ${MAGIC_SRC}
+                BYPRODUCTS ${MAGIC_COMPRESSED}
+                COMMENT "Generating embedded magic.mgc.h"
+        )
+    endif ()
     add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
     add_dependencies(embed_magic_header libmagic)
     set(LIBMAGIC_INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install)
@@ -352,6 +364,16 @@ else ()
     set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
     set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
+    set(ZLIB_H_PATH
+            "${CMAKE_SOURCE_DIR}/third_party/zlib"
+            "${CMAKE_BINARY_DIR}/third_party/zlib-build"
+            CACHE PATH "zlib include dir" FORCE)
+
+    set(ZLIB_LIB_PATH
+            "${CMAKE_BINARY_DIR}/third_party/zlib-build/libz.a"
+            CACHE FILEPATH "zlib library" FORCE)
+    set(ZLIB_LIBRARY "${CMAKE_BINARY_DIR}/third_party/zlib-build/libz.a")
+    set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib;${CMAKE_BINARY_DIR}/third_party/zlib-build")
 endif ()
 
 # libpng
@@ -437,7 +459,6 @@ ExternalProject_Add(mozjpeg
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DPNG_SUPPORTED=0
         UPDATE_DISCONNECTED 1
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
 
@@ -445,14 +466,11 @@ set(_mozjpeg_build_dir "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build")
 set(_mozjpeg_jconfig   "${_mozjpeg_build_dir}/jconfig.h")
 set(_mozjpeg_dest      "${CMAKE_SOURCE_DIR}/third_party/mozjpeg/jconfig.h")
 
-add_custom_command(
-        OUTPUT "${_mozjpeg_dest}"
+add_custom_target(copy_mozjpeg_jconfig ALL
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_mozjpeg_jconfig}" "${_mozjpeg_dest}"
         DEPENDS mozjpeg
         COMMENT "Copying mozjpeg jconfig.h into third_party/mozjpeg"
 )
-
-add_custom_target(copy_mozjpeg_jconfig DEPENDS "${_mozjpeg_dest}")
 
 add_library(mozjpeg_static STATIC IMPORTED GLOBAL)
 set_target_properties(mozjpeg_static PROPERTIES
@@ -621,7 +639,7 @@ if(NOT WIN32)
             third_party/gifsicle/src/support.c
             third_party/gifsicle/src/ungifwrt.c
     )
-    if(WIN32)
+    if(WIN32 OR NOT APPLE)
         target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
     endif()
     target_include_directories(giflib PUBLIC

@@ -6,6 +6,7 @@
 #include "../../libchisel/include/logger.hpp"
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
