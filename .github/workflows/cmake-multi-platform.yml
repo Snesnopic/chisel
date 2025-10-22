@@ -26,7 +26,7 @@ jobs:
             cpp_compiler: clang++
             artifact_name: chisel-ubuntu-clang
             binary_path: build/chisel_cli/chisel
-          - os: macos-latest
+          - os: macos-26
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++

@@ -67,7 +67,7 @@ bool MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
 #endif
 }
 
-std::vector<unsigned char> decompress_gzip(const unsigned char* data, size_t len)
+std::vector<unsigned char> decompress_gzip(const unsigned char* data, const size_t len)
 {
     std::vector<unsigned char> out;
     out.resize(8 * 1024 * 1024); // start with 8mb
