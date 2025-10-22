@@ -292,27 +292,29 @@ if(NOT WIN32)
     set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/libchisel/include/magic.mgc.h")
     set(MAGIC_COMPRESSED "${CMAKE_BINARY_DIR}/magic.mgc.gz")
     if(APPLE)
-    add_custom_command(
-            OUTPUT ${MAGIC_HEADER}
-            COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
-            COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
-            COMMAND xxd -i -n embedded_magic_mgc ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
-            DEPENDS ${MAGIC_SRC}
-            BYPRODUCTS ${MAGIC_COMPRESSED}
-            COMMENT "Generating embedded magic.mgc.h"
-    )
-    else ()
         add_custom_command(
                 OUTPUT ${MAGIC_HEADER}
                 COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
                 COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
-                COMMAND xxd -i ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
+                COMMAND xxd -i -n embedded_magic_mgc ${MAGIC_COMPRESSED} > ${MAGIC_HEADER}
                 DEPENDS ${MAGIC_SRC}
                 BYPRODUCTS ${MAGIC_COMPRESSED}
-                COMMENT "Generating embedded magic.mgc.h"
+                COMMENT "Generating embedded magic.mgc.h (macOS)"
         )
-        message(STATUS "magic.mgc.h will be generated in: ${MAGIC_HEADER}")
-    endif ()
+    else()
+        get_filename_component(_magic_base ${MAGIC_COMPRESSED} NAME)
+        string(REPLACE "." "_" _magic_symbol ${_magic_base})
+
+        add_custom_command(
+                OUTPUT ${MAGIC_HEADER}
+                COMMAND ${CMAKE_COMMAND} -E echo "Compressing magic.mgc with gzip..."
+                COMMAND gzip -9 -c ${MAGIC_SRC} > ${MAGIC_COMPRESSED}
+                COMMAND xxd -i ${MAGIC_COMPRESSED} | sed "s/${_magic_symbol}/embedded_magic_mgc/g" > ${MAGIC_HEADER}
+                DEPENDS ${MAGIC_SRC}
+                BYPRODUCTS ${MAGIC_COMPRESSED}
+                COMMENT "Generating embedded magic.mgc.h (Linux)"
+        )
+    endif()
     add_custom_target(embed_magic_header ALL DEPENDS ${MAGIC_HEADER})
     add_dependencies(embed_magic_header libmagic)
     set(LIBMAGIC_INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install)
