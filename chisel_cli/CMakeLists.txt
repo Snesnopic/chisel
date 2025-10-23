@@ -17,13 +17,10 @@ target_include_directories(chisel PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(chisel PRIVATE libchisel)
+target_link_libraries(chisel PRIVATE libchisel ${CHISEL_LIBS})
 
 if(WIN32)
     target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
-    if(MSVC)
-        target_link_libraries(chisel PRIVATE zlibstatic)
-    endif()
 elseif(APPLE)
     target_compile_definitions(chisel PRIVATE PLATFORM_APPLE)
 elseif(UNIX AND NOT APPLE)
