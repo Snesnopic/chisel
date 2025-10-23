@@ -19,19 +19,19 @@ jobs:
             c_compiler: gcc
             cpp_compiler: g++
             artifact_name: chisel-ubuntu-gcc
-            binary_path: bin/release/chisel_cli/chisel
+            binary_path: bin/Release/chisel_cli/chisel
           - os: ubuntu-latest
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-ubuntu-clang
-            binary_path: bin/release/chisel_cli/chisel
+            binary_path: bin/Release/chisel_cli/chisel
           - os: macos-26
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-macos
-            binary_path: bin/release/chisel_cli/chisel
+            binary_path: bin/Release/chisel_cli/chisel
           - os: windows-latest
             build_type: Release
             c_compiler: cl
