@@ -696,4 +696,5 @@ elseif(WIN32)
 endif()
 
 add_subdirectory(libchisel)
+add_dependencies(libchisel copy_mozjpeg_jconfig)
 add_subdirectory(chisel_cli)
