@@ -675,4 +675,5 @@ endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
+add_dependencies(libchisel zlibstatic)
 add_subdirectory(chisel_cli)
