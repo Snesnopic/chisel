@@ -1,6 +1,3 @@
-# chisel_cli/CMakeLists.txt
-
-# --- Sorgenti CLI ---
 set(CHISEL_CLI_SOURCES
         src/main.cpp
         src/cli/cli_parser.cpp
@@ -13,11 +10,8 @@ set(CHISEL_CLI_SOURCES
         src/utils/file_log_sink.hpp
 )
 
-# --- Eseguibile ---
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
-# --- Include Directories ---
-# eredita gli include pubblici di libchisel
 target_include_directories(chisel PRIVATE
         $<TARGET_PROPERTY:libchisel,INTERFACE_INCLUDE_DIRECTORIES>
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -35,17 +29,8 @@ elseif(UNIX AND NOT APPLE)
     target_compile_definitions(chisel PRIVATE PLATFORM_LINUX)
 endif()
 
-# --- Dipendenze build-time ---
-# Se l’eseguibile ha bisogno di dipendenze generate da ExternalProject
-# (es. magic.mgc.h su Linux), aggiungile qui
-if(NOT WIN32)
-    add_dependencies(chisel embed_magic_header)
-endif()
-
-# --- Standard C++ ---
 target_compile_features(chisel PRIVATE cxx_std_23)
 
-# --- Output directory coerente con il root ---
 set_target_properties(chisel PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/$<CONFIG>
 )

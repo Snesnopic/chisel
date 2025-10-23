@@ -127,7 +127,6 @@ add_dependencies(libchisel MAC)
 
 if(NOT WIN32)
     add_dependencies(libchisel libmagic)
-    add_dependencies(libchisel embed_magic_header)
     add_dependencies(libchisel libmseed)
     add_dependencies(libchisel giflib)
 endif()
