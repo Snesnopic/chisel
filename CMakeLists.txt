@@ -305,48 +305,27 @@ if(NOT WIN32)
 endif()
 
 # zlib
-if (WIN32)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-    set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
-    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
+set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-    get_target_property(_zlib_type zlibstatic TYPE)
-    if(_zlib_type STREQUAL "STATIC_LIBRARY")
-        set(_zlib_location $<TARGET_FILE:zlibstatic>)
-    endif()
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 
-    set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-    set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dirs")
-    if(MSVC)
-        set(ZLIB_LIBRARY $<TARGET_FILE:zlibstatic> CACHE FILEPATH "zlib library")
-    else()
-        set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libzlibstatic.a" CACHE FILEPATH "zlib library")
-    endif()
-    set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
-    set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
 
-    set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-    set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
-else ()
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-    set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR})
-    set(ZLIB_H_PATH
-            "${CMAKE_SOURCE_DIR}/third_party/zlib"
-            "${CMAKE_BINARY_DIR}/third_party/zlib-build"
-            CACHE PATH "zlib include dir" FORCE)
+if(MSVC)
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
+else()
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libz.a" CACHE FILEPATH "zlib library")
+endif()
 
-    set(ZLIB_LIB_PATH
-            "${CMAKE_BINARY_DIR}/third_party/zlib-build/libz.a"
-            CACHE FILEPATH "zlib library" FORCE)
-    set(ZLIB_LIBRARY "${CMAKE_BINARY_DIR}/third_party/zlib-build/libz.a")
-    set(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib;${CMAKE_BINARY_DIR}/third_party/zlib-build")
-endif ()
+set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
+set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
+
+set(ZLIB_H_PATH "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dir")
+set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
 
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
@@ -607,7 +586,7 @@ if(NOT WIN32)
             third_party/gifsicle/src/optimize.c
             # third_party/gifsicle/src/opttemplate.c
             third_party/gifsicle/src/quantize.c
-            third_party/gifsicle/src/strerror.c
+            # third_party/gifsicle/src/strerror.c
             third_party/gifsicle/src/support.c
             third_party/gifsicle/src/ungifwrt.c
     )
