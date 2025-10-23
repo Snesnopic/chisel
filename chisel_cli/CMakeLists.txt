@@ -17,10 +17,10 @@ target_include_directories(chisel PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# --- Link alla libreria core ---
 target_link_libraries(chisel PRIVATE libchisel)
 
-# --- Macro di piattaforma ---
+add_dependencies(chisel ${CHISEL_LIBS})
+
 if(WIN32)
     target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
 elseif(APPLE)
