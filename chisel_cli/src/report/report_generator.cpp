@@ -4,9 +4,10 @@
 
 #include "report_generator.hpp"
 #include <iostream>
-#include <format>
 #include <algorithm>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 #include "../cli/cli_parser.hpp"
 
 #ifdef _WIN32
@@ -56,7 +57,6 @@ void print_console_report(const std::vector<Result>& results,
     const unsigned term_width = get_terminal_width();
     const bool use_colors = is_stdout_a_tty();
 
-    // calculate column widths
     size_t max_mime = 15;
     size_t max_before = 12;
     size_t max_after = 12;
@@ -74,9 +74,13 @@ void print_console_report(const std::vector<Result>& results,
         double pct = r.success && r.size_before
                          ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
                          : 0.0;
-        const std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
+        std::ostringstream ossd;
+        ossd << std::fixed << std::setprecision(2) << pct << "%";
+        const std::string delta = r.success ? ossd.str() : "-";
+        std::ostringstream osst;
+        osst << std::fixed << std::setprecision(2) << r.seconds;
         max_delta  = std::max(max_delta, strip_ansi(delta).size());
-        max_time   = std::max(max_time,  std::format("{:.2f}", r.seconds).size());
+        max_time   = std::max(max_time,  osst.str().size());
         std::string outcome;
         if (!r.success) {
             outcome = use_colors ? "\033[1;31mFAIL\033[0m" : "FAIL";
@@ -102,21 +106,16 @@ void print_console_report(const std::vector<Result>& results,
         return s.size() <= max_len ? s : s.substr(0, max_len - 3) + "...";
     };
 
-    // header
-    auto fmt_str = std::string("{:<") + std::to_string(file_col_width) + "}"
-             + "{:<" + std::to_string(max_mime) + "}"
-             + "{:<" + std::to_string(max_before) + "}"
-             + "{:<" + std::to_string(max_after) + "}"
-             + "{:<" + std::to_string(max_delta) + "}"
-             + "{:<" + std::to_string(max_time) + "}"
-             + "{:<" + std::to_string(max_result) + "}"
-             + "{:<" + std::to_string(max_error) + "}"
-             + "\n";
-
-    std::cout << "\n" << std::vformat(fmt_str,
-        std::make_format_args(
-            "File", "MIME type", "Before(KB)", "After(KB)",
-            "Delta(%)", "Time(s)", "Result", "Error" ));
+    std::cout << "\n"
+              << std::left << std::setw(file_col_width) << "File"
+              << std::setw(max_mime)   << "MIME type"
+              << std::setw(max_before)<< "Before(KB)"
+              << std::setw(max_after) << "After(KB)"
+              << std::setw(max_delta) << "Delta(%)"
+              << std::setw(max_time)  << "Time(s)"
+              << std::setw(max_result)<< "Result"
+              << std::setw(max_error) << "Error"
+              << "\n";
 
     uintmax_t total_saved = 0;
     auto sorted = results;
@@ -124,22 +123,13 @@ void print_console_report(const std::vector<Result>& results,
         return a.path < b.path;
     });
 
-    // row formatting
-    auto row_fmt = std::string("{:<") + std::to_string(file_col_width) + "}"
-                 + "{:<" + std::to_string(max_mime) + "}"
-                 + "{:<" + std::to_string(max_before) + "}"
-                 + "{:<" + std::to_string(max_after) + "}"
-                 + "{:<" + std::to_string(max_delta) + "}"
-                 + "{:<" + std::to_string(max_time) + "}"
-                 + "{:<" + std::to_string(max_result) + "}"
-                 + "{:<" + std::to_string(max_error) + "}"
-                 + "\n";
-
     for (const auto& r : sorted) {
         double pct = r.success && r.size_before
                          ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
                          : 0.0;
-        std::string delta = r.success ? std::format("{:.2f}%", pct) : "-";
+        std::ostringstream ossd;
+        ossd << std::fixed << std::setprecision(2) << pct << "%";
+        std::string delta = r.success ? ossd.str() : "-";
         std::string outcome = !r.success ? "\033[1;31mFAIL\033[0m"
                                          : r.replaced ? "\033[1;32mOK (replaced)\033[0m"
                                                       : "\033[1;33mOK (skipped)\033[0m";
@@ -153,32 +143,34 @@ void print_console_report(const std::vector<Result>& results,
 
         auto sizeBefore = r.size_before / 1024;
         auto sizeAfter = r.size_after / 1024;
-        std::cout << std::vformat(row_fmt,
-           std::make_format_args(
-               filenamecolwidth,
-               r.mime,
-               sizeBefore,
-               sizeAfter,
-               delta,
-               r.seconds,
-               outcome,
-               r.error_msg ));
+        std::ostringstream osst;
+        osst << std::fixed << std::setprecision(2) << r.seconds;
+        std::cout << std::left << std::setw(file_col_width) << filenamecolwidth
+                  << std::setw(max_mime)   << r.mime
+                  << std::setw(max_before)<< sizeBefore
+                  << std::setw(max_after) << sizeAfter
+                  << std::setw(max_delta) << delta
+                  << std::setw(max_time)  << osst.str()
+                  << std::setw(max_result)<< outcome
+                  << std::setw(max_error) << r.error_msg
+                  << "\n";
 
-        // print pipeline/parallel breakdown
         if (!r.codecs_used.empty()) {
             if (mode == EncodeMode::PIPE) {
                 std::cout << "    Pipeline: ";
                 for (size_t i = 0; i < r.codecs_used.size(); ++i) {
-                    std::cout << r.codecs_used[i].first
-                              << " (" << std::format("{:.2f}%", r.codecs_used[i].second) << ")";
+                    std::ostringstream ossc;
+                    ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
+                    std::cout << r.codecs_used[i].first << " (" << ossc.str() << "%)";
                     if (i + 1 < r.codecs_used.size()) std::cout << " -> ";
                 }
                 std::cout << "\n";
             } else {
                 std::cout << "    Tried: ";
                 for (size_t i = 0; i < r.codecs_used.size(); ++i) {
-                    std::cout << r.codecs_used[i].first
-                              << " (" << std::format("{:.2f}%", r.codecs_used[i].second) << ")";
+                    std::ostringstream ossc;
+                    ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
+                    std::cout << r.codecs_used[i].first << " (" << ossc.str() << "%)";
                     if (i + 1 < r.codecs_used.size()) std::cout << "; ";
                 }
                 std::cout << "\n";
@@ -188,30 +180,36 @@ void print_console_report(const std::vector<Result>& results,
 
     if (!container_results.empty()) {
         std::cout << "\n=== Container results ===\n";
-        std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
-            std::make_format_args("Container", "Format", "Before(KB)", "After(KB)", "Delta(%)", "Error"));
+        std::cout << std::left << std::setw(40) << "Container"
+                  << std::setw(12) << "Format"
+                  << std::setw(12) << "Before(KB)"
+                  << std::setw(12) << "After(KB)"
+                  << std::setw(8)  << "Delta(%)"
+                  << "Error"
+                  << "\n";
 
         for (const auto& c : container_results) {
             double pct = c.success && c.size_before
                          ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
                          : 0.0;
-            std::string delta = c.success ? std::format("{:.2f}%", pct) : "-";
-const auto size_before = c.size_before / 1024;
+            std::ostringstream ossd;
+            ossd << std::fixed << std::setprecision(2) << pct << "%";
+            std::string delta = c.success ? ossd.str() : "-";
+            const auto size_before = c.size_before / 1024;
             const auto size_after = c.size_after / 1024;
             const auto fileName = c.filename.filename().string();
-            std::cout << std::vformat("{:<40}{:<12}{:<12}{:<12}{:<8}{:<}\n",
-                std::make_format_args(
-                    fileName,
-                    c.format,
-                    size_before,
-                    size_after,
-                    delta,
-                    c.error_msg));
+            std::cout << std::left << std::setw(40) << fileName
+<< std::setw(12) << size_before
+                      << std::setw(12) << size_after
+                      << std::setw(8)  << delta
+                      << c.error_msg
+                      << "\n";
         }
     }
     std::cout << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
-    std::cout << "Total time: " << std::format("{:.2f}", total_seconds)
-              << " s (" << num_threads << " thread" << (num_threads > 1U ? "s" : "") << ")\n";
+    std::cout << "Total time: " << std::fixed << std::setprecision(2)
+              << total_seconds << " s (" << num_threads << " thread"
+              << (num_threads > 1U ? "s" : "") << ")\n";
 }
 
 void export_csv_report(const std::vector<Result>& results,
@@ -232,21 +230,32 @@ void export_csv_report(const std::vector<Result>& results,
                                          : r.replaced ? "OK (replaced)"
                                                       : "OK (skipped)";
 
-        // flatten codecs_used into "codec1:xx% -> codec2:yy%" for PIPE
-        // or "codec1:xx%; codec2:yy%" for PARALLEL
         std::string codecs_str;
         for (size_t i = 0; i < r.codecs_used.size(); ++i) {
-            codecs_str += r.codecs_used[i].first + ":" +
-                          std::format("{:.2f}%", r.codecs_used[i].second);
+            std::ostringstream ossc;
+            ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
+            codecs_str += r.codecs_used[i].first + ":" + ossc.str() + "%";
+            if (i + 1 < r.codecs_used.size()) {
+                if (mode == EncodeMode::PIPE)
+                    codecs_str += " -> ";
+                else
+                    codecs_str += "; ";
+            }
         }
 
         out << '"' << r.path.filename().string() << "\","
-            << '"' << r.container_origin->filename().string() << "\","
+            << '"' << (r.container_origin ? r.container_origin->filename().string() : "") << "\","
             << r.mime << ","
             << (r.size_before / 1024) << ","
-            << (r.size_after / 1024) << ","
-            << pct << ","
-            << r.seconds << ","
+            << (r.size_after / 1024) << ",";
+
+        std::ostringstream osspct;
+        osspct << std::fixed << std::setprecision(2) << pct;
+        out << osspct.str() << ",";
+
+        std::ostringstream osstime;
+        osstime << std::fixed << std::setprecision(2) << r.seconds;
+        out << osstime.str() << ","
             << outcome << ","
             << '"' << codecs_str << "\","
             << '"' << r.error_msg << "\"\n";
@@ -260,13 +269,15 @@ void export_csv_report(const std::vector<Result>& results,
             out << '"' << c.filename.filename().string() << "\","
                 << c.format << ","
                 << (c.size_before / 1024) << ","
-                << (c.size_after / 1024) << ","
-                << (c.success ? pct : 0.0) << ","
+                << (c.size_after / 1024) << ",";
+            std::ostringstream osspct;
+            osspct << std::fixed << std::setprecision(2) << (c.success ? pct : 0.0);
+            out << osspct.str() << ","
                 << '"' << c.error_msg << "\"\n";
         }
     }
 
     out << "\n\nTotal amount of time,Encoding mode used\n";
-    out << total_seconds << " seconds,"
+    out << std::fixed << std::setprecision(2) << total_seconds << " seconds,"
         << (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL") << "\n";
 }

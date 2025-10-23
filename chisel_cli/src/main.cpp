@@ -7,7 +7,7 @@
 #include <csignal>
 #include <atomic>
 #include <chrono>
-#include <format>
+#include <iomanip>
 #include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
@@ -35,9 +35,9 @@ inline void print_progress_bar(const size_t done, const size_t total, double ela
         else std::cout << " ";
     }
     std::cout << "] "
-              << std::format("{:3.0f}%", progress * 100.0)
+              << std::setw(3) << std::fixed << std::setprecision(0) << (progress * 100.0) << "%"
               << " (" << done << "/" << total << ")"
-              << " elapsed: " << std::format("{:.1f}s", elapsed_seconds)
+              << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
               << std::flush;
 }
 
