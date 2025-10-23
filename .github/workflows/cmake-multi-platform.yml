@@ -19,25 +19,25 @@ jobs:
             c_compiler: gcc
             cpp_compiler: g++
             artifact_name: chisel-ubuntu-gcc
-            binary_path: bin/Release/chisel_cli/chisel
+            binary_path: bin/Release/chisel
           - os: ubuntu-latest
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-ubuntu-clang
-            binary_path: bin/Release/chisel_cli/chisel
+            binary_path: bin/Release/chisel
           - os: macos-26
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-macos
-            binary_path: bin/Release/chisel_cli/chisel
+            binary_path: bin/Release/chisel
           - os: windows-latest
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
             artifact_name: chisel-windows
-            binary_path: bin/release/chisel_cli/chisel.exe
+            binary_path: bin/Release/chisel.exe
 
     steps:
       - name: Checkout repository
@@ -83,9 +83,12 @@ jobs:
       - name: Build
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-
-      - name: List build outputs
-        run: find ${{ steps.strings.outputs.build-output-dir }} -type f -name chisel
+      - name: List zlib build directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Contents of third_party\\zlib-build:"
+          Get-ChildItem -Recurse ${{ github.workspace }}\build\third_party\zlib-build
 
       # ---------------- Upload Artifact ----------------
       - name: Upload build artifact
