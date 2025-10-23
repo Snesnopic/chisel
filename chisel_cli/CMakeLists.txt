@@ -19,12 +19,11 @@ target_include_directories(chisel PRIVATE
 
 target_link_libraries(chisel PRIVATE libchisel)
 
-if(MSVC)
-    add_dependencies(chisel zlibstatic)
-endif()
-
 if(WIN32)
     target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
+    if(MSVC)
+        target_link_libraries(chisel PRIVATE zlibstatic)
+    endif()
 elseif(APPLE)
     target_compile_definitions(chisel PRIVATE PLATFORM_APPLE)
 elseif(UNIX AND NOT APPLE)
