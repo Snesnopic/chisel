@@ -12,12 +12,14 @@ set(CHISEL_CLI_SOURCES
 
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
+set_property(TARGET chisel APPEND PROPERTY
+        VS_PROJECT_REFERENCES zlibstatic
+)
+
 target_include_directories(chisel PRIVATE
         $<TARGET_PROPERTY:libchisel,INTERFACE_INCLUDE_DIRECTORIES>
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-
-target_link_libraries(chisel PRIVATE libchisel ${CHISEL_LIBS})
 
 if(WIN32)
     target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
