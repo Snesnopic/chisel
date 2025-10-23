@@ -11,10 +11,12 @@ set(CHISEL_CLI_SOURCES
 )
 
 add_executable(chisel ${CHISEL_CLI_SOURCES})
-
+if (MSVC)
 set_property(TARGET chisel APPEND PROPERTY
         VS_PROJECT_REFERENCES zlibstatic
 )
+endif()
+target_link_libraries(chisel PRIVATE libchisel)
 
 target_include_directories(chisel PRIVATE
         $<TARGET_PROPERTY:libchisel,INTERFACE_INCLUDE_DIRECTORIES>
