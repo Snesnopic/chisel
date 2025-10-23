@@ -45,7 +45,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
+          lfs: true
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
       # ---------------- Linux Dependencies (Simplified) ----------------
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
