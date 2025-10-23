@@ -19,7 +19,9 @@ target_include_directories(chisel PRIVATE
 
 target_link_libraries(chisel PRIVATE libchisel)
 
-add_dependencies(chisel ${CHISEL_LIBS})
+if(MSVC)
+    add_dependencies(chisel zlibstatic)
+endif()
 
 if(WIN32)
     target_compile_definitions(chisel PRIVATE PLATFORM_WINDOWS)
