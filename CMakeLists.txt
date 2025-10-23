@@ -670,7 +670,6 @@ if(UNIX)
 elseif(WIN32)
     list(APPEND CHISEL_LIBS
             libmseed
-            ZLIB::ZLIB
     )
 endif()
 
