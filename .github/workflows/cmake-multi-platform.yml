@@ -84,7 +84,6 @@ jobs:
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
       - name: List zlib build directory (Windows)
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Write-Host "Contents of third_party\\zlib-build:"
