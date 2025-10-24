@@ -392,7 +392,7 @@ add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
 if(MSVC)
-    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/jpeg-static.lib")
+    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/Release/jpeg-static.lib")
 elseif(MINGW)
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 else()
