@@ -14,8 +14,8 @@ add_executable(chisel ${CHISEL_CLI_SOURCES})
 if (MSVC)
     set_property(TARGET chisel APPEND PROPERTY
             VS_PROJECT_REFERENCES
-            libchisel
             zlibstatic
+            libchisel
     )
 endif()
 target_link_libraries(chisel PRIVATE libchisel)
