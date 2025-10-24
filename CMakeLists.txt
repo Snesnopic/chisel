@@ -316,7 +316,7 @@ set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib in
 set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
 
 if(MSVC)
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlib.lib" CACHE FILEPATH "zlib library")
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/Release/zlibstatic.lib" CACHE FILEPATH "zlib library")
 else()
     set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libz.a" CACHE FILEPATH "zlib library")
 endif()
