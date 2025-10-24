@@ -15,7 +15,6 @@ if (MSVC)
     set_property(TARGET chisel APPEND PROPERTY
             VS_PROJECT_REFERENCES libchisel
     )
-    if(MSVC)
         add_dependencies(chisel ${CHISEL_LIBS})
 endif()
 target_link_libraries(chisel PRIVATE libchisel)
