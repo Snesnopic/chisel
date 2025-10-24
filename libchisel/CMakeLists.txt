@@ -59,6 +59,13 @@ endif()
 
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
+if(MSVC)
+
+    set_property(TARGET libchisel APPEND PROPERTY
+            VS_PROJECT_REFERENCES ${CHISEL_LIBS}
+    )
+endif()
+
 target_include_directories(libchisel
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
