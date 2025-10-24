@@ -310,12 +310,14 @@ set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build EXCLUDE_FROM_ALL)
+add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build)
 
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
 
-if(NOT MSVC)
+if(MSVC)
+    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/zlibstatic.lib" CACHE FILEPATH "zlib library")
+else()
     set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libz.a" CACHE FILEPATH "zlib library")
 endif()
 
