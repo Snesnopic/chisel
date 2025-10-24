@@ -310,7 +310,7 @@ set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
+add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build EXCLUDE_FROM_ALL)
 
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
@@ -675,5 +675,4 @@ endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
-add_dependencies(libchisel zlibstatic)
 add_subdirectory(chisel_cli)
