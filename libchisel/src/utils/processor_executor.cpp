@@ -23,17 +23,19 @@ namespace chisel {
                                          const bool preserve_metadata,
                                          const ContainerFormat format,
                                          const bool verify_checksums,
-                                         EncodeMode mode,
+                                         const EncodeMode mode,
                                          EventBus &bus,
+                                         std::atomic<bool>& stop_flag,
                                          const unsigned threads)
         : registry_(registry),
           preserve_metadata_(preserve_metadata),
           verify_checksums_(verify_checksums),
           format_(format),
           pool_(threads),
+          stop_flag_(stop_flag),
           event_bus_(bus),
-          mode_(mode) {
-    }
+          mode_(mode)
+           {}
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
         for (const auto &path: inputs) {
@@ -44,6 +46,7 @@ namespace chisel {
     }
 
     void ProcessorExecutor::analyze_path(const fs::path &path) {
+        if (stop_flag_.load()) return;
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
         auto mime = MimeDetector::detect(path);
@@ -83,6 +86,7 @@ namespace chisel {
 
     void ProcessorExecutor::process_work_list() {
         for (const auto &file: work_list_) {
+            if (stop_flag_.load()) break;
             pool_.enqueue([this, file](const std::stop_token &st) {
                 event_bus_.publish(FileProcessStartEvent{file});
 
@@ -242,7 +246,7 @@ namespace chisel {
     }
 
     void ProcessorExecutor::finalize_containers() {
-        while (!finalize_stack_.empty()) {
+        while (!finalize_stack_.empty() && !stop_flag_.load()) {
             auto content = finalize_stack_.top();
             finalize_stack_.pop();
 

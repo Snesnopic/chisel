@@ -52,6 +52,7 @@ public:
                                bool verify_checksums,
                                EncodeMode mode,
                                EventBus& bus,
+                               std::atomic<bool>& stop_flag,
                                unsigned threads = std::thread::hardware_concurrency());
 
     /**
@@ -78,6 +79,7 @@ private:
     std::stack<ExtractedContent> finalize_stack_; ///< Stack of containers to finalize
     std::mutex log_mutex_;                        ///< Protects logging
     ThreadPool pool_;                             ///< Thread pool for parallel execution
+    std::atomic<bool>& stop_flag_;                ///<
     EventBus& event_bus_;                         ///< Event bus for publishing events
     EncodeMode mode_;                             ///< Encoding mode (PIPE or PARALLEL)
 };

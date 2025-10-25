@@ -178,6 +178,7 @@ int main(int argc, char* argv[]) {
                                settings.verify_checksums,
                                settings.encode_mode,
                                bus,
+                               interrupted,
                                settings.num_threads);
 
     // run processing
