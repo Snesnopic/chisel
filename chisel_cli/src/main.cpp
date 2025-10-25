@@ -116,14 +116,17 @@ int main(int argc, char* argv[]) {
         const size_t current = ++done;
         const double elapsed = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_total).count();
-        print_progress_bar(current, total, elapsed);
+        if (!settings.is_pipe) {
+            print_progress_bar(current, total, elapsed);
+        }
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
-        std::cout << "[DONE] " << e.path.filename().string()
-                  << " (" << e.original_size << " -> " << e.new_size << " bytes)"
-                  << (e.replaced ? " [replaced]" : " [kept]") << std::endl;
-
+        if (!settings.is_pipe) {
+            std::cout << "[DONE] " << e.path.filename().string()
+                      << " (" << e.original_size << " -> " << e.new_size << " bytes)"
+                      << (e.replaced ? " [replaced]" : " [kept]") << std::endl;
+        }
         Result r;
         r.path = e.path;
         r.mime = MimeDetector::detect(e.path);
@@ -138,7 +141,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
-        std::cerr << "[ERROR] " << e.path.filename().string() << ": " << e.error_message << std::endl;
+        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
 
         Result r;
         r.path = e.path;
@@ -153,9 +156,10 @@ int main(int argc, char* argv[]) {
     bus.subscribe<FileProcessSkippedEvent>(on_finish);
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-    //    std::cout << "[FINALIZED] " << e.path.filename().string()
-    //              << " (" << e.final_size << " bytes)" << std::endl;
-
+        // if (!settings.is_pipe) {
+        //   std::cout << "[FINALIZED] " << e.path.filename().string(
+        //             << " (" << e.final_size << " bytes)" << std::endl;
+        // }
         ContainerResult c;
         c.filename = e.path;
         c.success = true;
@@ -166,7 +170,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
-        std::cerr << "[ERROR FINALIZE] " << e.path.filename().string() << ": " << e.error_message << std::endl;
+        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
 
         ContainerResult c;
         c.filename = e.path;
