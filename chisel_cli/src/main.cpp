@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
 
     // subscribe to events: print progress and collect results
     // bus.subscribe<FileAnalyzeStartEvent>([](const FileAnalyzeStartEvent& e) {
-    //     std::cout << "[ANALYZE] " << e.path << std::endl;
+    //     std::cout << "[ANALYZE] " << e.path.filename().string() << std::endl;
     // });
 
     // update total if a container is extracted (finalization step counts as extra work)
@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
-        std::cout << "[DONE] " << e.path
+        std::cout << "[DONE] " << e.path.filename().string()
                   << " (" << e.original_size << " -> " << e.new_size << " bytes)"
                   << (e.replaced ? " [replaced]" : " [kept]") << std::endl;
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
-        std::cerr << "[ERROR] " << e.path << ": " << e.error_message << std::endl;
+        std::cerr << "[ERROR] " << e.path.filename().string() << ": " << e.error_message << std::endl;
 
         Result r;
         r.path = e.path;
@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
     bus.subscribe<FileProcessSkippedEvent>(on_finish);
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-    //    std::cout << "[FINALIZED] " << e.path
+    //    std::cout << "[FINALIZED] " << e.path.filename().string()
     //              << " (" << e.final_size << " bytes)" << std::endl;
 
         ContainerResult c;
@@ -166,7 +166,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
-        std::cerr << "[ERROR FINALIZE] " << e.path << ": " << e.error_message << std::endl;
+        std::cerr << "[ERROR FINALIZE] " << e.path.filename().string() << ": " << e.error_message << std::endl;
 
         ContainerResult c;
         c.filename = e.path;
