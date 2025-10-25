@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
     // update total if a container is extracted (finalization step counts as extra work)
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
         if (e.extracted) {
-            ++total;
+            total += e.num_children;
         }
     });
 
