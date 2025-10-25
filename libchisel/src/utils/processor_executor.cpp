@@ -70,7 +70,7 @@ namespace chisel {
                 for (const auto &child: content->extracted_files) {
                     analyze_path(child);
                 }
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, false});
+                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, false, content->extracted_files.size()});
             } else {
                 Logger::log(LogLevel::Error, "prepare_extraction failed for " + path.string(), "Executor");
                 event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
