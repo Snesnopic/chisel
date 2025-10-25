@@ -11,9 +11,7 @@
 ## Refactoring / Architecture
 
 - [ ] Abstract common logic across processors.
-- [ ] Make processor classes more MIME-aware.
 - [ ] Normalize MIME detection and extension mapping.
-- [ ] Begin support for using chisel as a library (public API, minimal dependencies).
 - [ ] Implement a UriProcessor to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing processors, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
@@ -122,7 +120,6 @@
 
 ## Build / CI
 
-- [ ] Fix compilation issues on Windows (ensure reproducible builds).
 - [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
 - [ ] On MinGW, enforce fully static builds (no runtime DLL dependencies).
 - [ ] Review linker flags and explore options to reduce final binary size (e.g. `-Wl,--gc-sections`, `-s` for stripping symbols, or platform-specific equivalents).
@@ -134,5 +131,4 @@
 - [ ] Investigate further metadata preservation strategies across all formats.
 - [ ] Implement lossless recompression of embedded cover art in audio files (FLAC, APE, WavPack, MP3, etc.).
 - [ ] Improve logging granularity and structured output for CI integration.
-- [ ] Investigate which apt/brew packages are actually needed for compiling.
 - [ ] Future: implement a general XML/HTML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
