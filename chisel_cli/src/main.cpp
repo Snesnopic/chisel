@@ -19,6 +19,7 @@
 #include "../../libchisel/include/logger.hpp"
 #include "../../libchisel/include/file_type.hpp"
 #include "../../libchisel/include/mime_detector.hpp"
+#include "utils/file_log_sink.hpp"
 
 // simple progress bar printer
 inline void print_progress_bar(const size_t done, const size_t total, double elapsed_seconds) {
@@ -69,9 +70,14 @@ int main(int argc, char* argv[]) {
     }
 
     // set console logger
-    auto sink = std::make_unique<ConsoleLogSink>();
-    sink->log_level = Logger::string_to_level(settings.log_level);
-    Logger::set_sink(std::unique_ptr<ILogSink>(sink.get()));
+    // auto sink = std::make_unique<ConsoleLogSink>();
+    // sink->log_level = Logger::string_to_level(settings.log_level);
+    // Logger::set_sink(std::move(sink));
+
+    // set file logger
+    auto sink = std::make_unique<FileLogSink>("chisel.log",false);
+    // sink->log_level = Logger::string_to_level(settings.log_level);
+    Logger::set_sink(std::move(sink));
 
     // registry of processors and event bus
     ProcessorRegistry registry;
