@@ -103,7 +103,7 @@ namespace chisel {
 
                 auto safe_size = [](const fs::path &p) {
                     std::error_code ec;
-                    auto s = fs::file_size(p, ec);
+                    const auto s = fs::file_size(p, ec);
                     return ec ? 0ull : s;
                 };
 
@@ -144,8 +144,7 @@ namespace chisel {
                             // and, if checksum verification is enabled, the raw checksums match
                             const bool size_improved = (new_size > 0 && new_size < orig_size);
                             const bool checksum_ok = !verify_checksums_ ||
-                                                     (candidates[0]->get_raw_checksum(file) ==
-                                                      candidates[0]->get_raw_checksum(last_tmp));
+                                candidates[0]->raw_equal(file, last_tmp);
 
                             if (size_improved && checksum_ok) {
                                 std::error_code ec;

@@ -106,6 +106,17 @@ public:
      * @return Checksum string (algorithm is processor-specific).
      */
     [[nodiscard]] virtual std::string get_raw_checksum(const std::filesystem::path& file_path) const = 0;
+
+    /**
+     * @brief Compare two files at raw level (using checksums or direct comparison).
+     * @param a First file path.
+     * @param b Second file path.
+     * @return true if the two files are raw-equivalent.
+     */
+    [[nodiscard]] virtual bool raw_equal(const std::filesystem::path& a,
+                                         const std::filesystem::path& b) const {
+        return get_raw_checksum(a) == get_raw_checksum(b);
+    }
 };
 
 } // namespace chisel
