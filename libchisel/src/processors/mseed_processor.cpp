@@ -19,7 +19,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
     Logger::log(LogLevel::Info, "Starting MiniSEED recompression", "mseed_processor");
 
     MS3Record* msr = nullptr;
-    uint32_t read_flags = MSF_VALIDATECRC | MSF_UNPACKDATA;
+    const uint32_t read_flags = MSF_VALIDATECRC | MSF_UNPACKDATA;
     constexpr int8_t verbose = 0;
 
     int retcode = ms3_readmsr(&msr, input.string().c_str(), read_flags, verbose);
@@ -52,7 +52,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
     Logger::log(LogLevel::Info, "Recompression completed successfully", "mseed_processor");
 }
 
-int MseedProcessor::choose_reclen(const MS3Record* msr, size_t sample_count) {
+int MseedProcessor::choose_reclen(const MS3Record* msr, const size_t sample_count) {
     if (!msr || sample_count == 0) return 4096;
 
     const int max_reclen_exp = (msr->formatversion == 2) ? 16 : 20;
@@ -65,7 +65,7 @@ int MseedProcessor::choose_reclen(const MS3Record* msr, size_t sample_count) {
     uint64_t best_size = (std::numeric_limits<uint64_t>::max)();
     int best_reclen = 4096;
 
-    for (int reclen : candidates) {
+    for (const int reclen : candidates) {
         MS3Record* clone = msr3_duplicate(msr, 1);
         if (!clone) continue;
 
@@ -77,7 +77,7 @@ int MseedProcessor::choose_reclen(const MS3Record* msr, size_t sample_count) {
         uint32_t write_flags = MSF_FLUSHDATA;
         if (clone->formatversion == 2) write_flags |= MSF_PACKVER2;
 
-        const int64_t rv = msr3_writemseed(clone, tmpfile.string().c_str(), 1, write_flags, 0);
+        const int64_t rv = msr3_writemseed(clone, tmpfile.string().c_str(), 0, write_flags, 0);
         msr3_free(&clone);
 
         if (rv < 0) {
@@ -99,6 +99,46 @@ int MseedProcessor::choose_reclen(const MS3Record* msr, size_t sample_count) {
 std::string MseedProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw MiniSEED data
     return "";
+}
+
+bool MseedProcessor::raw_equal(const std::filesystem::path& a,
+                               const std::filesystem::path& b) const {
+    MS3Record* msrA = nullptr;
+    MS3Record* msrB = nullptr;
+    constexpr uint32_t flags = MSF_VALIDATECRC | MSF_UNPACKDATA;
+    constexpr int8_t verbose = 0;
+
+    int retA = ms3_readmsr(&msrA, a.string().c_str(), flags, verbose);
+    int retB = ms3_readmsr(&msrB, b.string().c_str(), flags, verbose);
+
+    while (retA == MS_NOERROR && retB == MS_NOERROR) {
+        if (msrA->numsamples != msrB->numsamples ||
+            msrA->sampletype != msrB->sampletype) {
+            return false;
+            }
+
+        if (msrA->sampletype == 'i') {
+            const auto* sa = static_cast<int32_t*>(msrA->datasamples);
+            const auto* sb = static_cast<int32_t*>(msrB->datasamples);
+            for (int64_t i = 0; i < msrA->numsamples; ++i) {
+                if (sa[i] != sb[i]) return false;
+            }
+        } else if (msrA->sampletype == 'f') {
+            const auto* sa = static_cast<float*>(msrA->datasamples);
+            const auto* sb = static_cast<float*>(msrB->datasamples);
+            for (int64_t i = 0; i < msrA->numsamples; ++i) {
+                if (fabs(sa[i] - sb[i]) > 1e-6f) return false;
+            }
+        } else {
+            //TODO: handle other types
+            return false;
+        }
+
+        retA = ms3_readmsr(&msrA, nullptr, flags, verbose);
+        retB = ms3_readmsr(&msrB, nullptr, flags, verbose);
+    }
+
+    return (retA == MS_ENDOFFILE && retB == MS_ENDOFFILE);
 }
 
 } // namespace chisel

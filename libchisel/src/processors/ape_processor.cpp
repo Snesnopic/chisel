@@ -168,5 +168,81 @@ std::string ApeProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw APE data
     return "";
 }
+    std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
+                                    unsigned& sample_rate,
+                                    unsigned& channels,
+                                    unsigned& bps) {
+    int err = 0;
+    APE::IAPEDecompress* dec = CreateIAPEDecompress(file.wstring().c_str(),
+                                                    &err,
+                                                    true,  // full header analysis
+                                                    true,  // check CRC
+                                                    false);
+    if (!dec || err != ERROR_SUCCESS) {
+        if (dec) delete dec;
+        throw std::runtime_error("APE open failed");
+    }
+
+    sample_rate = static_cast<unsigned>(dec->GetInfo(APE::IAPEDecompress::APE_INFO_SAMPLE_RATE));
+    channels    = static_cast<unsigned>(dec->GetInfo(APE::IAPEDecompress::APE_INFO_CHANNELS));
+    bps         = static_cast<unsigned>(dec->GetInfo(APE::IAPEDecompress::APE_INFO_BITS_PER_SAMPLE));
+    const int64_t total_blocks = dec->GetInfo(APE::IAPEDecompress::APE_INFO_TOTAL_BLOCKS);
+
+    if (channels == 0 || sample_rate == 0 || bps == 0) {
+        delete dec;
+        throw std::runtime_error("Invalid APE parameters");
+    }
+
+    const int bytes_per_sample =static_cast<int>(bps) / 8;
+    const int block_align = static_cast<int>(channels) * bytes_per_sample;
+    constexpr int block_frames_request = 16384;
+
+    std::vector<int32_t> pcm;
+    std::vector<uint8_t> block(static_cast<size_t>(block_frames_request) * block_align);
+
+    int64_t frames_processed = 0;
+    while (frames_processed < total_blocks) {
+        APE::int64 blocks_retrieved = 0;
+        int rc = dec->GetData(block.data(), block_frames_request, &blocks_retrieved);
+        if (rc != ERROR_SUCCESS) {
+            delete dec;
+            throw std::runtime_error("APE decode failed");
+        }
+        if (blocks_retrieved <= 0) break;
+
+        const size_t bytes_to_copy = static_cast<size_t>(blocks_retrieved) * block_align;
+        const auto* src16 = reinterpret_cast<const int16_t*>(block.data());
+        const auto* src32 = reinterpret_cast<const int32_t*>(block.data());
+
+        if (bps == 16) {
+            for (size_t i = 0; i < bytes_to_copy / 2; ++i) {
+                pcm.push_back(static_cast<int32_t>(src16[i]));
+            }
+        } else if (bps == 24 || bps == 32) {
+            for (size_t i = 0; i < bytes_to_copy / 4; ++i) {
+                pcm.push_back(src32[i]);
+            }
+        } else {
+            delete dec;
+            throw std::runtime_error("Unsupported bit depth in APE");
+        }
+
+        frames_processed += blocks_retrieved;
+    }
+
+    delete dec;
+    return pcm;
+}
+
+bool ApeProcessor::raw_equal(const std::filesystem::path& a,
+                             const std::filesystem::path& b) const {
+    unsigned ra, ca, bpsa;
+    unsigned rb, cb, bpsb;
+    const auto pcmA = decode_ape_pcm(a, ra, ca, bpsa);
+    const auto pcmB = decode_ape_pcm(b, rb, cb, bpsb);
+
+    if (ra != rb || ca != cb || bpsa != bpsb) return false;
+    return pcmA == pcmB;
+}
 
 } // namespace chisel

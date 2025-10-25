@@ -45,8 +45,10 @@ namespace chisel {
 
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
     private:
-        int choose_reclen(const MS3Record* msr, size_t sample_count);
+        static int choose_reclen(const MS3Record* msr, size_t sample_count);
     };
 
 } // namespace chisel

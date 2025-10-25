@@ -130,4 +130,49 @@ std::string WavPackProcessor::get_raw_checksum(const std::filesystem::path&) con
     return "";
 }
 
+std::vector<int32_t> decode_wavpack_pcm(const std::filesystem::path& file,
+                                        int& sample_rate,
+                                        int& channels,
+                                        int& bps) {
+    char error[128]{};
+    WavpackContext* ctx = WavpackOpenFileInput(file.string().c_str(), error, OPEN_TAGS, 0);
+    if (!ctx) {
+        throw std::runtime_error("WavPack open failed: " + std::string(error));
+    }
+
+    sample_rate = static_cast<int>(WavpackGetSampleRate(ctx));
+    channels    = WavpackGetNumChannels(ctx);
+    bps         = WavpackGetBitsPerSample(ctx);
+
+    if (channels <= 0 || sample_rate <= 0 || bps <= 0) {
+        WavpackCloseFile(ctx);
+        throw std::runtime_error("Invalid WavPack parameters");
+    }
+
+    const int32_t num_channels = channels;
+    constexpr int32_t block_size = 65536;
+    std::vector<int32_t> buffer(static_cast<size_t>(block_size) * static_cast<size_t>(num_channels));
+    std::vector<int32_t> pcm;
+
+    uint32_t samples = 0;
+    while ((samples = WavpackUnpackSamples(ctx, buffer.data(), block_size)) > 0) {
+        pcm.insert(pcm.end(), buffer.begin(), buffer.begin() + samples * num_channels);
+    }
+
+    WavpackCloseFile(ctx);
+    return pcm;
+}
+
+
+bool WavPackProcessor::raw_equal(const std::filesystem::path& a,
+                                 const std::filesystem::path& b) const {
+    int ra, ca, bpsa;
+    int rb, cb, bpsb;
+    const auto pcmA = decode_wavpack_pcm(a, ra, ca, bpsa);
+    const auto pcmB = decode_wavpack_pcm(b, rb, cb, bpsb);
+
+    if (ra != rb || ca != cb || bpsa != bpsb) return false;
+    return pcmA == pcmB;
+}
+
 } // namespace chisel

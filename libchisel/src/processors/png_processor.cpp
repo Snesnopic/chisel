@@ -433,4 +433,70 @@ namespace chisel {
         // TODO: implement checksum of raw pixel data if needed
         return "";
     }
+
+    std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
+                                                png_uint_32 &width,
+                                                png_uint_32 &height) {
+        FILE *fp = std::fopen(file.string().c_str(), "rb");
+        if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
+
+        png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+        if (!png) {
+            fclose(fp);
+            throw std::runtime_error("png_create_read_struct failed");
+        }
+
+        png_infop info = png_create_info_struct(png);
+        if (!info) {
+            png_destroy_read_struct(&png, nullptr, nullptr);
+            fclose(fp);
+            throw std::runtime_error("png_create_info_struct failed");
+        }
+
+        if (setjmp(png_jmpbuf(png))) {
+            png_destroy_read_struct(&png, &info, nullptr);
+            fclose(fp);
+            throw std::runtime_error("libpng error while reading " + file.string());
+        }
+
+        png_init_io(png, fp);
+        png_read_info(png, info);
+
+        int bit_depth, color_type;
+        png_get_IHDR(png, info, &width, &height, &bit_depth, &color_type, nullptr, nullptr, nullptr);
+
+        if (bit_depth == 16) png_set_strip_16(png);
+        if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(png);
+        if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) png_set_expand_gray_1_2_4_to_8(png);
+        if (png_get_valid(png, info, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png);
+        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
+        if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(png);
+
+        png_read_update_info(png, info);
+
+        const size_t rowbytes = png_get_rowbytes(png, info);
+        std::vector<unsigned char> image(rowbytes * height);
+        std::vector<png_bytep> row_pointers(height);
+        for (png_uint_32 y = 0; y < height; ++y) {
+            row_pointers[y] = image.data() + y * rowbytes;
+        }
+
+        png_read_image(png, row_pointers.data());
+        png_read_end(png, info);
+
+        png_destroy_read_struct(&png, &info, nullptr);
+        fclose(fp);
+
+        return image;
+    }
+
+    bool PngProcessor::raw_equal(const std::filesystem::path &a,
+                                 const std::filesystem::path &b) const {
+        png_uint_32 wa, ha, wb, hb;
+        const auto imgA = decode_png_rgba8(a, wa, ha);
+        const auto imgB = decode_png_rgba8(b, wb, hb);
+
+        if (wa != wb || ha != hb) return false;
+        return imgA == imgB;
+    }
 } // namespace chisel

@@ -201,5 +201,84 @@ std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_pa
     FLAC__metadata_object_delete(metadata);
     return oss.str();
 }
+    // Decodifica un FLAC in PCM interleaved (int32)
+std::vector<int32_t> decode_flac_pcm(const std::filesystem::path& file,
+                                     unsigned& sample_rate,
+                                     unsigned& channels,
+                                     unsigned& bps) {
+    FLAC__StreamDecoder* dec = FLAC__stream_decoder_new();
+    if (!dec) throw std::runtime_error("Cannot create FLAC decoder");
+
+    std::vector<int32_t> pcm;
+    struct Context {
+        std::vector<int32_t>* pcm;
+        unsigned channels{};
+        unsigned bps{};
+        bool failed{false};
+    } ctx;
+    ctx.pcm = &pcm;
+
+    auto write_cb = [](const FLAC__StreamDecoder*,
+                       const FLAC__Frame* frame,
+                       const FLAC__int32* const buffer[],
+                       void* client_data) -> FLAC__StreamDecoderWriteStatus {
+        auto* c = static_cast<Context*>(client_data);
+        const size_t n = frame->header.blocksize;
+        for (size_t i = 0; i < n; ++i) {
+            for (unsigned ch = 0; ch < frame->header.channels; ++ch) {
+                c->pcm->push_back(buffer[ch][i]);
+            }
+        }
+        return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+    };
+
+    auto metadata_cb = [](const FLAC__StreamDecoder*,
+                          const FLAC__StreamMetadata* md,
+                          void* client_data) {
+        if (md->type == FLAC__METADATA_TYPE_STREAMINFO) {
+            auto* c = static_cast<Context*>(client_data);
+            c->channels = md->data.stream_info.channels;
+            c->bps      = md->data.stream_info.bits_per_sample;
+        }
+    };
+
+    auto error_cb = [](const FLAC__StreamDecoder*,
+                       FLAC__StreamDecoderErrorStatus,
+                       void*) {};
+
+    if (FLAC__stream_decoder_init_file(dec,
+                                       file.string().c_str(),
+                                       write_cb,
+                                       metadata_cb,
+                                       error_cb,
+                                       &ctx) != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
+        FLAC__stream_decoder_delete(dec);
+        throw std::runtime_error("FLAC decoder init failed");
+    }
+
+    if (!FLAC__stream_decoder_process_until_end_of_stream(dec)) {
+        FLAC__stream_decoder_delete(dec);
+        throw std::runtime_error("FLAC decode failed");
+    }
+
+    sample_rate = FLAC__stream_decoder_get_sample_rate(dec);
+    channels    = ctx.channels;
+    bps         = ctx.bps;
+
+    FLAC__stream_decoder_delete(dec);
+    return pcm;
+}
+
+
+bool FlacProcessor::raw_equal(const std::filesystem::path& a,
+                              const std::filesystem::path& b) const {
+    unsigned ra, ca, bpsa;
+    unsigned rb, cb, bpsb;
+    const auto pcmA = decode_flac_pcm(a, ra, ca, bpsa);
+    const auto pcmB = decode_flac_pcm(b, rb, cb, bpsb);
+
+    if (ra != rb || ca != cb || bpsa != bpsb) return false;
+    return pcmA == pcmB;
+}
 
 } // namespace chisel
