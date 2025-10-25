@@ -50,7 +50,7 @@ ProcessorRegistry::ProcessorRegistry() {
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
     std::vector<IProcessor*> result;
     for (const auto& proc_ptr : processors_) {
-        for (auto supported_mime : proc_ptr->get_supported_mime_types()) {
+        for (const auto supported_mime : proc_ptr->get_supported_mime_types()) {
             if (supported_mime == mime) {
                 result.push_back(proc_ptr.get());
             }
@@ -63,7 +63,7 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_extension(const std::string&
     std::vector<IProcessor*> result;
     if (ext.empty() || ext[0] != '.') return result;
 
-    auto iequals = [](std::string_view s1, std::string_view s2) {
+    auto iequals = [](const std::string_view s1, const std::string_view s2) {
         return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(),
                           [](char a, char b) {
                               return std::tolower(static_cast<unsigned char>(a)) ==
@@ -72,7 +72,7 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_extension(const std::string&
     };
 
     for (const auto& proc_ptr : processors_) {
-        for (auto supported_ext : proc_ptr->get_supported_extensions()) {
+        for (const auto supported_ext : proc_ptr->get_supported_extensions()) {
             if (iequals(supported_ext, ext)) {
                 result.push_back(proc_ptr.get());
             }
