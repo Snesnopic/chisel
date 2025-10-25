@@ -119,7 +119,7 @@ namespace chisel {
                         for (size_t i = 0; i < candidates.size(); ++i) {
                             fs::path tmp = file;
                             tmp += ".pipe." + std::to_string(i) + ".tmp";
-                            candidates[i]->recompress(current, tmp, verify_checksums_);
+                            candidates[i]->recompress(current, tmp, preserve_metadata_);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
                                 pipeline_ok = false;
@@ -182,7 +182,7 @@ namespace chisel {
                             tmp += ".cand." + std::to_string(i) + ".tmp";
                             Result r{tmp, 0, false};
                             try {
-                                candidates[i]->recompress(file, tmp, verify_checksums_);
+                                candidates[i]->recompress(file, tmp, preserve_metadata_);
                                 auto sz = safe_size(tmp);
                                 if (sz > 0) {
                                     r.size = sz;
