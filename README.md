@@ -1,82 +1,75 @@
 # chisel
 
 **chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform monolithic binary.  
-It focuses on lossless recompression of various file formats by integrating multiple specialized encoders, with a strict emphasis on reproducibility, static linking, and Unix‑orthodox CLI behavior.
+It focuses on lossless recompression of various file formats by integrating multiple specialized encoders.
 
 ---
 
 ## Requirements
 
-To build **chisel** you need only a few system tools. All other libraries are automatically fetched and built by CMake or installed through your system package manager.
+The project builds all its dependencies automatically via Git submodules. You only need a C++23 build toolchain and basic build tools.
 
-### Linux
-- CMake ≥ 3.20
-- A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
-- Git
-- Autotools (for building libmagic)
-- Standard build tools (make, pkg-config, etc.)
-
-### macOS
-- CMake ≥ 3.20
-- Xcode Command Line Tools (Clang with C++23 support)
-- Git
-- Autotools (for building libmagic)
-- [Homebrew](https://brew.sh/) is recommended for installing missing build tools
-
-### Windows
-- CMake ≥ 3.20
-- Visual Studio 2022 (MSVC with C++23 support)
-- Git
-- [vcpkg](https://github.com/microsoft/vcpkg) for dependency integration
+-   **All Platforms:**
+  -   `git` (with LFS support: run `git lfs install` once)
+  -   `cmake` (≥ 3.20)
+  -   `ninja` (recommended)
+-   **Linux:**
+  -   A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
+  -   `build-essential`, `pkg-config`
+  -   `autoconf`, `automake`, `libtool`, `m4`, `nasm`, `yasm` (required by some submodules)
+-   **macOS:**
+  -   Xcode Command Line Tools (Clang with C++23 support)
+  -   `pkg-config`
+  -   `autoconf`, `automake`, `libtool`, `nasm`, `yasm` (required by some submodules)
+-   **Windows:**
+  -   Visual Studio 2022 (with MSVC C++23 toolchain)
 
 ---
 
 ## Installing dependencies
 
 ### Linux (Debian/Ubuntu)
+This command installs only the build tools. All libraries are submodules.
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build pkg-config git curl wget \
-autoconf automake libtool m4 nasm yasm \
-zlib1g-dev libpng-dev libjpeg-dev libwebp-dev libtiff-dev \
-libogg-dev liblzma-dev libbz2-dev liblz4-dev libxml2-dev libexpat1-dev \
-python3 python3-pip ccache libqpdf-dev
+sudo apt-get install -y build-essential cmake ninja-build pkg-config git \
+autoconf automake libtool m4 nasm yasm ccache
 ```
 
 ### macOS (Homebrew)
 ```bash
 brew update
-brew install cmake ninja pkg-config autoconf automake libtool git wget nasm yasm qpdf
+brew install cmake ninja pkg-config git autoconf automake libtool nasm yasm
 ```
 
 ### Windows
-Install [vcpkg](https://github.com/microsoft/vcpkg) and ensure it is available in your environment.  
-Dependencies will be resolved automatically through vcpkg when configuring with CMake.
+Ensure you have installed Visual Studio 2022 (with the "Desktop development with C++" workload) and Git. No other package managers are required.
 
 ---
 
 ## Building chisel
 
-### Linux / macOS
+### Clone the repository and initialize all submodules:
+```bash
+  git clone [https://github.com/Snesnopic/chisel.git](https://github.com/Snesnopic/chisel.git)
+  cd chisel
+  git lfs install
+  git lfs pull
+  git submodule update --init --recursive
+```
+### Configure and build with CMake (Linux / macOS):
 ```bash
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release \
--DBUILD_TESTING=OFF -DQPDF_BUILD_TESTS=OFF -DQPDF_BUILD_EXAMPLES=OFF \
--DQPDF_BUILD_DOC=OFF -DQPDF_BUILD_FUZZ=OFF -DQPDF_INSTALL=OFF \
--DSKIP_INSTALL_ALL=ON -DINSTALL_MANPAGES=OFF -DREQUIRE_CRYPTO_OPENSSL=OFF
+cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
 
-### Windows
-```bash
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake \
--DCMAKE_BUILD_TYPE=Release \
--DBUILD_TESTING=OFF -DQPDF_BUILD_TESTS=OFF -DQPDF_BUILD_EXAMPLES=OFF \
--DQPDF_BUILD_DOC=OFF -DQPDF_BUILD_FUZZ=OFF -DQPDF_INSTALL=OFF \
--DSKIP_INSTALL_ALL=ON -DINSTALL_MANPAGES=OFF -DREQUIRE_CRYPTO_OPENSSL=OFF
-cmake --build build --config Release
+### Configure and build with CMake (Windows):
+```powershell
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --config Release
 ```
----
 
 ## Usage
 
@@ -101,14 +94,6 @@ cmake --build build --config Release
   into a different format (zip, 7z, tar, gz, bz2, xz, wim).  
   If not specified, such archives are left untouched.
 
-**Pipe mode:**
-- If `-` is given as the only input, chisel reads a single file from stdin and writes the optimized result to stdout.
-- In this mode:
-  - Only one input (`-`) is allowed, not mixed with other files.
-  - No progress bar or CSV/console report is generated.
-  - Only the optimized file (or the original if no improvement) is written to stdout.
-  - Errors and warnings are printed to stderr.
-
 **Examples:**
 - `./chisel file.jpg dir/ --recursive --threads 4`
 - `./chisel archive.zip`
@@ -120,165 +105,39 @@ cmake --build build --config Release
 
 ## Supported formats
 
-### Images
-- **JPEG**
-  - **MIME:** `image/jpeg`, `image/jpg`
-  - **Extensions:** .jpg, .jpeg
-  - **Library:** mozjpeg
-- **GIF**
-  - **MIME:** `image/gif`
-  - **Extensions:** .gif
-  - **Libraries:** gifsicle, flexigif
-- **JPEG XL**
-  - **MIME:** `image/jxl`
-  - **Extensions:** .jxl
-  - **Library:** libjxl
-- **WebP**
-  - **MIME:** `image/webp`, `image/x-webp`
-  - **Extensions:** .webp
-  - **Library:** libwebp
-- **PNG**
-  - **MIME:** `image/png`
-  - **Extensions:** .png
-  - **Libraries:** zlib/Deflate, zopflipng
-- **TIFF**
-  - **MIME:** `image/tiff`, `image/tiff-fx`
-  - **Extensions:** .tif, .tiff
-  - **Library:** libtiff
-- **OpenRaster**
-  - **MIME:** `image/openraster`
-  - **Extensions:** .ora
-  - **Library:** libarchive (ZIP-based)
-
----
-
-### Documents
-- **PDF**
-  - **MIME:** `application/pdf`
-  - **Extensions:** .pdf
-  - **Library:** qpdf
-- **Microsoft Office OpenXML**
-  - **DOCX MIME:** `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-  - **XLSX MIME:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-  - **PPTX MIME:** `application/vnd.openxmlformats-officedocument.presentationml.presentation`, `application/vnd.ms-powerpoint`
-  - **Extensions:** .docx, .xlsx, .pptx
-- **OpenDocument**
-  - **ODT MIME:** `application/vnd.oasis.opendocument.text`
-  - **ODS MIME:** `application/vnd.oasis.opendocument.spreadsheet`
-  - **ODP MIME:** `application/vnd.oasis.opendocument.presentation`
-  - **ODG MIME:**  `application/vnd.oasis.opendocument.graphics`
-  - **ODF MIME:**  `application/vnd.oasis.opendocument.formula`,
-  - **Extensions:** .odt, .ods, .odp, .odg, .odf
-- **EPUB**
-  - **MIME:** `application/epub+zip`
-  - **Extensions:** .epub
-  - **Library:** libarchive (ZIP-based)
-- **Comic Book**
-  - **CBZ MIME:** `application/vnd.comicbook+zip`
-  - **CBT MIME:** `application/vnd.comicbook+tar`
-  - **Extensions:** .cbz, .cbt
-  - **Library:** libarchive
-- **XPS**
-  - **MIME:** `application/vnd.ms-xpsdocument`, `application/oxps`
-  - **Extensions:** .xps, .oxps
-  - **Library:** libarchive (ZIP-based)
-- **DWFX**
-  - **MIME:** `model/vnd.dwfx+xps`
-  - **Extensions:** .dwfx
-  - **Library:** libarchive (ZIP-based)
-
----
-
-### Audio
-- **FLAC**
-  - **MIME:** `audio/flac`, `audio/x-flac`
-  - **Extensions:** .flac
-  - **Library:** libFLAC
-- **Monkey's Audio**
-  - **MIME:** `audio/ape`, `audio/x-ape`
-  - **Extensions:** .ape
-  - **Library:** MACLib
-- **WavPack**
-  - **MIME:** `audio/x-wavpack`, `audio/x-wavpack-correction`
-  - **Extensions:** .wv, .wvp, .wvc
-  - **Library:** wavpack
-
----
-
-### Databases
-- **SQLite**
-  - **MIME:** `application/vnd.sqlite3`, `application/x-sqlite3`
-  - **Extensions:** .sqlite, .db
-  - **Library:** sqlite3
-
----
-
-### Archive and container formats
-- **Zip**
-  - **MIME:** `application/zip`, `application/x-zip-compressed`
-  - **Extensions:** .zip
-  - **Library:** libarchive
-- **7z**
-  - **MIME:** `application/x-7z-compressed`
-  - **Extensions:** .7z
-  - **Library:** libarchive
-- **Tar**
-  - **MIME:** `application/x-tar`
-  - **Extensions:** .tar
-  - **Library:** libarchive
-- **GZip**
-  - **MIME:** `application/gzip`
-  - **Extensions:** .gz
-  - **Library:** libarchive
-- **BZip2**
-  - **MIME:** `application/x-bzip2`
-  - **Extensions:** .bz2
-  - **Library:** libarchive
-- **Xz**
-  - **MIME:** `application/x-xz`
-  - **Extensions:** .xz
-  - **Library:** libarchive
-- **Rar**
-  - **MIME:** `application/vnd.rar`, `application/x-rar-compressed`
-  - **Extensions:** .rar
-  - **Library:** libarchive (read-only)
-- **ISO**
-  - **MIME:** `application/x-iso9660-image`
-  - **Extensions:** .iso
-  - **Library:** libarchive
-- **CPIO**
-  - **MIME:** `application/x-cpio`
-  - **Extensions:** .cpio
-  - **Library:** libarchive
-- **LZMA**
-  - **MIME:** `application/x-lzma`
-  - **Extensions:** .lzma
-  - **Library:** libarchive
-- **CAB**
-  - **MIME:** `application/vnd.ms-cab-compressed`
-  - **Extensions:** .cab
-  - **Library:** libarchive
-- **WIM**
-  - **MIME:** `application/x-ms-wim`
-  - **Extensions:** .wim
-  - **Library:** libarchive
-- **JAR**
-  - **MIME:** `application/java-archive`
-  - **Extensions:** .jar
-  - **Library:** libarchive (ZIP-based)
-- **XPI**
-  - **MIME:** `application/x-xpinstall`
-  - **Extensions:** .xpi
-  - **Library:** libarchive (ZIP-based)
-- **APK**
-  - **MIME:** `application/vnd.android.package-archive`
-  - **Extensions:** .apk
-  - **Library:** libarchive (ZIP-based)
-
----
-
-### Scientific and seismic
-- **MSEED**
-  - **MIME:** `application/vnd.fdsn.mseed`
-  - **Extensions:** .mseed
-  - **Library:** libmseed
+| Category   | Format                 | MIME                                                                                                                                                                                                                                                                       | Extensions                   | Library/Libraries       |
+|------------|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|-------------------------|
+| Images     | JPEG                   | image/jpeg, image/jpg                                                                                                                                                                                                                                                      | .jpg, .jpeg                  | mozjpeg                 |
+| Images     | GIF                    | image/gif                                                                                                                                                                                                                                                                  | .gif                         | gifsicle, flexigif      |
+| Images     | JPEG XL                | image/jxl                                                                                                                                                                                                                                                                  | .jxl                         | libjxl                  |
+| Images     | WebP                   | image/webp, image/x-webp                                                                                                                                                                                                                                                   | .webp                        | libwebp                 |
+| Images     | PNG                    | image/png                                                                                                                                                                                                                                                                  | .png                         | zlib/Deflate, zopflipng |
+| Images     | TIFF                   | image/tiff, image/tiff-fx                                                                                                                                                                                                                                                  | .tif, .tiff                  | libtiff                 |
+| Images     | OpenRaster             | image/openraster                                                                                                                                                                                                                                                           | .ora                         | libarchive (ZIP-based)  |
+| Documents  | PDF                    | application/pdf                                                                                                                                                                                                                                                            | .pdf                         | qpdf                    |
+| Documents  | Microsoft Office OOXML | docx: application/vnd.openxmlformats-officedocument.wordprocessingml.document<br>xlsx: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet<br>pptx: application/vnd.openxmlformats-officedocument.presentationml.presentation, application/vnd.ms-powerpoint | .docx, .xlsx, .pptx          | —                       |
+| Documents  | OpenDocument           | odt: application/vnd.oasis.opendocument.text<br>ods: application/vnd.oasis.opendocument.spreadsheet<br>odp: application/vnd.oasis.opendocument.presentation<br>odg: application/vnd.oasis.opendocument.graphics<br>odf: application/vnd.oasis.opendocument.formula         | .odt, .ods, .odp, .odg, .odf | —                       |
+| Documents  | EPUB                   | application/epub+zip                                                                                                                                                                                                                                                       | .epub                        | libarchive (ZIP-based)  |
+| Documents  | Comic Book             | CBZ: application/vnd.comicbook+zip<br>CBT: application/vnd.comicbook+tar                                                                                                                                                                                                   | .cbz, .cbt                   | libarchive              |
+| Documents  | XPS                    | application/vnd.ms-xpsdocument, application/oxps                                                                                                                                                                                                                           | .xps, .oxps                  | libarchive (ZIP-based)  |
+| Documents  | DWFX                   | model/vnd.dwfx+xps                                                                                                                                                                                                                                                         | .dwfx                        | libarchive (ZIP-based)  |
+| Audio      | FLAC                   | audio/flac, audio/x-flac                                                                                                                                                                                                                                                   | .flac                        | libFLAC                 |
+| Audio      | Monkey's Audio         | audio/ape, audio/x-ape                                                                                                                                                                                                                                                     | .ape                         | MACLib                  |
+| Audio      | WavPack                | audio/x-wavpack, audio/x-wavpack-correction                                                                                                                                                                                                                                | .wv, .wvp, .wvc              | wavpack                 |
+| Databases  | SQLite                 | application/vnd.sqlite3, application/x-sqlite3                                                                                                                                                                                                                             | .sqlite, .db                 | sqlite3                 |
+| Archives   | Zip                    | application/zip, application/x-zip-compressed                                                                                                                                                                                                                              | .zip                         | libarchive              |
+| Archives   | 7z                     | application/x-7z-compressed                                                                                                                                                                                                                                                | .7z                          | libarchive              |
+| Archives   | Tar                    | application/x-tar                                                                                                                                                                                                                                                          | .tar                         | libarchive              |
+| Archives   | GZip                   | application/gzip                                                                                                                                                                                                                                                           | .gz                          | libarchive              |
+| Archives   | BZip2                  | application/x-bzip2                                                                                                                                                                                                                                                        | .bz2                         | libarchive              |
+| Archives   | Xz                     | application/x-xz                                                                                                                                                                                                                                                           | .xz                          | libarchive              |
+| Archives   | Rar                    | application/vnd.rar, application/x-rar-compressed                                                                                                                                                                                                                          | .rar                         | libarchive (read-only)  |
+| Archives   | ISO                    | application/x-iso9660-image                                                                                                                                                                                                                                                | .iso                         | libarchive              |
+| Archives   | CPIO                   | application/x-cpio                                                                                                                                                                                                                                                         | .cpio                        | libarchive              |
+| Archives   | LZMA                   | application/x-lzma                                                                                                                                                                                                                                                         | .lzma                        | libarchive              |
+| Archives   | CAB                    | application/vnd.ms-cab-compressed                                                                                                                                                                                                                                          | .cab                         | libarchive              |
+| Archives   | WIM                    | application/x-ms-wim                                                                                                                                                                                                                                                       | .wim                         | libarchive              |
+| Archives   | JAR                    | application/java-archive                                                                                                                                                                                                                                                   | .jar                         | libarchive (ZIP-based)  |
+| Archives   | XPI                    | application/x-xpinstall                                                                                                                                                                                                                                                    | .xpi                         | libarchive (ZIP-based)  |
+| Archives   | APK                    | application/vnd.android.package-archive                                                                                                                                                                                                                                    | .apk                         | libarchive (ZIP-based)  |
+| Scientific | MSEED                  | application/vnd.fdsn.mseed                                                                                                                                                                                                                                                 | .mseed                       | libmseed                |
