@@ -94,9 +94,9 @@ int main(int argc, char* argv[]) {
     auto start_total = std::chrono::steady_clock::now();
 
     // subscribe to events: print progress and collect results
-    bus.subscribe<FileAnalyzeStartEvent>([](const FileAnalyzeStartEvent& e) {
-        std::cout << "[ANALYZE] " << e.path << std::endl;
-    });
+    // bus.subscribe<FileAnalyzeStartEvent>([](const FileAnalyzeStartEvent& e) {
+    //     std::cout << "[ANALYZE] " << e.path << std::endl;
+    // });
 
     // update total if a container is extracted (finalization step counts as extra work)
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
@@ -147,8 +147,8 @@ int main(int argc, char* argv[]) {
     bus.subscribe<FileProcessSkippedEvent>(on_finish);
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-        std::cout << "[FINALIZED] " << e.path
-                  << " (" << e.final_size << " bytes)" << std::endl;
+    //    std::cout << "[FINALIZED] " << e.path
+    //              << " (" << e.final_size << " bytes)" << std::endl;
 
         ContainerResult c;
         c.filename = e.path;
