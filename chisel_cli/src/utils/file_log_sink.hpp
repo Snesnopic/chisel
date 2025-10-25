@@ -25,7 +25,6 @@ public:
         out_ << "[" << Logger::level_to_string(level) << "]";
         if (!tag.empty()) out_ << "[" << tag << "]";
         out_ << " " << message << "\n";
-        out_.flush();
     }
 
 private:
