@@ -78,6 +78,7 @@ cmake --build . --config Release
 **Options:**
 - `--dry-run`                  Use chisel without replacing original files.
 - `--no-meta`                  Do not preserve metadata in recompressed files.
+- `--verify-checksums`         Verify raw checksums before replacing files.
 - `--recursive`                Process directories recursively.
 - `--threads N`                Number of worker threads to use (default: half of available cores).
 - `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
