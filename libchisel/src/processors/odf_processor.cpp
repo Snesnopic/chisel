@@ -60,7 +60,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
          ext == ".ods" ? "ods_" :
          ext == ".odp" ? "odp_" :
          ext == ".odg" ? "odg_" : "odf_");
-    content.format = parse_container_format(prefix.substr(1, prefix.size())).value();
+    content.format = parse_container_format(prefix.substr(0, prefix.size() - 1)).value();
 
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
