@@ -35,6 +35,7 @@ struct FileAnalyzeCompleteEvent {
     std::filesystem::path path; ///< Path of the analyzed file
     bool extracted = false;     ///< True if the file was identified as a container and extracted
     bool scheduled = false;     ///< True if the file was scheduled for recompression
+    std::size_t num_children = 0;
 };
 
 /**
