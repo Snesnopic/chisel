@@ -369,7 +369,6 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
             archive_entry_free(entry);
 
-            archive_write_set_format_option(a, "zip", "compression", "deflate");
             archive_write_set_filter_option(a, "deflate", "compression-level", "9");
         }
     }
@@ -569,7 +568,7 @@ void ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
     }
 
     const fs::path src_path(content.original_path);
-    const std::string out_ext = container_format_to_string(out_fmt);
+    const std::string out_ext = "." + container_format_to_string(out_fmt);
     const fs::path tmp_archive = src_path.parent_path() / (src_path.stem().string() + "_tmp" + out_ext);
 
     Logger::log(LogLevel::Info, "Recreating archive: " + tmp_archive.string(), processor_tag());
