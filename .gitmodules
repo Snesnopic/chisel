@@ -65,7 +65,3 @@
 	path = third_party/libmkclean
 	url = https://github.com/Snesnopic/libmkclean.git
 	branch = no-zlib
-[submodule "third_party/megamimes"]
-	path = third_party/megamimes
-    url = https://github.com/Snesnopic/MegaMimes.git
-    branch = fix-windows-strings-include
