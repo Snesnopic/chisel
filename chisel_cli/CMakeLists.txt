@@ -8,6 +8,7 @@ set(CHISEL_CLI_SOURCES
         src/utils/file_scanner.hpp
         src/utils/console_log_sink.hpp
         src/utils/file_log_sink.hpp
+        src/utils/color.hpp
 )
 
 add_executable(chisel ${CHISEL_CLI_SOURCES})
