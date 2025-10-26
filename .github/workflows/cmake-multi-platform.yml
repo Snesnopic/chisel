@@ -46,6 +46,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
           lfs: true
+
       - name: Setup Git LFS
         run: |
           git lfs install
@@ -56,29 +57,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            autoconf automake libtool m4 nasm yasm ccache
+            autoconf automake libtool m4 nasm yasm
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install autoconf automake libtool nasm yasm ccache
-
-      - name: Cache ccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('**/CMakeLists.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-
-      - name: Cache build
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: ${{ runner.os }}-build-${{ matrix.c_compiler }}-${{ matrix.cpp_compiler }}-${{ hashFiles('**/CMakeLists.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-build-
+          brew install autoconf automake libtool nasm yasm
 
       - name: Set build output directory
         id: strings
@@ -91,8 +76,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache
-          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DBUILD_TESTING=OFF
           -S ${{ github.workspace }}
 
