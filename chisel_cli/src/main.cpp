@@ -55,9 +55,32 @@ void signal_handler(int sig) {
     }
 }
 
+inline void init_utf8_locale() {
+    std::setlocale(LC_ALL, "");
+
+    const char *cur = std::setlocale(LC_CTYPE, nullptr);
+    if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
+        Logger::log(LogLevel::Debug, std::string("Locale corrente: ") + cur, "LocaleInit");
+        return; // ok
+    }
+
+    constexpr char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
+    for (const auto fb: fallbacks) {
+        if (std::setlocale(LC_ALL, fb)) {
+            Logger::log(LogLevel::Info, std::string("Locale set to ") + fb, "LocaleInit");
+            return;
+        }
+    }
+
+    // no UTF-8 available
+    Logger::log(LogLevel::Warning, "UTF-8 locale not available; non-ASCII file names may be problematic.",
+                "LocaleInit");
+}
+
+
 int main(int argc, char* argv[]) {
     std::signal(SIGINT, signal_handler);
-
+    init_utf8_locale();
     Settings settings;
     try {
         // parse CLI arguments
