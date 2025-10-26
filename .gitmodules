@@ -67,4 +67,5 @@
 	branch = no-zlib
 [submodule "third_party/megamimes"]
 	path = third_party/megamimes
-	url = https://github.com/kobbyowen/MegaMimes.git
+    url = https://github.com/Snesnopic/MegaMimes.git
+    branch = fix-windows-strings-include
