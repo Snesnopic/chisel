@@ -171,6 +171,15 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
     set(CMAKE_EXE_LINKER_FLAGS "${_new_exe_linker_flags}" CACHE STRING "Propagated linker flags for external projects" FORCE)
 endif()
 
+# MegaMimes
+set(MEGA_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(MEGA_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(MEGA_BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(MEGA_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(megamimes_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/megamimes")
+set(megamimes_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/megamimes-build")
+add_subdirectory(${megamimes_SOURCE_DIR} ${megamimes_BINARY_DIR} EXCLUDE_FROM_ALL)
+
 # libmkclean
 add_subdirectory("third_party/libmkclean")
 
@@ -670,6 +679,7 @@ if(UNIX)
 elseif(WIN32)
     list(APPEND CHISEL_LIBS
             libmseed
+            megamimes_static
     )
 endif()
 

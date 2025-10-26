@@ -59,6 +59,10 @@ endif()
 
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
+if(WIN32)
+    target_link_libraries(libchisel PRIVATE megamimes)
+endif()
+
 target_include_directories(libchisel
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -85,6 +89,9 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
         ${CMAKE_SOURCE_DIR}/third_party/flexigif
 )
+if(WIN32)
+    target_include_directories(libchisel PRIVATE ${megamimes_SOURCE_DIR}/include)
+endif()
 if(NOT WIN32)
     target_include_directories(libchisel PRIVATE
             ${LIBMAGIC_INCLUDE_DIR}

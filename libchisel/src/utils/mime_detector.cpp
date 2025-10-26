@@ -4,6 +4,8 @@
 #ifndef _WIN32
 #include <magic.h>
 #include "magic_mgc.h"
+#else
+#include <megamimes.h>
 #endif
 #include "../../include/mime_detector.hpp"
 #include "../../include/file_type.hpp"
@@ -30,10 +32,21 @@ std::string MimeDetector::detect(const std::filesystem::path& path)
     magic_close(magic);
     return result;
 #else
-    auto ext = path.extension().string();
-    std::ranges::transform(ext, ext.begin(), ::tolower);
-    auto it = ext_to_mime.find(ext);
-    return it != ext_to_mime.end() ? it->second : "application/octet-stream";
+    MegaMimesCtx* ctx = mega_open(nullptr);
+    if (!ctx) return "application/octet-stream";
+
+    MegaFileInfo* info = nullptr;
+    std::string result = "application/octet-stream";
+
+    if (mega_probe_path(ctx, path.string().c_str(), &info) == MEGA_OK && info) {
+        if (info->mime_type) {
+            result = info->mime_type;
+        }
+        mega_free(ctx, info);
+    }
+
+    mega_close(ctx);
+    return result;
 #endif
 }
 
@@ -62,8 +75,21 @@ bool MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
     magic_close(magic);
     return ok;
 #else
-    // fallback: only check .mp3 extension
-    return path.extension() == ".mp3";
+    MegaMimesCtx* ctx = mega_open(nullptr);
+    if (!ctx) return false;
+
+    MegaFileInfo* info = nullptr;
+    bool ok = false;
+
+    if (mega_probe_path(ctx, path.string().c_str(), &info) == MEGA_OK && info) {
+        if (info->mime_type && std::string(info->mime_type) == "audio/mpeg") {
+            ok = true;
+        }
+        mega_free(ctx, info);
+    }
+
+    mega_close(ctx);
+    return ok;
 #endif
 }
 
