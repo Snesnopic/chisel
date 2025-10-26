@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <iomanip>
+#include "utils/color.hpp"
 #include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
@@ -50,7 +51,9 @@ static std::atomic<bool> interrupted{false};
 // handle ctrl+c or termination signals
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        Logger::log(LogLevel::Warning, "Stop detected. Waiting for threads to finish...", "main");
+        std::cout << CYAN
+                  << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
+                  << RESET << std::endl;
         interrupted.store(true);
     }
 }
@@ -88,7 +91,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, e.what(), "main");
+        std::cout << RED
+                  << e.what()
+                  << RESET << std::endl;
         return 1;
     }
 
@@ -146,9 +151,12 @@ int main(int argc, char* argv[]) {
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
         if (!settings.is_pipe) {
-            std::cout << "[DONE] " << e.path.filename().string()
-                      << " (" << e.original_size << " -> " << e.new_size << " bytes)"
-                      << (e.replaced ? " [replaced]" : " [kept]") << std::endl;
+            std::cout
+                << (e.replaced ? GREEN : YELLOW)
+                << "\n[DONE] " << e.path.filename().string()
+                << " (" << e.original_size << " -> " << e.new_size << " bytes)"
+                << (e.replaced ? " [replaced]" : " [kept]")
+                << RESET << std::endl;
         }
         Result r;
         r.path = e.path;
