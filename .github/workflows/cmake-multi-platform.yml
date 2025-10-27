@@ -8,49 +8,58 @@ on:
 
 jobs:
   build:
-    name: build (${{ contains(matrix.os, 'ubuntu') && 'linux' || contains(matrix.os, 'macos') && 'macos' || 'windows' }}-${{ contains(matrix.os, 'arm64') && 'arm64' || 'x86_64' }})
+    name: build (${{ contains(matrix.os, 'ubuntu') && 'linux' || contains(matrix.os, 'macos') && 'macos' || 'windows' }}-${{ contains(matrix.os, '-arm') && 'arm64' || contains(matrix.os, 'macos-26') && 'arm64' || contains(matrix.os, '-intel') && 'x86_64' || 'x86_64' }})
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # --- x86_64 Builds ---
+          - os: ubuntu-latest # x86_64
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
             artifact_name: chisel-ubuntu-x86_64-gcc
             binary_path: bin/Release/chisel
-          - os: ubuntu-latest
+          - os: ubuntu-latest # x86_64
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-ubuntu-x86_64-clang
             binary_path: bin/Release/chisel
-          - os: macos-26
+          - os: macos-15-intel # x86_64
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-macos-x86_64
             binary_path: bin/Release/chisel
-          - os: windows-latest
+          - os: windows-latest # x86_64
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
             artifact_name: chisel-windows-x86_64
             binary_path: bin/Release/chisel.exe
-          - os: ubuntu-latest-arm64
+
+          # --- ARM64 Builds ---
+          - os: ubuntu-24.04-arm # Linux ARM64
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
             artifact_name: chisel-linux-arm64-gcc
             binary_path: bin/Release/chisel
-          - os: macos-26-arm64
+          - os: macos-26 # macOS ARM64 (M1 Public Preview)
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-macos-arm64
             binary_path: bin/Release/chisel
+          - os: windows-11-arm # Windows ARM64
+            build_type: Release
+            c_compiler: cl
+            cpp_compiler: cl
+            artifact_name: chisel-windows-arm64
+            binary_path: bin/Release/chisel.exe
 
     steps:
       - name: Checkout repository
