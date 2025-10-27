@@ -67,7 +67,7 @@ inline void init_utf8_locale() {
         return; // ok
     }
 
-    constexpr char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
+    constexpr const char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
         if (std::setlocale(LC_ALL, fb)) {
             Logger::log(LogLevel::Info, std::string("Locale set to ") + fb, "LocaleInit");
