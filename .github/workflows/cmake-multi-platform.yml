@@ -22,18 +22,21 @@ jobs:
             cpp_compiler: g++
             artifact_name: chisel-ubuntu-x86_64-gcc
             binary_path: bin/Release/chisel
+
           - os: ubuntu-latest # x86_64
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-ubuntu-x86_64-clang
             binary_path: bin/Release/chisel
+
           - os: macos-15-intel # x86_64
             build_type: Release
-            c_compiler: clang
-            cpp_compiler: clang++
+            c_compiler: gcc-12
+            cpp_compiler: g++-12
             artifact_name: chisel-macos-x86_64
             binary_path: bin/Release/chisel
+
           - os: windows-latest # x86_64
             build_type: Release
             c_compiler: cl
@@ -48,12 +51,14 @@ jobs:
             cpp_compiler: g++
             artifact_name: chisel-linux-arm64-gcc
             binary_path: bin/Release/chisel
+
           - os: macos-26 # macOS ARM64 (M1 Public Preview)
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
             artifact_name: chisel-macos-arm64
             binary_path: bin/Release/chisel
+
           - os: windows-11-arm # Windows ARM64
             build_type: Release
             c_compiler: cl
@@ -86,6 +91,10 @@ jobs:
         run: |
           brew update
           brew install autoconf automake libtool nasm yasm
+          # install GCC 12 for Intel builds
+          if [[ "$(uname -m)" == "x86_64" ]]; then
+            brew install gcc@12
+          fi
 
       - name: Set build output directory
         id: strings
