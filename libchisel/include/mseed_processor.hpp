@@ -26,7 +26,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view,1> kExts = { ".mseed" };
+            static constexpr std::array<std::string_view,3> kExts = { ".mseed", ".mseed2", ".mseed3" };
             return {kExts.data(), kExts.size()};
         }
 
