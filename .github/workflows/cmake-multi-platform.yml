@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: build (${{ contains(matrix.os, 'ubuntu') && 'linux' || contains(matrix.os, 'macos') && 'macos' || 'windows' }}-${{ contains(matrix.os, 'arm64') && 'arm64' || 'x86_64' }})
     runs-on: ${{ matrix.os }}
 
     strategy:
