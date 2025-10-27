@@ -84,17 +84,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            autoconf automake libtool m4 nasm yasm
+            autoconf automake libtool m4 nasm yasm curl unzip tar gzip python3-pip
+          pip3 install gdown --upgrade
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install autoconf automake libtool nasm yasm
+          brew install autoconf automake libtool nasm yasm curl python
+          pip3 install gdown --upgrade
           # install GCC 12 for Intel builds
           if [[ "$(uname -m)" == "x86_64" ]]; then
             brew install gcc@12
           fi
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pip3 install gdown --upgrade
+        shell: bash
 
       - name: Set build output directory
         id: strings
@@ -107,14 +115,110 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DBUILD_TESTING=OFF
+          -DBUILD_TESTING=ON
           -S ${{ github.workspace }}
 
       - name: Build
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-      - name: Upload build artifact
+      - name: Upload build directory (for testing)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ github.workspace }}/${{ matrix.binary_path }}
+          name: build-dir-${{ matrix.os }}
+          path: ${{ steps.strings.outputs.build-output-dir }}
+          retention-days: 1
+
+  test:
+    name: test (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-15-intel
+          - windows-latest
+          - ubuntu-24.04-arm
+          - macos-26
+          - windows-11-arm
+
+    env:
+      TEST_ARCHIVE_NAME: chisel_samples.zip
+      TEST_DIR: test-data
+      GDRIVE_CREDS_FILE: gdrive_creds.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build directory artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dir-${{ matrix.os }}
+          path: build
+
+      - name: Install gdown (Python)
+        if: runner.os != 'Linux' && runner.os != 'macOS'
+        run: pip3 install gdown --upgrade
+        shell: bash
+
+      - name: Cache test data archive
+        id: cache-test-archive
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TEST_ARCHIVE_NAME }}
+          key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
+
+      - name: Authenticate and Download Test Data from Google Drive
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+        env:
+          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
+          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
+        run: |
+          echo "Setting up Google Drive credentials..."
+          echo "${GDRIVE_CREDENTIALS_JSON}" > ${{ env.GDRIVE_CREDS_FILE }}
+          echo "Downloading test data archive (ID: ${GDRIVE_FILE_ID})..."
+          gdown --service-account ${{ env.GDRIVE_CREDS_FILE }} "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
+          echo "Removing credentials file..."
+          rm ${{ env.GDRIVE_CREDS_FILE }}
+        shell: bash
+
+      - name: Extract Test Data
+        run: |
+          echo "Extracting test data..."
+          mkdir ${{ env.TEST_DIR }}
+          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+        shell: bash
+
+      - name: Run Tests (using CTest)
+        working-directory: build
+        run: ctest --output-on-failure -C Release
+        shell: bash
+
+      - name: Check for errors in Chisel Log
+        if: always()
+        run: |
+          LOG_FILE="build/chisel.log"
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "Log file not found at $LOG_FILE"
+            exit 0
+          fi
+          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+            echo "::error::Errors detected in chisel.log!"
+            grep '\[ERROR\]' "$LOG_FILE"
+            exit 1
+          else
+            echo "No [ERROR] lines found in chisel.log."
+            exit 0
+          fi
+        shell: bash
+
+      - name: Upload Chisel Log File
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chisel-log-${{ matrix.os }}
+          path: build/chisel.log
+          retention-days: 7
