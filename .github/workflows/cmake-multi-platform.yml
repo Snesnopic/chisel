@@ -83,14 +83,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
             autoconf automake libtool m4 nasm yasm curl unzip tar gzip python3-pip
-          pip3 install gdown --upgrade
+          pip3 install "gdown>=4.7.1" --upgrade
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
           brew install autoconf automake libtool nasm yasm curl pipx
-          pipx install gdown
+          pipx install "gdown>=4.7.1"
+          pipx ensurepath
           if [[ "$(uname -m)" == "x86_64" ]]; then
             brew install gcc@12
           fi
@@ -98,7 +99,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          pip3 install gdown --upgrade
+          pip3 install "gdown>=4.7.1" --upgrade
         shell: bash
 
       - name: Set build output directory
@@ -171,9 +172,9 @@ jobs:
           name: build-dir-${{ matrix.id }}
           path: build
 
-      - name: Install gdown (Python)
-        if: runner.os != 'Linux' && runner.os != 'macOS'
-        run: pip3 install gdown --upgrade
+      - name: Install gdown (Python, only if not already installed in build job)
+        if: runner.os == 'Windows'
+        run: pip3 install "gdown>=4.7.1" --upgrade
         shell: bash
 
       - name: Cache test data archive
@@ -189,32 +190,52 @@ jobs:
           GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
           GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
         run: |
+          # Ensure gdown executable is in PATH for this script session
+          export PATH="$HOME/.local/bin:$PATH"
           echo "Setting up Google Drive credentials..."
           echo "${GDRIVE_CREDENTIALS_JSON}" > ${{ env.GDRIVE_CREDS_FILE }}
           echo "Downloading test data archive (ID: ${GDRIVE_FILE_ID})..."
           gdown --service-account ${{ env.GDRIVE_CREDS_FILE }} "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
+          echo "Removing credentials file..."
           rm ${{ env.GDRIVE_CREDS_FILE }}
         shell: bash
 
       - name: Extract Test Data
         run: |
+          echo "Extracting test data..."
           mkdir ${{ env.TEST_DIR }}
           unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
         shell: bash
 
-      - name: Run Tests (using CTest)
-        working-directory: build
-        run: ctest --output-on-failure -C Release
+      - name: Run Chisel Tests
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            CHISEL_EXE="./build/bin/Release/chisel.exe"
+          else
+            CHISEL_EXE="./build/bin/Release/chisel"
+          fi
+          echo "Running chisel from: $CHISEL_EXE"
+          echo "Processing files in: ${{ env.TEST_DIR }}"
+          
+          "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive
         shell: bash
 
       - name: Check for errors in Chisel Log
         if: always()
         run: |
-          LOG_FILE="build/chisel.log"
+          LOG_FILE="build/chisel.log" # Assuming log is written relative to execution dir (build)
           if [ ! -f "$LOG_FILE" ]; then
-            echo "Log file not found at $LOG_FILE"
-            exit 0
+            # Try finding the log file relative to the checkout directory if not in build
+            if [ -f "${{ github.workspace }}/chisel.log" ]; then
+                LOG_FILE="${{ github.workspace }}/chisel.log"
+            elif [ -f "chisel.log" ]; then
+                 LOG_FILE="chisel.log" # Check current directory as last resort
+            else
+              echo "Log file not found at build/chisel.log, ${{ github.workspace }}/chisel.log, or current directory."
+              exit 0 # Exit successfully if log is missing
+            fi
           fi
+          echo "Checking log file at: $LOG_FILE"
           if grep -q '\[ERROR\]' "$LOG_FILE"; then
             echo "::error::Errors detected in chisel.log!"
             grep '\[ERROR\]' "$LOG_FILE"
@@ -230,5 +251,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chisel-log-${{ matrix.id }}
-          path: build/chisel.log
+          # Try multiple locations for the log file
+          path: |
+            build/chisel.log
+            ${{ github.workspace }}/chisel.log
+            chisel.log
+          if-no-files-found: warn # Don't fail if log is missing
           retention-days: 7
+
