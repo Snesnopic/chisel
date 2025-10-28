@@ -1,4 +1,4 @@
-name: CMake on multiple platforms
+name: Multi-platform build
 
 on:
   push:
@@ -8,62 +8,60 @@ on:
 
 jobs:
   build:
-    name: build (${{ contains(matrix.os, 'ubuntu') && 'linux' || contains(matrix.os, 'macos') && 'macos' || 'windows' }}-${{ contains(matrix.os, '-arm') && 'arm64' || contains(matrix.os, 'macos-26') && 'arm64' || contains(matrix.os, '-intel') && 'x86_64' || 'x86_64' }})
-    runs-on: ${{ matrix.os }}
+    name: build (${{ matrix.id }})
+    runs-on: ${{ matrix.runs_on }}
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          # --- x86_64 Builds ---
-          - os: ubuntu-latest # x86_64
+          - id: ubuntu-gcc
+            runs_on: ubuntu-latest
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            artifact_name: chisel-ubuntu-x86_64-gcc
             binary_path: bin/Release/chisel
 
-          - os: ubuntu-latest # x86_64
+          - id: ubuntu-clang
+            runs_on: ubuntu-latest
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            artifact_name: chisel-ubuntu-x86_64-clang
             binary_path: bin/Release/chisel
 
-          - os: macos-15-intel # x86_64
+          - id: ubuntu-arm
+            runs_on: ubuntu-24.04-arm
+            build_type: Release
+            c_compiler: gcc
+            cpp_compiler: g++
+            binary_path: bin/Release/chisel
+
+          - id: macos-intel
+            runs_on: macos-15-intel
             build_type: Release
             c_compiler: gcc-12
             cpp_compiler: g++-12
-            artifact_name: chisel-macos-x86_64
             binary_path: bin/Release/chisel
 
-          - os: windows-latest # x86_64
-            build_type: Release
-            c_compiler: cl
-            cpp_compiler: cl
-            artifact_name: chisel-windows-x86_64
-            binary_path: bin/Release/chisel.exe
-
-          # --- ARM64 Builds ---
-          - os: ubuntu-24.04-arm # Linux ARM64
-            build_type: Release
-            c_compiler: gcc
-            cpp_compiler: g++
-            artifact_name: chisel-linux-arm64-gcc
-            binary_path: bin/Release/chisel
-
-          - os: macos-26 # macOS ARM64 (M1 Public Preview)
+          - id: macos-arm
+            runs_on: macos-26
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            artifact_name: chisel-macos-arm64
             binary_path: bin/Release/chisel
 
-          - os: windows-11-arm # Windows ARM64
+          - id: windows-x86
+            runs_on: windows-latest
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            artifact_name: chisel-windows-arm64
+            binary_path: bin/Release/chisel.exe
+
+          - id: windows-arm
+            runs_on: windows-11-arm
+            build_type: Release
+            c_compiler: cl
+            cpp_compiler: cl
             binary_path: bin/Release/chisel.exe
 
     steps:
@@ -93,7 +91,6 @@ jobs:
           brew update
           brew install autoconf automake libtool nasm yasm curl pipx
           pipx install gdown
-          # install GCC 12 for Intel builds
           if [[ "$(uname -m)" == "x86_64" ]]; then
             brew install gcc@12
           fi
@@ -124,25 +121,40 @@ jobs:
       - name: Upload build directory (for testing)
         uses: actions/upload-artifact@v4
         with:
-          name: build-dir-${{ matrix.os }}
+          name: build-dir-${{ matrix.id }}
           path: ${{ steps.strings.outputs.build-output-dir }}
           retention-days: 1
 
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chisel-${{ matrix.id }}
+          path: ${{ github.workspace }}/${{ matrix.binary_path }}
+          retention-days: 7
+
   test:
-    name: test (${{ matrix.os }})
+    name: test (${{ matrix.id }})
     needs: build
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runs_on }}
 
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-15-intel
-          - windows-latest
-          - ubuntu-24.04-arm
-          - macos-26
-          - windows-11-arm
+        include:
+          - id: ubuntu-gcc
+            runs_on: ubuntu-latest
+          - id: ubuntu-clang
+            runs_on: ubuntu-latest
+          - id: ubuntu-arm
+            runs_on: ubuntu-24.04-arm
+          - id: macos-intel
+            runs_on: macos-15-intel
+          - id: macos-arm
+            runs_on: macos-26
+          - id: windows-x86
+            runs_on: windows-latest
+          - id: windows-arm
+            runs_on: windows-11-arm
 
     env:
       TEST_ARCHIVE_NAME: chisel_samples.zip
@@ -156,7 +168,7 @@ jobs:
       - name: Download build directory artifact
         uses: actions/download-artifact@v4
         with:
-          name: build-dir-${{ matrix.os }}
+          name: build-dir-${{ matrix.id }}
           path: build
 
       - name: Install gdown (Python)
@@ -181,13 +193,11 @@ jobs:
           echo "${GDRIVE_CREDENTIALS_JSON}" > ${{ env.GDRIVE_CREDS_FILE }}
           echo "Downloading test data archive (ID: ${GDRIVE_FILE_ID})..."
           gdown --service-account ${{ env.GDRIVE_CREDS_FILE }} "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
-          echo "Removing credentials file..."
           rm ${{ env.GDRIVE_CREDS_FILE }}
         shell: bash
 
       - name: Extract Test Data
         run: |
-          echo "Extracting test data..."
           mkdir ${{ env.TEST_DIR }}
           unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
         shell: bash
@@ -219,6 +229,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: chisel-log-${{ matrix.os }}
+          name: chisel-log-${{ matrix.id }}
           path: build/chisel.log
           retention-days: 7
