@@ -99,7 +99,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          pip3 install "gdown>=4.7.1" --upgrade
+          pip3 install "gdown>=4.7.1" --upgrade --force-reinstall
         shell: bash
 
       - name: Set build output directory
@@ -172,9 +172,9 @@ jobs:
           name: build-dir-${{ matrix.id }}
           path: build
 
-      - name: Install gdown (Python, only if not already installed in build job)
+      - name: Install gdown (Python, Windows only in test job)
         if: runner.os == 'Windows'
-        run: pip3 install "gdown>=4.7.1" --upgrade
+        run: pip3 install "gdown>=4.7.1" --upgrade --force-reinstall
         shell: bash
 
       - name: Cache test data archive
@@ -190,12 +190,26 @@ jobs:
           GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
           GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
         run: |
-          # Ensure gdown executable is in PATH for this script session
+          # Ensure gdown executable is potentially in PATH for Linux/pip
           export PATH="$HOME/.local/bin:$PATH"
+          
           echo "Setting up Google Drive credentials..."
           echo "${GDRIVE_CREDENTIALS_JSON}" > ${{ env.GDRIVE_CREDS_FILE }}
+          
+          echo "Setting GOOGLE_APPLICATION_CREDENTIALS environment variable..."
+          # Set the standard environment variable pointing to the credentials file
+          export GOOGLE_APPLICATION_CREDENTIALS="${{ github.workspace }}/${{ env.GDRIVE_CREDS_FILE }}"
+          
           echo "Downloading test data archive (ID: ${GDRIVE_FILE_ID})..."
-          gdown --service-account ${{ env.GDRIVE_CREDS_FILE }} "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
+          # Run gdown without specific auth flags; it will use the env var
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Use pipx run which handles the environment
+            pipx run gdown "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
+          else
+            # Linux and Windows use the gdown found via PATH
+            gdown "${GDRIVE_FILE_ID}" -O ${{ env.TEST_ARCHIVE_NAME }}
+          fi
+          
           echo "Removing credentials file..."
           rm ${{ env.GDRIVE_CREDS_FILE }}
         shell: bash
@@ -225,14 +239,13 @@ jobs:
         run: |
           LOG_FILE="build/chisel.log" # Assuming log is written relative to execution dir (build)
           if [ ! -f "$LOG_FILE" ]; then
-            # Try finding the log file relative to the checkout directory if not in build
             if [ -f "${{ github.workspace }}/chisel.log" ]; then
                 LOG_FILE="${{ github.workspace }}/chisel.log"
             elif [ -f "chisel.log" ]; then
-                 LOG_FILE="chisel.log" # Check current directory as last resort
+                 LOG_FILE="chisel.log"
             else
               echo "Log file not found at build/chisel.log, ${{ github.workspace }}/chisel.log, or current directory."
-              exit 0 # Exit successfully if log is missing
+              exit 0
             fi
           fi
           echo "Checking log file at: $LOG_FILE"
@@ -251,11 +264,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chisel-log-${{ matrix.id }}
-          # Try multiple locations for the log file
           path: |
             build/chisel.log
             ${{ github.workspace }}/chisel.log
             chisel.log
-          if-no-files-found: warn # Don't fail if log is missing
+          if-no-files-found: warn
           retention-days: 7
 
