@@ -56,8 +56,10 @@ int MseedProcessor::choose_reclen(const uint8_t original_version,
 
     const int exponent = static_cast<int>(std::ceil(std::log2(total_estimated_size)));
     int reclen = static_cast<int>(std::pow(2, exponent));
-
-    return std::min(reclen, MAX_COMPROMISE_RECLEN);
+    if (reclen <= MIN_RECLEN) {
+        return reclen;
+    }
+    return MIN_RECLEN;
 }
 void MseedProcessor::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output,
@@ -69,7 +71,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
     uint8_t original_version = 3;
     uint32_t pack_flags = MSF_FLUSHDATA;
 
-    int ret = ms3_readmsr(&msr, input.c_str(), 0, 0);
+    int ret = ms3_readmsr(&msr, input.string().c_str(), 0, 0);
 
     if (ret != MS_NOERROR) {
         if (msr) msr3_free(&msr);
@@ -86,7 +88,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
         pack_flags |= MSF_PACKVER2;
     }
 
-    ret = ms3_readtracelist(&mstl, input.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    ret = ms3_readtracelist(&mstl, input.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
 
     if (ret != MS_NOERROR) {
         if (mstl) mstl3_free(&mstl, 0);
@@ -97,7 +99,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
         return;
     }
 
-    outfile = fopen(output.c_str(), "wb");
+    outfile = fopen(output.string().c_str(), "wb");
     if (outfile == nullptr) {
         mstl3_free(&mstl, 0);
         throw std::runtime_error("Failed to open output file for writing: " + output.string());
@@ -168,14 +170,14 @@ bool MseedProcessor::raw_equal(const std::filesystem::path &a,
     MS3TraceList *mstl_b = nullptr;
     bool are_equal = true;
 
-    int ret_a = ms3_readtracelist(&mstl_a, a.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    int ret_a = ms3_readtracelist(&mstl_a, a.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
     if (ret_a != MS_NOERROR) {
         Logger::log(LogLevel::Error, "raw_equal: Failed to read file A: " + a.string());
         if (mstl_a) mstl3_free(&mstl_a, 0);
         return false;
     }
 
-    int ret_b = ms3_readtracelist(&mstl_b, b.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    int ret_b = ms3_readtracelist(&mstl_b, b.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
     if (ret_b != MS_NOERROR) {
         Logger::log(LogLevel::Error, "raw_equal: Failed to read file B: " + b.string());
         if (mstl_a) mstl3_free(&mstl_a, 0);
