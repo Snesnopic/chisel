@@ -207,15 +207,15 @@ jobs:
           fi
 
           "$PY_EXE" -c "
-            import os
-            import io
-            import json
-            import sys
-            from google.oauth2 import service_account
-            from googleapiclient.discovery import build
-            from googleapiclient.http import MediaIoBaseDownload
+          import os
+          import io
+          import json
+          import sys
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
             
-            creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
+          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
           if not creds_json_string:
             print('::error::Secret GDRIVE_CREDENTIALS_JSON is not set.', file=sys.stderr)
             sys.exit(1)
@@ -255,11 +255,11 @@ jobs:
               sys.exit(1)
           
           try:
-              print(f'Opening output file: {output_filename}...')
+            print(f'Opening output file: {output_filename}...')
             fh = io.FileIO(output_filename, 'wb')
           except Exception as e:
             print(f'::error::Failed to open output file {output_filename} for writing: {e}', file=sys.stderr)
-              sys.exit(1)
+            sys.exit(1)
           
           downloader = MediaIoBaseDownload(fh, request)
           done = False
@@ -273,78 +273,78 @@ jobs:
             print(f'::error::Download failed: {e}', file=sys.stderr)
               # Ensure file handle is closed before attempting removal
               if not fh.closed:
-                  fh.close()
+                fh.close()
               # Attempt to remove partially downloaded file
               try:
-                  if os.path.exists(output_filename):
-                      os.remove(output_filename)
-                      print(f'Removed partially downloaded file: {output_filename}')
+                if os.path.exists(output_filename):
+                  os.remove(output_filename)
+                  print(f'Removed partially downloaded file: {output_filename}')
               except OSError as oe:
-                  print(f'Warning: Could not remove partial file {output_filename}: {oe}', file=sys.stderr)
+                print(f'Warning: Could not remove partial file {output_filename}: {oe}', file=sys.stderr)
               sys.exit(1)
           finally:
               # Ensure file handle is closed even if download finished successfully
-              if not fh.closed:
-                  fh.close()
+            if not fh.closed:
+              fh.close()
           
           print(f'Download complete: {output_filename}.')
             "
-                  shell: bash
+
+        shell: bash
           
-                - name: Extract Test Data
-                  run: |
-                    echo "Extracting test data..."
+      - name: Extract Test Data
+        run: |
+            echo "Extracting test data..."
             mkdir ${{ env.TEST_DIR }}
             unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
-          shell: bash
+        shell: bash
           
-          - name: Run Chisel Tests
-            run: |
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
-                CHISEL_EXE="./build/bin/Release/chisel.exe"
-              else
-                CHISEL_EXE="./build/bin/Release/chisel"
-              fi
-              echo "Running chisel from: $CHISEL_EXE"
-              echo "Processing files in: ${{ env.TEST_DIR }}"
+      - name: Run Chisel Tests
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            CHISEL_EXE="./build/bin/Release/chisel.exe"
+          else
+            CHISEL_EXE="./build/bin/Release/chisel"
+          fi
+          echo "Running chisel from: $CHISEL_EXE"
+          echo "Processing files in: ${{ env.TEST_DIR }}"
               
-              "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive
-            shell: bash
+          "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive
+        shell: bash
           
-          - name: Check for errors in Chisel Log
-            if: always()
-            run: |
-              LOG_FILE="build/chisel.log"
-              if [ ! -f "$LOG_FILE" ]; then
-                if [ -f "${{ github.workspace }}/chisel.log" ]; then
-                    LOG_FILE="${{ github.workspace }}/chisel.log"
-                elif [ -f "chisel.log" ]; then
-                     LOG_FILE="chisel.log"
-                else
-                  echo "Log file not found at build/chisel.log, ${{ github.workspace }}/chisel.log, or current directory."
-                  exit 0
-                fi
-              fi
-              echo "Checking log file at: $LOG_FILE"
-              if grep -q '\[ERROR\]' "$LOG_FILE"; then
-                echo "::error::Errors detected in chisel.log!"
-                grep '\[ERROR\]' "$LOG_FILE"
-                exit 1
-              else
-                echo "No [ERROR] lines found in chisel.log."
-                exit 0
-              fi
-            shell: bash
+      - name: Check for errors in Chisel Log
+        if: always()
+        run: |
+          LOG_FILE="build/chisel.log"
+          if [ ! -f "$LOG_FILE" ]; then
+            if [ -f "${{ github.workspace }}/chisel.log" ]; then
+              LOG_FILE="${{ github.workspace }}/chisel.log"
+            elif [ -f "chisel.log" ]; then
+              LOG_FILE="chisel.log"
+            else
+              echo "Log file not found at build/chisel.log, ${{ github.workspace }}/chisel.log, or current directory."
+              exit 0
+            fi
+          fi
+          echo "Checking log file at: $LOG_FILE"
+          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+            echo "::error::Errors detected in chisel.log!"
+            grep '\[ERROR\]' "$LOG_FILE"
+            exit 1
+          else
+            echo "No [ERROR] lines found in chisel.log."
+            exit 0
+          fi
+        shell: bash
           
-          - name: Upload Chisel Log File
-            if: always()
-            uses: actions/upload-artifact@v4
-            with:
-              name: chisel-log-${{ matrix.id }}
-              path: |
-                build/chisel.log
-                ${{ github.workspace }}/chisel.log
-                chisel.log
+      - name: Upload Chisel Log File
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chisel-log-${{ matrix.id }}
+          path: |
+              build/chisel.log
+              ${{ github.workspace }}/chisel.log
+              chisel.log
               if-no-files-found: warn
               retention-days: 7
-          
