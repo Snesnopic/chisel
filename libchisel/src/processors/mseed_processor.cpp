@@ -2,98 +2,158 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
-#include "../../include/mseed_processor.hpp"
-#include "../../include/logger.hpp"
+#include "mseed_processor.hpp"
 #include <libmseed.h>
-#include <limits>
-#include <vector>
-#include <filesystem>
-#include <fstream>
 #include <stdexcept>
+#include <iostream>
+#include <map>
+#include "logger.hpp"
+#include "log_sink.hpp"
 
 namespace chisel {
 
+extern "C" void record_handler_c(char *record, int reclen, void *userdata) {
+    if (userdata == nullptr) {
+        Logger::log(LogLevel::Error, "record_handler_c: userdata (FILE*) is null");
+        return;
+    }
+
+    auto outfile = static_cast<FILE*>(userdata);
+
+    if (fwrite(record, 1, reclen, outfile) != static_cast<size_t>(reclen)) {
+        Logger::log(LogLevel::Error, "record_handler_c: Error writing record to output file");
+    }
+}
+int MseedProcessor::choose_reclen(const uint8_t original_version,
+                                  const char sampleType,
+                                  const int64_t sample_count) {
+
+    constexpr int MAX_COMPROMISE_RECLEN = 131072;
+
+    constexpr int MIN_RECLEN = 256;
+
+    if (original_version == 3) {
+
+        return MAX_COMPROMISE_RECLEN;
+    }
+
+
+    size_t estimated_data_size = 0;
+
+    if (sampleType == 'i' || sampleType == 'f') {
+        estimated_data_size = sample_count * 4; // float32 or int32
+    } else if (sampleType == 'd') {
+        estimated_data_size = sample_count * 8; // float64
+    } else {
+        estimated_data_size = sample_count; // text
+    }
+
+    const size_t total_estimated_size = estimated_data_size + 128;
+
+    if (total_estimated_size <= MIN_RECLEN) {
+        return MIN_RECLEN;
+    }
+
+    const int exponent = static_cast<int>(std::ceil(std::log2(total_estimated_size)));
+    int reclen = static_cast<int>(std::pow(2, exponent));
+
+    return std::min(reclen, MAX_COMPROMISE_RECLEN);
+}
 void MseedProcessor::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output,
-                                bool /*preserve_metadata*/) {
-    Logger::log(LogLevel::Info, "Starting MiniSEED recompression", "mseed_processor");
+                                [[maybe_unused]] bool preserve_metadata) {
+    ms_rloginit(nullptr, nullptr, [](const char* _){}, nullptr, 0);
+    MS3Record *msr = nullptr;
+    MS3TraceList *mstl = nullptr;
+    FILE *outfile = nullptr;
+    uint8_t original_version = 3;
+    uint32_t pack_flags = MSF_FLUSHDATA;
 
-    MS3Record* msr = nullptr;
-    const uint32_t read_flags = MSF_VALIDATECRC | MSF_UNPACKDATA;
-    constexpr int8_t verbose = 0;
+    int ret = ms3_readmsr(&msr, input.c_str(), 0, 0);
 
-    int retcode = ms3_readmsr(&msr, input.string().c_str(), read_flags, verbose);
-    while (retcode == MS_NOERROR) {
-        const int reclen = choose_reclen(msr, msr->numsamples);
-
-        uint32_t write_flags = MSF_FLUSHDATA;
-        if (msr->formatversion == 2) write_flags |= MSF_PACKVER2;
-        if (msr->sampletype == 'i') msr->encoding = DE_STEIM2;
-
-        msr->reclen = reclen;
-
-        const int64_t rv = msr3_writemseed(msr, output.string().c_str(), 1, write_flags, verbose);
-        if (rv < 0) {
-            Logger::log(LogLevel::Error, "Error writing MiniSEED record", "mseed_processor");
-            ms3_readmsr(&msr, nullptr, read_flags, 0);
-            throw std::runtime_error("MseedProcessor: write failed");
-        }
-
-        retcode = ms3_readmsr(&msr, nullptr, read_flags, verbose);
+    if (ret != MS_NOERROR) {
+        if (msr) msr3_free(&msr);
+        Logger::log(LogLevel::Warning, "Could not peek first record from " + input.string() +
+                                       " (ret " + std::to_string(ret) + "). Will attempt full read.");
     }
 
-    if (retcode != MS_ENDOFFILE) {
-        Logger::log(LogLevel::Error, "Error reading MiniSEED: " + std::string(ms_errorstr(retcode)), "mseed_processor");
-        ms3_readmsr(&msr, nullptr, read_flags, 0);
-        throw std::runtime_error("MseedProcessor: read failed");
+    if (msr) {
+        original_version = msr->formatversion;
+        msr3_free(&msr);
     }
 
-    ms3_readmsr(&msr, nullptr, read_flags, 0);
-    Logger::log(LogLevel::Info, "Recompression completed successfully", "mseed_processor");
-}
-
-int MseedProcessor::choose_reclen(const MS3Record* msr, const size_t sample_count) {
-    if (!msr || sample_count == 0) return 4096;
-
-    const int max_reclen_exp = (msr->formatversion == 2) ? 16 : 20;
-    constexpr int MIN_RECLEN_EXP = 8;
-    std::vector<int> candidates;
-    for (int e = MIN_RECLEN_EXP; e <= max_reclen_exp; ++e)
-        candidates.push_back(1 << e);
-
-    const auto tmpdir = std::filesystem::temp_directory_path();
-    uint64_t best_size = (std::numeric_limits<uint64_t>::max)();
-    int best_reclen = 4096;
-
-    for (const int reclen : candidates) {
-        MS3Record* clone = msr3_duplicate(msr, 1);
-        if (!clone) continue;
-
-        clone->reclen = reclen;
-        if (clone->sampletype == 'i') clone->encoding = DE_STEIM2;
-
-        auto tmpfile = tmpdir / ("mseed_test_" + std::to_string(reclen) + ".mseed");
-
-        uint32_t write_flags = MSF_FLUSHDATA;
-        if (clone->formatversion == 2) write_flags |= MSF_PACKVER2;
-
-        const int64_t rv = msr3_writemseed(clone, tmpfile.string().c_str(), 0, write_flags, 0);
-        msr3_free(&clone);
-
-        if (rv < 0) {
-            if (std::filesystem::exists(tmpfile)) std::filesystem::remove(tmpfile);
-            continue;
-        }
-
-        const uint64_t sz = std::filesystem::file_size(tmpfile);
-        if (sz < best_size) {
-            best_size = sz;
-            best_reclen = reclen;
-        }
-        std::filesystem::remove(tmpfile);
+    if (original_version == 2) {
+        pack_flags |= MSF_PACKVER2;
     }
 
-    return best_reclen;
+    ret = ms3_readtracelist(&mstl, input.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+
+    if (ret != MS_NOERROR) {
+        if (mstl) mstl3_free(&mstl, 0);
+        throw std::runtime_error("Failed to read trace list from input: " + input.string());
+    }
+
+    if (mstl == nullptr) {
+        return;
+    }
+
+    outfile = fopen(output.c_str(), "wb");
+    if (outfile == nullptr) {
+        mstl3_free(&mstl, 0);
+        throw std::runtime_error("Failed to open output file for writing: " + output.string());
+    }
+
+    for (MS3TraceID *id = mstl->traces.next[0]; id != nullptr; id = id->next[0]) {
+        for (MS3TraceSeg *seg = id->first; seg != nullptr; seg = seg->next) {
+
+            int8_t target_encoding;
+
+            const int reclen = choose_reclen(original_version, seg->sampletype, seg->samplecnt);
+            int64_t packed_samples = 0;
+            int64_t ret_pack = 0;
+
+            if (seg->sampletype == 'i') {
+                target_encoding = DE_STEIM2;
+            }
+            else if (seg->sampletype == 'f') {
+                target_encoding = DE_FLOAT32;
+            } else if (seg->sampletype == 'd') {
+                target_encoding = DE_FLOAT64;
+            } else if (seg->sampletype == 't') {
+                target_encoding = DE_TEXT;
+            } else {
+                target_encoding = -1;
+            }
+
+            ret_pack = mstl3_pack_segment(mstl, id, seg,
+                                          record_handler_c, outfile,
+                                          reclen, target_encoding,
+                                          &packed_samples, pack_flags, 0, nullptr);
+
+            if (ret_pack < 0 && seg->sampletype == 'i') {
+
+                Logger::log(LogLevel::Warning, std::string("SID ") + id->sid +
+                                               ": Steim2 packing failed (data range likely too large). " +
+                                               "Retrying with uncompressed 32-bit integers (DE_INT32).");
+
+                target_encoding = DE_INT32;
+                packed_samples = 0;
+
+                ret_pack = mstl3_pack_segment(mstl, id, seg,
+                                              record_handler_c, outfile,
+                                              reclen, target_encoding,
+                                              &packed_samples, pack_flags, 0, nullptr);
+            }
+
+            if (ret_pack < 0) {
+                Logger::log(LogLevel::Error, std::string("Final packing error for SID ") + id->sid +
+                                             " (type " + seg->sampletype + ") after fallback. Segment skipped.");
+            }
+        }
+    }
+
+    fclose(outfile);
+    mstl3_free(&mstl, 0);
 }
 
 std::string MseedProcessor::get_raw_checksum(const std::filesystem::path&) const {
@@ -101,44 +161,157 @@ std::string MseedProcessor::get_raw_checksum(const std::filesystem::path&) const
     return "";
 }
 
-bool MseedProcessor::raw_equal(const std::filesystem::path& a,
-                               const std::filesystem::path& b) const {
-    MS3Record* msrA = nullptr;
-    MS3Record* msrB = nullptr;
-    constexpr uint32_t flags = MSF_VALIDATECRC | MSF_UNPACKDATA;
-    constexpr int8_t verbose = 0;
+bool MseedProcessor::raw_equal(const std::filesystem::path &a,
+                               const std::filesystem::path &b) const {
 
-    int retA = ms3_readmsr(&msrA, a.string().c_str(), flags, verbose);
-    int retB = ms3_readmsr(&msrB, b.string().c_str(), flags, verbose);
+    MS3TraceList *mstl_a = nullptr;
+    MS3TraceList *mstl_b = nullptr;
+    bool are_equal = true;
 
-    while (retA == MS_NOERROR && retB == MS_NOERROR) {
-        if (msrA->numsamples != msrB->numsamples ||
-            msrA->sampletype != msrB->sampletype) {
-            return false;
-            }
-
-        if (msrA->sampletype == 'i') {
-            const auto* sa = static_cast<int32_t*>(msrA->datasamples);
-            const auto* sb = static_cast<int32_t*>(msrB->datasamples);
-            for (int64_t i = 0; i < msrA->numsamples; ++i) {
-                if (sa[i] != sb[i]) return false;
-            }
-        } else if (msrA->sampletype == 'f') {
-            const auto* sa = static_cast<float*>(msrA->datasamples);
-            const auto* sb = static_cast<float*>(msrB->datasamples);
-            for (int64_t i = 0; i < msrA->numsamples; ++i) {
-                if (fabs(sa[i] - sb[i]) > 1e-6f) return false;
-            }
-        } else {
-            //TODO: handle other types
-            return false;
-        }
-
-        retA = ms3_readmsr(&msrA, nullptr, flags, verbose);
-        retB = ms3_readmsr(&msrB, nullptr, flags, verbose);
+    int ret_a = ms3_readtracelist(&mstl_a, a.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    if (ret_a != MS_NOERROR) {
+        Logger::log(LogLevel::Error, "raw_equal: Failed to read file A: " + a.string());
+        if (mstl_a) mstl3_free(&mstl_a, 0);
+        return false;
     }
 
-    return (retA == MS_ENDOFFILE && retB == MS_ENDOFFILE);
+    int ret_b = ms3_readtracelist(&mstl_b, b.c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    if (ret_b != MS_NOERROR) {
+        Logger::log(LogLevel::Error, "raw_equal: Failed to read file B: " + b.string());
+        if (mstl_a) mstl3_free(&mstl_a, 0);
+        if (mstl_b) mstl3_free(&mstl_b, 0);
+        return false;
+    }
+
+    if (mstl_a == nullptr || mstl_b == nullptr) {
+        are_equal = (mstl_a == mstl_b);
+        if (mstl_a) mstl3_free(&mstl_a, 0);
+        if (mstl_b) mstl3_free(&mstl_b, 0);
+
+        return are_equal;
+    }
+
+    if (mstl_a->numtraceids != mstl_b->numtraceids) {
+        Logger::log(LogLevel::Warning, "raw_equal: Trace ID count mismatch (A: " +
+                                       std::to_string(mstl_a->numtraceids) + ", B: " +
+                                       std::to_string(mstl_b->numtraceids) + ")");
+        are_equal = false;
+        if (mstl_a) mstl3_free(&mstl_a, 0);
+        if (mstl_b) mstl3_free(&mstl_b, 0);
+
+        return are_equal;
+    }
+
+    MS3TraceID *id_a = mstl_a->traces.next[0];
+    MS3TraceID *id_b = mstl_b->traces.next[0];
+
+    while (id_a != nullptr && id_b != nullptr) {
+        if (strcmp(id_a->sid, id_b->sid) != 0) {
+            Logger::log(LogLevel::Warning, std::string("raw_equal: SID mismatch (A: ") + id_a->sid +
+                                           ", B: " + id_b->sid + ")");
+            are_equal = false;
+            if (mstl_a) mstl3_free(&mstl_a, 0);
+            if (mstl_b) mstl3_free(&mstl_b, 0);
+
+            return are_equal;
+        }
+
+        if (id_a->numsegments != id_b->numsegments) {
+            Logger::log(LogLevel::Warning, std::string("raw_equal: Segment count mismatch for ") + id_a->sid +
+                                           " (A: " + std::to_string(id_a->numsegments) +
+                                           ", B: " + std::to_string(id_b->numsegments) + ")");
+            are_equal = false;
+            if (mstl_a) mstl3_free(&mstl_a, 0);
+            if (mstl_b) mstl3_free(&mstl_b, 0);
+
+            return are_equal;
+        }
+
+        const MS3TraceSeg *seg_a = id_a->first;
+        const MS3TraceSeg *seg_b = id_b->first;
+
+        while (seg_a != nullptr && seg_b != nullptr) {
+            if (seg_a->starttime != seg_b->starttime ||
+                seg_a->samplecnt != seg_b->samplecnt ||
+                seg_a->sampletype != seg_b->sampletype)
+            {
+                Logger::log(LogLevel::Warning, std::string("raw_equal: Segment metadata mismatch for ") + id_a->sid);
+                are_equal = false;
+                if (mstl_a) mstl3_free(&mstl_a, 0);
+                if (mstl_b) mstl3_free(&mstl_b, 0);
+
+                return are_equal;
+            }
+
+            if (!MS_ISRATETOLERABLE(seg_a->samprate, seg_b->samprate)) {
+                Logger::log(LogLevel::Warning, "raw_equal: Sample rate mismatch for " + std::string(id_a->sid) +
+                                               " (A: " + std::to_string(seg_a->samprate) +
+                                               ", B: " + std::to_string(seg_b->samprate) + ")");
+are_equal = false;
+                if (mstl_a) mstl3_free(&mstl_a, 0);
+                if (mstl_b) mstl3_free(&mstl_b, 0);
+                return are_equal;
+            }
+
+            if (seg_a->sampletype == 'i') { // 32-bit integers
+                const auto *samples_a = static_cast<int32_t*>(seg_a->datasamples);
+                const auto *samples_b = static_cast<int32_t*>(seg_b->datasamples);
+                for (int64_t i = 0; i < seg_a->samplecnt; ++i) {
+                    if (samples_a[i] != samples_b[i]) {
+                        are_equal = false;
+                        if (mstl_a) mstl3_free(&mstl_a, 0);
+                        if (mstl_b) mstl3_free(&mstl_b, 0);
+                        return are_equal;
+                    }
+                }
+            } else if (seg_a->sampletype == 'f') { // 32-bit floats
+                const auto *samples_a = static_cast<float*>(seg_a->datasamples);
+                const auto *samples_b = static_cast<float*>(seg_b->datasamples);
+                for (int64_t i = 0; i < seg_a->samplecnt; ++i) {
+                    if (std::fabs(samples_a[i] - samples_b[i]) > (std::fabs(samples_a[i]) * 1e-6)) {
+                        are_equal = false;
+                        if (mstl_a) mstl3_free(&mstl_a, 0);
+                        if (mstl_b) mstl3_free(&mstl_b, 0);
+                        return are_equal;
+                    }
+                }
+            } else if (seg_a->sampletype == 'd') { // 64-bit doubles
+                const auto *samples_a = static_cast<double*>(seg_a->datasamples);
+                const auto *samples_b = static_cast<double*>(seg_b->datasamples);
+                for (int64_t i = 0; i < seg_a->samplecnt; ++i) {
+                    if (std::fabs(samples_a[i] - samples_b[i]) > (std::fabs(samples_a[i]) * 1e-9)) {
+                        are_equal = false;
+                        if (mstl_a) mstl3_free(&mstl_a, 0);
+                        if (mstl_b) mstl3_free(&mstl_b, 0);
+                        return are_equal;
+                    }
+                }
+            } else if (seg_a->sampletype == 't') { // Text
+                if (memcmp(seg_a->datasamples, seg_b->datasamples, seg_a->samplecnt) != 0) {
+                    are_equal = false;
+                    if (mstl_a) mstl3_free(&mstl_a, 0);
+                    if (mstl_b) mstl3_free(&mstl_b, 0);
+                    return are_equal;
+                }
+            } else {
+                Logger::log(LogLevel::Error, std::string("raw_equal: Unknown sample type '") + seg_a->sampletype + "'");
+                are_equal = false;
+                if (mstl_a) mstl3_free(&mstl_a, 0);
+                if (mstl_b) mstl3_free(&mstl_b, 0);
+                return are_equal;
+            }
+
+            seg_a = seg_a->next;
+            seg_b = seg_b->next;
+        }
+
+        id_a = id_a->next[0];
+        id_b = id_b->next[0];
+    }
+
+    if (mstl_a) mstl3_free(&mstl_a, 0);
+    if (mstl_b) mstl3_free(&mstl_b, 0);
+    return are_equal;
 }
 
 } // namespace chisel

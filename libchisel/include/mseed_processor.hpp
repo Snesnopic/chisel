@@ -48,7 +48,7 @@ namespace chisel {
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 
     private:
-        static int choose_reclen(const MS3Record* msr, size_t sample_count);
+        static int choose_reclen(uint8_t original_version, char sampleType,  int64_t sample_count);
     };
 
 } // namespace chisel
