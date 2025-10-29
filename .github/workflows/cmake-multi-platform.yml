@@ -110,18 +110,10 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DBUILD_TESTING=ON
           -S ${{ github.workspace }}
 
       - name: Build
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
-
-      - name: Upload build directory (for testing)
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-dir-${{ matrix.id }}
-          path: ${{ steps.strings.outputs.build-output-dir }}
-          retention-days: 1
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
@@ -157,16 +149,22 @@ jobs:
     env:
       TEST_ARCHIVE_NAME: chisel_samples.zip
       TEST_DIR: test-data
+      BIN_DIR: bin
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download build directory artifact
+      - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: build-dir-${{ matrix.id }}
-          path: build
+          name: chisel-${{ matrix.id }}
+          path: ${{ env.BIN_DIR }}
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x ${{ env.BIN_DIR }}/chisel
+        shell: bash
 
       - name: Install test dependencies (Linux)
         if: runner.os == 'Linux'
