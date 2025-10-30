@@ -325,6 +325,7 @@ endif()
 # flexiGIF
 set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
 file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
+list(REMOVE_ITEM FLEXIGIF_SOURCES "${FLEXIGIF_DIR}/flexiGIF.cpp")
 add_library(flexigif STATIC ${FLEXIGIF_SOURCES})
 target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
 target_compile_features(flexigif PUBLIC cxx_std_11)
