@@ -177,7 +177,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install python3 unzip
-          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          python3 -m venv ${{ github.workspace }}/venv-gdrive
+          ${{ github.workspace }}/venv-gdrive/bin/pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
       - name: Install test dependencies (Windows)
         if: runner.os == 'Windows'
@@ -202,6 +203,9 @@ jobs:
           PY_EXE="python3"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             PY_EXE="python"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Point to the python inside the venv
+            PY_EXE="${{ github.workspace }}/venv-gdrive/bin/python3"
           fi
 
           "$PY_EXE" -c "
@@ -226,10 +230,10 @@ jobs:
             sys.exit(1)
           except Exception as e:
             print(f'::error::Failed to load service account credentials: {e}', file=sys.stderr)
-              sys.exit(1)
+            sys.exit(1)
           
           file_id = os.environ.get('GDRIVE_FILE_ID')
-            output_filename = os.environ.get('TEST_ARCHIVE_NAME')
+          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
           
           if not file_id:
             print('::error::Secret GDRIVE_FILE_ID is not set.', file=sys.stderr)
@@ -243,14 +247,14 @@ jobs:
             service = build('drive', 'v3', credentials=creds)
           except Exception as e:
             print(f'::error::Failed to build Drive service: {e}', file=sys.stderr)
-              sys.exit(1)
+            sys.exit(1)
           
           print(f'Requesting file ID: {file_id}...')
           try:
             request = service.files().get_media(fileId=file_id)
           except Exception as e:
             print(f'::error::Failed to create download request for file ID {file_id}: {e}', file=sys.stderr)
-              sys.exit(1)
+            sys.exit(1)
           
           try:
             print(f'Opening output file: {output_filename}...')
@@ -270,8 +274,8 @@ jobs:
           except Exception as e:
             print(f'::error::Download failed: {e}', file=sys.stderr)
               # Ensure file handle is closed before attempting removal
-              if not fh.closed:
-                fh.close()
+            if not fh.closed:
+              fh.close()
               # Attempt to remove partially downloaded file
               try:
                 if os.path.exists(output_filename):
