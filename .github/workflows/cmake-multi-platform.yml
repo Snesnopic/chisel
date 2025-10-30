@@ -216,7 +216,7 @@ jobs:
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
           from googleapiclient.http import MediaIoBaseDownload
-            
+          
           creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
           if not creds_json_string:
             print('::error::Secret GDRIVE_CREDENTIALS_JSON is not set.', file=sys.stderr)
@@ -241,7 +241,7 @@ jobs:
           if not output_filename:
             print('::error::Environment variable TEST_ARCHIVE_NAME is not set.', file=sys.stderr)
             sys.exit(1)
-            
+          
             print(f'Authenticating and creating Google Drive service...')
           try:
             service = build('drive', 'v3', credentials=creds)
@@ -293,27 +293,27 @@ jobs:
             "
 
         shell: bash
-          
+
       - name: Extract Test Data
         run: |
-            echo "Extracting test data..."
-            mkdir ${{ env.TEST_DIR }}
-            unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+          echo "Extracting test data..."
+          mkdir ${{ env.TEST_DIR }}
+          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
         shell: bash
-          
+
       - name: Run Chisel Tests
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            CHISEL_EXE="./build/bin/Release/chisel.exe"
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel.exe"
           else
-            CHISEL_EXE="./build/bin/Release/chisel"
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
           fi
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
-              
+          
           "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive
         shell: bash
-          
+
       - name: Check for errors in Chisel Log
         if: always()
         run: |
@@ -338,15 +338,15 @@ jobs:
             exit 0
           fi
         shell: bash
-          
+
       - name: Upload Chisel Log File
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: chisel-log-${{ matrix.id }}
           path: |
-              build/chisel.log
-              ${{ github.workspace }}/chisel.log
-              chisel.log
-              if-no-files-found: warn
-              retention-days: 7
+            build/chisel.log
+            ${{ github.workspace }}/chisel.log
+            chisel.log
+            if-no-files-found: warn
+            retention-days: 7
