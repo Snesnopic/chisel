@@ -33,13 +33,14 @@ static FLAC__StreamDecoderWriteStatus write_callback(
         FLAC__stream_encoder_set_bits_per_sample(ctx->encoder, frame->header.bits_per_sample);
         FLAC__stream_encoder_set_sample_rate(ctx->encoder, frame->header.sample_rate);
         FLAC__stream_encoder_set_compression_level(ctx->encoder, 8);
-        FLAC__stream_encoder_set_blocksize(ctx->encoder, 16384);
+        FLAC__stream_encoder_set_blocksize(ctx->encoder, 0);
         FLAC__stream_encoder_set_do_mid_side_stereo(ctx->encoder, true);
         FLAC__stream_encoder_set_loose_mid_side_stereo(ctx->encoder, false);
         FLAC__stream_encoder_set_apodization(ctx->encoder, "tukey(0.5);partial_tukey(2);punchout_tukey(3);gauss(0.2)");
         FLAC__stream_encoder_set_max_lpc_order(ctx->encoder, 16);
         FLAC__stream_encoder_set_min_residual_partition_order(ctx->encoder, 0);
         FLAC__stream_encoder_set_max_residual_partition_order(ctx->encoder, 6);
+        FLAC__stream_encoder_set_do_exhaustive_model_search(ctx->encoder, true);
         FLAC__stream_encoder_set_streamable_subset(ctx->encoder, false);
 
         if (ctx->preserve_metadata && ctx->metadata_blocks && ctx->num_blocks > 0) {
@@ -201,7 +202,7 @@ std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_pa
     FLAC__metadata_object_delete(metadata);
     return oss.str();
 }
-    // Decodifica un FLAC in PCM interleaved (int32)
+
 std::vector<int32_t> decode_flac_pcm(const std::filesystem::path& file,
                                      unsigned& sample_rate,
                                      unsigned& channels,
