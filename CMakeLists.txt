@@ -554,6 +554,7 @@ set(CHISEL_LIBS
         ogg
         ebml
         matroska
+        mozjpeg_static
         wavpack
         flexigif
         thirdparty_webp
