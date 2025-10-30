@@ -64,6 +64,7 @@ target_include_directories(libchisel
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         PRIVATE
         src
+        SYSTEM PRIVATE
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
         ${libpng_SOURCE_DIR}
@@ -87,7 +88,7 @@ target_include_directories(libchisel
 )
 
 if(NOT WIN32)
-    target_include_directories(libchisel PRIVATE
+    target_include_directories(libchisel SYSTEM PRIVATE
             ${LIBMAGIC_INCLUDE_DIR}
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
