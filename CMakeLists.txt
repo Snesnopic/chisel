@@ -628,6 +628,7 @@ set(CHISEL_LIBS
         SQLite::SQLite3
         mkclean_lib
         zlibstatic
+        liblzma
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
