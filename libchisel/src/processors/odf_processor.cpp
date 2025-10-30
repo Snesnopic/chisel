@@ -89,6 +89,17 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
 
         const fs::path out_path = temp_dir / ename;
         std::error_code ec;
+        const auto filetype = archive_entry_filetype(entry);
+
+        if (filetype == AE_IFDIR) {
+            fs::create_directories(out_path, ec);
+            if (ec) {
+                Logger::log(LogLevel::Error, "Failed to create directory: " + out_path.string(), processor_tag());
+            }
+            archive_read_data_skip(in);
+            continue;
+        }
+
         fs::create_directories(out_path.parent_path(), ec);
         if (ec) {
             Logger::log(LogLevel::Error,
