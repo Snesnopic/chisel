@@ -350,3 +350,77 @@ jobs:
             chisel.log
             if-no-files-found: warn
             retention-days: 7
+
+  publish_nightly:
+    name: Publish Nightly Pre-Release
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/development'
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download all build and log artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List downloaded artifacts
+        run: ls -R artifacts/
+
+      - name: Prepare assets for release
+        run: |
+          mkdir release_assets
+          
+          # --- Linux (gcc) ---
+          mv artifacts/chisel-ubuntu-gcc/chisel release_assets/chisel-ubuntu-gcc
+          tar -czf release_assets/chisel-ubuntu-gcc.tar.gz -C release_assets chisel-ubuntu-gcc
+          rm release_assets/chisel-ubuntu-gcc
+
+          # --- Linux (clang) ---
+          mv artifacts/chisel-ubuntu-clang/chisel release_assets/chisel-ubuntu-clang
+          tar -czf release_assets/chisel-ubuntu-clang.tar.gz -C release_assets chisel-ubuntu-clang
+          rm release_assets/chisel-ubuntu-clang
+
+          # --- Linux (arm) ---
+          mv artifacts/chisel-ubuntu-arm/chisel release_assets/chisel-ubuntu-arm
+          tar -czf release_assets/chisel-ubuntu-arm.tar.gz -C release_assets chisel-ubuntu-arm
+          rm release_assets/chisel-ubuntu-arm
+
+          # --- macOS (intel) ---
+          mv artifacts/chisel-macos-intel/chisel release_assets/chisel-macos-intel
+          tar -czf release_assets/chisel-macos-intel.tar.gz -C release_assets chisel-macos-intel
+          rm release_assets/chisel-macos-intel
+
+          # --- macOS (arm) ---
+          mv artifacts/chisel-macos-arm/chisel release_assets/chisel-macos-arm
+          tar -czf release_assets/chisel-macos-arm.tar.gz -C release_assets chisel-macos-arm
+          rm release_assets/chisel-macos-arm
+
+          # --- Windows (x86) ---
+          mv artifacts/chisel-windows-x86/chisel.exe release_assets/chisel-windows-x86.exe
+          zip -j release_assets/chisel-windows-x86.zip release_assets/chisel-windows-x86.exe
+          rm release_assets/chisel-windows-x86.exe
+
+          # --- Windows (arm) ---
+          mv artifacts/chisel-windows-arm/chisel.exe release_assets/chisel-windows-arm.exe
+          zip -j release_assets/chisel-windows-arm.zip release_assets/chisel-windows-arm.exe
+          rm release_assets/chisel-windows-arm.exe
+          
+          find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
+
+      - name: Delete and recreate 'development-latest' release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete development-latest -y || echo "No previous nightly release to delete."
+          
+          gh push origin --delete development-latest || echo "No previous nightly tag to delete."
+          
+          gh release create development-latest \
+            --prerelease \
+            --title "Nightly Build" \
+            --notes "Latest successful build from 'development' branch. Not a stable release." \
+            release_assets/*
