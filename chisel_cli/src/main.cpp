@@ -23,7 +23,7 @@
 #include "utils/file_log_sink.hpp"
 
 // simple progress bar printer
-inline void print_progress_bar(const size_t done, const size_t total, double elapsed_seconds) {
+inline void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
     const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
@@ -95,6 +95,9 @@ int main(int argc, char* argv[]) {
                   << e.what()
                   << RESET << std::endl;
         return 1;
+    }
+    if (settings.regenerate_magic) {
+        MimeDetector::ensure_magic_installed();
     }
 
     // set console logger

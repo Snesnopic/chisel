@@ -311,7 +311,7 @@ jobs:
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
           
-          "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive
+          "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
         shell: bash
 
       - name: Check for errors in Chisel Log

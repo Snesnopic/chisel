@@ -130,7 +130,7 @@ void MimeDetector::ensure_magic_installed()
 
         const auto decompressed = decompress_gzip(embedded_magic_mgc, embedded_magic_mgc_len);
         std::ofstream ofs(target, std::ios::binary);
-        ofs.write(reinterpret_cast<const char*>(decompressed.data()), decompressed.size());
+        ofs.write(reinterpret_cast<const char*>(decompressed.data()), static_cast<long>(decompressed.size()));
         ofs.close();
     }
     setenv("MAGIC", target.c_str(), 1);
