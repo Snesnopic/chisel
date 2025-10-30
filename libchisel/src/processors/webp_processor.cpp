@@ -37,7 +37,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     // skip lossy
     if (features.format != 2) {
         Logger::log(LogLevel::Info, "Input is lossy WebP, skipping recompression", "webp_processor");
-        throw std::runtime_error("WebpProcessor: input is lossy, can't recompress further");
+        return;
     }
 
     // decode to RGBA
