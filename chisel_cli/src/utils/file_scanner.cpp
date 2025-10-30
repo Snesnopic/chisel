@@ -12,6 +12,9 @@ namespace fs = std::filesystem;
 
 static bool is_junk(const fs::path& p) {
     auto name = p.filename().string();
+    if (name.starts_with("._")) {
+        return true;
+    }
     std::transform(name.begin(), name.end(), name.begin(), ::tolower);
     return name == ".ds_store" || name == "desktop.ini";
 }
