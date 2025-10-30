@@ -156,73 +156,7 @@ set(BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
 add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
-
-target_include_directories(liblzma INTERFACE
-        ${xz_SOURCE_DIR}/src/liblzma/api
-)
-
-set(LIBLZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "" FORCE)
-set(LIBLZMA_LIBRARY "${xz_BINARY_DIR}/src/liblzma/liblzma.a" CACHE FILEPATH "" FORCE)
-set(LZMA_STATIC_LIB "${xz_BINARY_DIR}/src/liblzma/liblzma.a" CACHE FILEPATH "liblzma static library")
-set(LZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
-set(LZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
-set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
-set(LZMA_INCLUDE_DIR "${xz_SOURCE_DIR}/src/liblzma/api" CACHE PATH "lzma include" FORCE)
-
-# ----- robust search for liblzma static artifact -----
-if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz")
-    set(_lzma_search_roots
-            "${CMAKE_BINARY_DIR}/third_party/xz-build"
-            "${CMAKE_BINARY_DIR}/third_party/xz"
-            "${CMAKE_SOURCE_DIR}/third_party/xz"
-            "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma"
-            "${CMAKE_SOURCE_DIR}/third_party/xz/lib"
-            "${CMAKE_BINARY_DIR}/xz-build/"
-    )
-    set(_found_lzma "")
-    foreach(_root IN LISTS _lzma_search_roots)
-        if (EXISTS "${_root}")
-            file(GLOB_RECURSE _candidates
-                    RELATIVE "${_root}"
-                    "${_root}/**/liblzma*.a"
-                    "${_root}/**/liblzma.a"
-                    "${_root}/**/liblzma_static.a")
-            foreach(_cand IN LISTS _candidates)
-                set(_full "${_root}/${_cand}")
-                if (EXISTS "${_full}")
-                    set(_found_lzma "${_full}")
-                    break()
-                endif()
-            endforeach()
-        endif()
-        if (_found_lzma)
-            break()
-        endif()
-    endforeach()
-    if(NOT _found_lzma)
-        set(_found_lzma "${CMAKE_BINARY_DIR}/xz-build/liblzma.a")
-    endif()
-    if (_found_lzma)
-        message(STATUS "found liblzma static: ${_found_lzma}")
-        set(LZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
-        set(LIBLZMA_STATIC_LIB "${_found_lzma}" CACHE FILEPATH "liblzma static library")
-        if (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api")
-            set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
-            set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include")
-        elseif (EXISTS "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma")
-            set(LZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
-            set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma" CACHE PATH "liblzma include")
-        endif()
-        set(LZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
-        set(LIBLZMA_LIBRARY "${LZMA_STATIC_LIB}" CACHE STRING "lzma library" FORCE)
-        set(LZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
-        set(LIBLZMA_LIBRARIES "${LZMA_STATIC_LIB}" CACHE STRING "lzma libraries" FORCE)
-        set(LZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
-        set(LIBLZMA_FOUND TRUE CACHE BOOL "lzma found" FORCE)
-    else()
-        message(WARNING "liblzma built but static lib not found; searched common locations. please locate liblzma.a and set LZMA_STATIC_LIB or adjust search paths.")
-    endif()
-endif()
+set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include" FORCE)
 
 # zstd
 set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
@@ -341,7 +275,7 @@ add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libarchive
 set(ENABLE_OPENSSL OFF CACHE BOOL "Disable OpenSSL in libarchive" FORCE)
-set(ENABLE_TAR OFF CACHE BOOL "" FORCE)
+set(ENABLE_TAR ON CACHE BOOL "" FORCE)
 set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
 set(ENABLE_CAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
@@ -349,8 +283,8 @@ set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_NETTLE  OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT   OFF CACHE BOOL "" FORCE)
-set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
-set(ENABLE_LIBB2 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZ4 ON CACHE BOOL "" FORCE)
+set(ENABLE_LIBB2 ON CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
@@ -358,6 +292,13 @@ set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
+target_include_directories(archive_static PRIVATE
+        ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
+)
+add_dependencies(archive_static liblzma)
+target_compile_definitions(archive_static PRIVATE LZMA_API_STATIC)
+set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
+set(HAVE_LZMA_H 1 CACHE INTERNAL "Force lzma.h found")
 
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
@@ -628,7 +569,6 @@ set(CHISEL_LIBS
         SQLite::SQLite3
         mkclean_lib
         zlibstatic
-        liblzma
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
