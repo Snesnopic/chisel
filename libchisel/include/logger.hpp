@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 /**
  * @brief Static logging facade for chisel.
@@ -19,10 +20,15 @@
 class Logger {
 public:
     /**
-     * @brief Set the active log sink.
+     * @brief Add a new log sink to the logger.
      * @param sink Unique pointer to a sink implementation.
      */
-    static void set_sink(std::unique_ptr<ILogSink> sink);
+    static void add_sink(std::unique_ptr<ILogSink> sink);
+
+    /**
+     * @brief Remove all configured sinks.
+     */
+    static void clear_sinks();
 
     /**
      * @brief Log a message.
@@ -54,8 +60,8 @@ public:
         return LogLevel::Error;
     }
 private:
-    static std::unique_ptr<ILogSink> sink_; ///< Active sink
-    static std::mutex mtx_;                 ///< Protects sink access
+    static std::vector<std::unique_ptr<ILogSink>> sinks_;
+    static std::mutex mtx_;                               ///< Protects sink access
 };
 
 #endif //CHISEL_LOGGER_HPP
