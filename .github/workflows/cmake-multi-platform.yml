@@ -92,6 +92,9 @@ jobs:
           if [[ "$(uname -m)" == "x86_64" ]]; then
             brew install gcc@12
           fi
+          echo "Uninstalling dynamic libs to force static build..."
+          brew uninstall --ignore-dependencies jpeg-turbo libjpeg zlib lz4 xz bzip2 || true
+          echo "Uninstall complete."
 
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
@@ -478,6 +481,12 @@ jobs:
       FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
 
     steps:
+      - name: Setup MSVC Developer Environment
+        if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: ${{ matrix.id == 'windows-arm' && 'arm64' || 'x86' }}
+
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
