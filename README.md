@@ -51,7 +51,7 @@ Ensure you have installed Visual Studio 2022 (with the "Desktop development with
 
 ### Clone the repository and initialize all submodules:
 ```bash
-  git clone [https://github.com/Snesnopic/chisel.git](https://github.com/Snesnopic/chisel.git)
+  git clone https://github.com/Snesnopic/chisel.git
   cd chisel
   git lfs install
   git lfs pull
@@ -77,18 +77,22 @@ cmake --build . --config Release
 
 **Options:**
 - `--dry-run`                  Use chisel without replacing original files.
+- `-d, --output-dir DIR`       Write optimized files to DIR instead of modifying in-place.
+- `-q, --quiet`                Suppress non-error console output (progress bar, results).
 - `--no-meta`                  Do not preserve metadata in recompressed files.
 - `--verify-checksums`         Verify raw checksums before replacing files.
 - `--recursive`                Process directories recursively.
 - `--threads N`                Number of worker threads to use (default: half of available cores).
 - `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
+- `--include PATTERN`          Process only files matching regex PATTERN. (Can be used multiple times).
+- `--exclude PATTERN`          Do not process files matching regex PATTERN. (Can be used multiple times).
 - `--mode MODE`                Select how multiple encoders are applied to a file.
 
   PIPE (default): encoders are chained, the output of one becomes the input of the next.
 
   PARALLEL: all encoders run independently on the original file, and the smallest result is chosen.
-- `-o, --output-csv FILE`      CSV report export filename. Must be a file path (stdout not supported).
-- `--regenerate-magic`         Re-install libmagic file-detection database.
+- `-o, --output-csv FILE`      CSV report export filename.
+- `--regenerate-magic`         Re-install libmagic file-detection database. (Linux and macOS)
 - `--recompress-unencodable FORMAT`
 
   Allows to recompress archives that can be opened but not recompressed  
