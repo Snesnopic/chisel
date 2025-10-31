@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <iomanip>
+#include <fstream>
 #include "utils/color.hpp"
 #include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
@@ -27,17 +28,26 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
     const unsigned term_width = get_terminal_width();
     const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
 
-    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
-    const unsigned pos = static_cast<int>(bar_width * progress);
+    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : (done > 0 ? 1.0 : 0.0);
+    const unsigned pos = static_cast<unsigned>(bar_width * progress);
+
+    double percent = progress * 100.0;
+    if (done < total && percent >= 99.95) {
+        percent = 99.9;
+    }
+    if (done == total) {
+        percent = 100.0;
+    }
 
     std::cout << "\r[";
     for (unsigned i = 0; i < bar_width; ++i) {
         if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
+        else if (i == pos && done < total) std::cout << ">";
+        else if (i == pos && done == total) std::cout << "=";
         else std::cout << " ";
     }
     std::cout << "] "
-              << std::setw(3) << std::fixed << std::setprecision(0) << (progress * 100.0) << "%"
+              << std::setw(5) << std::fixed << std::setprecision(1) << percent << "%"
               << " (" << done << "/" << total << ")"
               << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
               << std::flush;
@@ -63,7 +73,7 @@ inline void init_utf8_locale() {
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
-        Logger::log(LogLevel::Debug, std::string("Locale corrente: ") + cur, "LocaleInit");
+        Logger::log(LogLevel::Debug, std::string("Current locale: ") + cur, "LocaleInit");
         return; // ok
     }
 
