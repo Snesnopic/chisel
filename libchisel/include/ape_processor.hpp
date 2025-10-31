@@ -42,7 +42,7 @@ namespace chisel {
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
         std::filesystem::path finalize_extraction(const ExtractedContent &,
-                                                  [[maybe_unused]] ContainerFormat target_format) override {}
+                                                  [[maybe_unused]] ContainerFormat target_format) override {return {};}
 
         // --- integrity check ---
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
