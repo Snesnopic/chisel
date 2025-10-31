@@ -24,18 +24,32 @@ namespace chisel {
                                          const ContainerFormat format,
                                          const bool verify_checksums,
                                          const EncodeMode mode,
+                                         const bool dry_run,
+                                         fs::path output_dir,
                                          EventBus &bus,
                                          std::atomic<bool>& stop_flag,
                                          const unsigned threads)
         : registry_(registry),
           preserve_metadata_(preserve_metadata),
           verify_checksums_(verify_checksums),
+          dry_run_(dry_run),
+          output_dir_(std::move(output_dir)),
+          has_output_dir_(!output_dir_.empty()),
           format_(format),
           pool_(threads),
           stop_flag_(stop_flag),
           event_bus_(bus),
           mode_(mode)
-           {}
+           {
+                if (has_output_dir_ && !dry_run_) {
+                    std::error_code ec;
+                    fs::create_directories(output_dir_, ec);
+                    if (ec) {
+                        Logger::log(LogLevel::Error, "Failed to create output directory: " + output_dir_.string(), "Executor");
+                        throw std::runtime_error("Failed to create output directory.");
+                    }
+                }
+           }
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
         for (const auto &path: inputs) {
@@ -45,14 +59,53 @@ namespace chisel {
         finalize_containers();
     }
 
-    void ProcessorExecutor::analyze_path(const fs::path &path) {
-        if (stop_flag_.load()) return;
-        const std::string name = path.filename().string();
-        if (name.starts_with("._") || name == ".DS_Store" || name == "desktop.ini") {
-            Logger::log(LogLevel::Debug, "Skipping junk file: " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Junk file"});
+    void ProcessorExecutor::handle_temp_file(const fs::path& original_file,
+                                             const fs::path& temp_file,
+                                             const uintmax_t original_size,
+                                             const std::chrono::milliseconds duration) const {
+        std::error_code ec;
+        auto new_size = fs::file_size(temp_file, ec);
+        if (ec || new_size == 0) {
+            Logger::log(LogLevel::Warning, "Temp file is invalid or empty: " + temp_file.string(), "Executor");
+            fs::remove(temp_file, ec);
+            event_bus_.publish(FileProcessErrorEvent{original_file, "Failed to create optimized file"});
             return;
         }
+
+        bool replaced = false;
+
+        if (dry_run_) {
+            Logger::log(LogLevel::Info, "[DRY-RUN] Would replace: " + original_file.string(), "Executor");
+            fs::remove(temp_file, ec);
+
+        } else if (has_output_dir_) {
+            fs::path dest = output_dir_ / original_file.filename();
+            fs::rename(temp_file, dest, ec);
+            if (ec) {
+                Logger::log(LogLevel::Error, "Rename failed (output dir): " + dest.string() + " (" + ec.message() + ")", "Executor");
+                fs::remove(temp_file, ec);
+                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + ec.message()});
+                return;
+            }
+            replaced = true;
+
+        } else { // in-place
+            fs::rename(temp_file, original_file, ec);
+            if (ec) {
+                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + ec.message() + ")", "Executor");
+                fs::remove(temp_file, ec);
+                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + ec.message()});
+                return;
+            }
+            replaced = true;
+        }
+
+        event_bus_.publish(FileProcessCompleteEvent{original_file, original_size, new_size, replaced, duration});
+    }
+
+
+    void ProcessorExecutor::analyze_path(const fs::path &path) {
+        if (stop_flag_.load()) return;
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
         auto mime = MimeDetector::detect(path);
@@ -69,8 +122,10 @@ namespace chisel {
 
         IProcessor *processor = procs.front();
 
+        const fs::path current_path = path;
+
         if (processor->can_extract_contents()) {
-            auto content = processor->prepare_extraction(path);
+            auto content = processor->prepare_extraction(current_path);
             if (content) {
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
@@ -82,7 +137,7 @@ namespace chisel {
                 event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
             }
         } else if (processor->can_recompress()) {
-            work_list_.push_back(path);
+            work_list_.push_back(current_path);
             event_bus_.publish(FileAnalyzeCompleteEvent{path, false, true});
         } else {
             Logger::log(LogLevel::Debug, "file ignored: " + path.string(), "Executor");
@@ -123,8 +178,13 @@ namespace chisel {
                         bool pipeline_ok = true;
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
-                            fs::path tmp = file;
-                            tmp += ".pipe." + std::to_string(i) + ".tmp";
+                            if (st.stop_requested()) {
+                                pipeline_ok = false;
+                                break;
+                            }
+
+                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + ".pipe." + std::to_string(i) + ".tmp");
+
                             candidates[i]->recompress(current, tmp, preserve_metadata_);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
@@ -153,26 +213,20 @@ namespace chisel {
                                 candidates[0]->raw_equal(file, last_tmp);
 
                             if (size_improved && checksum_ok) {
-                                std::error_code ec;
-                                fs::rename(last_tmp, file, ec);
-                                if (ec) {
-                                    Logger::log(LogLevel::Error,
-                                                "rename failed: " + file.string() + " (" + ec.message() + ")",
-                                                "Executor");
-                                    fs::remove(last_tmp, ec);
-                                    event_bus_.publish(FileProcessErrorEvent{file, "Rename failed: " + ec.message()});
-                                } else {
-                                    event_bus_.publish(FileProcessCompleteEvent{
-                                        file, orig_size, new_size, true, duration
-                                    });
-                                }
+                                handle_temp_file(file, last_tmp, orig_size, duration);
                             } else {
                                 std::error_code ec;
                                 fs::remove(last_tmp, ec);
                                 event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
                             }
                         } else {
-                            event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
+                            auto err = std::error_code{};
+                            if (!last_tmp.empty()) fs::remove(last_tmp, err);
+                            if (st.stop_requested()) {
+                                event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                            } else {
+                                event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
+                            }
                         }
                     } else {
                         // parallel
@@ -184,8 +238,8 @@ namespace chisel {
                         std::vector<Result> results;
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
-                            fs::path tmp = file;
-                            tmp += ".cand." + std::to_string(i) + ".tmp";
+                            if (st.stop_requested()) break;
+                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + ".cand." + std::to_string(i) + ".tmp");
                             Result r{tmp, 0, false};
                             try {
                                 candidates[i]->recompress(file, tmp, preserve_metadata_);
@@ -214,30 +268,23 @@ namespace chisel {
                                                         });
 
                         if (best_it != results.end() && best_it->success && best_it->size < orig_size) {
-                            std::error_code ec;
-                            fs::rename(best_it->tmp, file, ec);
-                            if (ec) {
-                                Logger::log(LogLevel::Error,
-                                            "rename failed: " + file.string() + " (" + ec.message() + ")", "Executor");
-                                fs::remove(best_it->tmp, ec);
-                                event_bus_.publish(FileProcessErrorEvent{file, "Rename failed: " + ec.message()});
-                            } else {
-                                for (const auto &r: results) {
-                                    if (r.tmp != best_it->tmp) {
-                                        std::error_code ec2;
-                                        fs::remove(r.tmp, ec2);
-                                    }
+                            handle_temp_file(file, best_it->tmp, orig_size, duration);
+                            for (const auto &r: results) {
+                                if (r.tmp != best_it->tmp) {
+                                    std::error_code ec2;
+                                    fs::remove(r.tmp, ec2);
                                 }
-                                event_bus_.publish(FileProcessCompleteEvent{
-                                    file, orig_size, best_it->size, true, duration
-                                });
                             }
                         } else {
                             for (const auto &r: results) {
                                 std::error_code ec;
                                 fs::remove(r.tmp, ec);
                             }
-                            event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                            if (st.stop_requested()) {
+                                event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                            } else {
+                                event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                            }
                         }
                     }
                 } catch (const std::exception &e) {
@@ -269,14 +316,25 @@ namespace chisel {
             }
 
             try {
-                // use the first processor found to finalize
-                procs.front()->finalize_extraction(content, format_);
+                auto start = std::chrono::steady_clock::now();
+                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content, format_);
+                auto end = std::chrono::steady_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
                 std::error_code ec;
-                auto final_size = std::filesystem::file_size(content.original_path, ec);
-                if (ec) final_size = 0;
 
-                event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, final_size});
+                if (new_temp_file.empty()) {
+                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
+                    const auto final_size = std::filesystem::file_size(content.original_path, ec);
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, ec ? 0 : final_size});
+                    continue;
+                }
+
+                auto orig_size = std::filesystem::file_size(content.original_path, ec);
+                if (ec) orig_size = 0;
+
+                handle_temp_file(content.original_path, new_temp_file, orig_size, duration);
+
             } catch (const std::exception &e) {
                 Logger::log(LogLevel::Error,
                             "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()),

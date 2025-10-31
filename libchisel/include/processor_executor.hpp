@@ -43,6 +43,8 @@ public:
      * @param format Target container format for unencodable archives.
      * @param verify_checksums Whether to verify checksums after recompression.
      * @param mode Encoding mode (PIPE or PARALLEL).
+     * @param dry_run If true, do not write files.
+     * @param output_dir If set, write files to this directory.
      * @param bus EventBus used to publish progress and results.
      * @param threads Number of worker threads to use (default: hardware concurrency).
      */
@@ -51,6 +53,8 @@ public:
                                ContainerFormat format,
                                bool verify_checksums,
                                EncodeMode mode,
+                               bool dry_run,
+                               std::filesystem::path output_dir,
                                EventBus& bus,
                                std::atomic<bool>& stop_flag,
                                unsigned threads = std::thread::hardware_concurrency());
@@ -71,9 +75,17 @@ private:
     /// Phase 3: finalize containers after their contents have been processed
     void finalize_containers();
 
+    void handle_temp_file(const std::filesystem::path& original_file,
+                            const std::filesystem::path& temp_file,
+                            uintmax_t original_size,
+                            std::chrono::milliseconds duration) const;
+
     ProcessorRegistry& registry_;                 ///< Processor registry reference
     bool preserve_metadata_;                      ///< Preserve metadata flag
     bool verify_checksums_;                       ///< Verify checksums flag
+    bool dry_run_;                                ///< Dry run flag
+    std::filesystem::path output_dir_;            ///< Output directory
+    bool has_output_dir_;                         ///< Convenience flag
     ContainerFormat format_;                      ///< Target format for unencodable containers
     std::vector<std::filesystem::path> work_list_;///< Files scheduled for recompression
     std::stack<ExtractedContent> finalize_stack_; ///< Stack of containers to finalize
