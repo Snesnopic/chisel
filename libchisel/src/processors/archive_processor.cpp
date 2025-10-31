@@ -541,9 +541,8 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     return content;
 }
 
-void ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
-                                           ContainerFormat target_format) {
-    // Determine output format
+std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
+                                                            const ContainerFormat target_format) {
     auto out_fmt = ContainerFormat::Unknown;
 
     if (can_write_format(content.format)) {
@@ -564,80 +563,39 @@ void ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
         );
         std::error_code ec;
         fs::remove_all(content.temp_dir, ec);
-        return;
+        return {};
     }
 
     const fs::path src_path(content.original_path);
     const std::string out_ext = "." + container_format_to_string(out_fmt);
-    const fs::path tmp_archive = src_path.parent_path() / (src_path.stem().string() + "_tmp" + out_ext);
+
+    const fs::path tmp_archive = fs::temp_directory_path() /
+                                 (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + out_ext);
 
     Logger::log(LogLevel::Info, "Recreating archive: " + tmp_archive.string(), processor_tag());
 
     if (!create_with_libarchive(content.temp_dir, tmp_archive, out_fmt)) {
         Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), processor_tag());
+        fs::remove_all(content.temp_dir);
         throw std::runtime_error("ArchiveProcessor: create_with_libarchive failed");
     }
 
     std::error_code ec;
     if (!fs::exists(tmp_archive, ec) || ec) {
         Logger::log(LogLevel::Error, "Compressed archive not found: " + tmp_archive.string(), processor_tag());
+        fs::remove_all(content.temp_dir);
         throw std::runtime_error("ArchiveProcessor: tmp archive missing");
     }
 
-    auto orig_size = fs::file_size(content.original_path, ec);
-    if (ec) orig_size = 0;
-    auto new_size  = fs::file_size(tmp_archive, ec);
-    if (ec) new_size = 0;
-
-    if (new_size == 0) {
-        Logger::log(LogLevel::Warning, "Empty archive: " + tmp_archive.string(), processor_tag());
-    }
-
-    if (new_size > 0 && (orig_size == 0 || new_size < orig_size)) {
-        fs::path final_path = content.original_path;
-
-        if (final_path.extension().string() != out_ext) {
-            final_path.replace_extension("");
-            final_path += out_ext;
-        }
-
-        if (content.format == ContainerFormat::Xpi || content.format == ContainerFormat::Apk) {
-            fs::path backup_path = content.original_path;
-            backup_path += ".bak";
-            std::error_code bec;
-            fs::copy_file(content.original_path, backup_path, fs::copy_options::overwrite_existing, bec);
-            /*
-            if (!bec) {
-                std::cerr << "Backup of original " << content.original_path
-                          << " saved to " << backup_path << "\n";
-            } else {
-                std::cerr << "WARNING: Failed to create backup for "
-                          << content.original_path << " (" << bec.message() << ")\n";
-            }*/
-        }
-
-        fs::rename(tmp_archive, final_path, ec);
-        if (ec) {
-            Logger::log(LogLevel::Error, "Renaming archive failed: " + final_path.string() + " (" + ec.message() + ")", processor_tag());
-            throw std::runtime_error("ArchiveProcessor: rename failed");
-        }
-        Logger::log(
-            LogLevel::Info,
-            "Optimized archive: " + final_path.string() +
-            " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)",
-            processor_tag()
-        );
-    } else {
-        fs::remove(tmp_archive, ec);
-        Logger::log(LogLevel::Debug, "No improvement for: " + content.original_path.filename().string(), processor_tag());
-    }
-
-    fs::remove_all(content.temp_dir, ec);
-    if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + content.temp_dir.filename().string() + " (" + ec.message() + ")", processor_tag());
+    std::error_code cleanup_ec;
+    fs::remove_all(content.temp_dir, cleanup_ec);
+    if (cleanup_ec) {
+        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + content.temp_dir.filename().string() + " (" + cleanup_ec.message() + ")", processor_tag());
     } else {
         Logger::log(LogLevel::Debug, "Removed temp dir: " + content.temp_dir.filename().string(), processor_tag());
     }
+
+    return tmp_archive;
 }
 
 std::string ArchiveProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {

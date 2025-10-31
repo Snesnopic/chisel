@@ -94,9 +94,11 @@ public:
      * @brief Rebuild the original container file after its contents have been modified.
      * @param content The ExtractedContent struct returned by prepare_extraction().
      * @param target_format Target format, if the current one cannot be re-written.
+     * @return Path to the newly created optimized temporary container, or an
+     * empty path if finalization failed or was skipped.
      */
-    virtual void finalize_extraction(const ExtractedContent& content,
-                                     ContainerFormat target_format) = 0;
+    virtual std::filesystem::path finalize_extraction(const ExtractedContent &content,
+                                                      ContainerFormat target_format) = 0;
 
     // --- integrity check ---
 

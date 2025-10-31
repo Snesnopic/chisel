@@ -39,8 +39,8 @@ namespace chisel {
             return std::nullopt;
         }
 
-        void finalize_extraction(const ExtractedContent&,
-                                 [[maybe_unused]]ContainerFormat target_format) override {}
+        std::filesystem::path finalize_extraction(const ExtractedContent &,
+                                                  [[maybe_unused]] ContainerFormat target_format) override {}
 
         // --- operations ---
         void recompress(const std::filesystem::path& input,

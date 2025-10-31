@@ -41,7 +41,8 @@ public:
         return std::nullopt;
     }
 
-    void finalize_extraction(const ExtractedContent&,[[maybe_unused]]ContainerFormat target_format) override {}
+    std::filesystem::path
+    finalize_extraction(const ExtractedContent &, [[maybe_unused]] ContainerFormat target_format) override {}
 
     void recompress(const std::filesystem::path &input, const std::filesystem::path &output, bool preserve_metadata) override;
 

@@ -8,9 +8,12 @@
 #include <vector>
 #include <filesystem>
 
+// Aggiunto
+struct Settings; // Forward declaration
+
 std::vector<std::filesystem::path>
 collect_input_files(const std::vector<std::filesystem::path>& inputs,
-                    bool recursive,
+                    const Settings& settings,
                     bool& is_pipe);
 
 #endif //CHISEL_FILE_SCANNER_HPP

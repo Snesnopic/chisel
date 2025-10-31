@@ -79,8 +79,8 @@ std::optional<ExtractedContent> MkvProcessor::prepare_extraction(const std::file
     return std::nullopt;
 }
 
-void MkvProcessor::finalize_extraction(const ExtractedContent&,
-                                       ContainerFormat) {
+std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &,
+                                                        ContainerFormat) {
     // TODO: implement container rebuild after track modifications
 }
 

@@ -75,7 +75,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
          ext == ".xlsx" ? "xlsx_" :
          ext == ".pptx" ? "pptx_" : "ooxml_");
 
-    content.format = parse_container_format(prefix.substr(0, prefix.size() - 1)).value();
+    content.format = parse_container_format(prefix.substr(0, prefix.size() - 1)).value_or(ContainerFormat::Unknown);
 
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
@@ -86,7 +86,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
     if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
         Logger::log(LogLevel::Error, "Failed to open OOXML for reading: " + std::string(archive_error_string(in)), processor_tag());
         archive_read_free(in);
-        // return content with empty extracted_files to signal failure upstream
+        cleanup_temp_dir(temp_dir);
         return content;
     }
     if (open_r == ARCHIVE_WARN) {
@@ -165,20 +165,21 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
     return content;
 }
 
-void OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
-                                         ContainerFormat /*target_format*/) {
+std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
+                                                          ContainerFormat /*target_format*/) {
     Logger::log(LogLevel::Info, "Finalizing OOXML: " + content.original_path.filename().string(), processor_tag());
 
     namespace fs = std::filesystem;
     std::error_code ec;
 
     const fs::path src_path(content.original_path);
-    const fs::path tmp_path = src_path.parent_path() /
-                              (src_path.stem().string() + "_tmp" + src_path.extension().string());
+    const fs::path tmp_path = fs::temp_directory_path() /
+                              (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + src_path.extension().string());
 
-    struct archive* out = archive_write_new();
+    archive* out = archive_write_new();
     if (!out) {
         Logger::log(LogLevel::Error, "archive_write_new failed", processor_tag());
+        cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: archive_write_new failed");
     }
 
@@ -190,6 +191,7 @@ void OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
     if (set_fmt != ARCHIVE_OK) {
         Logger::log(LogLevel::Error, "Failed to set ZIP format: " + std::string(archive_error_string(out)), processor_tag());
         archive_write_free(out);
+        cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: set_format_zip failed");
     }
     archive_write_set_options(out, "compression=deflate");
@@ -201,6 +203,7 @@ void OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
     if (open_w != ARCHIVE_OK) {
         Logger::log(LogLevel::Error, "Failed to open temp OOXML for writing: " + std::string(archive_error_string(out)), processor_tag());
         archive_write_free(out);
+        cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: open_filename failed");
     }
 
@@ -217,105 +220,88 @@ void OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
         }
     }
 
-    // write all entries (recompress images; copy others)
-    for (const auto& file : files_ordered) {
-        fs::path rel = fs::relative(file, content.temp_dir, ec);
-        if (ec) rel = fs::path(file).filename();
+    try {
+        // write all entries (recompress images; copy others)
+        for (const auto& file : files_ordered) {
+            fs::path rel = fs::relative(file, content.temp_dir, ec);
+            if (ec) rel = fs::path(file).filename();
 
-        std::ifstream ifs(file, std::ios::binary);
-        if (!ifs) {
-            Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), processor_tag());
-            continue;
-        }
-        const std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+            std::ifstream ifs(file, std::ios::binary);
+            if (!ifs) {
+                Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), processor_tag());
+                continue;
+            }
+            const std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
-        std::vector<unsigned char> final_data;
-        const auto ext = rel.extension().string();
+            std::vector<unsigned char> final_data;
+            const auto ext = rel.extension().string();
 
-        // recompress only PNG/JPG images, leave XML and others untouched
-        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-            final_data = recompress_with_zopfli(buf);
-            Logger::log(LogLevel::Debug,
-                        "Recompressed image: " + rel.string() + " (" +
-                        std::to_string(buf.size()) + " -> " +
-                        std::to_string(final_data.size()) + " bytes)", processor_tag());
-        } else {
-            final_data = buf;
-            Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), processor_tag());
-        }
+            // recompress only PNG/JPG images, leave XML and others untouched
+            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
+                final_data = recompress_with_zopfli(buf);
+                Logger::log(LogLevel::Debug,
+                            "Recompressed image: " + rel.string() + " (" +
+                            std::to_string(buf.size()) + " -> " +
+                            std::to_string(final_data.size()) + " bytes)", processor_tag());
+            } else {
+                final_data = buf;
+                Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), processor_tag());
+            }
 
-        archive_entry* entry = archive_entry_new();
-        if (!entry) {
-            Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());
-            archive_write_close(out);
-            archive_write_free(out);
-            throw std::runtime_error("OOXMLProcessor: archive_entry_new failed");
-        }
+            archive_entry* entry = archive_entry_new();
+            if (!entry) {
+                Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());
+                throw std::runtime_error("OOXMLProcessor: archive_entry_new failed");
+            }
 
-        archive_entry_set_pathname(entry, rel.generic_string().c_str());
-        archive_entry_set_size(entry, static_cast<la_int64_t>(final_data.size()));
-        archive_entry_set_filetype(entry, AE_IFREG);
-        archive_entry_set_perm(entry, 0644);
-        archive_entry_set_mtime(entry, 0, 0); // determinism
+            archive_entry_set_pathname(entry, rel.generic_string().c_str());
+            archive_entry_set_size(entry, static_cast<la_int64_t>(final_data.size()));
+            archive_entry_set_filetype(entry, AE_IFREG);
+            archive_entry_set_perm(entry, 0644);
+            archive_entry_set_mtime(entry, 0, 0); // determinism
 
-        const int wh = archive_write_header(out, entry);
-        if (wh == ARCHIVE_WARN) {
-            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), processor_tag());
-        }
-        if (wh != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error,
-                        "Failed to write header for: " + rel.string() +
-                        " (" + std::string(archive_error_string(out)) + ")", processor_tag());
+            const int wh = archive_write_header(out, entry);
+            if (wh == ARCHIVE_WARN) {
+                Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), processor_tag());
+            }
+            if (wh != ARCHIVE_OK) {
+                Logger::log(LogLevel::Error,
+                            "Failed to write header for: " + rel.string() +
+                            " (" + std::string(archive_error_string(out)) + ")", processor_tag());
+                archive_entry_free(entry);
+                throw std::runtime_error("OOXMLProcessor: write_header failed");
+            }
+
+            const la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
+            if (wrote < 0) {
+                Logger::log(LogLevel::Error,
+                            "Failed to write data for: " + rel.string() +
+                            " (" + std::string(archive_error_string(out)) + ")", processor_tag());
+                archive_entry_free(entry);
+                throw std::runtime_error("OOXMLProcessor: write_data failed");
+            }
+
             archive_entry_free(entry);
-            archive_write_close(out);
-            archive_write_free(out);
-            throw std::runtime_error("OOXMLProcessor: write_header failed");
         }
-
-        const la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
-        if (wrote < 0) {
-            Logger::log(LogLevel::Error,
-                        "Failed to write data for: " + rel.string() +
-                        " (" + std::string(archive_error_string(out)) + ")", processor_tag());
-            archive_entry_free(entry);
-            archive_write_close(out);
-            archive_write_free(out);
-            throw std::runtime_error("OOXMLProcessor: write_data failed");
-        }
-
-        archive_entry_free(entry);
+    } catch (...) {
+        archive_write_close(out);
+        archive_write_free(out);
+        cleanup_temp_dir(content.temp_dir);
+        throw;
     }
 
     const int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
         Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), processor_tag());
         archive_write_free(out);
+        cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: write_close failed");
     }
     archive_write_free(out);
 
-    auto orig_size = fs::file_size(src_path, ec);
-    if (ec) orig_size = 0;
-    auto new_size = fs::file_size(tmp_path, ec);
-    if (ec) new_size = 0;
-
-    if (new_size > 0 && (orig_size == 0 || new_size < orig_size)) {
-        fs::rename(tmp_path, src_path, ec);
-        if (ec) {
-            Logger::log(LogLevel::Error, "Failed to replace original OOXML: " + ec.message(), processor_tag());
-            cleanup_temp_dir(content.temp_dir);
-            throw std::runtime_error("OOXMLProcessor: rename failed");
-        }
-        Logger::log(LogLevel::Info,
-                    "Optimized OOXML: " + src_path.string() +
-                    " (" + std::to_string(orig_size) + " -> " + std::to_string(new_size) + " bytes)", processor_tag());
-    } else {
-        fs::remove(tmp_path, ec);
-        Logger::log(LogLevel::Debug, "No improvement for: " + src_path.string(), processor_tag());
-    }
-
-    // cleanup temp dir
     cleanup_temp_dir(content.temp_dir);
+
+    return tmp_path;
 }
 
 std::string OOXMLProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {

@@ -185,8 +185,8 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     return content;
 }
 
-void PdfProcessor::finalize_extraction(const ExtractedContent& content,
-                                       ContainerFormat /*target_format*/) {
+std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content,
+                                                        ContainerFormat /*target_format*/) {
     Logger::log(LogLevel::Info, "Finalizing PDF container: " + content.original_path.string(), "pdf_processor");
 
     try {
@@ -248,8 +248,9 @@ void PdfProcessor::finalize_extraction(const ExtractedContent& content,
             );
         }
 
+        // Always write to a new temporary file
         auto tmp_path = content.original_path;
-        tmp_path += ".tmp";
+        tmp_path += ".refinalized.pdf";
 
         QPDFWriter writer(pdf, tmp_path.string().c_str());
         writer.setLinearization(true);
@@ -257,19 +258,12 @@ void PdfProcessor::finalize_extraction(const ExtractedContent& content,
         writer.setDeterministicID(true);
         writer.write();
 
-        auto orig_size = std::filesystem::file_size(content.original_path);
-        auto new_size = std::filesystem::file_size(tmp_path);
-
-        if (new_size < orig_size) {
-            std::filesystem::rename(tmp_path, content.original_path);
-        } else {
-            std::filesystem::remove(tmp_path);
-        }
-
         cleanup_temp_dir(st.temp_dir);
         state_.erase(content.original_path);
 
-        Logger::log(LogLevel::Info, "PDF container finalized: " + content.original_path.string(), "pdf_processor");
+        Logger::log(LogLevel::Info, "PDF container finalized at: " + tmp_path.string(), "pdf_processor");
+
+        return tmp_path;
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Error, std::string("Exception during PDF finalize: ") + e.what(), "pdf_processor");
         throw;

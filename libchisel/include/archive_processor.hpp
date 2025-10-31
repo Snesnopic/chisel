@@ -68,8 +68,8 @@ public:
     std::optional<ExtractedContent> prepare_extraction(
         const std::filesystem::path& input_path) override;
 
-    void finalize_extraction(const ExtractedContent& content,
-                             ContainerFormat target_format) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content,
+                                              ContainerFormat target_format) override;
 
     // --- integrity check ---
     [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
