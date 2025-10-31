@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(chisel VERSION 0.1 LANGUAGES C CXX)
 
+option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
+
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
@@ -587,4 +589,7 @@ endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
-add_subdirectory(chisel_cli)
+
+if(CHISEL_BUILD_CLI)
+    add_subdirectory(chisel_cli)
+endif()
