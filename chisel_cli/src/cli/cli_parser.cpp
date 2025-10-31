@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iostream>
 #include <thread>
+#include <regex>
 
 bool parse_arguments(const int argc, char** argv, Settings& settings) {
     if (argc < 2) {
@@ -16,12 +17,16 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  " << argv[0] << " <file_or_directory>... [options]\n\n"
                   << "Options:\n"
                   << "  --dry-run                  Use chisel without replacing original files.\n"
+                  << "  -d, --output-dir DIR       Write optimized files to DIR instead of modifying in-place.\n"
+                  << "  -q, --quiet                Suppress non-error console output (progress bar, results).\n"
                   << "  --no-meta                  Don't preserve files metadata.\n"
                   << "  --recursive                Recursively scan input folders.\n"
                   << "  --threads N                Threads to use for parallel encoding.\n"
                   << "  --log-level LEVEL          Log level: ERROR, WARNING, INFO, DEBUG, NONE.\n"
                   << "  -o, --output-csv FILE      CSV report export filename.\n"
                   << "  --mode MODE                Encoding mode: 'pipe' (default) or 'parallel'.\n"
+                  << "  --include PATTERN          Process only files matching regex PATTERN. (Can be used multiple times).\n"
+                  << "  --exclude PATTERN          Do not process files matching regex PATTERN. (Can be used multiple times).\n"
                   << "  --regenerate-magic         Re-install libmagic file-detection database.\n"
                   << "  --recompress-unencodable FORMAT\n"
                   << "                             Recompress archives that can be opened but not recompressed\n"
@@ -31,7 +36,8 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
                   << "  " << argv[0] << " file.jpg dir/ --recursive --threads 4\n"
                   << "  " << argv[0] << " archive.zip\n"
                   << "  " << argv[0] << " archive.rar --recompress-unencodable 7z\n"
-                  << "  " << argv[0] << " dir/ -o report.csv\n";
+                  << "  " << argv[0] << " dir/ -o report.csv\n"
+                  << "  " << argv[0] << " dir/ -d ./optimized --include \"\\.png$\" --exclude \"temp/\"\n";
         return false;
     }
 
@@ -43,6 +49,33 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
     flag_map["--no-meta"] = [&](const int&, char**) { settings.preserve_metadata = false; };
     flag_map["--recursive"] = [&](const int&, char**) { settings.recursive = true; };
     flag_map["--dry-run"] = [&](const int&, char**) { settings.dry_run = true; };
+
+    // Aggiunti
+    flag_map["-q"] = [&](const int&, char**) { settings.quiet = true; };
+    flag_map["--quiet"] = flag_map["-q"];
+
+    flag_map["-d"] = [&](int& i, char** args) {
+        settings.output_dir = args[++i];
+    };
+    flag_map["--output-dir"] = flag_map["-d"];
+
+    flag_map["--include"] = [&](int& i, char** args) {
+        try {
+            auto regex = std::regex(args[i+1]);
+            settings.include_patterns.push_back(args[++i]);
+        } catch (const std::regex_error& e) {
+            throw std::runtime_error(std::string("Invalid regex for --include: ") + e.what());
+        }
+    };
+    flag_map["--exclude"] = [&](int& i, char** args) {
+         try {
+            auto regex = std::regex(args[i+1]);
+            settings.exclude_patterns.push_back(args[++i]);
+        } catch (const std::regex_error& e) {
+            throw std::runtime_error(std::string("Invalid regex for --exclude: ") + e.what());
+        }
+    };
+    // Fine aggiunte
 
     flag_map["--threads"] = [&](int& i, char** args) {
         settings.num_threads = std::max(1UL, std::stoul(args[++i]));
@@ -108,6 +141,13 @@ bool parse_arguments(const int argc, char** argv, Settings& settings) {
         } else {
             settings.inputs.emplace_back(a);
         }
+    }
+
+    if (settings.dry_run && !settings.output_dir.empty()) {
+        throw std::runtime_error("--dry-run and --output-dir cannot be used together.");
+    }
+    if (settings.is_pipe && !settings.output_dir.empty()) {
+        throw std::runtime_error("Cannot use --output-dir when reading from stdin.");
     }
 
     return true;

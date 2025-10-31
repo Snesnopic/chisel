@@ -26,6 +26,11 @@ struct Settings {
     bool regenerate_magic = false;
     bool verify_checksums = false;
     EncodeMode encode_mode = EncodeMode::PIPE;
+
+    bool quiet = false;
+    std::filesystem::path output_dir;
+    std::vector<std::string> include_patterns;
+    std::vector<std::string> exclude_patterns;
 };
 
 bool parse_arguments(int argc, char** argv, Settings& settings);

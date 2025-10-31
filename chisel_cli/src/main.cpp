@@ -106,9 +106,15 @@ int main(int argc, char* argv[]) {
     // Logger::set_sink(std::move(sink));
 
     // set file logger
-    auto sink = std::make_unique<FileLogSink>("chisel.log",false);
-    // sink->log_level = Logger::string_to_level(settings.log_level);
-    Logger::set_sink(std::move(sink));
+    Logger::clear_sinks();
+    auto fileSink = std::make_unique<FileLogSink>("chisel.log",false);
+    Logger::add_sink(std::move(fileSink));
+
+    if (!settings.quiet) {
+        auto consoleSink = std::make_unique<ConsoleLogSink>();
+        consoleSink->log_level = Logger::string_to_level(settings.log_level);
+        Logger::add_sink(std::move(consoleSink));
+    }
 
     // registry of processors and event bus
     ProcessorRegistry registry;
@@ -119,7 +125,7 @@ int main(int argc, char* argv[]) {
     std::vector<ContainerResult> container_results;
 
     // collect input files
-    auto inputs = collect_input_files(settings.inputs, settings.recursive, settings.is_pipe);
+    auto inputs = collect_input_files(settings.inputs, settings, settings.is_pipe);
     if (inputs.empty()) {
         Logger::log(LogLevel::Error, "No valid input files.", "main");
         return 1;
@@ -147,18 +153,26 @@ int main(int argc, char* argv[]) {
         const size_t current = ++done;
         const double elapsed = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_total).count();
-        if (!settings.is_pipe) {
+        if (!settings.is_pipe && !settings.quiet) {
             print_progress_bar(current, total, elapsed);
         }
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
-        if (!settings.is_pipe) {
+        if (!settings.is_pipe && !settings.quiet) {
+            std::string status_msg;
+            if (!e.replaced) {
+                status_msg = settings.dry_run ? " [DRY-RUN]" : " [kept]";
+            } else {
+                status_msg = settings.dry_run ? " [DRY-RUN]" :
+                             (settings.output_dir.empty() ? " [replaced]" : " [OK]");
+            }
+
             std::cout
                 << (e.replaced ? GREEN : YELLOW)
                 << "\n[DONE] " << e.path.filename().string()
                 << " (" << e.original_size << " -> " << e.new_size << " bytes)"
-                << (e.replaced ? " [replaced]" : " [kept]")
+                << status_msg
                 << RESET << std::endl;
         }
         Result r;
@@ -190,17 +204,18 @@ int main(int argc, char* argv[]) {
     bus.subscribe<FileProcessSkippedEvent>(on_finish);
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-        // if (!settings.is_pipe) {
-        //   std::cout << "[FINALIZED] " << e.path.filename().string(
-        //             << " (" << e.final_size << " bytes)" << std::endl;
-        // }
+        auto it = std::find_if(results.begin(), results.end(),
+                             [&](const Result& r){ return r.path == e.path; });
+        if (it != results.end()) {
+            it->size_after = e.final_size;
+        }
+
         ContainerResult c;
         c.filename = e.path;
         c.success = true;
         c.size_after = e.final_size;
         container_results.push_back(std::move(c));
 
-        on_finish(e);
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
@@ -221,6 +236,8 @@ int main(int argc, char* argv[]) {
                                settings.unencodable_target_format.value_or(ContainerFormat::Unknown),
                                settings.verify_checksums,
                                settings.encode_mode,
+                               settings.dry_run,
+                               settings.output_dir,
                                bus,
                                interrupted,
                                settings.num_threads);
@@ -230,6 +247,26 @@ int main(int argc, char* argv[]) {
 
     auto end_total = std::chrono::steady_clock::now();
     double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
+
+    if (settings.is_pipe && !inputs.empty() && !settings.dry_run) {
+        const fs::path& temp_file = inputs.front();
+
+        fs::path file_to_read = temp_file;
+        if (!settings.output_dir.empty()) {
+            file_to_read = settings.output_dir / temp_file.filename();
+        }
+
+        std::ifstream infile(file_to_read, std::ios::binary);
+        if (infile) {
+            std::cout << infile.rdbuf();
+        }
+
+        std::error_code ec;
+        fs::remove(temp_file, ec);
+        if (!settings.output_dir.empty()) {
+            fs::remove(file_to_read, ec);
+        }
+    }
 
     // export CSV if requested
     if (!settings.output_csv.empty()) {
