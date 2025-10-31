@@ -143,8 +143,9 @@ jobs:
             runs_on: macos-26
           - id: windows-x86
             runs_on: windows-latest
-          - id: windows-arm
-            runs_on: windows-11-arm
+          # disabled, takes longer than 6 hours
+          #- id: windows-arm
+          #  runs_on: windows-11-arm
 
     env:
       TEST_ARCHIVE_NAME: chisel_samples.zip
@@ -351,6 +352,30 @@ jobs:
             if-no-files-found: warn
             retention-days: 7
 
+  combine-logs:
+    name: combine-logs
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all log artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: chisel-log-*
+          path: logs
+
+      - name: Combine logs
+        run: |
+          mkdir -p combined
+          find logs -type f -name "*.log" -exec cat {} + > combined/chisel-combined.log
+          sort -u combined/chisel-combined.log > combined/chisel-combined-unique.log
+
+      - name: Upload combined log
+        uses: actions/upload-artifact@v4
+        with:
+          name: chisel-combined-logs
+          path: combined/
+          retention-days: 14
+
   publish_nightly:
     name: Publish Nightly Pre-Release
     runs-on: ubuntu-latest
@@ -424,3 +449,89 @@ jobs:
             --title "Nightly Build" \
             --notes "Latest successful build from 'development' branch. Not a stable release." \
             release_assets/*
+  verify-static-linking:
+    name: verify-static-linking (${{ matrix.id }})
+    needs: build
+    runs-on: ${{ matrix.runs_on }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: ubuntu-gcc
+            runs_on: ubuntu-latest
+          - id: ubuntu-clang
+            runs_on: ubuntu-latest
+          - id: ubuntu-arm
+            runs_on: ubuntu-24.04-arm
+          - id: macos-intel
+            runs_on: macos-15-intel
+          - id: macos-arm
+            runs_on: macos-26
+          - id: windows-x86
+            runs_on: windows-latest
+          - id: windows-arm
+            runs_on: windows-11-arm
+
+    env:
+      BIN_DIR: bin
+      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
+
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chisel-${{ matrix.id }}
+          path: ${{ env.BIN_DIR }}
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x ${{ env.BIN_DIR }}/chisel
+
+      - name: Verify Linux (ldd)
+        if: runner.os == 'Linux'
+        run: |
+          echo "Checking dependencies for Linux..."
+          ldd ${{ env.BIN_DIR }}/chisel
+          echo "---"
+          matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          else
+            echo "OK: No forbidden dynamic libraries found."
+          fi
+
+      - name: Verify macOS (otool)
+        if: runner.os == 'macOS'
+        run: |
+          echo "Checking dependencies for macOS..."
+          otool -L ${{ env.BIN_DIR }}/chisel
+          echo "---"
+          matches=$(otool -L ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          else
+            echo "OK: No forbidden dynamic libraries found."
+          fi
+
+      - name: Verify Windows (dumpbin + PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Output "Checking dependencies for Windows..."
+          $deps = & dumpbin /dependents "${{ env.BIN_DIR }}\chisel.exe"
+          $deps | Out-String | Write-Output
+          Write-Output "---"
+          $pattern = [regex]"(${env:FORBIDDEN_LIBS})\.dll"
+          $matches = $deps | Select-String -Pattern $pattern -AllMatches
+          if ($matches) {
+            Write-Error "Found forbidden dynamic libraries!"
+            $matches | ForEach-Object { $_.Matches.Value } | Sort-Object -Unique | ForEach-Object { Write-Output $_ }
+            exit 1
+          } else {
+            Write-Output "OK: No forbidden dynamic libraries found."
+          }
