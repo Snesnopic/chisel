@@ -14,15 +14,12 @@
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Implement a UriProcessor to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing processors, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
-- [ ] Unify and simplify the way compiler and linker flags are passed across platforms.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
+- [ ] Refactor file I/O in processors to use `wchar_t` APIs (`.wstring()`) on Windows to bypass locale issues.
 
 ## FLAC
 
-- [ ] Verify maximum compression parameters compatible with `streamable_subset=false`.
 - [ ] Improve metadata handling: ensure valid STREAMINFO and preserve PICTURE blocks.
-- [ ] Optional support for tag editing and Vorbis comment manipulation.
-- [ ] Implement brute-force recompression across presets 0–8 and select the smallest output.
 
 ## WavPack
 
@@ -68,7 +65,6 @@
 ## MKV / Matroska
 
 - [ ] Preserve chapters, tags, and attachments (e.g. fonts, cover art).
-- [ ] Optional `mkclean` pass after remux for EBML optimization.
 - [ ] Finish Matroska container support (currently unfinished).
 
 ## New MIME types / Codecs
