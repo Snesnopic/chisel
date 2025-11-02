@@ -53,9 +53,12 @@ namespace chisel {
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
         for (const auto &path: inputs) {
+            check_for_stop_request();
             analyze_path(path);
         }
+        check_for_stop_request();
         process_work_list();
+        check_for_stop_request();
         finalize_containers();
     }
 
@@ -105,7 +108,7 @@ namespace chisel {
 
 
     void ProcessorExecutor::analyze_path(const fs::path &path) {
-        if (stop_flag_.load()) return;
+        check_for_stop_request();
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
         auto mime = MimeDetector::detect(path);
@@ -147,8 +150,13 @@ namespace chisel {
 
     void ProcessorExecutor::process_work_list() {
         for (const auto &file: work_list_) {
+            check_for_stop_request();
             if (stop_flag_.load()) break;
             pool_.enqueue([this, file](const std::stop_token &st) {
+                if (st.stop_requested()) {
+                    event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                    return;
+                }
                 event_bus_.publish(FileProcessStartEvent{file});
 
                 // collect all candidates
@@ -299,6 +307,7 @@ namespace chisel {
 
     void ProcessorExecutor::finalize_containers() {
         while (!finalize_stack_.empty() && !stop_flag_.load()) {
+            check_for_stop_request();
             auto content = finalize_stack_.top();
             finalize_stack_.pop();
 
@@ -343,4 +352,16 @@ namespace chisel {
             }
         }
     }
+
+    void ProcessorExecutor::request_stop() {
+        stop_flag_.store(true);
+        pool_.request_stop();
+    }
+
+    void ProcessorExecutor::check_for_stop_request() {
+        if (stop_flag_.load(std::memory_order_relaxed)) {
+            pool_.request_stop();
+        }
+    }
+
 } // namespace chisel

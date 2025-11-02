@@ -46,8 +46,17 @@ void ThreadPool::request_stop() {
     {
         std::unique_lock lock(queue_mutex_);
         stop_ = true;
+        while (!tasks_.empty()) {
+            tasks_.pop();
+            if (pending_ > 0) {
+                pending_--;
+            }
+        }
     }
     condition_.notify_all();
+    for (auto& worker : workers_) {
+        worker.request_stop();
+    }
 }
 
 void ThreadPool::wait_idle() {

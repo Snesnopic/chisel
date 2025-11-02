@@ -57,6 +57,7 @@ using namespace chisel;
 namespace fs = std::filesystem;
 
 static std::atomic<bool> interrupted{false};
+static chisel::ProcessorExecutor* g_executor = nullptr;
 
 // handle ctrl+c or termination signals
 void signal_handler(int sig) {
@@ -64,6 +65,12 @@ void signal_handler(int sig) {
         std::cout << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
+        if (g_executor) {
+            std::cout << RED
+                      << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
+                      << RESET << std::endl;
+            g_executor->request_stop();
+        }
         interrupted.store(true);
     }
 }
@@ -251,9 +258,10 @@ int main(int argc, char* argv[]) {
                                bus,
                                interrupted,
                                settings.num_threads);
-
+    g_executor = &executor;
     // run processing
     executor.process(inputs);
+    g_executor = nullptr;
 
     auto end_total = std::chrono::steady_clock::now();
     double total_seconds = std::chrono::duration<double>(end_total - start_total).count();

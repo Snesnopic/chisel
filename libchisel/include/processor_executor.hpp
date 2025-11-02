@@ -65,7 +65,9 @@ public:
      */
     void process(const std::vector<std::filesystem::path>& inputs);
 
+    void request_stop();
 private:
+    void check_for_stop_request();
     /// Phase 1: recursively analyze files and containers
     void analyze_path(const std::filesystem::path& path);
 
