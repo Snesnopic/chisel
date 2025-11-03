@@ -88,12 +88,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install autoconf automake libtool nasm yasm curl pipx
-          if [[ "$(uname -m)" == "x86_64" ]]; then
-            brew install gcc@12
-          fi
+          brew install autoconf automake libtool nasm yasm
           echo "Uninstalling dynamic libs to force static build..."
-          brew uninstall --ignore-dependencies jpeg-turbo libjpeg zlib lz4 xz bzip2 || true
+          brew uninstall --ignore-dependencies jpeg-turbo libjpeg zlib lz4 xz bzip2 jpeg lz4 || true
           echo "Uninstall complete."
 
       - name: Install build dependencies (Windows)
