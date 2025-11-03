@@ -109,6 +109,16 @@ namespace chisel {
 
     void ProcessorExecutor::analyze_path(const fs::path &path) {
         check_for_stop_request();
+
+        auto name = path.filename().string();
+
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        if (name == ".ds_store" || name == "desktop.ini" || name.starts_with("._")) {
+            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Junk file"});
+
+            return;
+        }
+
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
         auto mime = MimeDetector::detect(path);
