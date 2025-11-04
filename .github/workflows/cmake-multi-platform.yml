@@ -168,10 +168,7 @@ jobs:
             export CC=clang
             export CXX=clang++
             
-            cmake -B build \
-              -DCMAKE_BUILD_TYPE=Release \
-              -S ${{ github.workspace }}
-            
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
