@@ -29,6 +29,12 @@ bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &b
     return true;
 }
 
+size_t get_bytes_per_channel(const JxlDataType data_type) {
+    if (data_type == JXL_TYPE_FLOAT) return 4;
+    if (data_type == JXL_TYPE_UINT16) return 2;
+    return 1; // JXL_TYPE_UINT8
+}
+
 } // namespace
 
 namespace chisel {
@@ -64,14 +70,32 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     std::vector<FrameData> frames;
 
     size_t stride = 0;
-    constexpr JxlPixelFormat format = {4, JXL_TYPE_UINT8, JXL_NATIVE_ENDIAN, 0};
+
+    JxlPixelFormat format = {};
+    JxlDataType data_type = {};
 
     for (;;) {
         const JxlDecoderStatus status = JxlDecoderProcessInput(dec);
         if (status == JXL_DEC_ERROR) { ok = false; break; }
         if (status == JXL_DEC_BASIC_INFO) {
             if (JXL_DEC_SUCCESS != JxlDecoderGetBasicInfo(dec, &info)) { ok = false; break; }
-            stride = info.xsize * 4;
+
+            uint32_t num_channels = info.num_color_channels;
+            if (info.alpha_bits > 0) {
+                num_channels++;
+            }
+
+            if (info.exponent_bits_per_sample > 0) {
+                data_type = JXL_TYPE_FLOAT;
+            } else if (info.bits_per_sample > 8) {
+                data_type = JXL_TYPE_UINT16;
+            } else {
+                data_type = JXL_TYPE_UINT8;
+            }
+
+            format = {num_channels, data_type, JXL_NATIVE_ENDIAN, 0};
+
+            stride = info.xsize * num_channels * get_bytes_per_channel(data_type);
         }
         if (status == JXL_DEC_FRAME) {
             JxlFrameHeader header;
@@ -93,6 +117,15 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     JxlEncoder* enc = JxlEncoderCreate(nullptr);
     if (!enc) throw std::runtime_error("JxlProcessor: cannot create encoder");
 
+    if (JXL_ENC_SUCCESS != JxlEncoderSetBasicInfo(enc, &info)) {
+        JxlEncoderDestroy(enc);
+        throw std::runtime_error("JxlProcessor: failed to set basic info");
+    }
+
+    if (preserve_metadata) {
+        JxlEncoderStoreJPEGMetadata(enc, JXL_TRUE);
+    }
+
     for (const auto &frame : frames) {
         JxlEncoderFrameSettings* frame_settings = JxlEncoderFrameSettingsCreate(enc, nullptr);
         JxlEncoderSetFrameLossless(frame_settings, JXL_TRUE);
@@ -105,10 +138,6 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
             JxlEncoderDestroy(enc);
             throw std::runtime_error("JxlProcessor: failed to add frame");
         }
-    }
-
-    if (preserve_metadata) {
-        JxlEncoderStoreJPEGMetadata(enc, JXL_TRUE);
     }
 
     JxlEncoderCloseInput(enc);
