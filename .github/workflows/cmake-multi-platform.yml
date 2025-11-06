@@ -175,7 +175,7 @@ jobs:
             
             export PATH=$HOME/bin:$PATH
             
-            cmake -G Ninja -B -DCMAKE_CXX_STANDARD=20  build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20  build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
