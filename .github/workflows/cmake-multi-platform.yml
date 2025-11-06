@@ -167,8 +167,9 @@ jobs:
             echo "--- Starting FreeBSD Build ---"
             export CC=clang
             export CXX=clang++
+            export MAKE=gmake
             
-            cmake -B build -DCMAKE_MAKE_PROGRAM=gmake -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
