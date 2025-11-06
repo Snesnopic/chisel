@@ -259,8 +259,13 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
     int r = ARCHIVE_OK;
 
     switch (fmt) {
-        case ContainerFormat::Zip:
         case ContainerFormat::Epub:
+            r = archive_write_set_format_zip(a);
+            if (r == ARCHIVE_OK) {
+                archive_write_set_format_option(a, "zip", "compression", "store");
+            }
+            break;
+        case ContainerFormat::Zip:
         case ContainerFormat::Cbz:
         case ContainerFormat::Jar:
         case ContainerFormat::Xpi:
@@ -337,7 +342,6 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
     if (fmt == ContainerFormat::Epub) {
         fs::path mimetype_path = fs::path(src_dir) / "mimetype";
         if (fs::exists(mimetype_path)) {
-            archive_write_set_format_option(a, "zip", "compression", "store");
 
             std::ifstream ifs(mimetype_path, std::ios::binary);
             std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
