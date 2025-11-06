@@ -169,7 +169,7 @@ jobs:
             export CXX=clang++
             export MAKE=gmake
             
-            cmake -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            cmake -G "Unix Makefiles" -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
