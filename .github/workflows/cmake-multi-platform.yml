@@ -168,8 +168,17 @@ jobs:
             export CC=clang
             export CXX=clang++
             export MAKE=gmake
+
+            mkdir -p $HOME/bin
             
-            cmake -G "Unix Makefiles" -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            ln -s /usr/local/bin/gmake $HOME/bin/make
+            
+            export PATH=$HOME/bin:$PATH
+            
+            which make
+            make --version | grep "GNU Make"
+            
+            cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
