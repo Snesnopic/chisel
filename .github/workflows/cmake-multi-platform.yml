@@ -162,7 +162,7 @@ jobs:
               nasm \
               yasm \
               gmake \
-              git \
+              git
           run: |
             echo "--- Starting FreeBSD Build ---"
             
