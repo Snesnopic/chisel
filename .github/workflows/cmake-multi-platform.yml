@@ -161,8 +161,9 @@ jobs:
               nasm \
               yasm \
               gmake \
-              git
-
+              git \
+              llvm \
+              libc++
           run: |
             echo "--- Starting FreeBSD Build ---"
             export CC=clang
@@ -175,7 +176,8 @@ jobs:
             
             export PATH=$HOME/bin:$PATH
             
-            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}           
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
