@@ -119,77 +119,76 @@ jobs:
           name: chisel-${{ matrix.id }}
           path: ${{ github.workspace }}/${{ matrix.binary_path }}
           retention-days: 7
-  build-freebsd:
-    name: build (freebsd-${{ matrix.arch }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: freebsd-x86
-            arch: amd64
-          - id: freebsd-arm
-            arch: arm64
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-          lfs: true
-
-      - name: Setup Git LFS
-        run: |
-          git lfs install
-          git lfs pull
-
-      - name: Build on FreeBSD
-        uses: vmactions/freebsd-vm@v1
-        with:
-          arch: ${{ matrix.arch }}
-          release: 14.3
-          usesh: true
-          prepare: |
-            pkg install -y \
-              cmake \
-              ninja \
-              pkgconf \
-              autoconf \
-              automake \
-              libtool \
-              m4 \
-              nasm \
-              yasm \
-              gmake \
-              git \
-              llvm20
-          run: |
-            echo "--- Starting FreeBSD Build ---"
-            
-            export MAKE=gmake
-              
-            mkdir -p $HOME/bin
-            ln -s /usr/local/bin/gmake $HOME/bin/make
-            export PATH=$HOME/bin:$PATH
-            
-            
-            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
-                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
-                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
-                  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
-                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
-              
-            cmake --build build --config Release
-            echo "--- Build Complete ---"
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: chisel-${{ matrix.id }}
-          path: ${{ github.workspace }}/build/bin/Release/chisel
-          retention-days: 7
+#  build-freebsd:
+#    name: build (freebsd-${{ matrix.arch }})
+#    runs-on: ubuntu-latest
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        include:
+#          - id: freebsd-x86
+#            arch: amd64
+#          - id: freebsd-arm
+#            arch: arm64
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#        with:
+#          submodules: recursive
+#          fetch-depth: 0
+#          lfs: true
+#
+#      - name: Setup Git LFS
+#        run: |
+#          git lfs install
+#          git lfs pull
+#
+#      - name: Build on FreeBSD
+#        uses: vmactions/freebsd-vm@v1
+#        with:
+#          arch: ${{ matrix.arch }}
+#          release: 14.3
+#          usesh: true
+#          prepare: |
+#            pkg install -y \
+#              cmake \
+#              ninja \
+#              pkgconf \
+#              autoconf \
+#              automake \
+#              libtool \
+#              m4 \
+#              nasm \
+#              yasm \
+#              gmake \
+#              git \
+#              llvm20
+#          run: |
+#            echo "--- Starting FreeBSD Build ---"
+#
+#            export MAKE=gmake
+#
+#            mkdir -p $HOME/bin
+#            ln -s /usr/local/bin/gmake $HOME/bin/make
+#            export PATH=$HOME/bin:$PATH
+#
+#            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+#                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+#                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+#                  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+#                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+#                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+#
+#            cmake --build build --config Release
+#            echo "--- Build Complete ---"
+#
+#      - name: Upload binary artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: chisel-${{ matrix.id }}
+#          path: ${{ github.workspace }}/build/bin/Release/chisel
+#          retention-days: 7
   test:
     name: test (${{ matrix.id }})
     needs: build
@@ -419,142 +418,141 @@ jobs:
             chisel.log
             if-no-files-found: warn
             retention-days: 7
-  test-freebsd:
-    name: test (freebsd-${{ matrix.arch }})
-    needs: build-freebsd
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: freebsd-x86
-            arch: amd64
-          - id: freebsd-arm
-            arch: arm64
-    env:
-      TEST_ARCHIVE_NAME: chisel_samples.zip
-      TEST_DIR: test-data
-      BIN_DIR: bin
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Download binary artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: chisel-${{ matrix.id }}
-          path: ${{ env.BIN_DIR }}
-      - name: Install test dependencies (Linux Host for GDrive)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip unzip
-          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-      - name: Cache test data archive
-        id: cache-test-archive
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TEST_ARCHIVE_NAME }}
-          key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
-      - name: Authenticate and Download Test Data from Google Drive
-        if: steps.cache-test-archive.outputs.cache-hit != 'true'
-        env:
-          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
-          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
-        run: |
-          python3 -c "
-          import os, io, json, sys
-          from google.oauth2 import service_account
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaIoBaseDownload
-          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
-          if not creds_json_string: sys.exit(1)
-          try:
-            creds_info = json.loads(creds_json_string)
-            creds = service_account.Credentials.from_service_account_info(creds_info)
-          except: sys.exit(1)
-          file_id = os.environ.get('GDRIVE_FILE_ID')
-          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
-          if not file_id or not output_filename: sys.exit(1)
-          try: service = build('drive', 'v3', credentials=creds)
-          except: sys.exit(1)
-          try: request = service.files().get_media(fileId=file_id)
-          except: sys.exit(1)
-          try: fh = io.FileIO(output_filename, 'wb')
-          except: sys.exit(1)
-          downloader = MediaIoBaseDownload(fh, request)
-          done = False
-          try:
-            while done is False: status, done = downloader.next_chunk()
-          except:
-            if not fh.closed: fh.close()
-            try:
-              if os.path.exists(output_filename): os.remove(output_filename)
-            except: pass
-            sys.exit(1)
-          finally:
-            if not fh.closed: fh.close()
-          "
-        shell: bash
-      - name: Extract Test Data
-        run: |
-          echo "Extracting test data..."
-          mkdir ${{ env.TEST_DIR }}
-          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
-        shell: bash
-      - name: Run Chisel Tests (in FreeBSD VM)
-        uses: vmactions/freebsd-vm@v1
-        with:
-          arch: ${{ matrix.arch }}
-          usesh: true
-          run: |
-            echo "--- Starting FreeBSD Test ---"
-            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
-            chmod +x $CHISEL_EXE
-            
-            echo "Running chisel from: $CHISEL_EXE"
-            echo "Processing files in: ${{ env.TEST_DIR }}"
-            
-            # Esegui il test (la VM condivide il workspace con i dati di test)
-            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
-            echo "--- Test Run Complete ---"
-      - name: Check for errors in Chisel Log
-        if: always()
-        run: |
-          LOG_FILE="build/chisel.log"
-          if [ ! -f "$LOG_FILE" ]; then
-            if [ -f "${{ github.workspace }}/chisel.log" ]; then
-              LOG_FILE="${{ github.workspace }}/chisel.log"
-            elif [ -f "chisel.log" ]; then
-              LOG_FILE="chisel.log"
-            else
-              echo "Log file not found."
-              exit 0
-            fi
-          fi
-          echo "Checking log file at: $LOG_FILE"
-          if grep -q '\[ERROR\]' "$LOG_FILE"; then
-            echo "::error::Errors detected in chisel.log!"
-            grep '\[ERROR\]' "$LOG_FILE"
-            exit 1
-          else
-            echo "No [ERROR] lines found in chisel.log."
-            exit 0
-          fi
-        shell: bash
-      - name: Upload Chisel Log File
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: chisel-log-${{ matrix.id }}
-          path: |
-            build/chisel.log
-            ${{ github.workspace }}/chisel.log
-            chisel.log
-            if-no-files-found: warn
-            retention-days: 7
+#  test-freebsd:
+#    name: test (freebsd-${{ matrix.arch }})
+#    needs: build-freebsd
+#    runs-on: ubuntu-latest
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        include:
+#          - id: freebsd-x86
+#            arch: amd64
+#          - id: freebsd-arm
+#            arch: arm64
+#    env:
+#      TEST_ARCHIVE_NAME: chisel_samples.zip
+#      TEST_DIR: test-data
+#      BIN_DIR: bin
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#      - name: Download binary artifact
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: chisel-${{ matrix.id }}
+#          path: ${{ env.BIN_DIR }}
+#      - name: Install test dependencies (Linux Host for GDrive)
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y python3-pip unzip
+#          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+#      - name: Cache test data archive
+#        id: cache-test-archive
+#        uses: actions/cache@v4
+#        with:
+#          path: ${{ env.TEST_ARCHIVE_NAME }}
+#          key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
+#      - name: Authenticate and Download Test Data from Google Drive
+#        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+#        env:
+#          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
+#          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
+#        run: |
+#          python3 -c "
+#          import os, io, json, sys
+#          from google.oauth2 import service_account
+#          from googleapiclient.discovery import build
+#          from googleapiclient.http import MediaIoBaseDownload
+#          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
+#          if not creds_json_string: sys.exit(1)
+#          try:
+#            creds_info = json.loads(creds_json_string)
+#            creds = service_account.Credentials.from_service_account_info(creds_info)
+#          except: sys.exit(1)
+#          file_id = os.environ.get('GDRIVE_FILE_ID')
+#          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
+#          if not file_id or not output_filename: sys.exit(1)
+#          try: service = build('drive', 'v3', credentials=creds)
+#          except: sys.exit(1)
+#          try: request = service.files().get_media(fileId=file_id)
+#          except: sys.exit(1)
+#          try: fh = io.FileIO(output_filename, 'wb')
+#          except: sys.exit(1)
+#          downloader = MediaIoBaseDownload(fh, request)
+#          done = False
+#          try:
+#            while done is False: status, done = downloader.next_chunk()
+#          except:
+#            if not fh.closed: fh.close()
+#            try:
+#              if os.path.exists(output_filename): os.remove(output_filename)
+#            except: pass
+#            sys.exit(1)
+#          finally:
+#            if not fh.closed: fh.close()
+#          "
+#        shell: bash
+#      - name: Extract Test Data
+#        run: |
+#          echo "Extracting test data..."
+#          mkdir ${{ env.TEST_DIR }}
+#          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+#        shell: bash
+#      - name: Run Chisel Tests (in FreeBSD VM)
+#        uses: vmactions/freebsd-vm@v1
+#        with:
+#          arch: ${{ matrix.arch }}
+#          usesh: true
+#          run: |
+#            echo "--- Starting FreeBSD Test ---"
+#            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
+#            chmod +x $CHISEL_EXE
+#
+#            echo "Running chisel from: $CHISEL_EXE"
+#            echo "Processing files in: ${{ env.TEST_DIR }}"
+#
+#            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+#            echo "--- Test Run Complete ---"
+#      - name: Check for errors in Chisel Log
+#        if: always()
+#        run: |
+#          LOG_FILE="build/chisel.log"
+#          if [ ! -f "$LOG_FILE" ]; then
+#            if [ -f "${{ github.workspace }}/chisel.log" ]; then
+#              LOG_FILE="${{ github.workspace }}/chisel.log"
+#            elif [ -f "chisel.log" ]; then
+#              LOG_FILE="chisel.log"
+#            else
+#              echo "Log file not found."
+#              exit 0
+#            fi
+#          fi
+#          echo "Checking log file at: $LOG_FILE"
+#          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+#            echo "::error::Errors detected in chisel.log!"
+#            grep '\[ERROR\]' "$LOG_FILE"
+#            exit 1
+#          else
+#            echo "No [ERROR] lines found in chisel.log."
+#            exit 0
+#          fi
+#        shell: bash
+#      - name: Upload Chisel Log File
+#        if: always()
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: chisel-log-${{ matrix.id }}
+#          path: |
+#            build/chisel.log
+#            ${{ github.workspace }}/chisel.log
+#            chisel.log
+#            if-no-files-found: warn
+#            retention-days: 7
 
   combine-logs:
     name: combine-logs
-    needs: [test, test-freebsd]
+    needs: [test]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -580,7 +578,7 @@ jobs:
   publish_nightly:
     name: Publish Nightly Pre-Release
     runs-on: ubuntu-latest
-    needs: [test, test-freebsd]
+    needs: [test]
     if: github.ref == 'refs/heads/development'
 
     permissions:
@@ -636,14 +634,14 @@ jobs:
           rm release_assets/chisel-windows-arm.exe
           
           # --- FreeBSD (x86) ---
-          mv artifacts/chisel-freebsd-x86/chisel release_assets/chisel-freebsd-x86
-          tar -czf release_assets/chisel-freebsd-x86.tar.gz -C release_assets chisel-freebsd-x86
-          rm release_assets/chisel-freebsd-x86
+#          mv artifacts/chisel-freebsd-x86/chisel release_assets/chisel-freebsd-x86
+#          tar -czf release_assets/chisel-freebsd-x86.tar.gz -C release_assets chisel-freebsd-x86
+#          rm release_assets/chisel-freebsd-x86
           
           # --- FreeBSD (arm) ---
-          mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
-          tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
-          rm release_assets/chisel-freebsd-arm
+#          mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
+#          tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
+#          rm release_assets/chisel-freebsd-arm
           
           find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
 
@@ -752,43 +750,42 @@ jobs:
           } else {
             Write-Output "OK: No forbidden dynamic libraries found."
           }
-  verify-static-linking-freebsd:
-    name: verify-static-linking (freebsd-${{ matrix.arch }})
-    needs: build-freebsd
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: freebsd-x86
-            arch: amd64
-          - id: freebsd-arm
-            arch: arm64
-    env:
-      BIN_DIR: bin
-      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
-    steps:
-      - name: Download binary artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: chisel-${{ matrix.id }}
-          path: ${{ env.BIN_DIR }}
-      - name: Verify FreeBSD (ldd)
-        uses: vmactions/freebsd-vm@v1
-        with:
-          arch: ${{ matrix.arch }}
-          usesh: true
-          run: |
-            echo "Checking dependencies for FreeBSD..."
-            chmod +x ${{ env.BIN_DIR }}/chisel
-            ldd ${{ env.BIN_DIR }}/chisel
-            echo "---"
-            # Usa lo stesso controllo ldd di Linux
-            matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
-            if [ -n "$matches" ]; then
-              echo "::error::Found forbidden dynamic libraries!"
-              echo "$matches"
-              exit 1
-            else
-              echo "OK: No forbidden dynamic libraries found."
-            fi
+#  verify-static-linking-freebsd:
+#    name: verify-static-linking (freebsd-${{ matrix.arch }})
+#    needs: build-freebsd
+#    runs-on: ubuntu-latest
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        include:
+#          - id: freebsd-x86
+#            arch: amd64
+#          - id: freebsd-arm
+#            arch: arm64
+#    env:
+#      BIN_DIR: bin
+#      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
+#    steps:
+#      - name: Download binary artifact
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: chisel-${{ matrix.id }}
+#          path: ${{ env.BIN_DIR }}
+#      - name: Verify FreeBSD (ldd)
+#        uses: vmactions/freebsd-vm@v1
+#        with:
+#          arch: ${{ matrix.arch }}
+#          usesh: true
+#          run: |
+#            echo "Checking dependencies for FreeBSD..."
+#            chmod +x ${{ env.BIN_DIR }}/chisel
+#            ldd ${{ env.BIN_DIR }}/chisel
+#            echo "---"
+#            matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+#            if [ -n "$matches" ]; then
+#              echo "::error::Found forbidden dynamic libraries!"
+#              echo "$matches"
+#              exit 1
+#            else
+#              echo "OK: No forbidden dynamic libraries found."
+#            fi
