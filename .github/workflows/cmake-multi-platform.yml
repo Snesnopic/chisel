@@ -162,8 +162,7 @@ jobs:
               yasm \
               gmake \
               git \
-              llvm20 \
-              libcxx
+              llvm20
           run: |
             echo "--- Starting FreeBSD Build ---"
             
