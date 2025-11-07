@@ -156,7 +156,6 @@ set(ENABLE_NLS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL "" FORCE)
 add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
 set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include" FORCE)
 
@@ -356,9 +355,6 @@ set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
 add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
-target_include_directories(ebml PUBLIC
-        ${libebml_BINARY_DIR}
-)
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # libMatroska
@@ -366,6 +362,9 @@ set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
 set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
 add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
 
+target_include_directories(matroska PRIVATE
+        ${libebml_BINARY_DIR}
+)
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
