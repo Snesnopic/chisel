@@ -106,7 +106,7 @@ void print_console_report(const std::vector<Result>& results,
         return s.size() <= max_len ? s : s.substr(0, max_len - 3) + "...";
     };
 
-    std::cout << "\n"
+    std::cerr << "\n"
               << std::left << std::setw(file_col_width) << "File"
               << std::setw(max_mime)   << "MIME type"
               << std::setw(max_before)<< "Before(KB)"
@@ -145,7 +145,7 @@ void print_console_report(const std::vector<Result>& results,
         auto sizeAfter = r.size_after / 1024;
         std::ostringstream osst;
         osst << std::fixed << std::setprecision(2) << r.seconds;
-        std::cout << std::left << std::setw(file_col_width) << filenamecolwidth
+        std::cerr << std::left << std::setw(file_col_width) << filenamecolwidth
                   << std::setw(max_mime)   << r.mime
                   << std::setw(max_before)<< sizeBefore
                   << std::setw(max_after) << sizeAfter
@@ -157,30 +157,30 @@ void print_console_report(const std::vector<Result>& results,
 
         if (!r.codecs_used.empty()) {
             if (mode == EncodeMode::PIPE) {
-                std::cout << "    Pipeline: ";
+                std::cerr << "    Pipeline: ";
                 for (size_t i = 0; i < r.codecs_used.size(); ++i) {
                     std::ostringstream ossc;
                     ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
-                    std::cout << r.codecs_used[i].first << " (" << ossc.str() << "%)";
-                    if (i + 1 < r.codecs_used.size()) std::cout << " -> ";
+                    std::cerr << r.codecs_used[i].first << " (" << ossc.str() << "%)";
+                    if (i + 1 < r.codecs_used.size()) std::cerr << " -> ";
                 }
-                std::cout << "\n";
+                std::cerr << "\n";
             } else {
-                std::cout << "    Tried: ";
+                std::cerr << "    Tried: ";
                 for (size_t i = 0; i < r.codecs_used.size(); ++i) {
                     std::ostringstream ossc;
                     ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
-                    std::cout << r.codecs_used[i].first << " (" << ossc.str() << "%)";
-                    if (i + 1 < r.codecs_used.size()) std::cout << "; ";
+                    std::cerr << r.codecs_used[i].first << " (" << ossc.str() << "%)";
+                    if (i + 1 < r.codecs_used.size()) std::cerr << "; ";
                 }
-                std::cout << "\n";
+                std::cerr << "\n";
             }
         }
     }
 
     if (!container_results.empty()) {
-        std::cout << "\n=== Container results ===\n";
-        std::cout << std::left << std::setw(40) << "Container"
+        std::cerr << "\n=== Container results ===\n";
+        std::cerr << std::left << std::setw(40) << "Container"
                   << std::setw(12) << "Format"
                   << std::setw(12) << "Before(KB)"
                   << std::setw(12) << "After(KB)"
@@ -198,7 +198,7 @@ void print_console_report(const std::vector<Result>& results,
             const auto size_before = c.size_before / 1024;
             const auto size_after = c.size_after / 1024;
             const auto fileName = c.filename.filename().string();
-            std::cout << std::left << std::setw(40) << fileName
+            std::cerr << std::left << std::setw(40) << fileName
 << std::setw(12) << size_before
                       << std::setw(12) << size_after
                       << std::setw(8)  << delta
@@ -206,8 +206,8 @@ void print_console_report(const std::vector<Result>& results,
                       << "\n";
         }
     }
-    std::cout << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
-    std::cout << "Total time: " << std::fixed << std::setprecision(2)
+    std::cerr << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
+    std::cerr << "Total time: " << std::fixed << std::setprecision(2)
               << total_seconds << " s (" << num_threads << " thread"
               << (num_threads > 1U ? "s" : "") << ")\n";
 }

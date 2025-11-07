@@ -39,14 +39,14 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
         percent = 100.0;
     }
 
-    std::cout << "\r[";
+    std::cerr << "\r[";
     for (unsigned i = 0; i < bar_width; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos && done < total) std::cout << ">";
-        else if (i == pos && done == total) std::cout << "=";
-        else std::cout << " ";
+        if (i < pos) std::cerr << "=";
+        else if (i == pos && done < total) std::cerr << ">";
+        else if (i == pos && done == total) std::cerr << "=";
+        else std::cerr << " ";
     }
-    std::cout << "] "
+    std::cerr << "] "
               << std::setw(5) << std::fixed << std::setprecision(1) << percent << "%"
               << " (" << done << "/" << total << ")"
               << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
@@ -62,11 +62,11 @@ static chisel::ProcessorExecutor* g_executor = nullptr;
 // handle ctrl+c or termination signals
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        std::cout << CYAN
+        std::cerr << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
         if (g_executor) {
-            std::cout << RED
+            std::cerr << RED
                       << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                       << RESET << std::endl;
             g_executor->request_stop();
@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     } catch (const std::exception& e) {
-        std::cout << RED
+        std::cerr << RED
                   << e.what()
                   << RESET << std::endl;
         return 1;
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
 
     // subscribe to events: print progress and collect results
     // bus.subscribe<FileAnalyzeStartEvent>([](const FileAnalyzeStartEvent& e) {
-    //     std::cout << "[ANALYZE] " << e.path.filename().string() << std::endl;
+    //     std::cerr << "[ANALYZE] " << e.path.filename().string() << std::endl;
     // });
 
     // update total if a container is extracted (finalization step counts as extra work)
@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
                              (settings.output_dir.empty() ? " [replaced]" : " [OK]");
             }
 
-            std::cout
+            std::cerr
                 << (e.replaced ? GREEN : YELLOW)
                 << "\n[DONE] " << e.path.filename().string()
                 << " (" << e.original_size << " -> " << e.new_size << " bytes)"

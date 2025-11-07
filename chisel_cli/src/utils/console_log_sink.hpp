@@ -17,12 +17,12 @@ public:
         switch (level) {
             case LogLevel::Debug:
                 if (log_level == LogLevel::Debug) {
-                    std::cout << "[DEBUG][" << tag << "] " << message << std::endl;
+                    std::cerr << "[DEBUG][" << tag << "] " << message << std::endl;
                 }
                 break;
             case LogLevel::Info:
                 if (log_level == LogLevel::Info) {
-                    std::cout << "[INFO ][" << tag << "] " << message << std::endl;
+                    std::cerr << "[INFO ][" << tag << "] " << message << std::endl;
                 }
                 break;
             case LogLevel::Warning:
