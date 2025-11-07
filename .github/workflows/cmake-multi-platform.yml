@@ -162,8 +162,7 @@ jobs:
               yasm \
               gmake \
               git \
-              llvm \
-              libc++
+              llvm
           run: |
             echo "--- Starting FreeBSD Build ---"
             export CC=clang
