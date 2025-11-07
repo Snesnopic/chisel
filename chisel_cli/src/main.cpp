@@ -11,6 +11,7 @@
 #include <fstream>
 #include "utils/color.hpp"
 #include "cli/cli_parser.hpp"
+#include "cli/CLI11.hpp"
 #include "report/report_generator.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
 #include "../../libchisel/include/processor_executor.hpp"
@@ -66,9 +67,6 @@ void signal_handler(int sig) {
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
         if (g_executor) {
-            std::cerr << RED
-                      << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
-                      << RESET << std::endl;
             g_executor->request_stop();
         }
         interrupted.store(true);
@@ -99,20 +97,28 @@ inline void init_utf8_locale() {
 
 
 int main(int argc, char* argv[]) {
+
+    CLI::App app{"chisel: Cross-platform tool for lossless recompression."};
+    Settings settings;
+    setup_cli_parser(app, settings);
+
+    try {
+        app.parse(argc, argv);
+    }
+    catch (const CLI::CallForHelp &e) {
+        return app.exit(e);
+    }
+    catch (const CLI::CallForVersion &e) {
+        return app.exit(e);
+    }
+    catch (const CLI::ParseError &e) {
+        std::cerr << RED << "Parse error: " << e.what() << RESET << std::endl;
+        return app.exit(e);
+    }
+
     std::signal(SIGINT, signal_handler);
     init_utf8_locale();
-    Settings settings;
-    try {
-        // parse CLI arguments
-        if (!parse_arguments(argc, argv, settings)) {
-            return 1;
-        }
-    } catch (const std::exception& e) {
-        std::cerr << RED
-                  << e.what()
-                  << RESET << std::endl;
-        return 1;
-    }
+
     if (settings.regenerate_magic) {
         MimeDetector::ensure_magic_installed();
     }
@@ -170,19 +176,19 @@ int main(int argc, char* argv[]) {
         const size_t current = ++done;
         const double elapsed = std::chrono::duration<double>(
             std::chrono::steady_clock::now() - start_total).count();
-        if (!settings.is_pipe && !settings.quiet) {
+        if (!settings.quiet) {
             print_progress_bar(current, total, elapsed);
         }
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
-        if (!settings.is_pipe && !settings.quiet) {
+        if (!settings.quiet) {
             std::string status_msg;
             if (!e.replaced) {
                 status_msg = settings.dry_run ? " [DRY-RUN]" : " [kept]";
             } else {
                 status_msg = settings.dry_run ? " [DRY-RUN]" :
-                             (settings.output_dir.empty() ? " [replaced]" : " [OK]");
+                             (settings.output_path.empty() ? " [replaced]" : " [OK]");
             }
 
             std::cerr
@@ -247,14 +253,19 @@ int main(int argc, char* argv[]) {
         on_finish(e);
     });
 
+    std::filesystem::path executor_output_dir;
+    if (!settings.is_pipe && !settings.output_path.empty()) {
+        executor_output_dir = settings.output_path;
+    }
+
     // build executor
     ProcessorExecutor executor(registry,
-                               settings.preserve_metadata,
-                               settings.unencodable_target_format.value_or(ContainerFormat::Unknown),
+                                settings.should_preserve_metadata(),
+                        settings.unencodable_target_format.value_or(ContainerFormat::Unknown),
                                settings.verify_checksums,
                                settings.encode_mode,
                                settings.dry_run,
-                               settings.output_dir,
+                               executor_output_dir,
                                bus,
                                interrupted,
                                settings.num_threads);
@@ -269,28 +280,38 @@ int main(int argc, char* argv[]) {
     if (settings.is_pipe && !inputs.empty() && !settings.dry_run) {
         const fs::path& temp_file = inputs.front();
 
-        fs::path file_to_read = temp_file;
-        if (!settings.output_dir.empty()) {
-            file_to_read = settings.output_dir / temp_file.filename();
-        }
-
-        std::ifstream infile(file_to_read, std::ios::binary);
+        // in pipe mode, executor_output_dir is empty, so the
+        // optimized file is the temp_file itself (replaced in-place)
+        std::ifstream infile(temp_file, std::ios::binary);
         if (infile) {
             std::cout << infile.rdbuf();
         }
 
-        std::error_code ec;
-        fs::remove(temp_file, ec);
-        if (!settings.output_dir.empty()) {
-            fs::remove(file_to_read, ec);
+        std::error_code ec_rename;
+        fs::rename(temp_file, settings.output_path, ec_rename);
+        if (ec_rename) {
+            // fallback to copy if rename fails (e.g., different devices)
+            std::error_code ec_copy;
+            fs::copy_file(temp_file, settings.output_path, fs::copy_options::overwrite_existing, ec_copy);
+            if (ec_copy) {
+                std::cerr << RED << "Error: Failed to write final output to: "
+                          << settings.output_path.string() << RESET << std::endl;
+            } else {
+                fs::remove(temp_file, ec_rename); // clean up temp
+            }
         }
+
+    } else if (settings.is_pipe && !inputs.empty()) {
+        // pipe mode but with --dry-run, just clean up the temp file
+        std::error_code ec;
+        fs::remove(inputs.front(), ec);
     }
 
     // export CSV if requested
-    if (!settings.output_csv.empty()) {
+    if (!settings.report_path.empty()) {
         export_csv_report(results,
                           container_results,
-                          settings.output_csv,
+                          settings.report_path,
                           total_seconds,
                           settings.encode_mode);
     }

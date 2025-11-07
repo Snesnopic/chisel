@@ -4,151 +4,131 @@
 
 #include "cli_parser.hpp"
 #include "../../libchisel/include/file_type.hpp"
-#include <unordered_map>
-#include <functional>
-#include <algorithm>
-#include <iostream>
+#include "CLI11.hpp"
 #include <thread>
-#include <regex>
+#include <algorithm>
+#include <map>
 
-bool parse_arguments(const int argc, char** argv, Settings& settings) {
-    if (argc < 2) {
-        std::cerr << "Usage:\n"
-                  << "  " << argv[0] << " <file_or_directory>... [options]\n\n"
-                  << "Options:\n"
-                  << "  --dry-run                  Use chisel without replacing original files.\n"
-                  << "  -d, --output-dir DIR       Write optimized files to DIR instead of modifying in-place.\n"
-                  << "  -q, --quiet                Suppress non-error console output (progress bar, results).\n"
-                  << "  --no-meta                  Don't preserve files metadata.\n"
-                  << "  --recursive                Recursively scan input folders.\n"
-                  << "  --threads N                Threads to use for parallel encoding.\n"
-                  << "  --log-level LEVEL          Log level: ERROR, WARNING, INFO, DEBUG, NONE.\n"
-                  << "  -o, --output-csv FILE      CSV report export filename.\n"
-                  << "  --mode MODE                Encoding mode: 'pipe' (default) or 'parallel'.\n"
-                  << "  --include PATTERN          Process only files matching regex PATTERN. (Can be used multiple times).\n"
-                  << "  --exclude PATTERN          Do not process files matching regex PATTERN. (Can be used multiple times).\n"
-                  << "  --regenerate-magic         Re-install libmagic file-detection database.\n"
-                  << "  --recompress-unencodable FORMAT\n"
-                  << "                             Recompress archives that can be opened but not recompressed\n"
-                  << "                             into a different format (zip, 7z, tar, gz, bz2, xz, wim).\n"
-                  << "  --verify-checksums         Verify raw checksums before replacing files.\n\n"
-                  << "Examples:\n"
-                  << "  " << argv[0] << " file.jpg dir/ --recursive --threads 4\n"
-                  << "  " << argv[0] << " archive.zip\n"
-                  << "  " << argv[0] << " archive.rar --recompress-unencodable 7z\n"
-                  << "  " << argv[0] << " dir/ -o report.csv\n"
-                  << "  " << argv[0] << " dir/ -d ./optimized --include \"\\.png$\" --exclude \"temp/\"\n";
-        return false;
+namespace {
+// helper for validating container format string
+struct ContainerFormatValidator : CLI::Validator {
+    ContainerFormatValidator() {
+        name_ = "ContainerFormat";
+        func_ = [](const std::string& str) {
+            auto fmt = parse_container_format(str);
+            if (!fmt.has_value()) {
+                return std::string("Invalid format: '") + str +
+                       "'. Must be one of: zip, 7z, tar, gz, bz2, xz, wim.";
+            }
+            return std::string(); // ok
+        };
     }
+};
+} // namespace
 
+void setup_cli_parser(CLI::App& app, Settings& settings) {
+    // setup standard help and version flags
+    app.set_help_flag("-h,--help", "Show this help message and exit.");
+    app.set_version_flag("--version", "0.1");
+
+    // --- Flags (booleans) ---
+    app.add_flag("--no-meta", settings.no_meta,
+                    "Don't preserve files metadata.");
+
+    app.add_flag("-r,--recursive", settings.recursive,
+                 "Recursively scan input folders.");
+
+    app.add_flag("--dry-run", settings.dry_run,
+                 "Use chisel without replacing original files.");
+
+    app.add_flag("-q,--quiet", settings.quiet,
+                 "Suppress non-error console output (progress bar, results).");
+
+    app.add_flag("--regenerate-magic", settings.regenerate_magic,
+                 "Re-install libmagic file-detection database.");
+
+    app.add_flag("--verify-checksums", settings.verify_checksums,
+                 "Verify raw checksums before replacing files.");
+
+    app.add_option("-o,--output", settings.output_path,
+                   "Write optimized files to PATH instead of modifying in-place.\n"
+                   "(If input is stdin, PATH is a file. Otherwise, PATH is a directory).");
+
+    app.add_option("--report", settings.report_path,
+                   "CSV report export filename.")
+                   ->take_last(); // if used multiple times, take the last one
+
+    // calculate default thread count
     settings.num_threads = std::max(1U, std::thread::hardware_concurrency() / 2);
+    app.add_option("--threads", settings.num_threads,
+                   "Threads to use for parallel encoding.")
+                   ->default_val(settings.num_threads)
+                   ->check(CLI::PositiveNumber);
 
-    using FlagHandler = std::function<void(int&, char**)>;
-    std::unordered_map<std::string, FlagHandler> flag_map;
+    app.add_option("--log-level", settings.log_level,
+                   "Log level: ERROR, WARNING, INFO, DEBUG, NONE.")
+                   ->default_val("INFO")
+                   ->check(CLI::IsMember({"ERROR", "WARNING", "INFO", "DEBUG", "NONE"}, CLI::ignore_case));
 
-    flag_map["--no-meta"] = [&](const int&, char**) { settings.preserve_metadata = false; };
-    flag_map["--recursive"] = [&](const int&, char**) { settings.recursive = true; };
-    flag_map["--dry-run"] = [&](const int&, char**) { settings.dry_run = true; };
+    // encoding mode option with a map transformer
+    app.add_option("--mode", settings.encode_mode, "Encoding mode: 'pipe' (default) or 'parallel'.")
+        ->default_val(EncodeMode::PIPE)
+        ->transform(CLI::CheckedTransformer(
+            std::map<std::string, EncodeMode>{
+                {"pipe", EncodeMode::PIPE},
+                {"parallel", EncodeMode::PARALLEL}
+            }, CLI::ignore_case));
 
-    // Aggiunti
-    flag_map["-q"] = [&](const int&, char**) { settings.quiet = true; };
-    flag_map["--quiet"] = flag_map["-q"];
+    app.add_option("--include", settings.include_patterns,
+                   "Process only files matching regex PATTERN. (Can be used multiple times).");
 
-    flag_map["-d"] = [&](int& i, char** args) {
-        settings.output_dir = args[++i];
-    };
-    flag_map["--output-dir"] = flag_map["-d"];
+    app.add_option("--exclude", settings.exclude_patterns,
+                   "Do not process files matching regex PATTERN. (Can be used multiple times).");
 
-    flag_map["--include"] = [&](int& i, char** args) {
-        try {
-            auto regex = std::regex(args[i+1]);
-            settings.include_patterns.push_back(args[++i]);
-        } catch (const std::regex_error& e) {
-            throw std::runtime_error(std::string("Invalid regex for --include: ") + e.what());
+    // option with custom validator
+    app.add_option("--recompress-unencodable",
+                   [&settings](const CLI::results_t& res) {
+                       // this lambda is called only if validation passes
+                       settings.unencodable_target_format = parse_container_format(res[0]);
+                       return true;
+                   }, "Recompress archives that can be opened but not recompressed\n"
+                   "into a different format (zip, 7z, tar, gz, bz2, xz, wim).")
+                   ->check(ContainerFormatValidator());
+
+    // --- Positional Arguments ---
+    app.add_option("inputs", settings.inputs, "One or more files or directories (use '-' for stdin)")
+        ->required()
+        ->check([](const std::string& str) {
+            // allow stdin or an existing path
+            if (str == "-") return std::string();
+            if (!std::filesystem::exists(str)) return "Input path '" + str + "' not found.";
+            return std::string(); // ok
+        });
+
+    // --- Cross-validation logic ---
+    app.callback([&settings]() {
+        // check for stdin '-'
+        for (const auto& path : settings.inputs) {
+            if (path == "-") {
+                settings.is_pipe = true;
+                break;
+            }
         }
-    };
-    flag_map["--exclude"] = [&](int& i, char** args) {
-         try {
-            auto regex = std::regex(args[i+1]);
-            settings.exclude_patterns.push_back(args[++i]);
-        } catch (const std::regex_error& e) {
-            throw std::runtime_error(std::string("Invalid regex for --exclude: ") + e.what());
+
+        if (settings.is_pipe && settings.inputs.size() > 1) {
+             throw CLI::ValidationError("Cannot use stdin ('-') with other input files.");
         }
-    };
-    // Fine aggiunte
 
-    flag_map["--threads"] = [&](int& i, char** args) {
-        settings.num_threads = std::max(1UL, std::stoul(args[++i]));
-    };
-
-    flag_map["--log-level"] = [&](int& i, char** args) {
-        settings.log_level = args[++i];
-    };
-
-    flag_map["--verify-checksums"] = [&](const int&, char**) {
-        settings.verify_checksums = true;
-    };
-
-    flag_map["--recompress-unencodable"] = [&](int &i, char **args) {
-        if (i + 1 >= argc) {
-            std::cerr << "--recompress-unencodable requires a format (zip, 7z, tar, gz, bz2, xz, wim)\n";
-            exit(1);
+        if (settings.is_pipe && settings.output_path.empty()) {
+            throw CLI::ValidationError("Option '-o, --output' is required when using stdin ('-').");
         }
-        const std::string fmt_str = args[++i];
-        auto fmt = parse_container_format(fmt_str);
-        if (!fmt.has_value()) {
-            std::cerr << "Format not valid for --recompress-unencodable: " << fmt_str << "\n";
-            exit(1);
+
+        if (settings.is_pipe && !settings.output_path.empty() && std::filesystem::is_directory(settings.output_path)) {
+            throw CLI::ValidationError("Output path ('-o') must be a file, not a directory, when using stdin ('-').");
         }
-        settings.unencodable_target_format = fmt.value();
-    };
 
-    flag_map["-o"] = [&](int &i, char **args) {
-        const std::string out = args[++i];
-        if (out == "-") {
-            throw std::runtime_error("'-' is not allowed as output CSV (only files are supported).");
+        if (settings.dry_run && !settings.output_path.empty()) {
+            throw CLI::ValidationError("--dry-run and -o, --output cannot be used together.");
         }
-        settings.output_csv = out;
-    };
-    flag_map["--output-csv"] = flag_map["-o"];
-
-    flag_map["--regenerate-magic"] = [&](const int&, char**) {
-        settings.regenerate_magic = true;
-    };
-
-    flag_map["--mode"] = [&](int& i, char** args) {
-        if (i + 1 >= argc) {
-            throw std::runtime_error("--mode requires an argument (pipe|parallel)");
-        }
-        std::string mode = args[++i];
-        std::ranges::transform(mode, mode.begin(), ::tolower);
-        if (mode == "pipe") {
-            settings.encode_mode = EncodeMode::PIPE;
-        } else if (mode == "parallel") {
-            settings.encode_mode = EncodeMode::PARALLEL;
-        } else {
-            throw std::runtime_error("Unknown mode: " + mode + " (expected pipe or parallel)");
-        }
-    };
-
-    // parsing effettivo
-    for (int i = 1; i < argc; ++i) {
-        std::string a = argv[i];
-        if (auto it = flag_map.find(a); it != flag_map.end()) {
-            it->second(i, argv);
-        } else if (!a.empty() && a[0] == '-' && a.size() > 1) {
-            throw std::runtime_error("Unknown option: " + a);
-        } else {
-            settings.inputs.emplace_back(a);
-        }
-    }
-
-    if (settings.dry_run && !settings.output_dir.empty()) {
-        throw std::runtime_error("--dry-run and --output-dir cannot be used together.");
-    }
-    if (settings.is_pipe && !settings.output_dir.empty()) {
-        throw std::runtime_error("Cannot use --output-dir when reading from stdin.");
-    }
-
-    return true;
+    });
 }
