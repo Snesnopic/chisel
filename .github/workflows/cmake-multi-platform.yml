@@ -149,6 +149,7 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           usesh: true
+          release: 15.0
           prepare: |
             pkg install -y \
               cmake \
@@ -162,12 +163,11 @@ jobs:
               yasm \
               gmake \
               git \
-              llvm20
           run: |
             echo "--- Starting FreeBSD Build ---"
             
-            export CC=/usr/local/bin/clang20
-            export CXX=/usr/local/bin/clang++20
+            export CC=/usr/local/bin/clang
+            export CXX=/usr/local/bin/clang
             
             export MAKE=gmake
             
@@ -178,8 +178,6 @@ jobs:
             export PATH=$HOME/bin:$PATH
             
             cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -I/usr/local/include" \
-            -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib" \
             -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
