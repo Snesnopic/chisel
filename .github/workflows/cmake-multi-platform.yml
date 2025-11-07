@@ -178,8 +178,10 @@ jobs:
             
             export PATH=$HOME/bin:$PATH
             
-            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -I/usr/local/include" \
+            -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib" \
+            -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
