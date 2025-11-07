@@ -162,13 +162,15 @@ jobs:
               yasm \
               gmake \
               git \
-              llvm
+              llvm20
           run: |
             echo "--- Starting FreeBSD Build ---"
-            export CC=clang
-            export CXX=clang++
+            
+            export CC=/usr/local/bin/clang20
+            export CXX=/usr/local/bin/clang++20
+            
             export MAKE=gmake
-
+            
             mkdir -p $HOME/bin
             
             ln -s /usr/local/bin/gmake $HOME/bin/make
