@@ -32,14 +32,14 @@ The project builds all its dependencies automatically via Git submodules. You on
 This command installs only the build tools. All libraries are submodules.
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential cmake ninja-build pkg-config git \
+sudo apt-get install -y build-essential cmake ninja-build help2man pkg-config git \
 autoconf automake libtool m4 nasm yasm ccache
 ```
 
 ### macOS (Homebrew)
 ```bash
 brew update
-brew install cmake ninja pkg-config git autoconf automake libtool nasm yasm
+brew install cmake ninja pkg-config git autoconf help2man automake libtool nasm yasm
 ```
 
 ### Windows
@@ -71,40 +71,85 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
 
+## Installing (Optional)
+
+After building the project, you can install the `chisel` executable and its documentation (manpage) onto your system by running:
+
+```bash
+sudo cmake --install . --prefix /usr/local
+```
+
 ## Usage
 
 `./chisel <file-or-directory>... [options]`
 
+**Arguments:**
+-   `inputs...`
+    One or more files or directories to process.
+    Use `-` to read from `stdin` (standard input).
+
 **Options:**
-- `--dry-run`                  Use chisel without replacing original files.
-- `-d, --output-dir DIR`       Write optimized files to DIR instead of modifying in-place.
-- `-q, --quiet`                Suppress non-error console output (progress bar, results).
-- `--no-meta`                  Do not preserve metadata in recompressed files.
-- `--verify-checksums`         Verify raw checksums before replacing files.
-- `--recursive`                Process directories recursively.
-- `--threads N`                Number of worker threads to use (default: half of available cores).
-- `--log-level LEVEL`          Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE).
-- `--include PATTERN`          Process only files matching regex PATTERN. (Can be used multiple times).
-- `--exclude PATTERN`          Do not process files matching regex PATTERN. (Can be used multiple times).
-- `--mode MODE`                Select how multiple encoders are applied to a file.
+-   `-h, --help`
+    Show the help message and exit.
 
-  PIPE (default): encoders are chained, the output of one becomes the input of the next.
+-   `--version`
+    Display program version information and exit.
 
-  PARALLEL: all encoders run independently on the original file, and the smallest result is chosen.
-- `-o, --output-csv FILE`      CSV report export filename.
-- `--regenerate-magic`         Re-install libmagic file-detection database. (Linux and macOS)
-- `--recompress-unencodable FORMAT`
+-   `-o, --output <PATH>`
+    Write optimized files to PATH instead of modifying them in-place.
+    If the input is `stdin` (-), PATH must be a file.
+    Otherwise, PATH must be a directory.
 
-  Allows to recompress archives that can be opened but not recompressed  
-  into a different format (zip, 7z, tar, gz, bz2, xz, wim).  
-  If not specified, such archives are left untouched.
+-   `--report <FILE>`
+    Export a final CSV report to the specified file.
+
+-   `-r, --recursive`
+    Recursively scan input folders.
+
+-   `-q, --quiet`
+    Suppress non-error console output (progress bar, results).
+
+-   `--dry-run`
+    Use chisel without replacing original files.
+
+-   `--no-meta`
+    Don't preserve files metadata. (Metadata is preserved by default).
+
+-   `--verify-checksums`
+    Verify raw checksums before replacing files.
+
+-   `--threads <N>`
+    Number of worker threads to use (default: half of available cores).
+
+-   `--log-level <LEVEL>`
+    Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE). Default is INFO.
+
+-   `--include <PATTERN>`
+    Process only files matching regex PATTERN. (Can be used multiple times).
+
+-   `--exclude <PATTERN>`
+    Do not process files matching regex PATTERN. (Can be used multiple times).
+
+-   `--mode <MODE>`
+    Select how multiple encoders are applied to a file (`pipe` or `parallel`).
+    `pipe` (default): Encoders are chained; output of one is input to the next.
+    `parallel`: All encoders run on the original file; the smallest result is chosen.
+
+-   `--regenerate-magic`
+    Re-install the libmagic file-detection database. (Linux and macOS)
+
+-   `--recompress-unencodable <FORMAT>`
+    Recompress archives that can be opened but not re-written (like RAR)
+    into a different format (zip, 7z, tar, gz, bz2, xz, wim).
+    If not specified, such archives are left untouched.
 
 **Examples:**
-- `./chisel file.jpg dir/ --recursive --threads 4`
-- `./chisel archive.zip`
-- `./chisel archive.rar --recompress-unencodable 7z`
-- `./chisel dir/ -o report.csv`
-- `cat file.png | ./chisel - > out.png`
+-   `./chisel file.jpg dir/ --recursive --threads 4`
+-   `./chisel archive.zip`
+-   `./chisel archive.rar --recompress-unencodable 7z`
+-   `./chisel dir/ --report report.csv`
+-   `cat file.png | ./chisel - -o out.png`
+-   `cat file.png | ./chisel - > out.png`
 
 ---
 
