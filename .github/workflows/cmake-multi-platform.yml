@@ -167,19 +167,19 @@ jobs:
           run: |
             echo "--- Starting FreeBSD Build ---"
             
-            export CC=/usr/local/bin/clang20
-            export CXX=/usr/local/bin/clang++20
             export MAKE=gmake
               
             mkdir -p $HOME/bin
             ln -s /usr/local/bin/gmake $HOME/bin/make
             export PATH=$HOME/bin:$PATH
-          
-              
+            
+            
             cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -I/usr/local/include" \
-            -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib" \
-            -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
               
             cmake --build build --config Release
             echo "--- Build Complete ---"
