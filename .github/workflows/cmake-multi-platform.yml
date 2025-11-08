@@ -581,7 +581,7 @@ jobs:
   publish_nightly:
     name: Publish Nightly Pre-Release
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: test
     if: github.ref == 'refs/heads/development'
 
     permissions:
