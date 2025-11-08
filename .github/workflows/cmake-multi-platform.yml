@@ -596,7 +596,6 @@ jobs:
 
 #      - name: List downloaded artifacts
 #        run: ls -R artifacts/
-
       - name: Prepare assets for release
         run: |
           mkdir release_assets
