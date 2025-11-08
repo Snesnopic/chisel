@@ -594,8 +594,8 @@ jobs:
         with:
           path: artifacts/
 
-      - name: List downloaded artifacts
-        run: ls -R artifacts/
+#      - name: List downloaded artifacts
+#        run: ls -R artifacts/
 
       - name: Prepare assets for release
         run: |
