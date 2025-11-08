@@ -592,8 +592,7 @@ jobs:
           path: artifacts/
 
       - name: List downloaded artifacts
-        run: |
-          ls -R artifacts
+        run: ls -R artifacts/
 
       - name: Prepare assets for release
         run: |
@@ -751,6 +750,7 @@ jobs:
           } else {
             Write-Output "OK: No forbidden dynamic libraries found."
           }
+
 #  verify-static-linking-freebsd:
 #    name: verify-static-linking (freebsd-${{ matrix.arch }})
 #    needs: build-freebsd
