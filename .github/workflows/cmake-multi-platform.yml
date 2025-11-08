@@ -119,6 +119,7 @@ jobs:
           name: chisel-${{ matrix.id }}
           path: ${{ github.workspace }}/${{ matrix.binary_path }}
           retention-days: 7
+
 #  build-freebsd:
 #    name: build (freebsd-${{ matrix.arch }})
 #    runs-on: ubuntu-latest
@@ -189,6 +190,7 @@ jobs:
 #          name: chisel-${{ matrix.id }}
 #          path: ${{ github.workspace }}/build/bin/Release/chisel
 #          retention-days: 7
+
   test:
     name: test (${{ matrix.id }})
     needs: build
@@ -418,6 +420,7 @@ jobs:
             chisel.log
             if-no-files-found: warn
             retention-days: 7
+
 #  test-freebsd:
 #    name: test (freebsd-${{ matrix.arch }})
 #    needs: build-freebsd
