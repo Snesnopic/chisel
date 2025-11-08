@@ -636,14 +636,14 @@ jobs:
           rm release_assets/chisel-windows-arm.exe
           
           # --- FreeBSD (x86) ---
-#          mv artifacts/chisel-freebsd-x86/chisel release_assets/chisel-freebsd-x86
-#          tar -czf release_assets/chisel-freebsd-x86.tar.gz -C release_assets chisel-freebsd-x86
-#          rm release_assets/chisel-freebsd-x86
+          #mv artifacts/chisel-freebsd-x86/chisel release_assets/chisel-freebsd-x86
+          #tar -czf release_assets/chisel-freebsd-x86.tar.gz -C release_assets chisel-freebsd-x86
+          #rm release_assets/chisel-freebsd-x86
           
           # --- FreeBSD (arm) ---
-#          mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
-#          tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
-#          rm release_assets/chisel-freebsd-arm
+          #mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
+          #tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
+          #rm release_assets/chisel-freebsd-arm
           
           find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
 
