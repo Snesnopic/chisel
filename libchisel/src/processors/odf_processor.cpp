@@ -176,7 +176,9 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: set_format_zip failed");
     }
-    archive_write_set_options(out, "compression=deflate");
+
+    // set default compression to 'store' for the mimetype file
+    archive_write_set_options(out, "compression=store");
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
@@ -220,7 +222,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
             if (rel.filename() == "mimetype") {
                 final_data = buf;
                 Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", processor_tag());
-                archive_write_set_options(out, "compression=store");
+                // option is already 'store', do nothing
             } else if (ext == ".xml") {
                 ZopfliOptions opts;
                 ZopfliInitOptions(&opts);
@@ -235,11 +237,9 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
                 final_data = result;
 
                 Logger::log(LogLevel::Debug, "Recompressed XML with Zopfli: " + rel.string(), processor_tag());
-                archive_write_set_options(out, "compression=deflate");
             } else {
                 final_data = buf;
                 Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), processor_tag());
-                archive_write_set_options(out, "compression=deflate");
             }
 
             archive_entry* entry = archive_entry_new();
@@ -276,6 +276,11 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
             }
 
             archive_entry_free(entry);
+
+            // after writing mimetype, switch to deflate for subsequent files
+            if (rel.filename() == "mimetype") {
+                archive_write_set_options(out, "compression=deflate");
+            }
         }
     } catch (...) {
         archive_write_close(out);
