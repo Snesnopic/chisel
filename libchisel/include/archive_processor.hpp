@@ -21,11 +21,11 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 16> kMimes = {
+        static constexpr std::array<std::string_view, 15> kMimes = {
             "application/zip",
             //"application/x-7z-compressed",
             "application/x-tar",
-            "application/gzip",
+            //"application/gzip",
             "application/x-bzip2",
             "application/x-xz",
             "application/x-iso9660-image",
@@ -46,9 +46,9 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 16> kExts = {
+        static constexpr std::array<std::string_view, 15> kExts = {
             ".zip", //".7z",
-            ".tar", ".gz", ".bz2", //".xz",
+            ".tar", ".bz2", //".gz",".xz",
             ".iso", ".cpio", ".lzma", ".cab", //".wim",
             ".jar", ".xpi", ".apk",
             ".cbz", ".cbt", ".rar", ".cbr",

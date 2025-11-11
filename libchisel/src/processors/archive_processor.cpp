@@ -275,7 +275,8 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         case ContainerFormat::Apk:
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
-                archive_write_set_filter_option(a, "deflate", "compression-level", "9");
+                archive_write_set_format_option(a, "zip", "compression", "deflate");
+                archive_write_set_format_option(a, "zip", "compression-level", "9");
             }
             break;
         case ContainerFormat::Tar:
@@ -372,8 +373,8 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                 }
             }
             archive_entry_free(entry);
-
-            archive_write_set_filter_option(a, "deflate", "compression-level", "9");
+            archive_write_set_format_option(a, "zip", "compression", "deflate");
+            archive_write_set_format_option(a, "zip", "compression-level", "9");
         }
     }
 

@@ -176,9 +176,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: set_format_zip failed");
     }
-
-    // set default compression to 'store' for the mimetype file
-    archive_write_set_options(out, "compression=store");
+    archive_write_set_format_option(out, "zip", "compression", "store");
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
@@ -279,7 +277,8 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
             // after writing mimetype, switch to deflate for subsequent files
             if (rel.filename() == "mimetype") {
-                archive_write_set_options(out, "compression=deflate");
+                archive_write_set_format_option(out, "zip", "compression", "deflate");
+                archive_write_set_format_option(out, "zip", "compression-level", "9");
             }
         }
     } catch (...) {
