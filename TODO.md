@@ -16,6 +16,7 @@
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
 - [ ] Refactor file I/O in processors to use `wchar_t` APIs (`.wstring()`) on Windows to bypass locale issues.
+- [ ] Maybe add a check that complements lossless verification with metadata verification.
 
 ## FLAC
 
@@ -53,6 +54,7 @@
 
 ## Archives
 
+- [ ] Remove bzip2 from testing and libarchive supported archives.
 - [ ] Add support for 7Z recompression using 7zip SDK.
 - [ ] Investigate integration of BestCFBF (<https://papas-best.com/downloads/bestcfbf/stable/bestcfbf.cpp>) for optimizing MSI, DOC, PPT, XLS:
   - On Windows: adapt and integrate directly with COM Structured Storage APIs.
@@ -113,6 +115,10 @@
   ↳ <https://github.com/WebAssembly/binaryen>
 - [ ] HTML/XML – integrate tidy-html5 for cleanup/minification.  
   ↳ <https://github.com/htacg/tidy-html5>
+- [ ] TGA – add support for TGA recompression (RLE) using stb_image/stb_image_write.  
+  ↳ <https://github.com/nothings/stb>
+- [ ] HDR (Radiance RGBE) – add support for HDR file compression using stb_image/stb_image_write.  
+  ↳ <https://github.com/nothings/stb>
 
 ## Build / CI
 
@@ -120,6 +126,13 @@
 - [ ] On MinGW, enforce fully static builds (no runtime DLL dependencies).
 - [ ] Review linker flags and explore options to reduce final binary size (e.g. `-Wl,--gc-sections`, `-s` for stripping symbols, or platform-specific equivalents).
 - [ ] General cleanup and unification of the CMakeLists to remove cruft and ensure consistency across platforms.
+- [ ] Add generation of xcframework for Xcode packaging.
+- [ ] Create a Homebrew tap/formula for macOS distribution.
+- [ ] Publish a Winget manifest for Windows distribution.
+- [ ] Provide Linux packages:
+  - [ ] AppImage
+  - [ ] Snap
+  - [ ] .deb (Debian/Ubuntu)
 
 ## Other improvements
 
@@ -128,3 +141,29 @@
 - [ ] Implement lossless recompression of embedded cover art in audio files (FLAC, APE, WavPack, MP3, etc.).
 - [ ] Improve logging granularity and structured output for CI integration.
 - [ ] Future: implement a general XML/HTML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
+
+## Processor Verification Status
+
+This table tracks the reliability and completeness level of each processor in `libchisel`.
+| Processor            |  Lossless Verified?   | Metadata Verified? | Container Verified? | Notes                                                                                                                                                                                    |
+|:---------------------|:---------------------:|:------------------:|:-------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `FlacProcessor`      |          ✅           |         🟡         |          ❌          | Works. Needs verification on optimal settings (`streamable_subset=false` params). Metadata (PICTURE block) needs verification. Add cover art optimization. Consider brute-force presets. |
+| `WavPackProcessor`   |          ✅           |         🟡         |          ❌          | Needs verification on complete tag copying (ReplayGain, etc.). Test `.wvc` files. Consider brute-force modes.                                                                            |
+| `ApeProcessor`       |          🟡           |         🟡         |          ❌          | Needs verification on tag copying. Add cover art optimization.                                                                                                                           |
+| `JpegProcessor`      | 🟡 (`raw_equal` TODO)  |         🟡         |        N.A.         | Copies APP/COM markers. Add optional metadata stripping. Integrate other optimizers.                                                                                                     |
+| `PngProcessor`       |          🟡           |         🟡         |        N.A.         | Works. Needs formal verification for lossless & metadata (iCCP, sRGB, text chunks...).                                                                                                   |
+| `ZopfliPngProcessor` | 🟡 (`raw_equal` TODO) |         🟡         |        N.A.         | Assumes `PngProcessor::raw_equal` is sufficient. Copies standard chunks via `zopflipng_lib`. Needs ability to parameterize iterations.                                                   |
+| `WebpProcessor`      | 🟡 (`raw_equal` TODO)  |         🟡         |        N.A.         | Copies EXIF/XMP/ICCP chunks. Improve lossless options (`-m 6`, `-q 100`). Add optional chunk removal.                                                                                    |
+| `GifProcessor`       | ❌ (`raw_equal` and compilation TODO)  |         ❌          |        N.A.         | (gifsicle) **Currently disabled**. Needs fork of `gifsicle` to fix Windows build and make thread-safe.                                                                                   |
+| `FlexiGifProcessor`  | 🟡 (`raw_equal` TODO)  |         ❌          |        N.A.         | (flexigif) Needs verification. Needs ability to parameterize iterations/settings (like Zopfli).                                                                                          |
+| `TiffProcessor`      | 🟡 (`raw_equal` TODO)  |         🟡         |        N.A.         | Copies standard metadata tags (XMP, EXIF, ICC). Uses Deflate compression. Needs verification.                                                                                            |
+| `JxlProcessor`       | 🟡 (`raw_equal` TODO)  |         ❌          |        N.A.         | Simple re-encode loop. Needs verification for lossless & metadata.                                                                                                                       |
+| `SqliteProcessor`    |           ✅           |        N.A.        |        N.A.         | `VACUUM` + `ANALYZE` are standard, safe operations. Considered verified.                                                                                                                 |
+| `MseedProcessor`     |           ✅           |         ✅          |        N.A.         | Metadata is part of header structure. Considered complete. May be extended in the future to process eventual JSON header metadata.                                                       |
+| `MkvProcessor`       | 🟡 (`raw_equal` and container TODO)  |         🟡         |          ❌          | Uses `mkclean`. Container extraction/finalization is TODO. Verify chapter/tag/attachment preservation.                                                                                   |
+| `ArchiveProcessor`   |         ❌ (`raw_equal` and check all formats TODO)          |        N.A.        |         🟡          | Core extractor/rebuilder using `libarchive`. Needs extensive testing for various archive types (ZIP, TAR, RAR read...). Rewrite hardlink handling. Add 7z SDK support.                   |
+| `PdfProcessor`       |         🟡 (`raw_equal` TODO)          |        N.A.        |         🟡          | Extracts streams, recompresses Flate streams with Zopfli using `qpdf`. Complex format, needs verification. Investigate `pdfsizeopt` techniques.                                          |
+| `OOXMLProcessor`     |         ❌ (`raw_equal` and check all formats TODO)          |        N.A.        |         🟡          | Extracts ZIP, recompresses embedded PNG/JPG with Zopfli. Needs verification. Explore Leanify-style recursive optimization.                                                               |
+| `OdfProcessor`       |         ❌ (`raw_equal` and check all formats TODO)          |        N.A.        |         🟡          | Extracts ZIP, recompresses embedded XML with Zopfli, stores `mimetype` uncompressed. Needs verification. Explore Leanify-style recursive optimization.                                   |
+
+*(Legend: ✅ = Verified, 🟡 = Partially implemented/Needs verification, ❌ = Not implemented/Missing, N.A. = Not Applicable)*
