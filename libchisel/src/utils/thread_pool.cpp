@@ -3,6 +3,8 @@
 //
 
 #include "../../include/thread_pool.hpp"
+#include "logger.hpp"
+#include "log_sink.hpp"
 
 ThreadPool::ThreadPool(unsigned threads) {
     if (threads == 0) threads = 1;
@@ -35,7 +37,8 @@ ThreadPool::ThreadPool(unsigned threads) {
                 } guard{pending_, queue_mutex_, idle_cv_};
                 try {
                     task(st);
-                } catch (...) {
+                } catch (const std::exception& e) {
+                    Logger::log(LogLevel::Error, std::string("Unhandled exception in thread pool: ") + e.what());
                 }
             }
         });
