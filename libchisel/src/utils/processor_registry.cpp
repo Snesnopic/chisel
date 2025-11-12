@@ -18,6 +18,7 @@
 #include "../../include/png_processor.hpp"
 #include "../../include/sqlite_processor.hpp"
 #include "../../include/tiff_processor.hpp"
+#include "../../include/tga_processor.hpp"
 #include "../../include/wavpack_processor.hpp"
 #include "../../include/webp_processor.hpp"
 #include "../../include/zopflipng_processor.hpp"
@@ -35,6 +36,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<ZopfliPngProcessor>());
     processors_.push_back(std::make_unique<WebpProcessor>());
     // processors_.push_back(std::make_unique<GifProcessor>());
+    processors_.push_back(std::make_unique<TgaProcessor>());
     processors_.push_back(std::make_unique<FlexiGifProcessor>());
     processors_.push_back(std::make_unique<TiffProcessor>());
     processors_.push_back(std::make_unique<JxlProcessor>());

@@ -52,6 +52,8 @@ set(LIBCHISEL_SOURCES
         src/utils/processor_registry.cpp
         src/utils/random_utils.cpp
         src/utils/thread_pool.cpp
+        include/tga_processor.hpp
+        src/processors/tga_processor.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
@@ -85,6 +87,7 @@ target_include_directories(libchisel
         ${libmseed_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
         ${CMAKE_SOURCE_DIR}/third_party/flexigif
+        ${CMAKE_SOURCE_DIR}/third_party/stb
 )
 
 if(NOT WIN32)

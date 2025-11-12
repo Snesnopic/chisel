@@ -65,3 +65,6 @@
 	path = third_party/libmkclean
 	url = https://github.com/Snesnopic/libmkclean.git
 	branch = fix-arm64-lzo
+[submodule "third_party/stb"]
+	path = third_party/stb
+	url = https://github.com/nothings/stb
