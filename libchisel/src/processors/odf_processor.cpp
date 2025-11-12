@@ -240,18 +240,6 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
                 Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), processor_tag());
             }
 
-            if (rel.filename() == "mimetype") {
-                // mimetype is always store
-                archive_write_set_format_option(out, "zip", "compression", "store");
-            } else if (ext == ".xml") {
-                // pre-compressed zopfli data, must be store
-                archive_write_set_format_option(out, "zip", "compression", "store");
-            } else {
-                // other files (images, etc) use default deflate
-                archive_write_set_format_option(out, "zip", "compression", "deflate");
-                archive_write_set_format_option(out, "zip", "compression-level", "9");
-            }
-
             archive_entry* entry = archive_entry_new();
             if (!entry) {
                 Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());

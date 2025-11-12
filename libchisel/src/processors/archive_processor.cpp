@@ -395,11 +395,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         const bool is_dir = fs::is_directory(p, ec);
         const bool is_reg = fs::is_regular_file(p, ec);
         const bool is_symlink = fs::is_symlink(p, ec);
-        // set correct compression for epub files
-        if (fmt == ContainerFormat::Epub) {
-            archive_write_set_format_option(a, "zip", "compression", "deflate");
-            archive_write_set_format_option(a, "zip", "compression-level", "9");
-        }
+
         archive_entry* entry = archive_entry_new();
         if (!entry) {
             Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());
