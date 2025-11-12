@@ -273,6 +273,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
                 throw std::runtime_error("ODFProcessor: write_data failed");
             }
 
+            archive_write_finish_entry(out); // finish this entry
             archive_entry_free(entry);
 
             // after writing mimetype, switch to deflate for subsequent files

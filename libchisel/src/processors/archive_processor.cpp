@@ -372,6 +372,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                     return false;
                 }
             }
+            archive_write_finish_entry(a); // finish this entry
             archive_entry_free(entry);
             archive_write_set_format_option(a, "zip", "compression", "deflate");
             archive_write_set_format_option(a, "zip", "compression-level", "9");
@@ -484,6 +485,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
         }
 
+        archive_write_finish_entry(a); // finish this entry
         archive_entry_free(entry);
     }
 
