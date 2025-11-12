@@ -57,5 +57,70 @@ namespace chisel {
         // not implemented for tga
         return "";
     }
+    // helper to load a tga image into a raw rgba8 buffer
+static std::vector<unsigned char> decode_tga_rgba8(const std::filesystem::path& file,
+                                                   int& width,
+                                                   int& height,
+                                                   int& channels) {
+    // force 4 channels (rgba) for consistent comparison
+    unsigned char* data = stbi_load(file.string().c_str(), &width, &height, &channels, 4);
+    if (!data) {
+        Logger::log(LogLevel::Warning, std::string("raw_equal: Failed to load TGA: ") + stbi_failure_reason(), processor_tag());
+        return {};
+    }
 
+    channels = 4;
+    const size_t data_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+
+    // copy data to vector for safe handling
+    std::vector<unsigned char> pcm(data, data + data_size);
+
+    // free stb memory
+    stbi_image_free(data);
+
+    return pcm;
+}
+
+bool TgaProcessor::raw_equal(const std::filesystem::path &a,
+                             const std::filesystem::path &b) const {
+    int wa, ha, ca;
+    int wb, hb, cb;
+
+    std::vector<unsigned char> pcmA;
+    std::vector<unsigned char> pcmB;
+
+    try {
+        pcmA = decode_tga_rgba8(a, wa, ha, ca);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, "raw_equal: Error decoding " + a.string() + ": " + e.what(), processor_tag());
+        return false;
+    }
+
+    try {
+        pcmB = decode_tga_rgba8(b, wb, hb, cb);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, "raw_equal: Error decoding " + b.string() + ": " + e.what(), processor_tag());
+        return false;
+    }
+
+    // check for load failure
+    if (pcmA.empty() || pcmB.empty()) {
+        // error already logged by decode_tga_rgba8
+        return false;
+    }
+
+    // compare dimensions
+    if (wa != wb || ha != hb || ca != cb) {
+        Logger::log(LogLevel::Debug, "raw_equal: TGA dimension mismatch", processor_tag());
+        return false;
+    }
+
+    // compare raw pixel data
+    if (pcmA != pcmB) {
+        Logger::log(LogLevel::Debug, "raw_equal: TGA pixel data mismatch", processor_tag());
+        return false;
+    }
+
+    return true;
+}
 } // namespace chisel
