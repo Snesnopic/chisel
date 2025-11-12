@@ -282,7 +282,7 @@ add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR} EXCLUDE_FROM_ALL)
 # libarchive
 set(ENABLE_OPENSSL OFF CACHE BOOL "Disable OpenSSL in libarchive" FORCE)
 set(ENABLE_TAR ON CACHE BOOL "" FORCE)
-set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)
+set(ENABLE_CPIO ON CACHE BOOL "" FORCE)
 set(ENABLE_CAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
 set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
@@ -297,14 +297,14 @@ set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
 set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
+set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
+set(HAVE_LZMA_H 1 CACHE INTERNAL "Force lzma.h found")
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
 target_include_directories(archive_static PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
 )
 add_dependencies(archive_static liblzma)
 target_compile_definitions(archive_static PRIVATE LZMA_API_STATIC)
-set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
-set(HAVE_LZMA_H 1 CACHE INTERNAL "Force lzma.h found")
 
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
