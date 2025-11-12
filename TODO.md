@@ -2,21 +2,16 @@
 
 ## Testing
 
-- [ ] Unit tests for each processor.
-- [ ] Create a reproducible dataset of test files (small, medium, large, with and without metadata).
 - [ ] Test edge cases: corrupted files, unsupported formats, empty files, mismatched extensions.
-- [ ] Regression tests to ensure recompression is bit‑exact and lossless.
 - [ ] Validate metadata preservation across formats (cover art, tags, chapters).
 
 ## Refactoring / Architecture
 
-- [ ] Abstract common logic across processors.
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Implement a UriProcessor to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing processors, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
 - [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
 - [ ] Refactor file I/O in processors to use `wchar_t` APIs (`.wstring()`) on Windows to bypass locale issues.
-- [ ] Maybe add a check that complements lossless verification with metadata verification.
 
 ## FLAC
 
