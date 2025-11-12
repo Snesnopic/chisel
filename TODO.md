@@ -110,8 +110,6 @@
   ↳ <https://github.com/WebAssembly/binaryen>
 - [ ] HTML/XML – integrate tidy-html5 for cleanup/minification.  
   ↳ <https://github.com/htacg/tidy-html5>
-- [ ] TGA – add support for TGA recompression (RLE) using stb_image/stb_image_write.  
-  ↳ <https://github.com/nothings/stb>
 - [ ] HDR (Radiance RGBE) – add support for HDR file compression using stb_image/stb_image_write.  
   ↳ <https://github.com/nothings/stb>
 
