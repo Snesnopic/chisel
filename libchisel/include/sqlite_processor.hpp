@@ -81,6 +81,20 @@ namespace chisel {
         // --- integrity check ---
 
         /**
+         * @brief Compares two SQLite databases by their logical content.
+         *
+         * Performs a full SQL dump of both databases (schema and data)
+         * and compares the resulting text output. This ensures that
+         * files are considered equal even if their binary structure
+         * differs (e.g., after a VACUUM).
+         *
+         * @param a Path to the first SQLite file.
+         * @param b Path to the second SQLite file.
+         * @return true if the SQL dumps of both databases are identical.
+         */
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+        /**
          * @brief (Not Implemented) Compute a raw checksum.
          * @param file_path Path to the file.
          * @return An empty string.
