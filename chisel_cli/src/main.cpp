@@ -57,8 +57,7 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
 using namespace chisel;
 namespace fs = std::filesystem;
 
-static std::atomic<bool> interrupted{false};
-static chisel::ProcessorExecutor* g_executor = nullptr;
+static std::atomic<chisel::ProcessorExecutor*> g_executor{nullptr};
 
 // handle ctrl+c or termination signals
 void signal_handler(int sig) {
@@ -66,10 +65,10 @@ void signal_handler(int sig) {
         std::cerr << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
-        if (g_executor) {
-            g_executor->request_stop();
+        auto* executor_ptr = g_executor.load(std::memory_order_relaxed);
+        if (executor_ptr) {
+            executor_ptr->request_stop();
         }
-        interrupted.store(true);
     }
 }
 
@@ -117,6 +116,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
     init_utf8_locale();
 
     try {
@@ -273,12 +273,11 @@ int main(int argc, char* argv[]) {
                                settings.dry_run,
                                executor_output_dir,
                                bus,
-                               interrupted,
                                settings.num_threads);
-    g_executor = &executor;
+    g_executor.store(&executor);
     // run processing
     executor.process(inputs);
-    g_executor = nullptr;
+    g_executor.store(nullptr);
 
     auto end_total = std::chrono::steady_clock::now();
     double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
@@ -322,7 +321,7 @@ int main(int argc, char* argv[]) {
                           settings.encode_mode);
     }
 
-    if (interrupted.load()) {
+    if (executor.is_stopped()) {
         return 130; // standard exit code for SIGINT
     }
     return 0;

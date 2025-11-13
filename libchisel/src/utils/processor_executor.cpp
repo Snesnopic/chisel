@@ -27,7 +27,6 @@ namespace chisel {
                                          const bool dry_run,
                                          fs::path output_dir,
                                          EventBus &bus,
-                                         std::atomic<bool>& stop_flag,
                                          const unsigned threads)
         : registry_(registry),
           preserve_metadata_(preserve_metadata),
@@ -37,7 +36,6 @@ namespace chisel {
           has_output_dir_(!output_dir_.empty()),
           format_(format),
           pool_(threads),
-          stop_flag_(stop_flag),
           event_bus_(bus),
           mode_(mode)
            {
@@ -53,12 +51,12 @@ namespace chisel {
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
         for (const auto &path: inputs) {
-            check_for_stop_request();
+            if (stop_flag_.load(std::memory_order_relaxed)) return;
             analyze_path(path);
         }
-        check_for_stop_request();
+        if (stop_flag_.load(std::memory_order_relaxed)) return;
         process_work_list();
-        check_for_stop_request();
+        if (stop_flag_.load(std::memory_order_relaxed)) return;
         finalize_containers();
     }
 
@@ -108,7 +106,7 @@ namespace chisel {
 
 
     void ProcessorExecutor::analyze_path(const fs::path &path) {
-        check_for_stop_request();
+        if (stop_flag_.load(std::memory_order_relaxed)) return;
 
         auto name = path.filename().string();
 
@@ -160,8 +158,7 @@ namespace chisel {
 
     void ProcessorExecutor::process_work_list() {
         for (const auto &file: work_list_) {
-            check_for_stop_request();
-            if (stop_flag_.load()) break;
+            if (stop_flag_.load(std::memory_order_relaxed)) return;
             pool_.enqueue([this, file](const std::stop_token &st) {
                 if (st.stop_requested()) {
                     event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
@@ -317,7 +314,6 @@ namespace chisel {
 
     void ProcessorExecutor::finalize_containers() {
         while (!finalize_stack_.empty() && !stop_flag_.load()) {
-            check_for_stop_request();
             auto content = finalize_stack_.top();
             finalize_stack_.pop();
 
@@ -364,14 +360,8 @@ namespace chisel {
     }
 
     void ProcessorExecutor::request_stop() {
-        stop_flag_.store(true);
+        stop_flag_.store(true, std::memory_order_relaxed);
         pool_.request_stop();
-    }
-
-    void ProcessorExecutor::check_for_stop_request() {
-        if (stop_flag_.load(std::memory_order_relaxed)) {
-            pool_.request_stop();
-        }
     }
 
 } // namespace chisel

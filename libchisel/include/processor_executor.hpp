@@ -56,7 +56,6 @@ public:
                                bool dry_run,
                                std::filesystem::path output_dir,
                                EventBus& bus,
-                               std::atomic<bool>& stop_flag,
                                unsigned threads = std::thread::hardware_concurrency());
 
     /**
@@ -64,6 +63,14 @@ public:
      * @param inputs Vector of filesystem paths to process.
      */
     void process(const std::vector<std::filesystem::path>& inputs);
+
+    /**
+     * @brief Checks if the executor was requested to stop.
+     * @return true if request_stop() was called, false otherwise.
+     */
+    [[nodiscard]] bool is_stopped() const {
+        return stop_flag_.load(std::memory_order_relaxed);
+    }
 
     void request_stop();
 private:
@@ -93,7 +100,7 @@ private:
     std::stack<ExtractedContent> finalize_stack_; ///< Stack of containers to finalize
     std::mutex log_mutex_;                        ///< Protects logging
     ThreadPool pool_;                             ///< Thread pool for parallel execution
-    std::atomic<bool>& stop_flag_;                ///<
+    std::atomic<bool> stop_flag_{false};       ///< Flag to signal stop
     EventBus& event_bus_;                         ///< Event bus for publishing events
     EncodeMode mode_;                             ///< Encoding mode (PIPE or PARALLEL)
 };
