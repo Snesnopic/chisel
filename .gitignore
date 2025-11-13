@@ -38,4 +38,4 @@ CTestCustom.cmake
 /tests/
 /test/
 /Makefile
-
+bin/
