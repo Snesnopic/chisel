@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include <cstdint>
 #include <map>
+#include "file_utils.hpp"
 
 namespace chisel {
     void png_error_fn(png_structp, const png_const_charp msg) {
@@ -194,7 +195,7 @@ namespace chisel {
 
         // --- PASS 1: READ + ANALYZE ---
 
-        unique_FILE fp_in(std::fopen(input.string().c_str(), "rb"));
+        unique_FILE fp_in(chisel::open_file(input.string().c_str(), "rb"));
         if (!fp_in) {
             Logger::log(LogLevel::Error, "Cannot open PNG input: " + input.string(), "png_encoder");
             throw std::runtime_error("Cannot open PNG input (pass 1)");
@@ -251,7 +252,7 @@ namespace chisel {
 
         // --- PASS 2: WRITE ---
 
-        const unique_FILE fp_out(std::fopen(output.string().c_str(), "wb"));
+        const unique_FILE fp_out(chisel::open_file(output.string().c_str(), "wb"));
         if (!fp_out) {
             Logger::log(LogLevel::Error, "Cannot open PNG output: " + output.string(), "png_encoder");
             throw std::runtime_error("Cannot open PNG output");
@@ -304,7 +305,7 @@ namespace chisel {
         // copy metadata (must be done *before* png_write_info)
         // re-open read struct to get metadata
         {
-            unique_FILE fp_in_meta(std::fopen(input.string().c_str(), "rb"));
+            unique_FILE fp_in_meta(chisel::open_file(input.string().c_str(), "rb"));
             PngRead rd_meta;
             rd_meta.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
             if (!rd_meta.png) throw std::runtime_error("png_create_read_struct failed (meta)");
@@ -381,7 +382,7 @@ namespace chisel {
     std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
                                                 png_uint_32 &width,
                                                 png_uint_32 &height) {
-        FILE *fp = std::fopen(file.string().c_str(), "rb");
+        FILE *fp = chisel::open_file(file.string().c_str(), "rb");
         if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
 
         png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);

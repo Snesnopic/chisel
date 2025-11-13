@@ -16,6 +16,7 @@
 #include <cstring>
 #include <memory>
 #include <iostream>
+#include "file_utils.hpp"
 
 namespace fs = std::filesystem;
 
@@ -53,7 +54,7 @@ namespace { // anonymous namespace for helpers
     std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
                                                 png_uint_32 &width,
                                                 png_uint_32 &height) {
-        unique_FILE fp(std::fopen(file.string().c_str(), "rb"));
+        const unique_FILE fp(chisel::open_file(file.string().c_str(), "rb"));
         if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
 
         PngRead rd;

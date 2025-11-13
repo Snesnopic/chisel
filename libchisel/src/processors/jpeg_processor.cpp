@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include <memory>
+#include "file_utils.hpp"
 
 namespace {
 
@@ -85,12 +86,12 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
                                bool preserve_metadata) {
     Logger::log(LogLevel::Info, "Start JPEG recompression: " + input.string(), "jpeg_processor");
 
-    unique_FILE infile(std::fopen(input.string().c_str(), "rb"));
+    unique_FILE infile(chisel::open_file(input.string().c_str(), "rb"));
     if (!infile) {
         Logger::log(LogLevel::Error, "Cannot open JPEG input: " + input.string(), "jpeg_processor");
         throw std::runtime_error("Cannot open JPEG input");
     }
-    unique_FILE outfile(std::fopen(output.string().c_str(), "wb"));
+    unique_FILE outfile(chisel::open_file(output.string().c_str(), "wb"));
     if (!outfile) {
         // infile is closed automatically by raii
         Logger::log(LogLevel::Error, "Cannot open JPEG output: " + output.string(), "jpeg_processor");
@@ -183,7 +184,7 @@ static bool decode_jpeg_raw(const std::filesystem::path &path,
                             int &height,
                             int &channels,
                             std::vector<unsigned char> &buffer) {
-    unique_FILE infile(std::fopen(path.string().c_str(), "rb"));
+    unique_FILE infile(chisel::open_file(path.string().c_str(), "rb"));
     if (!infile) {
         return false;
     }

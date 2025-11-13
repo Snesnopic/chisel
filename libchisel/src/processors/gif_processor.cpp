@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <mutex>
+#include "file_utils.hpp"
 
 #ifndef _WIN32
 extern "C" {
@@ -31,7 +32,7 @@ void GifProcessor::recompress(const std::filesystem::path& input,
                 "gif_processor");
 
 #ifndef _WIN32
-    FILE* in = std::fopen(input.string().c_str(), "rb");
+    FILE* in = chisel::open_file(input.string().c_str(), "rb");
     if (!in) {
         Logger::log(LogLevel::Error,
                     "Cannot open GIF input: " + input.string(),
@@ -65,7 +66,7 @@ void GifProcessor::recompress(const std::filesystem::path& input,
         optimize_fragments(gfs, 3, 0);
     }
 
-    FILE* out = std::fopen(output.string().c_str(), "wb");
+    FILE* out = chisel::open_file(output.string().c_str(), "wb");
     if (!out) {
         Logger::log(LogLevel::Error,
                     "Cannot open GIF output: " + output.string(),

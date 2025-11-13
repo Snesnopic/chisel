@@ -156,7 +156,11 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
     archive_read_support_format_all(a);
     archive_read_set_options(a, "hdrcharset=UTF-8");
 
-    int r = archive_read_open_filename(a, archive_path.string().c_str(), 10240);
+    #ifdef _WIN32
+        int r = archive_read_open_filename_w(a, archive_path.wstring().c_str(), 10240);
+    #else
+        int r = archive_read_open_filename(a, archive_path.string().c_str(), 10240);
+    #endif
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
     }
@@ -213,7 +217,11 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
             continue;
         }
 
-        std::ofstream ofs(out_path, std::ios::binary);
+        #ifdef _WIN32
+            std::ofstream ofs(out_path.wstring(), std::ios::binary);
+        #else
+            std::ofstream ofs(out_path, std::ios::binary);
+        #endif
         if (!ofs) {
             Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), processor_tag());
             archive_read_data_skip(a);
@@ -324,7 +332,11 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         return false;
     }
 
-    r = archive_write_open_filename(a, out_path.string().c_str());
+    #ifdef _WIN32
+        r = archive_write_open_filename_w(a, out_path.wstring().c_str());
+    #else
+        r = archive_write_open_filename(a, out_path.string().c_str());
+    #endif
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
     }

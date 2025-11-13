@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <map>
+#include "file_utils.hpp"
 #include "logger.hpp"
 #include "log_sink.hpp"
 
@@ -99,7 +100,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
         return;
     }
 
-    outfile = fopen(output.string().c_str(), "wb");
+    outfile = chisel::open_file(output.string().c_str(), "wb");
     if (outfile == nullptr) {
         mstl3_free(&mstl, 0);
         throw std::runtime_error("Failed to open output file for writing: " + output.string());

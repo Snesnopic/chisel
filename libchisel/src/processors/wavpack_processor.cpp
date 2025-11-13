@@ -9,6 +9,7 @@
 #include <vector>
 #include <cstdio>
 #include <filesystem>
+#include "file_utils.hpp"
 
 namespace chisel {
 
@@ -27,7 +28,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     }
 
     // prepare output
-    FILE* out = std::fopen(output.string().c_str(), "wb");
+    FILE* out = chisel::open_file(output.string().c_str(), "wb");
     if (!out) {
         WavpackCloseFile(ctx_in);
         throw std::runtime_error("Cannot open output file");
