@@ -91,7 +91,17 @@ namespace chisel {
             replaced = true;
 
         } else { // in-place
-            fs::rename(temp_file, original_file, ec);
+            int retries = 5;
+            while (retries > 0) {
+                fs::rename(temp_file, original_file, ec);
+                if (!ec) break; // success
+
+                if (ec.value() != 32) break;
+
+                Logger::log(LogLevel::Debug, "Rename failed (sharing violation), retrying in 100ms...", "Executor");
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                --retries;
+            }
             if (ec) {
                 Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + ec.message() + ")", "Executor");
                 fs::remove(temp_file, ec);
