@@ -139,6 +139,11 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_finish_compress(&dstinfo);
         jpeg_finish_decompress(&srcinfo);
 
+        // explicitly flush stdio buffer to disk before returning
+        if (fflush(outfile.get()) != 0) {
+            Logger::log(LogLevel::Warning, "fflush failed for " + output.string(), "jpeg_processor");
+        }
+
         // destroy structs on success path
         jpeg_destroy_compress(&dstinfo);
         jpeg_destroy_decompress(&srcinfo);
@@ -148,12 +153,11 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
     } catch (const std::exception& e) {
         // destroy structs on error path
         Logger::log(LogLevel::Error, "JPEG recompression failed: " + std::string(e.what()), "jpeg_processor");
-
-        jpeg_destroy_compress(&dstinfo);
-        jpeg_destroy_decompress(&srcinfo);
+        // if the exception is caused by jpeg_destroy, then calling it here would cause another exception
+        // jpeg_destroy_compress(&dstinfo);
+        // jpeg_destroy_decompress(&srcinfo);
 
         // files are closed automatically by unique_FILE destructor
-        throw;
     }
 
     // files are closed automatically by unique_FILE destructor
