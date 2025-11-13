@@ -11,10 +11,16 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "file_utils.hpp"
 #include "../../third_party/stb/stb_image_write.h"
 // --------------------------
 
-
+namespace {
+    struct FileCloser {
+        void operator()(FILE* f) const { if (f) std::fclose(f); }
+    };
+    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
+}
 namespace chisel {
 
     static const char* processor_tag() {
@@ -28,9 +34,14 @@ namespace chisel {
         Logger::log(LogLevel::Info, "Recompressing TGA with RLE: " + input.string(), processor_tag());
 
         int width, height, channels;
+        unique_FILE in_file(chisel::open_file(input, "rb"));
+        if (!in_file) {
+            Logger::log(LogLevel::Error, "Failed to open input file", processor_tag());
+            throw std::runtime_error("TgaProcessor: Cannot open input");
+        }
         // load the image
-        unsigned char* data = stbi_load(input.string().c_str(), &width, &height, &channels, 0);
-
+        unsigned char* data = stbi_load_from_file(in_file.get(), &width, &height, &channels, 0);
+        in_file.reset();
         if (!data) {
             Logger::log(LogLevel::Error, std::string("Failed to load TGA: ") + stbi_failure_reason(), processor_tag());
             throw std::runtime_error("TgaProcessor: Failed to load TGA");
@@ -40,7 +51,7 @@ namespace chisel {
         stbi_write_tga_with_rle = 1;
 
         // write the image back out
-        int success = stbi_write_tga(output.string().c_str(), width, height, channels, data);
+        const int success = stbi_write_tga(output.string().c_str(), width, height, channels, data);
 
         // free the image data
         stbi_image_free(data);
@@ -63,7 +74,12 @@ static std::vector<unsigned char> decode_tga_rgba8(const std::filesystem::path& 
                                                    int& height,
                                                    int& channels) {
     // force 4 channels (rgba) for consistent comparison
-    unsigned char* data = stbi_load(file.string().c_str(), &width, &height, &channels, 4);
+    const unique_FILE in_file(chisel::open_file(file, "rb"));
+    if (!in_file) {
+        Logger::log(LogLevel::Warning, "raw_equal: Failed to open TGA: " + file.string(), processor_tag());
+        return {};
+    }
+    unsigned char* data = stbi_load_from_file(in_file.get(), &width, &height, &channels, 4);
     if (!data) {
         Logger::log(LogLevel::Warning, std::string("raw_equal: Failed to load TGA: ") + stbi_failure_reason(), processor_tag());
         return {};
