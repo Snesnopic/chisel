@@ -2,6 +2,16 @@
 // Created by Giuseppe Francione on 18/09/25.
 //
 
+/**
+ * @file file_type.hpp
+ * @brief Defines the central enumeration for container formats and utility functions.
+ *
+ * This file provides the core ContainerFormat enum, which classifies all
+ * archive-like formats chisel can interact with. It also provides maps
+ * and functions to convert between enums, MIME types, extensions, and
+ * string representations.
+ */
+
 #ifndef CHISEL_FILE_TYPE_HPP
 #define CHISEL_FILE_TYPE_HPP
 
@@ -10,6 +20,12 @@
 #include <optional>
 #include <algorithm>
 
+/**
+ * @brief Enumerates all known container types chisel can process.
+ *
+ * This is used to identify formats that can be extracted (e.g., Zip, Odf)
+ * or formats that are containers but treated as single files (e.g., Pdf).
+ */
 enum class ContainerFormat {
     Zip,
     SevenZip,
@@ -41,7 +57,7 @@ enum class ContainerFormat {
     Unknown
 };
 
-// MIME -> format
+///< Map linking MIME type strings to their corresponding ContainerFormat.
 inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/zip",              ContainerFormat::Zip },
     { "application/x-zip-compressed", ContainerFormat::Zip },
@@ -77,7 +93,11 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/vnd.android.package-archive", ContainerFormat::Apk },
 };
 
-// format -> extension
+/**
+ * @brief Converts a ContainerFormat enum to its lowercase string representation.
+ * @param fmt The ContainerFormat enum value.
+ * @return A string (e.g., "zip", "pdf", "unknown").
+ */
 inline std::string container_format_to_string(const ContainerFormat fmt) {
     switch (fmt) {
         case ContainerFormat::Zip:      return "zip";
@@ -111,7 +131,15 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
     }
 }
 
-// extension -> format
+/**
+ * @brief Parses a string (typically a file extension) into a ContainerFormat.
+ *
+ * The input string is case-insensitive (e.g., "zip", "Zip", "ZIP" all work).
+ *
+ * @param str The string to parse.
+ * @return std::optional<ContainerFormat> containing the enum if successful,
+ * std::nullopt otherwise.
+ */
 inline std::optional<ContainerFormat> parse_container_format(const std::string &str) {
     std::string s = str;
     std::ranges::transform(s, s.begin(),
@@ -147,11 +175,24 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     return std::nullopt;
 }
 
-// libarchive
+/**
+ * @brief Checks if a format is readable by the archive processor (libarchive).
+ * @param fmt The ContainerFormat to check.
+ * @return true if the format is supported for reading.
+ */
 inline bool can_read_format(const ContainerFormat fmt) {
     return fmt != ContainerFormat::Unknown;
 }
 
+/**
+ * @brief Checks if a format is writable by the archive processor (libarchive).
+ *
+ * This is used to determine if an archive can be *re-created*.
+ * Formats like RAR can be read but not written.
+ *
+ * @param fmt The ContainerFormat to check.
+ * @return true if libarchive supports writing this format.
+ */
 inline bool can_write_format(const ContainerFormat fmt) {
     // libarchive doesn't write on RAR, WIM, 7z is limited
     switch (fmt) {
@@ -185,7 +226,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
     }
 }
 
-
+///< Map linking common file extensions (lowercase) to their primary MIME type.
 static const std::unordered_map<std::string, std::string> ext_to_mime = {
     // archives
     {".zip",    "application/zip"},

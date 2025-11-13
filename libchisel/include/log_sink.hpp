@@ -2,6 +2,15 @@
 // Created by Giuseppe Francione on 20/10/25.
 //
 
+/**
+ * @file log_sink.hpp
+ * @brief Defines the abstract interface for log destinations.
+ *
+ * This file contains the ILogSink interface and the LogLevel enumeration,
+ * which decouple the Logger from the actual log output mechanism
+ * (e.g., console, file).
+ */
+
 #ifndef CHISEL_LOG_SINK_HPP
 #define CHISEL_LOG_SINK_HPP
 
@@ -25,16 +34,20 @@ enum class LogLevel {
  *
  * Implementations of ILogSink define how log messages are delivered
  * (e.g. console, file, syslog). The Logger class delegates to the
- * currently installed sink.
+ * currently installed sinks.
  */
 struct ILogSink {
     virtual ~ILogSink() = default;
 
     /**
      * @brief Log a message.
+     *
+     * This is the core function called by the Logger facade.
+     * Implementations must handle thread-safety if required.
+     *
      * @param level Severity level of the message.
      * @param message The message text.
-     * @param tag Optional tag identifying the source component.
+     * @param tag Optional tag identifying the source component (e.g., "jpeg_processor").
      */
     virtual void log(LogLevel level,
                      std::string_view message,

@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file jpeg_processor.hpp
+ * @brief Defines the IProcessor implementation for JPEG files.
+ */
+
 #ifndef CHISEL_JPEG_PROCESSOR_HPP
 #define CHISEL_JPEG_PROCESSOR_HPP
 
@@ -12,6 +17,13 @@
 
 namespace chisel {
 
+    /**
+     * @brief Implements IProcessor for JPEG files using mozjpeg.
+     *
+     * @details This processor provides lossless recompression by optimizing
+     * Huffman tables, similar to `jpegtran`. It does not perform
+     * a full decode and re-encode cycle.
+     */
     class JpegProcessor final : public IProcessor {
     public:
         // --- self-description ---
@@ -34,17 +46,45 @@ namespace chisel {
         [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
 
         // --- operations ---
+
+        /**
+         * @brief Losslessly recompresses a JPEG file using mozjpeg.
+         *
+         * Uses `jpegtran` logic to perform a lossless transformation,
+         * optimizing Huffman tables and copying critical parameters.
+         *
+         * @param input Path to the source JPEG file.
+         * @param output Path to write the optimized JPEG file.
+         * @param preserve_metadata If true, copies APP markers (EXIF, ICC, XMP)
+         * and COM markers. If false, strips them.
+         * @throws std::runtime_error if libjpeg encounters a fatal error.
+         * @note This operation is lossless regarding image data.
+         */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         bool preserve_metadata) override;
 
+        /**
+         * @brief JPEG is not a container format.
+         * @return std::nullopt
+         */
         std::optional<ExtractedContent> prepare_extraction(
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
+        /**
+         * @brief JPEG is not a container format.
+         * @return Empty path.
+         */
         std::filesystem::path finalize_extraction(const ExtractedContent &,
                                                   [[maybe_unused]] ContainerFormat target_format) override {return {};}
 
         // --- integrity check ---
+
+        /**
+         * @brief (Not Implemented) Compute a raw checksum.
+         * @param file_path Path to the file.
+         * @return An empty string.
+         */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
     };
 

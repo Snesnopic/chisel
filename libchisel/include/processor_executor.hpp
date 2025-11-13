@@ -2,6 +2,15 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file processor_executor.hpp
+ * @brief Defines the main orchestrator for file processing.
+ *
+ * This file contains the ProcessorExecutor class, which manages
+ * the entire lifecycle of file analysis, recompression, and
+ * container finalization.
+ */
+
 #ifndef CHISEL_PROCESSOR_EXECUTOR_HPP
 #define CHISEL_PROCESSOR_EXECUTOR_HPP
 
@@ -15,9 +24,19 @@
 #include "event_bus.hpp"
 #include "thread_pool.hpp"
 
+/**
+ * @brief Defines the strategy for applying multiple processors to a single file.
+ */
 enum class EncodeMode {
-    PIPE,      // one encoder output is the next one's output
-    PARALLEL   // all encoders on the original file
+    /**
+     * @brief Chain processors: output of one is input to the next.
+     * (e.g., PngProcessor -> ZopfliPngProcessor)
+     */
+    PIPE,
+    /**
+     * @brief Run all processors on the original file and pick the smallest result.
+     */
+    PARALLEL
 };
 
 namespace chisel {
@@ -25,28 +44,30 @@ namespace chisel {
 /**
  * @brief Orchestrates the analysis, processing, and finalization of files.
  *
- * ProcessorExecutor coordinates the three main phases of chisel:
- *  - Phase 1: Recursive analysis of input files and containers
- *  - Phase 2: Recompression of eligible files (PIPE or PARALLEL mode)
- *  - Phase 3: Finalization of containers after their contents are processed
+ * @details ProcessorExecutor coordinates the three main phases of chisel:
+ * - Phase 1: Recursive analysis of input files and containers.
+ * - Phase 2: Recompression of eligible files (in PIPE or PARALLEL mode)
+ * using the ThreadPool.
+ * - Phase 3: Finalization (re-assembly) of containers after their
+ * contents have been processed.
  *
  * It uses a ProcessorRegistry to discover processors, a ThreadPool to
- * parallelize work across files, and an EventBus to publish progress
- * and results to interested listeners (e.g. CLI, GUI, report generator).
+ * parallelize work, and an EventBus to publish progress and results.
  */
 class ProcessorExecutor {
 public:
     /**
      * @brief Construct a ProcessorExecutor.
+     *
      * @param registry Reference to a ProcessorRegistry with available processors.
      * @param preserve_metadata Whether to preserve metadata during recompression.
-     * @param format Target container format for unencodable archives.
-     * @param verify_checksums Whether to verify checksums after recompression.
+     * @param format Target container format for unencodable archives (e.g., RAR).
+     * @param verify_checksums Whether to verify data integrity after recompression.
      * @param mode Encoding mode (PIPE or PARALLEL).
-     * @param dry_run If true, do not write files.
-     * @param output_dir If set, write files to this directory.
+     * @param dry_run If true, do not write or replace files.
+     * @param output_dir If set, write optimized files here instead of in-place.
      * @param bus EventBus used to publish progress and results.
-     * @param threads Number of worker threads to use (default: hardware concurrency).
+     * @param threads Number of worker threads to use.
      */
     explicit ProcessorExecutor(ProcessorRegistry& registry,
                                bool preserve_metadata,
@@ -60,49 +81,85 @@ public:
 
     /**
      * @brief Entry point: process a list of input files.
+     *
+     * This function executes the 3-phase processing pipeline.
      * @param inputs Vector of filesystem paths to process.
      */
     void process(const std::vector<std::filesystem::path>& inputs);
 
     /**
-     * @brief Checks if the executor was requested to stop.
-     * @return true if request_stop() was called, false otherwise.
+     * @brief Checks if a stop has been requested.
+     * @return true if the internal stop flag is set, false otherwise.
+     * @note This reads the atomic stop flag with relaxed memory order.
      */
     [[nodiscard]] bool is_stopped() const {
         return stop_flag_.load(std::memory_order_relaxed);
     }
 
+    /**
+     * @brief Request the executor and its thread pool to stop.
+     *
+     * This is thread-safe and can be called from signal handlers
+     * or other threads to request a graceful shutdown.
+     */
     void request_stop();
+
 private:
-    void check_for_stop_request();
-    /// Phase 1: recursively analyze files and containers
+    /**
+     * @brief Phase 1: Recursively analyze a path.
+     *
+     * If it's a file, it's added to work_list_.
+     * If it's a container, its contents are extracted, added to
+     * work_list_, and the container is added to finalize_stack_.
+     *
+     * @param path The file or directory path to analyze.
+     */
     void analyze_path(const std::filesystem::path& path);
 
-    /// Phase 2: recompress files in work_list_ using PIPE or PARALLEL mode
+    /**
+     * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
+     *
+     * Dispatches tasks according to the specified EncodeMode (PIPE or PARALLEL).
+     */
     void process_work_list();
 
-    /// Phase 3: finalize containers after their contents have been processed
+    /**
+     * @brief Phase 3: Finalize all containers in finalize_stack_.
+     *
+     * This runs sequentially (LIFO) after all file processing is complete.
+     */
     void finalize_containers();
 
+    /**
+     * @brief Handles file replacement logic after a task succeeds.
+     *
+     * Manages --dry-run, --output, and in-place replacement,
+     * then publishes the final FileProcessCompleteEvent.
+     *
+     * @param original_file The path to the source file.
+     * @param temp_file The path to the newly created optimized file.
+     * @param original_size The size of the original file in bytes.
+     * @param duration The time taken for the recompression task.
+     */
     void handle_temp_file(const std::filesystem::path& original_file,
                             const std::filesystem::path& temp_file,
                             uintmax_t original_size,
                             std::chrono::milliseconds duration) const;
 
-    ProcessorRegistry& registry_;                 ///< Processor registry reference
-    bool preserve_metadata_;                      ///< Preserve metadata flag
-    bool verify_checksums_;                       ///< Verify checksums flag
-    bool dry_run_;                                ///< Dry run flag
-    std::filesystem::path output_dir_;            ///< Output directory
-    bool has_output_dir_;                         ///< Convenience flag
-    ContainerFormat format_;                      ///< Target format for unencodable containers
-    std::vector<std::filesystem::path> work_list_;///< Files scheduled for recompression
-    std::stack<ExtractedContent> finalize_stack_; ///< Stack of containers to finalize
-    std::mutex log_mutex_;                        ///< Protects logging
-    ThreadPool pool_;                             ///< Thread pool for parallel execution
-    std::atomic<bool> stop_flag_{false};       ///< Flag to signal stop
-    EventBus& event_bus_;                         ///< Event bus for publishing events
-    EncodeMode mode_;                             ///< Encoding mode (PIPE or PARALLEL)
+    ProcessorRegistry& registry_;                 ///< Reference to the processor registry
+    bool preserve_metadata_;                      ///< Whether to preserve metadata
+    bool verify_checksums_;                       ///< Whether to verify integrity
+    bool dry_run_;                                ///< If true, no files are written
+    std::filesystem::path output_dir_;            ///< Optional output directory
+    bool has_output_dir_;                         ///< Convenience flag for !output_dir_.empty()
+    ContainerFormat format_;                      ///< Target format for un-writable containers
+    std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
+    std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
+    std::mutex log_mutex_;                        ///< (DEPRECATED - logging is now sink-based)
+    ThreadPool pool_;                             ///< Thread pool for Phase 2
+    std::atomic<bool> stop_flag_{false};       ///< Flag to signal interruption
+    EventBus& event_bus_;                         ///< Bus for publishing events
+    EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression
 };
 
 } // namespace chisel

@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 20/10/25.
 //
 
+/**
+ * @file event_bus.hpp
+ * @brief Defines a simple, thread-safe publish/subscribe event bus.
+ */
+
 #ifndef CHISEL_EVENT_BUS_HPP
 #define CHISEL_EVENT_BUS_HPP
 
@@ -17,11 +22,13 @@ namespace chisel {
     /**
      * @brief Simple type-safe publish/subscribe event bus.
      *
-     * EventBus allows decoupled communication between producers (e.g. ProcessorExecutor)
-     * and consumers (e.g. CLI, report generator). Listeners can subscribe to specific
-     * event types, and publishers can broadcast events without knowing who is listening.
+     * @details EventBus allows decoupled communication between components.
+     * Producers (e.g. ProcessorExecutor) can broadcast events without
+     * knowing who is listening. Consumers (e.g. CLI, report generator)
+     * can subscribe to specific event types to receive notifications.
      *
-     * Thread-safety: subscriptions and publications are protected by a mutex.
+     * This class is thread-safe. Subscriptions and publications
+     * are protected by a mutex.
      */
     class EventBus {
     public:
@@ -29,8 +36,9 @@ namespace chisel {
 
         /**
          * @brief Subscribe a handler to a specific event type.
-         * @tparam Event The event struct type.
+         * @tparam Event The event struct type (e.g., FileProcessCompleteEvent).
          * @param handler Function to invoke when an event of this type is published.
+         * The handler will receive a const reference to the event.
          */
         template <typename Event>
         void subscribe(std::function<void(const Event&)> handler) {
@@ -58,9 +66,12 @@ namespace chisel {
         }
 
     private:
+        ///< Type alias for the internal type-erased callback.
         using Callback = std::function<void(const void*)>;
-        std::unordered_map<std::type_index, std::vector<Callback>> subscribers_; ///< Map of event type to callbacks
-        std::mutex mtx_; ///< Protects subscriber map
+        ///< Map of event type_index to a vector of callbacks.
+        std::unordered_map<std::type_index, std::vector<Callback>> subscribers_;
+        ///< Protects subscriber map during read/write.
+        std::mutex mtx_;
     };
 
 } // namespace chisel

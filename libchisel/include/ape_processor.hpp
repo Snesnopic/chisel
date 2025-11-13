@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file ape_processor.hpp
+ * @brief Defines the IProcessor implementation for Monkey's Audio (APE).
+ */
+
 #ifndef CHISEL_APE_PROCESSOR_HPP
 #define CHISEL_APE_PROCESSOR_HPP
 
@@ -12,6 +17,12 @@
 
 namespace chisel {
 
+    /**
+     * @brief Implements IProcessor for Monkey's Audio (APE) files using MACLib.
+     *
+     * Performs a full decode and re-encode cycle to the highest
+     * compression level ("insane"). Also attempts to preserve APEv2 tags.
+     */
     class ApeProcessor final : public IProcessor {
     public:
         // --- self-description ---
@@ -34,19 +45,53 @@ namespace chisel {
         [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
 
         // --- operations ---
+
+        /**
+         * @brief Recompresses an APE file using MACLib.
+         *
+         * Performs a full decode and re-encode cycle using the
+         * "insane" compression level (APE_COMPRESSION_LEVEL_INSANE).
+         *
+         * @param input Path to the source APE file.
+         * @param output Path to write the optimized APE file.
+         * @param preserve_metadata If true, attempts to copy APEv2 tags
+         * from the input file to the output file.
+         * @throws std::runtime_error if the MACLib encoder or decoder fails.
+         */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         bool preserve_metadata) override;
 
+        /**
+         * @brief This format cannot be extracted.
+         * @return std::nullopt
+         */
         std::optional<ExtractedContent> prepare_extraction(
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
+        /**
+         * @brief This format cannot be extracted.
+         * @return Empty path.
+         */
         std::filesystem::path finalize_extraction(const ExtractedContent &,
                                                   [[maybe_unused]] ContainerFormat target_format) override {return {};}
 
         // --- integrity check ---
+
+        /**
+         * @brief (Not Implemented) Compute a raw checksum.
+         * @param file_path Path to the file.
+         * @return An empty string.
+         */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
+        /**
+         * @brief Compares two APE files by decoding them to raw PCM and comparing.
+         *
+         * @param a First APE file.
+         * @param b Second APE file.
+         * @return true if the decoded PCM data and audio parameters are identical.
+         */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
     };
 

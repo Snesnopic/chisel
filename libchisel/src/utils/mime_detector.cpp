@@ -15,7 +15,7 @@
 #include <vector>
 #include <zlib.h>
 
-std::string MimeDetector::detect(const std::filesystem::path& path)
+std::string chisel::MimeDetector::detect(const std::filesystem::path& path)
 {
 #ifndef _WIN32
     const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
@@ -37,7 +37,7 @@ std::string MimeDetector::detect(const std::filesystem::path& path)
 #endif
 }
 
-bool MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
+bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
 {
 #ifndef _WIN32
     const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
@@ -106,7 +106,7 @@ std::vector<unsigned char> decompress_gzip(const unsigned char* data, const size
     return out;
 }
 
-std::filesystem::path MimeDetector::get_magic_file_path()
+std::filesystem::path chisel::MimeDetector::get_magic_file_path()
 {
 #ifdef __APPLE__
     const char* home = getenv("HOME");
@@ -119,7 +119,7 @@ std::filesystem::path MimeDetector::get_magic_file_path()
 #endif
 }
 
-void MimeDetector::ensure_magic_installed()
+void chisel::MimeDetector::ensure_magic_installed()
 {
 #ifndef _WIN32
     const auto target = get_magic_file_path();

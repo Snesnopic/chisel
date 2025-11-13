@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file flexigif_processor.hpp
+ * @brief Defines the IProcessor implementation for GIF files using flexigif.
+ */
+
 #ifndef CHISEL_FLEXIGIF_PROCESSOR_HPP
 #define CHISEL_FLEXIGIF_PROCESSOR_HPP
 
@@ -12,6 +17,13 @@
 
 namespace chisel {
 
+    /**
+     * @brief Implements IProcessor for GIF files using the flexigif library.
+     *
+     * @details This processor performs a lossless recompression by decoding
+     * the GIF, running LZW optimization passes (partial and final),
+     * and then re-encoding the LZW bitstream.
+     */
     class FlexiGifProcessor final : public IProcessor {
     public:
         // --- self-description ---
@@ -34,17 +46,46 @@ namespace chisel {
         [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
 
         // --- operations ---
+
+        /**
+         * @brief Losslessly recompresses a GIF file using flexigif.
+         *
+         * Decodes the GIF, then uses LzwEncoder::optimizePartial and
+         * LzwEncoder::optimize to find a more optimal LZW encoding.
+         * The result is written using `writeOptimized`.
+         *
+         * @param input Path to the source GIF file.
+         * @param output Path to write the optimized GIF file.
+         * @param preserve_metadata This processor currently does not
+         * support metadata preservation.
+         * @throws std::runtime_error if flexigif init or processing fails.
+         */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output,
                         bool preserve_metadata) override;
 
+        /**
+         * @brief GIF is not a container format.
+         * @return std::nullopt
+         */
         std::optional<ExtractedContent> prepare_extraction(
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
+        /**
+         * @brief GIF is not a container format.
+         * @return Empty path.
+         */
         std::filesystem::path finalize_extraction(const ExtractedContent &,
                                                   [[maybe_unused]] ContainerFormat target_format) override {return {};}
 
         // --- integrity check ---
+
+        /**
+         * @brief (Not Implemented) Compute a raw checksum.
+         * @param file_path Path to the file.
+         * @return An empty string.
+         * @note This means raw_equal() will always return true.
+         */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
     };
 

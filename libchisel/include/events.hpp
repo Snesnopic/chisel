@@ -2,6 +2,14 @@
 // Created by Giuseppe Francione on 20/10/25.
 //
 
+/**
+ * @file events.hpp
+ * @brief Defines all event data structures used by the EventBus.
+ *
+ * These lightweight structs are used with EventBus to notify subscribers
+ * about progress, errors, and results during processing.
+ */
+
 #ifndef CHISEL_EVENTS_HPP
 #define CHISEL_EVENTS_HPP
 
@@ -32,10 +40,10 @@ struct FileAnalyzeStartEvent {
  * @brief Emitted when analysis of a file completes.
  */
 struct FileAnalyzeCompleteEvent {
-    std::filesystem::path path; ///< Path of the analyzed file
-    bool extracted = false;     ///< True if the file was identified as a container and extracted
-    bool scheduled = false;     ///< True if the file was scheduled for recompression
-    std::size_t num_children = 0;
+    std::filesystem::path path;     ///< Path of the analyzed file
+    bool extracted = false;         ///< True if the file was a container and extracted
+    bool scheduled = false;         ///< True if the file was scheduled for recompression
+    std::size_t num_children = 0;   ///< Number of files found if extracted
 };
 
 /**
@@ -47,7 +55,7 @@ struct FileAnalyzeErrorEvent {
 };
 
 /**
- * @brief Emitted when a file is skipped during analysis.
+ * @brief Emitted when a file is skipped during analysis (e.g., junk file, unsupported).
  */
 struct FileAnalyzeSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
@@ -57,7 +65,7 @@ struct FileAnalyzeSkippedEvent {
 // --- Phase 2: Processing ---
 
 /**
- * @brief Emitted when processing of a file begins.
+ * @brief Emitted when recompression of a file begins.
  */
 struct FileProcessStartEvent {
     std::filesystem::path path; ///< Path of the file being processed
@@ -67,15 +75,15 @@ struct FileProcessStartEvent {
  * @brief Emitted when processing of a file completes successfully.
  */
 struct FileProcessCompleteEvent {
-    std::filesystem::path path;        ///< Path of the processed file
-    uintmax_t original_size = 0;       ///< Original file size in bytes
-    uintmax_t new_size = 0;            ///< New file size in bytes
-    bool replaced = false;             ///< True if the original file was replaced
-    std::chrono::milliseconds duration{0}; ///< Processing duration
+    std::filesystem::path path;             ///< Path of the processed file
+    uintmax_t original_size = 0;            ///< Original file size in bytes
+    uintmax_t new_size = 0;                 ///< New file size in bytes
+    bool replaced = false;                  ///< True if the original file was replaced/written
+    std::chrono::milliseconds duration{0};  ///< Processing duration
 };
 
 /**
- * @brief Emitted when processing of a file fails.
+ * @brief Emitted when processing of a file fails with an exception.
  */
 struct FileProcessErrorEvent {
     std::filesystem::path path; ///< Path of the file
@@ -83,7 +91,7 @@ struct FileProcessErrorEvent {
 };
 
 /**
- * @brief Emitted when a file is skipped during processing.
+ * @brief Emitted when a file is skipped during processing (e.g., no size improvement).
  */
 struct FileProcessSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
@@ -93,7 +101,7 @@ struct FileProcessSkippedEvent {
 // --- Phase 3: Finalization ---
 
 /**
- * @brief Emitted when finalization of a container begins.
+ * @brief Emitted when finalization (re-assembly) of a container begins.
  */
 struct ContainerFinalizeStartEvent {
     std::filesystem::path path; ///< Path of the container being finalized
@@ -103,8 +111,8 @@ struct ContainerFinalizeStartEvent {
  * @brief Emitted when finalization of a container completes successfully.
  */
 struct ContainerFinalizeCompleteEvent {
-    std::filesystem::path path; ///< Path of the finalized container
-    uintmax_t final_size = 0;   ///< Final size in bytes
+    std::filesystem::path path;     ///< Path of the finalized container
+    uintmax_t final_size = 0;       ///< Final size in bytes
 };
 
 /**
