@@ -45,7 +45,13 @@ bool copy_apetag(const std::filesystem::path &input,
         }
 
         return outTag.Save();
+    } catch (const std::exception& e) {
+        // log known exceptions
+        Logger::log(LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ape_processor");
+        return false;
     } catch (...) {
+        // log unknown exceptions
+        Logger::log(LogLevel::Warning, "Failed to copy APE tag: Unknown exception caught", "ape_processor");
         return false;
     }
 }

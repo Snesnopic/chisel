@@ -163,7 +163,9 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
             buf = obj.getStreamData(qpdf_dl_specialized);
             data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
             info.decodable = true;
-        } catch (QPDFExc&) {
+        } catch (QPDFExc& e) {
+            Logger::log(LogLevel::Debug,"Stream " + std::to_string(i) + " is not decodable, falling back to raw: " + e.what(),
+                                    "pdf_processor");
             buf = obj.getRawStreamData();
             data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
             info.decodable = false;

@@ -283,7 +283,16 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
 
             archive_entry_free(entry);
         }
+    } catch (const std::exception& e) {
+        // log the error before cleanup
+        Logger::log(LogLevel::Error, "Failed to finalize OOXML: " + std::string(e.what()) + " for file: " + content.original_path.filename().string(), processor_tag());
+        archive_write_close(out);
+        archive_write_free(out);
+        cleanup_temp_dir(content.temp_dir);
+        throw;
     } catch (...) {
+        // log unknown error
+        Logger::log(LogLevel::Error, "Failed to finalize OOXML: Unknown exception for file: " + content.original_path.filename().string(), processor_tag());
         archive_write_close(out);
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
