@@ -15,6 +15,18 @@
 
 enum class ContainerFormat;
 
+/**
+ * @namespace chisel
+ * @brief The main namespace for the Chisel library.
+ *
+ * @details This namespace encapsulates all core functionality of Chisel,
+ * including the abstract IProcessor interface, concrete file processor
+ * implementations (e.g., PngProcessor, ArchiveProcessor), the execution
+ * engine (ProcessorExecutor), and various utility helpers.
+ *
+ * All internal classes and functions are contained within this namespace
+ * to prevent symbol collisions.
+ */
 namespace chisel {
 
 /**
