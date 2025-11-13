@@ -154,6 +154,8 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         Logger::log(LogLevel::Info, "JPEG recompression completed: " + output.string(), "jpeg_processor");
 
     } catch (const std::exception& e) {
+        infile.reset();
+        outfile.reset();
         Logger::log(LogLevel::Error,
                     "JPEG recompression failed: " + std::string(e.what()),
                     "jpeg_processor");
