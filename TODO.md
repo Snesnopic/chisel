@@ -129,6 +129,11 @@
 
 ## Other improvements
 
+- [ ] Add CLI flags for optimization effort (e.g., --zopfli-iterations, --flexigif-effort).
+- [ ] Propagate effort settings from Settings -> ProcessorExecutor -> IProcessor (e.g., via a new virtual setOptimizationEffort method).
+- [ ] Enhance EventBus events (e.g., FileProcessCompleteEvent) to carry detailed benchmark data for all processor attempts (name, time, size).
+- [ ] Update ProcessorExecutor (parallel mode) to capture per-processor timings and sizes.
+- [ ] Update report_generator (CSV) to log detailed benchmark data for analysis.
 - [ ] File hash cache to skip already processed files across runs.
 - [ ] Investigate further metadata preservation strategies across all formats.
 - [ ] Implement lossless recompression of embedded cover art in audio files (FLAC, APE, WavPack, MP3, etc.).
