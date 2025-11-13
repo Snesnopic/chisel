@@ -139,6 +139,8 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_finish_compress(&dstinfo);
         jpeg_finish_decompress(&srcinfo);
 
+        infile.reset();
+
         // explicitly flush stdio buffer to disk before returning
         if (fflush(outfile.get()) != 0) {
             Logger::log(LogLevel::Warning, "fflush failed for " + output.string(), "jpeg_processor");
