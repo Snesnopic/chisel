@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <vector>
 #include <algorithm>
+#include <memory>
 
 namespace {
 
@@ -24,6 +25,12 @@ void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     Logger::log(LogLevel::Warning, std::string("libjpeg: ") + err->msg, "libjpeg");
     throw std::runtime_error(err->msg);
 }
+
+// raii wrapper for file handles, ensures fclose is called
+struct FileCloser {
+    void operator()(FILE *f) const { if (f) std::fclose(f); }
+};
+using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
 // save markers to copy from source (must be called before jpeg_read_header)
 void setup_marker_saving(const j_decompress_ptr srcinfo, const bool preserve_metadata) {
@@ -78,14 +85,14 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
                                bool preserve_metadata) {
     Logger::log(LogLevel::Info, "Start JPEG recompression: " + input.string(), "jpeg_processor");
 
-    FILE *infile = std::fopen(input.string().c_str(), "rb");
+    unique_FILE infile(std::fopen(input.string().c_str(), "rb"));
     if (!infile) {
         Logger::log(LogLevel::Error, "Cannot open JPEG input: " + input.string(), "jpeg_processor");
         throw std::runtime_error("Cannot open JPEG input");
     }
-    FILE *outfile = std::fopen(output.string().c_str(), "wb");
+    unique_FILE outfile(std::fopen(output.string().c_str(), "wb"));
     if (!outfile) {
-        std::fclose(infile);
+        // infile is closed automatically by raii
         Logger::log(LogLevel::Error, "Cannot open JPEG output: " + output.string(), "jpeg_processor");
         throw std::runtime_error("Cannot open JPEG output");
     }
@@ -94,6 +101,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
     jpeg_compress_struct dstinfo{};
     JpegErrorMgr jsrcerr{}, jdsterr{};
 
+    // error handlers must be set before any possible error
     srcinfo.err = jpeg_std_error(&jsrcerr.pub);
     jsrcerr.pub.error_exit = jpeg_error_exit_throw;
 
@@ -104,7 +112,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_create_decompress(&srcinfo);
         jpeg_create_compress(&dstinfo);
 
-        jpeg_stdio_src(&srcinfo, infile);
+        jpeg_stdio_src(&srcinfo, infile.get());
         setup_marker_saving(&srcinfo, preserve_metadata);
 
         if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
@@ -123,7 +131,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         }
 
         dstinfo.optimize_coding = TRUE;
-        jpeg_stdio_dest(&dstinfo, outfile);
+        jpeg_stdio_dest(&dstinfo, outfile.get());
         jpeg_write_coefficients(&dstinfo, coef_arrays);
 
         copy_saved_markers(&srcinfo, &dstinfo, preserve_metadata);
@@ -131,20 +139,24 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_finish_compress(&dstinfo);
         jpeg_finish_decompress(&srcinfo);
 
+        // destroy structs on success path
         jpeg_destroy_compress(&dstinfo);
         jpeg_destroy_decompress(&srcinfo);
-
-        std::fclose(infile);
-        std::fclose(outfile);
 
         Logger::log(LogLevel::Info, "JPEG recompression completed: " + output.string(), "jpeg_processor");
-    } catch (...) {
+
+    } catch (const std::exception& e) {
+        // destroy structs on error path
+        Logger::log(LogLevel::Error, "JPEG recompression failed: " + std::string(e.what()), "jpeg_processor");
+
         jpeg_destroy_compress(&dstinfo);
         jpeg_destroy_decompress(&srcinfo);
-        std::fclose(infile);
-        std::fclose(outfile);
+
+        // files are closed automatically by unique_FILE destructor
         throw;
     }
+
+    // files are closed automatically by unique_FILE destructor
 }
 
 std::string JpegProcessor::get_raw_checksum(const std::filesystem::path&) const {
