@@ -82,6 +82,18 @@ namespace chisel {
         // --- integrity check ---
 
         /**
+         * @brief Compares two WebP files pixel by pixel.
+         *
+         * Decodes both images into a raw RGBA8 buffer using libwebp
+         * and compares the buffers and dimensions.
+         *
+         * @param a Path to the first WebP file.
+         * @param b Path to the second WebP file.
+         * @return true if pixel data and dimensions match, false otherwise.
+         */
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+        /**
          * @brief (Not Implemented) Compute a raw checksum.
          * @param file_path Path to the file.
          * @return An empty string.

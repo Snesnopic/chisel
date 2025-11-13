@@ -104,6 +104,20 @@ public:
                                               ContainerFormat target_format) override;
 
     /**
+     * @brief Compares two PDF files by their raw stream content.
+     *
+     * Iterates through all objects in both PDF files using qpdf,
+     * extracts the *raw, compressed* data for each stream, and
+     * compares the resulting maps of (Object ID -> Stream Data).
+     *
+     * @param a Path to the first PDF file.
+     * @param b Path to the second PDF file.
+     * @return true if both files contain identical streams for
+     * identical object IDs, false otherwise.
+     */
+    [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+    /**
      * @brief (Not Implemented) Compute a raw checksum.
      * @param file_path Path to the file.
      * @return An empty string.

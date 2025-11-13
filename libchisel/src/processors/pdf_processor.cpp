@@ -271,7 +271,51 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         throw;
     }
 }
+    // helper to get all raw stream data from a pdf
+    static bool get_all_raw_streams(const std::filesystem::path& path,
+                                    std::map<int, std::vector<uint8_t>>& streams)
+{
+    try {
+        QPDF pdf;
+        const auto qlogger = QPDFLogger::create();
+        std::ostream warn_os(nullptr);
+        std::ostream err_os(nullptr);
+        qlogger->setOutputStreams(&warn_os, &err_os);
+        pdf.setLogger(qlogger);
+        pdf.processFile(path.string().c_str());
 
+        auto objects = pdf.getAllObjects();
+        for (auto& obj : objects) {
+            if (obj.isStream()) {
+                const std::shared_ptr<Buffer> buf = obj.getRawStreamData();
+                streams[obj.getObjGen().getObj()] =
+                    std::vector<uint8_t>(buf->getBuffer(), buf->getBuffer() + buf->getSize());
+            }
+        }
+        return true;
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Warning, "Failed to read PDF streams: " + std::string(e.what()), "pdf_processor");
+        return false;
+    }
+}
+    bool PdfProcessor::raw_equal(const std::filesystem::path& a,
+                             const std::filesystem::path& b) const {
+    std::map<int, std::vector<uint8_t>> streamsA, streamsB;
+
+    bool okA = get_all_raw_streams(a, streamsA);
+    bool okB = get_all_raw_streams(b, streamsB);
+
+    if (!okA || !okB) {
+        return false; // failed to read one or both
+    }
+
+    if (streamsA.size() != streamsB.size()) {
+        return false; // different number of streams
+    }
+
+    // compare map contents (obj-id -> raw_stream_bytes)
+    return streamsA == streamsB;
+}
 std::string PdfProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw PDF data
     return "";

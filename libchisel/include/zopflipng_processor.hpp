@@ -88,6 +88,18 @@ namespace chisel {
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
         /**
+         * @brief Compares two PNG files pixel by pixel.
+         *
+         * Decodes both images into a raw RGBA8 buffer using libpng
+         * and compares the buffers and dimensions.
+         *
+         * @param a Path to the first PNG file.
+         * @param b Path to the second PNG file.
+         * @return true if pixel data and dimensions match, false otherwise.
+         */
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+        /**
          * @brief (Static Helper) Recompresses a raw zlib data buffer with Zopfli.
          * @param input Raw data to compress.
          * @return A vector containing the Zopfli-compressed zlib stream.

@@ -81,6 +81,18 @@ namespace chisel {
         // --- integrity check ---
 
         /**
+         * @brief Compares two JPEG files pixel by pixel.
+         *
+         * Decodes both images into a raw pixel buffer (RGB or Grayscale)
+         * using libjpeg and compares the buffers and dimensions.
+         *
+         * @param a Path to the first JPEG file.
+         * @param b Path to the second JPEG file.
+         * @return true if pixel data and dimensions match, false otherwise.
+         */
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+        /**
          * @brief (Not Implemented) Compute a raw checksum.
          * @param file_path Path to the file.
          * @return An empty string.

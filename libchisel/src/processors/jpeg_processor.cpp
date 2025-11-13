@@ -179,6 +179,77 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
     // files are closed automatically by unique_FILE destructor
 }
 
+static bool decode_jpeg_raw(const std::filesystem::path &path,
+                            int &width,
+                            int &height,
+                            int &channels,
+                            std::vector<unsigned char> &buffer) {
+    unique_FILE infile(std::fopen(path.string().c_str(), "rb"));
+    if (!infile) {
+        return false;
+    }
+
+    jpeg_decompress_struct cinfo{};
+    JpegErrorMgr jsrcerr{};
+
+    cinfo.err = jpeg_std_error(&jsrcerr.pub);
+    jsrcerr.pub.error_exit = jpeg_error_exit_throw;
+
+    try {
+        jpeg_create_decompress(&cinfo);
+        jpeg_stdio_src(&cinfo, infile.get());
+
+        if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
+            jpeg_destroy_decompress(&cinfo);
+            return false;
+        }
+
+        jpeg_start_decompress(&cinfo);
+
+        width = static_cast<int>(cinfo.output_width);
+        height = static_cast<int>(cinfo.output_height);
+        channels = static_cast<int>(cinfo.output_components); // usually 3 (rgb) or 1 (grayscale)
+
+        buffer.resize(static_cast<size_t>(width) * height * channels);
+        unsigned char *row_ptr = buffer.data();
+        const unsigned int row_stride = width * channels;
+
+        while (cinfo.output_scanline < cinfo.output_height) {
+            jpeg_read_scanlines(&cinfo, &row_ptr, 1);
+            row_ptr += row_stride;
+        }
+
+        jpeg_finish_decompress(&cinfo);
+        jpeg_destroy_decompress(&cinfo);
+    } catch (const std::exception &) {
+        jpeg_destroy_decompress(&cinfo);
+        return false;
+    }
+
+    return true;
+}
+
+bool JpegProcessor::raw_equal(const std::filesystem::path &a,
+                              const std::filesystem::path &b) const {
+    int wa, ha, ca;
+    int wb, hb, cb;
+    std::vector<unsigned char> imgA, imgB;
+
+    const bool okA = decode_jpeg_raw(a, wa, ha, ca, imgA);
+    const bool okB = decode_jpeg_raw(b, wb, hb, cb, imgB);
+
+    if (!okA || !okB) {
+        // one or both files failed to decode
+        return false;
+    }
+
+    if (wa != wb || ha != hb || ca != cb) {
+        // dimensions or channel count mismatch
+        return false;
+    }
+
+    return imgA == imgB;
+}
 std::string JpegProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw JPEG data
     return "";

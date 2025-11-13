@@ -167,7 +167,76 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     JxlEncoderDestroy(enc);
     Logger::log(LogLevel::Info, "Re-encoding complete: " + output.string(), "jxl_processor");
 }
+    // helper to decode jxl to raw rgba8 buffer
+    static bool decode_jxl_rgba8(const std::filesystem::path& path,
+                                 uint32_t& width,
+                                 uint32_t& height,
+                                 std::vector<uint8_t>& buffer)
+{
+    std::vector<uint8_t> input_buf;
+    if (!read_file(path, input_buf)) {
+        return false;
+    }
 
+    JxlDecoder* dec = JxlDecoderCreate(nullptr);
+    if (!dec) return false;
+
+    // autodestroy
+    std::unique_ptr<JxlDecoder, decltype(&JxlDecoderDestroy)> dec_ptr(dec, &JxlDecoderDestroy);
+
+    JxlDecoderSubscribeEvents(dec, JXL_DEC_BASIC_INFO | JXL_DEC_FULL_IMAGE);
+    JxlDecoderSetInput(dec, input_buf.data(), input_buf.size());
+    JxlDecoderCloseInput(dec);
+
+    JxlBasicInfo info{};
+    JxlPixelFormat format = {4, JXL_TYPE_UINT8, JXL_NATIVE_ENDIAN, 0}; // force rgba8 output
+
+    for (;;) {
+        const JxlDecoderStatus status = JxlDecoderProcessInput(dec);
+        if (status == JXL_DEC_ERROR) return false;
+        if (status == JXL_DEC_BASIC_INFO) {
+            if (JXL_DEC_SUCCESS != JxlDecoderGetBasicInfo(dec, &info)) return false;
+            width = info.xsize;
+            height = info.ysize;
+            buffer.resize(static_cast<size_t>(width) * height * 4);
+            if (JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer(dec, &format,
+                                                              buffer.data(),
+                                                              buffer.size())) {
+                return false;
+                                                              }
+        }
+        if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER) {
+            // this should not happen if we set it after basic info
+            return false;
+        }
+        if (status == JXL_DEC_FULL_IMAGE) {
+            // frame is decoded
+        }
+        if (status == JXL_DEC_SUCCESS) {
+            // all frames decoded
+            return true;
+        }
+    }
+}
+    bool JxlProcessor::raw_equal(const std::filesystem::path& a,
+                             const std::filesystem::path& b) const {
+    uint32_t wa, ha;
+    uint32_t wb, hb;
+    std::vector<uint8_t> imgA, imgB;
+
+    bool okA = decode_jxl_rgba8(a, wa, ha, imgA);
+    bool okB = decode_jxl_rgba8(b, wb, hb, imgB);
+
+    if (!okA || !okB) {
+        return false;
+    }
+
+    if (wa != wb || ha != hb) {
+        return false;
+    }
+
+    return imgA == imgB;
+}
 std::string JxlProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw pixel data
     return "";

@@ -146,7 +146,56 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
 
     Logger::log(LogLevel::Info, "WebP recompression completed: " + output.string(), "webp_processor");
 }
+    // helper to decode webp to raw rgba buffer
+    static bool decode_webp_rgba8(const std::filesystem::path& path,
+                                  int& width,
+                                  int& height,
+                                  std::vector<uint8_t>& buffer)
+{
+    // read input
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        return false;
+    }
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> input_data(static_cast<size_t>(size));
+    if (!file.read(reinterpret_cast<char*>(input_data.data()), size)) {
+        return false;
+    }
 
+    if (!WebPGetInfo(input_data.data(), input_data.size(), &width, &height)) {
+        return false;
+    }
+
+    buffer.resize(static_cast<size_t>(width) * height * 4);
+    uint8_t* result = WebPDecodeRGBAInto(input_data.data(),
+                                         input_data.size(),
+                                         buffer.data(),
+                                         buffer.size(),
+                                         width * 4);
+
+    return result != nullptr;
+}
+    bool WebpProcessor::raw_equal(const std::filesystem::path& a,
+                              const std::filesystem::path& b) const {
+    int wa, ha;
+    int wb, hb;
+    std::vector<uint8_t> imgA, imgB;
+
+    bool okA = decode_webp_rgba8(a, wa, ha, imgA);
+    bool okB = decode_webp_rgba8(b, wb, hb, imgB);
+
+    if (!okA || !okB) {
+        return false;
+    }
+
+    if (wa != wb || ha != hb) {
+        return false;
+    }
+
+    return imgA == imgB;
+}
 std::string WebpProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw WebP data
     return "";
