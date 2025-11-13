@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include "file_utils.hpp"
 #ifndef _WIN32
 #include <sys/stat.h>
 #endif
@@ -217,12 +218,8 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
             continue;
         }
 
-        #ifdef _WIN32
-            std::ofstream ofs(out_path.wstring(), std::ios::binary);
-        #else
-            std::ofstream ofs(out_path, std::ios::binary);
-        #endif
-        if (!ofs) {
+        FILE* out = chisel::open_file(out_path, "wb");
+        if (!out) {
             Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), processor_tag());
             archive_read_data_skip(a);
             continue;
@@ -230,9 +227,9 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
 
         la_ssize_t size_read = 0;
         while ((size_read = archive_read_data(a, buffer.data(), buffer.size())) > 0) {
-            ofs.write(buffer.data(), static_cast<std::streamsize>(size_read));
+            fwrite(buffer.data(), 1, static_cast<size_t>(size_read), out);
         }
-        ofs.close();
+        fclose(out);
 
         if (size_read < 0) {
             Logger::log(LogLevel::Error, "Error reading data: " + std::string(archive_error_string(a)), processor_tag());
