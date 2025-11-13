@@ -138,6 +138,9 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
 
         jpeg_finish_compress(&dstinfo);
         jpeg_finish_decompress(&srcinfo);
+        // destroy structs on success path
+        jpeg_destroy_compress(&dstinfo);
+        jpeg_destroy_decompress(&srcinfo);
 
         infile.reset();
 
@@ -146,10 +149,6 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
             Logger::log(LogLevel::Warning, "fflush failed for " + output.string(), "jpeg_processor");
         }
         outfile.reset();
-
-        // destroy structs on success path
-        jpeg_destroy_compress(&dstinfo);
-        jpeg_destroy_decompress(&srcinfo);
 
         Logger::log(LogLevel::Info, "JPEG recompression completed: " + output.string(), "jpeg_processor");
 
