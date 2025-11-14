@@ -23,7 +23,18 @@ namespace chisel {
         // wide-char paths (UTF-16), supporting Unicode and long paths.
         std::wstring wmode;
         for (const char* p = mode; *p; ++p) wmode += static_cast<wchar_t>(*p);
-        return _wfopen(path.wstring().c_str(), wmode.c_str());
+
+        // get absolute path, required for the long path prefix
+        std::error_code ec;
+        auto abs_path = std::filesystem::absolute(path, ec);
+        if (ec) {
+            // fallback to original behavior on error
+            return _wfopen(path.wstring().c_str(), wmode.c_str());
+        }
+
+        // prepend the magic prefix to bypass MAX_PATH
+        std::wstring long_path = L"\\\\?\\" + abs_path.wstring();
+        return _wfopen(long_path.c_str(), wmode.c_str());
 #else
         return std::fopen(path.string().c_str(), mode);
 #endif
