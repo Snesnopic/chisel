@@ -91,7 +91,7 @@ namespace chisel {
             replaced = true;
 
         } else { // in-place
-            int retries = 5;
+            int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
                 if (!ec) break; // success
@@ -99,7 +99,7 @@ namespace chisel {
                 if (ec.value() != 32) break;
 
                 Logger::log(LogLevel::Debug, "Rename failed (sharing violation), retrying in 100ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 --retries;
             }
             if (ec) {
