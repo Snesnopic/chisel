@@ -80,8 +80,18 @@ namespace chisel {
             fs::remove(temp_file, ec);
 
         } else if (has_output_dir_) {
-            fs::path dest = output_dir_ / original_file.filename();
-            fs::rename(temp_file, dest, ec);
+            const fs::path dest = output_dir_ / original_file.filename();
+            int retries = 10;
+            while (retries > 0) {
+                fs::rename(temp_file, dest, ec);
+                if (!ec) break;
+
+                if (ec.value() != 32 && ec.value() != 5) break;
+
+                Logger::log(LogLevel::Debug, "Rename (output dir) failed (sharing violation), retrying in 250ms...", "Executor");
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                --retries;
+            }
             if (ec) {
                 Logger::log(LogLevel::Error, "Rename failed (output dir): " + dest.string() + " (" + ec.message() + ")", "Executor");
                 fs::remove(temp_file, ec);
@@ -96,10 +106,10 @@ namespace chisel {
                 fs::rename(temp_file, original_file, ec);
                 if (!ec) break; // success
 
-                if (ec.value() != 32) break;
+                if (ec.value() != 32 && ec.value() != 5) break;
 
-                Logger::log(LogLevel::Debug, "Rename failed (sharing violation), retrying in 100ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                Logger::log(LogLevel::Debug, "Rename failed (sharing violation), retrying in 500ms...", "Executor");
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
             if (ec) {
