@@ -381,8 +381,11 @@ jobs:
           fi
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
-          
-          "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --regenerate-magic
+          else
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+          fi
         shell: bash
 
       - name: Check for errors in Chisel Log
