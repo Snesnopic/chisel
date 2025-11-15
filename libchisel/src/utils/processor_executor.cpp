@@ -107,16 +107,21 @@ namespace chisel {
                 fs::rename(temp_file, original_file, ec);
                 if (!ec) break; // success
 
-                if (ec.value() != 32 && ec.value() != 5) break;
+                if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
 
-                Logger::log(LogLevel::Debug, "Rename failed (sharing violation), retrying in 500ms...", "Executor");
+                Logger::log(LogLevel::Debug, "Rename failed (sharing/lock violation), retrying in 500ms...", "Executor");
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
             if (ec) {
-                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + ec.message() + ")", "Executor");
-                fs::remove(temp_file, ec);
-                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + ec.message()});
+
+                const std::string rename_error = ec.message();
+                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + rename_error + ")", "Executor");
+
+                std::error_code remove_ec;
+                fs::remove(temp_file, remove_ec);
+
+                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + rename_error});
                 return;
             }
             replaced = true;
