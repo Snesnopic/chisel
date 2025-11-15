@@ -5,6 +5,7 @@
 #include "../../include/tga_processor.hpp"
 #include "../../include/logger.hpp"
 #include <stdexcept>
+#include <memory>
 
 // --- STB Implementation ---
 // define implementations in this single .cpp file
@@ -19,8 +20,16 @@ namespace {
     struct FileCloser {
         void operator()(FILE* f) const { if (f) std::fclose(f); }
     };
+
     using unique_FILE = std::unique_ptr<FILE, FileCloser>;
-}
+
+    void stbi_write_callback(void *context, void *data, int size) {
+        if (size <= 0) return;
+        FILE* f = static_cast<FILE *>(context);
+        std::fwrite(data, 1, static_cast<size_t>(size), f);
+    }
+} // namespace
+
 namespace chisel {
 
     static const char* processor_tag() {
@@ -47,11 +56,21 @@ namespace chisel {
             throw std::runtime_error("TgaProcessor: Failed to load TGA");
         }
 
+        unique_FILE out_file(chisel::open_file(output, "wb"));
+        if (!out_file) {
+            stbi_image_free(data);
+            Logger::log(LogLevel::Error, "Failed to open output file", processor_tag());
+            throw std::runtime_error("TgaProcessor: Cannot open output");
+        }
+
         // enable rle compression
         stbi_write_tga_with_rle = 1;
 
-        // write the image back out
-        const int success = stbi_write_tga(output.string().c_str(), width, height, channels, data);
+        const int success = stbi_write_tga_to_func(
+            stbi_write_callback,
+            out_file.get(),
+            width, height, channels, data
+        );
 
         // free the image data
         stbi_image_free(data);
