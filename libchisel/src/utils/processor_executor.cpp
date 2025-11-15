@@ -86,16 +86,17 @@ namespace chisel {
                 fs::rename(temp_file, dest, ec);
                 if (!ec) break;
 
-                if (ec.value() != 32 && ec.value() != 5) break;
+                if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
 
                 Logger::log(LogLevel::Debug, "Rename (output dir) failed (sharing violation), retrying in 250ms...", "Executor");
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 --retries;
             }
             if (ec) {
-                Logger::log(LogLevel::Error, "Rename failed (output dir): " + dest.string() + " (" + ec.message() + ")", "Executor");
+                const std::string rename_error = ec.message();
+                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + rename_error + ")", "Executor");
                 fs::remove(temp_file, ec);
-                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + ec.message()});
+                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + rename_error});
                 return;
             }
             replaced = true;
