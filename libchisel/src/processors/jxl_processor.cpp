@@ -74,6 +74,8 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     JxlPixelFormat format = {};
     JxlDataType data_type = {};
 
+    // this will store both the type and the content of each metadata box
+    std::vector<std::pair<std::string, std::vector<uint8_t>>> metadata_boxes;
     for (;;) {
         const JxlDecoderStatus status = JxlDecoderProcessInput(dec);
         if (status == JXL_DEC_ERROR) { ok = false; break; }
@@ -107,6 +109,40 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
                                                               frame.pixels.data(),
                                                               frame.pixels.size())) { ok = false; break; }
             frames.push_back(std::move(frame));
+        } else if (status == JXL_DEC_BOX) {
+            if (!preserve_metadata) {
+                // advance the decoder past this box, ignoring its content
+                if (JXL_DEC_SUCCESS != JxlDecoderProcessInput(dec)) {
+                    ok = false;
+                    break;
+                }
+                continue;
+            }
+
+            JxlBoxType type;
+            if (JXL_DEC_SUCCESS != JxlDecoderGetBoxType(dec, type, JXL_FALSE /* decompressed */)) {
+                ok = false;
+                break;
+            }
+
+            uint64_t box_size;
+            if (JXL_DEC_SUCCESS != JxlDecoderGetBoxSizeContents(dec, &box_size)) {
+                ok = false;
+                break;
+            }
+
+            std::vector<uint8_t> box_data(box_size);
+            if (JXL_DEC_SUCCESS != JxlDecoderSetBoxBuffer(dec, box_data.data(), box_data.size())) {
+                ok = false;
+                break;
+            }
+
+            if (JXL_DEC_SUCCESS != JxlDecoderProcessInput(dec)) {
+                ok = false;
+                break;
+            }
+
+            metadata_boxes.emplace_back(std::pair(std::string(type,4), std::move(box_data)));
         }
         if (status == JXL_DEC_SUCCESS) break;
     }
@@ -124,6 +160,11 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
 
     if (preserve_metadata) {
         JxlEncoderStoreJPEGMetadata(enc, JXL_TRUE);
+        for (const auto& [type, data] : metadata_boxes) {
+            if (JXL_ENC_SUCCESS != JxlEncoderAddBox(enc, type.c_str(), data.data(), data.size(), JXL_FALSE)) {
+                Logger::log(LogLevel::Warning, "Failed to add metadata box to JXL encoder", "jxl_processor");
+            }
+        }
     }
 
     for (const auto &frame : frames) {
