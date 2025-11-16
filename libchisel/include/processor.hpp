@@ -5,6 +5,7 @@
 #ifndef CHISEL_PROCESSOR_HPP
 #define CHISEL_PROCESSOR_HPP
 
+#include <any>
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -42,7 +43,14 @@ struct ExtractedContent {
     std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
     std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
     ContainerFormat format;                             ///< Format of the container
-    // Processors may add custom, format-specific context if needed
+    /**
+     * @brief Type-erased storage for processor-specific state.
+     *
+     * Used to pass state from prepare_extraction() to
+     * finalize_extraction() in a thread-safe, stateless way
+     * (e.g., FlacState, PdfState).
+     */
+    std::any extras;
 };
 
 /**
