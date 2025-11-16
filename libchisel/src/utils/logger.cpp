@@ -24,7 +24,7 @@ void Logger::log(const LogLevel level,
                   const std::string_view msg,
                   const std::string_view tag) {
     std::lock_guard lock(mtx_);
-    for (const auto& sink : sinks_) { // Modificato
+    for (const auto& sink : sinks_) {
         if (sink) {
             sink->log(level, msg, tag);
         }
