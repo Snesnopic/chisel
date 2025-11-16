@@ -145,7 +145,7 @@ namespace chisel {
 
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
-        auto mime = MimeDetector::detect(path);
+        const auto mime = MimeDetector::detect(path);
         auto procs = registry_.find_by_mime(mime);
         if (procs.empty()) {
             procs = registry_.find_by_extension(path.extension().string());
@@ -159,23 +159,33 @@ namespace chisel {
 
         IProcessor *processor = procs.front();
 
-        const fs::path current_path = path;
-
+        const fs::path& current_path = path;
+        bool scheduled_for_extraction = false;
+        bool scheduled_for_recompression = false;
+        std::optional<ExtractedContent> content;
         if (processor->can_extract_contents()) {
-            auto content = processor->prepare_extraction(current_path);
+             content = processor->prepare_extraction(current_path);
             if (content) {
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
                     analyze_path(child);
                 }
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, false, content->extracted_files.size()});
+                scheduled_for_extraction = true;
             } else {
                 Logger::log(LogLevel::Error, "prepare_extraction failed for " + path.string(), "Executor");
                 event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
             }
-        } else if (processor->can_recompress()) {
+        }
+        if (processor->can_recompress()) {
             work_list_.push_back(current_path);
-            event_bus_.publish(FileAnalyzeCompleteEvent{path, false, true});
+            scheduled_for_recompression = true;
+        }
+        if (scheduled_for_extraction || scheduled_for_recompression) {
+            if (scheduled_for_extraction) {
+                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, scheduled_for_recompression, content->extracted_files.size()});
+            } else {
+                event_bus_.publish(FileAnalyzeCompleteEvent{path, false, scheduled_for_recompression});
+            }
         } else {
             Logger::log(LogLevel::Debug, "file ignored: " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{path, "No operations available"});
