@@ -4,12 +4,171 @@
 
 #include "../../include/flac_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/random_utils.hpp"
 #include <FLAC/all.h>
+#include <FLAC++/metadata.h>
 #include <stdexcept>
 #include <cstdlib>
 #include <sstream>
+#include <fstream>
+#include <chrono>
 
 namespace chisel {
+
+namespace fs = std::filesystem;
+
+// --- helpers ---
+
+static fs::path make_temp_dir() {
+    const auto base = fs::temp_directory_path();
+    const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
+    fs::path dir = base / ("chisel_flac_" + std::to_string(now) + "_" + RandomUtils::random_suffix());
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    return dir;
+}
+
+static std::string sanitize_filename(const std::string& input) {
+    std::string sanitized;
+    sanitized.reserve(input.length());
+    for (char c : input) {
+        if (c >= 0 && (std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '_' || c == '-')) {
+            sanitized += c;
+        }
+    }
+    return sanitized;
+}
+
+std::optional<ExtractedContent> FlacProcessor::prepare_extraction(const std::filesystem::path& input_path)
+{
+    ExtractedContent content;
+    content.original_path = input_path;
+    content.temp_dir = make_temp_dir();
+
+    FLAC::Metadata::Chain chain;
+    if (!chain.read(input_path.string().c_str())) {
+        Logger::log(LogLevel::Error, "Failed to read FLAC metadata from: " + input_path.string(), "flac_processor");
+        return std::nullopt;
+    }
+
+    FLAC::Metadata::Iterator it;
+    it.init(chain);
+
+    unsigned index = 0;
+    unsigned pic_index = 0;
+    std::vector<PictureMetadata> picture_metadata;
+
+    do {
+        FLAC::Metadata::Prototype* block = it.get_block();
+        if (block->get_type() == FLAC__METADATA_TYPE_PICTURE) {
+            auto* pic = dynamic_cast<FLAC::Metadata::Picture*>(block);
+            if (pic) {
+                PictureMetadata meta;
+                meta.index = index;
+                meta.description = (const char*)pic->get_description();
+                meta.mime_type = pic->get_mime_type();
+                meta.type = pic->get_type();
+                meta.width = pic->get_width();
+                meta.height = pic->get_height();
+                meta.depth = pic->get_depth();
+                meta.colors = pic->get_colors();
+                picture_metadata.push_back(meta);
+
+                std::string filename = sanitize_filename(meta.description);
+                if (filename.empty()) {
+                    filename = "picture_" + std::to_string(pic_index);
+                    if (meta.mime_type == "image/jpeg") filename += ".jpg";
+                    else if (meta.mime_type == "image/png") filename += ".png";
+                }
+
+                fs::path out_path = content.temp_dir / filename;
+                std::ofstream ofs(out_path, std::ios::binary);
+                ofs.write(reinterpret_cast<const char*>(pic->get_data()), pic->get_data_length());
+                content.extracted_files.push_back(out_path);
+                pic_index++;
+            }
+        }
+        delete block;
+        index++;
+    } while (it.next());
+
+    content.processor_context = std::make_any<std::vector<PictureMetadata>>(picture_metadata);
+
+    return content;
+}
+
+std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content, [[maybe_unused]] ContainerFormat target_format)
+{
+    if (!content.processor_context.has_value()) {
+        return content.original_path;
+    }
+
+    const auto& picture_metadata = std::any_cast<const std::vector<PictureMetadata>&>(content.processor_context);
+    if (picture_metadata.empty()) {
+        return content.original_path;
+    }
+
+    std::vector<std::unique_ptr<FLAC::Metadata::Picture>> new_pictures;
+    for (size_t i = 0; i < picture_metadata.size(); ++i) {
+        const auto& meta = picture_metadata[i];
+        auto pic = std::make_unique<FLAC::Metadata::Picture>();
+        pic->set_description((const FLAC__byte*)meta.description.c_str());
+        pic->set_mime_type(meta.mime_type.c_str());
+        pic->set_type(meta.type);
+        pic->set_width(meta.width);
+        pic->set_height(meta.height);
+        pic->set_depth(meta.depth);
+        pic->set_colors(meta.colors);
+
+        std::ifstream ifs(content.extracted_files[i], std::ios::binary | std::ios::ate);
+        std::streamsize size = ifs.tellg();
+        ifs.seekg(0, std::ios::beg);
+        std::vector<char> buffer(size);
+        if (ifs.read(buffer.data(), size)) {
+            pic->set_data((const FLAC__byte*)buffer.data(), size);
+        }
+        new_pictures.push_back(std::move(pic));
+    }
+
+    fs::path temp_output_path = make_temp_dir() / content.original_path.filename();
+    fs::copy_file(content.original_path, temp_output_path);
+
+    FLAC::Metadata::Chain chain;
+    if (!chain.read(temp_output_path.string().c_str())) {
+        Logger::log(LogLevel::Error, "Failed to read FLAC metadata from: " + temp_output_path.string(), "flac_processor");
+        return {};
+    }
+
+    // Create a new chain with the updated metadata
+    FLAC::Metadata::Chain new_chain;
+    FLAC::Metadata::Iterator it;
+    it.init(chain);
+
+    std::vector<std::unique_ptr<FLAC::Metadata::Prototype>> new_blocks;
+    do {
+        FLAC::Metadata::Prototype* block = it.get_block();
+        if (block->get_type() != FLAC__METADATA_TYPE_PICTURE) {
+            new_blocks.push_back(std::unique_ptr<FLAC::Metadata::Prototype>(block->clone()));
+        }
+        delete block;
+    } while (it.next());
+
+    // Insert new pictures in correct order
+    for (size_t i = 0; i < new_pictures.size(); ++i) {
+        new_blocks.insert(new_blocks.begin() + picture_metadata[i].index, std::move(new_pictures[i]));
+    }
+
+    for (auto& block : new_blocks) {
+        new_chain.push_back(block.release());
+    }
+
+    if (!new_chain.write(temp_output_path.string().c_str())) {
+        Logger::log(LogLevel::Error, "Failed to write updated metadata to: " + temp_output_path.string(), "flac_processor");
+        return {};
+    }
+
+    return temp_output_path;
+}
 
 struct TranscodeContext {
     FLAC__StreamEncoder* encoder = nullptr;

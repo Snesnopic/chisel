@@ -12,6 +12,7 @@
 #include <span>
 #include <string_view>
 #include <stdexcept>
+#include <any>
 
 enum class ContainerFormat;
 
@@ -43,6 +44,7 @@ struct ExtractedContent {
     std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
     ContainerFormat format;                             ///< Format of the container
     // Processors may add custom, format-specific context if needed
+    std::any processor_context;
 };
 
 /**

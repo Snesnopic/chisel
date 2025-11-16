@@ -15,8 +15,22 @@
 #include <array>
 #include <string_view>
 #include <span>
+#include <map>
+#include <vector>
 
 namespace chisel {
+
+struct PictureMetadata {
+    unsigned index;
+    std::string description;
+    std::string mime_type;
+    FLAC__StreamMetadata_Picture_Type type;
+    unsigned width;
+    unsigned height;
+    unsigned depth;
+    unsigned colors;
+};
+
 
 /**
  * @brief Implements IProcessor for FLAC files using libFLAC.
@@ -45,24 +59,22 @@ public:
 
     // --- capabilities ---
     [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-    [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
+    [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
     /**
-     * @brief This format cannot be extracted.
-     * @return std::nullopt
+     * @brief Extracts cover art from a FLAC file.
+     * @param input_path Path to the FLAC file.
+     * @return ExtractedContent with paths to the cover art images.
      */
-    std::optional<ExtractedContent> prepare_extraction(
-        [[maybe_unused]]const std::filesystem::path& input_path) override
-    {
-        return std::nullopt;
-    }
+    std::optional<ExtractedContent> prepare_extraction(const std::filesystem::path& input_path) override;
 
     /**
-     * @brief This format cannot be extracted.
-     * @return Empty path.
+     * @brief Re-integrates the (optimized) cover art into the FLAC file.
+     * @param content The ExtractedContent struct from `prepare_extraction`.
+     * @return Path to the newly created temporary FLAC file.
      */
     std::filesystem::path
-    finalize_extraction(const ExtractedContent &, [[maybe_unused]] ContainerFormat target_format) override {return {};}
+    finalize_extraction(const ExtractedContent &content, ContainerFormat target_format) override;
 
     /**
      * @brief Recompresses a FLAC file using libFLAC.
@@ -99,6 +111,8 @@ public:
      * @return true if the decoded PCM data and audio parameters are identical.
      */
     [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+private:
 };
 
 } // namespace chisel
