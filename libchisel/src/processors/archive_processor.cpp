@@ -28,12 +28,20 @@ namespace chisel {
 
 namespace fs = std::filesystem;
 
+/**
+ * @brief Returns the tag used for logging by this processor.
+ * @return A constant string identifier.
+ */
 static const char* processor_tag() {
     return "ArchiveProcessor";
 }
 
 // --- helpers ---
 
+/**
+ * @brief Creates a unique temporary directory for extraction.
+ * @return Filesystem path to the newly created temporary directory.
+ */
 static fs::path make_temp_dir() {
     const auto base = fs::temp_directory_path();
     const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -43,11 +51,22 @@ static fs::path make_temp_dir() {
     return dir;
 }
 
+/**
+ * @brief Converts a string to lowercase.
+ * @param s The input string.
+ * @return A new string with all characters in lowercase.
+ */
 static std::string to_lower_copy(std::string s) {
     for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return s;
 }
 
+/**
+ * @brief Calculates the relative path of a file with respect to a root directory.
+ * @param root The base directory.
+ * @param p The full path to the file.
+ * @return A string representing the relative path.
+ */
 static std::string rel_path_of(const fs::path& root, const fs::path& p) {
     std::error_code ec;
     const auto rel = fs::relative(p, root, ec);
@@ -55,6 +74,12 @@ static std::string rel_path_of(const fs::path& root, const fs::path& p) {
     return s.empty() ? p.filename().generic_string() : s;
 }
 
+/**
+ * @brief Ensures that the parent directory for a given path exists.
+ * @param p The full path to the file.
+ * @param ec Error code to capture filesystem errors.
+ * @return True if the parent directory exists or was created successfully, false otherwise.
+ */
 static bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
     const auto parent = p.parent_path();
     if (parent.empty()) return true;
@@ -63,7 +88,13 @@ static bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
     return !ec;
 }
 
-// natural comparator for filenames (numeric-aware)
+/**
+ * @brief Performs a "natural" string comparison, correctly handling numeric sequences.
+ * For example, "file10.txt" comes after "file2.txt".
+ * @param sa The first string.
+ * @param sb The second string.
+ * @return True if sa is less than sb in natural order.
+ */
 static bool natural_less_string(const std::string& sa, const std::string& sb) {
     size_t i = 0, j = 0;
     while (i < sa.size() && j < sb.size()) {
@@ -91,13 +122,26 @@ static bool natural_less_string(const std::string& sa, const std::string& sb) {
     return sa.size() < sb.size();
 }
 
+/**
+ * @brief Performs a "natural" path comparison based on relative paths.
+ * @param a The first path.
+ * @param b The second path.
+ * @param root The root directory to make paths relative to.
+ * @return True if path a is less than path b in natural order.
+ */
 static bool natural_less_path(const fs::path& a, const fs::path& b, const fs::path& root) {
     const std::string sa = rel_path_of(root, a);
     const std::string sb = rel_path_of(root, b);
     return natural_less_string(sa, sb);
 }
 
-// sanitize a candidate archive entry path to avoid zip-slip
+/**
+ * @brief Sanitizes an archive entry path to prevent directory traversal attacks (zip-slip).
+ * @param entry_name The raw path from the archive entry.
+ * @param dest_dir The target extraction directory.
+ * @param out_path The sanitized, absolute path if validation succeeds.
+ * @return True if the path is safe, false otherwise.
+ */
 static bool sanitize_archive_entry_path(const std::string& entry_name, const fs::path& dest_dir, fs::path& out_path) {
     if (entry_name.empty()) return false;
     if (entry_name.find('\0') != std::string::npos) return false;
@@ -121,6 +165,11 @@ static bool sanitize_archive_entry_path(const std::string& entry_name, const fs:
 
 // --- format detection ---
 
+/**
+ * @brief Detects the container format of a file.
+ * @param path The path to the file.
+ * @return The detected ContainerFormat, or Unknown if not identified.
+ */
 static ContainerFormat detect_format(const fs::path& path) {
     const std::string mime = MimeDetector::detect(path);
     if (!mime.empty()) {
@@ -142,6 +191,12 @@ static ContainerFormat detect_format(const fs::path& path) {
     return ContainerFormat::Unknown;
 }
 
+/**
+ * @brief Checks if a file is a supported archive format.
+ * @param path The path to the file.
+ * @param fmt_out The detected container format if the file is a readable archive.
+ * @return True if the file is a readable archive, false otherwise.
+ */
 static bool is_archive_file(const fs::path& path, ContainerFormat& fmt_out) {
     fmt_out = detect_format(path);
     return fmt_out != ContainerFormat::Unknown && can_read_format(fmt_out);
@@ -149,6 +204,12 @@ static bool is_archive_file(const fs::path& path, ContainerFormat& fmt_out) {
 
 // --- libarchive extract/create ---
 
+/**
+ * @brief Extracts the contents of an archive to a destination directory using libarchive.
+ * @param archive_path The path to the archive file.
+ * @param dest_dir The directory where contents will be extracted.
+ * @return True on successful extraction, false otherwise.
+ */
 static bool extract_with_libarchive(const fs::path& archive_path, const fs::path& dest_dir) {
     struct archive* a = archive_read_new();
     struct archive_entry* entry = nullptr;
@@ -248,6 +309,9 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
     return true;
 }
 
+/**
+ * @brief A hash function for std::pair, used for the hardlink map.
+ */
 struct PairHash {
     template <class T1, class T2>
     std::size_t operator()(const std::pair<T1,T2>& p) const noexcept {
@@ -257,6 +321,13 @@ struct PairHash {
     }
 };
 
+/**
+ * @brief Creates an archive from a source directory using libarchive.
+ * @param src_dir The directory containing the files to be archived.
+ * @param out_path The path to the output archive file.
+ * @param fmt The target container format for the new archive.
+ * @return True on successful creation, false otherwise.
+ */
 static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_path, ContainerFormat fmt) {
     archive* a = archive_write_new();
     if (!a) return false;

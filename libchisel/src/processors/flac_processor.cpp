@@ -21,6 +21,15 @@ struct TranscodeContext {
     bool failed = false;
 };
 
+/**
+ * @brief FLAC decoder write callback.
+ * This function is called by the decoder for each decoded audio frame. It passes
+ * the decoded audio to the encoder, initializing it on the first frame.
+ * @param frame The decoded FLAC frame.
+ * @param buffer An array of pointers to the decoded audio samples.
+ * @param client_data A pointer to the TranscodeContext.
+ * @return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE on success, or ABORT on failure.
+ */
 static FLAC__StreamDecoderWriteStatus write_callback(
     const FLAC__StreamDecoder*,
     const FLAC__Frame* frame,
@@ -68,7 +77,17 @@ static FLAC__StreamDecoderWriteStatus write_callback(
     return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 }
 
+/**
+ * @brief FLAC decoder metadata callback (stub).
+ * This function is called for each metadata block but does nothing in this implementation.
+ */
 static void metadata_callback(const FLAC__StreamDecoder*, const FLAC__StreamMetadata*, void*) {}
+
+/**
+ * @brief FLAC decoder error callback.
+ * This function is called when a decoding error occurs.
+ * @param status The specific error status code.
+ */
 static void error_callback(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus status, void*) {
     Logger::log(LogLevel::Warning,
                 std::string("FLAC decoder: ") + FLAC__StreamDecoderErrorStatusString[status],
@@ -203,6 +222,15 @@ std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_pa
     return oss.str();
 }
 
+/**
+ * @brief Decodes a FLAC file into a raw PCM audio buffer.
+ * This is used for checksum verification.
+ * @param file The path to the FLAC file.
+ * @param sample_rate Output parameter for the sample rate.
+ * @param channels Output parameter for the number of channels.
+ * @param bps Output parameter for the bits per sample.
+ * @return A vector of 32-bit integers representing the decoded PCM data.
+ */
 std::vector<int32_t> decode_flac_pcm(const std::filesystem::path& file,
                                      unsigned& sample_rate,
                                      unsigned& channels,

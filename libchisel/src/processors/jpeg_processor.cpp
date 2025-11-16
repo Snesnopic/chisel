@@ -20,6 +20,10 @@ struct JpegErrorMgr {
     char msg[JMSG_LENGTH_MAX]{};
 };
 
+/**
+ * @brief libjpeg error handler that throws a C++ exception.
+ * @param cinfo Pointer to the libjpeg error context.
+ */
 void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     auto *err = reinterpret_cast<JpegErrorMgr *>(cinfo->err);
     (*cinfo->err->format_message)(cinfo, err->msg);
@@ -27,13 +31,19 @@ void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     throw std::runtime_error(err->msg);
 }
 
-// raii wrapper for file handles, ensures fclose is called
+/**
+ * @brief RAII wrapper for FILE pointers to ensure they are closed.
+ */
 struct FileCloser {
     void operator()(FILE *f) const { if (f) std::fclose(f); }
 };
 using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
-// save markers to copy from source (must be called before jpeg_read_header)
+/**
+ * @brief Configures libjpeg to save all metadata markers for later copying.
+ * @param srcinfo The libjpeg decompression struct.
+ * @param preserve_metadata If true, markers will be saved.
+ */
 void setup_marker_saving(const j_decompress_ptr srcinfo, const bool preserve_metadata) {
     if (preserve_metadata) {
         for (int m = 0; m < 16; ++m) {
@@ -43,6 +53,12 @@ void setup_marker_saving(const j_decompress_ptr srcinfo, const bool preserve_met
     }
 }
 
+/**
+ * @brief Copies saved metadata markers from the decompressor to the compressor.
+ * @param srcinfo The libjpeg decompression struct.
+ * @param dstinfo The libjpeg compression struct.
+ * @param preserve_metadata If true, markers will be copied.
+ */
 void copy_saved_markers(const j_decompress_ptr srcinfo,
                         const j_compress_ptr dstinfo,
                         const bool preserve_metadata) {
@@ -181,6 +197,15 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
     // files are closed automatically by unique_FILE destructor
 }
 
+/**
+ * @brief Decodes a JPEG file into a raw pixel buffer.
+ * @param path The path to the JPEG file.
+ * @param width Output parameter for the image width.
+ * @param height Output parameter for the image height.
+ * @param channels Output parameter for the number of color channels.
+ * @param buffer Output vector to store the raw pixel data.
+ * @return True on successful decoding, false otherwise.
+ */
 static bool decode_jpeg_raw(const std::filesystem::path &path,
                             int &width,
                             int &height,

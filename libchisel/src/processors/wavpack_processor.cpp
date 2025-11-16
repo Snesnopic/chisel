@@ -131,6 +131,14 @@ std::string WavPackProcessor::get_raw_checksum(const std::filesystem::path&) con
     return "";
 }
 
+/**
+ * @brief Decodes a WavPack file into a raw PCM audio buffer.
+ * @param file The path to the WavPack file.
+ * @param sample_rate Output parameter for the sample rate.
+ * @param channels Output parameter for the number of channels.
+ * @param bps Output parameter for the bits per sample.
+ * @return A vector of 32-bit integers representing the decoded PCM data.
+ */
 std::vector<int32_t> decode_wavpack_pcm(const std::filesystem::path& file,
                                         int& sample_rate,
                                         int& channels,

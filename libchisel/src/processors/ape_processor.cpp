@@ -14,6 +14,12 @@
 
 namespace {
 
+/**
+ * @brief Copies an APEv2 tag from an input file to an output file.
+ * @param input The path to the source file with the APE tag.
+ * @param output The path to the destination file.
+ * @return True if the tag was copied successfully, false otherwise.
+ */
 bool copy_apetag(const std::filesystem::path &input,
                  const std::filesystem::path &output) {
     try {
@@ -174,7 +180,16 @@ std::string ApeProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw APE data
     return "";
 }
-    std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
+
+/**
+ * @brief Decodes an APE file into a raw PCM audio buffer.
+ * @param file The path to the APE file.
+ * @param sample_rate Output parameter for the sample rate.
+ * @param channels Output parameter for the number of channels.
+ * @param bps Output parameter for the bits per sample.
+ * @return A vector of 32-bit integers representing the decoded PCM data.
+ */
+std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
                                     unsigned& sample_rate,
                                     unsigned& channels,
                                     unsigned& bps) {

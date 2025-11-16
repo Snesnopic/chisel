@@ -67,6 +67,13 @@ bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
 #endif
 }
 
+/**
+ * @brief Decompresses a Gzip buffer into a vector of bytes.
+ * @param data Pointer to the compressed Gzip data.
+ * @param len The length of the compressed data.
+ * @return A vector containing the decompressed data.
+ * @throws std::runtime_error on zlib errors.
+ */
 std::vector<unsigned char> decompress_gzip(const unsigned char* data, const size_t len)
 {
     std::vector<unsigned char> out;
