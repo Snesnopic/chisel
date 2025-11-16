@@ -593,13 +593,14 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all build and log artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
-#      - name: List downloaded artifacts
-#        run: ls -R artifacts/
       - name: Prepare assets for release
         run: |
           mkdir release_assets
@@ -657,7 +658,7 @@ jobs:
         run: |
           gh release delete development-latest -y || echo "No previous nightly release to delete."
           
-          gh push origin --delete development-latest || echo "No previous nightly tag to delete."
+          git push origin --delete development-latest || echo "No previous nightly tag to delete."
           
           gh release create development-latest \
             --prerelease \
