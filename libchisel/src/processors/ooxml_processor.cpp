@@ -19,7 +19,13 @@
 namespace chisel {
 
 namespace fs = std::filesystem;
-    std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
+
+/**
+ * @brief Recompresses a byte vector using Zopfli's Zlib implementation.
+ * @param input The raw data to be compressed.
+ * @return A vector containing the Zlib-compressed data.
+ */
+std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
         ZopfliOptions opts;
         ZopfliInitOptions(&opts);
         opts.numiterations = 15;
@@ -33,11 +39,21 @@ namespace fs = std::filesystem;
         free(out_data);
         return result;
     }
+
+/**
+ * @brief Returns the tag used for logging by this processor.
+ * @return A constant string identifier.
+ */
 static const char* processor_tag() {
     return "OOXMLProcessor";
 }
 
-// helper: create a portable unique temp dir for a given input file
+/**
+ * @brief Creates a unique temporary directory for a given input file.
+ * @param input The path to the input file, used to create a descriptive directory name.
+ * @param prefix A prefix for the temporary directory name.
+ * @return The path to the newly created temporary directory.
+ */
 static fs::path make_temp_dir_for(const fs::path& input, const std::string& prefix) {
     const auto base_tmp = fs::temp_directory_path() / "chisel-ooxml";
     std::error_code ec;
@@ -51,7 +67,10 @@ static fs::path make_temp_dir_for(const fs::path& input, const std::string& pref
     return dir;
 }
 
-// helper: cleanup a temp dir (best effort)
+/**
+ * @brief Recursively removes a directory and its contents, logging any errors.
+ * @param dir The path to the directory to be removed.
+ */
 static void cleanup_temp_dir(const fs::path& dir) {
     std::error_code ec;
     fs::remove_all(dir, ec);

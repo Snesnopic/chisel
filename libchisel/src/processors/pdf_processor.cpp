@@ -21,7 +21,10 @@
 
 namespace {
 
-// helper: custom streambuf to redirect qpdf messages into our logger
+/**
+ * @brief A custom std::stringbuf that redirects its content to the chisel Logger.
+ * This is used to capture warnings and errors from QPDF.
+ */
 struct LoggerStreamBuf final : std::stringbuf {
     LogLevel level;
     std::string module;
@@ -37,7 +40,12 @@ struct LoggerStreamBuf final : std::stringbuf {
     ~LoggerStreamBuf() override { LoggerStreamBuf::sync(); }
 };
 
-// helper: guess extension from pdf stream dictionary and data
+/**
+ * @brief Guesses a file extension for a PDF stream based on its dictionary and content.
+ * @param stream The QPDFObjectHandle for the stream.
+ * @param data The raw (decoded) stream data.
+ * @return A string representing the guessed file extension (e.g., ".jpg", ".png").
+ */
 static std::string guess_extension(QPDFObjectHandle const& stream,
                                    const std::vector<unsigned char>& data) {
     if (!stream.isStream()) return ".bin";
@@ -85,7 +93,11 @@ static std::string guess_extension(QPDFObjectHandle const& stream,
     return ".bin";
 }
 
-// helper: recompress data with zopfli
+/**
+ * @brief Recompresses a byte vector using Zopfli's Zlib implementation.
+ * @param input The raw data to be compressed.
+ * @return A vector containing the Zlib-compressed data.
+ */
 static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
     ZopfliOptions opts;
     ZopfliInitOptions(&opts);
@@ -99,7 +111,11 @@ static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsig
     return result;
 }
 
-// helper: check whether a stream uses only /FlateDecode
+/**
+ * @brief Checks if a PDF stream is compressed only with FlateDecode.
+ * @param stream The QPDFObjectHandle for the stream.
+ * @return True if the stream uses a single /FlateDecode filter, false otherwise.
+ */
 static bool stream_is_single_flate(QPDFObjectHandle const& stream) {
     if (!stream.isStream()) return false;
     const QPDFObjectHandle dict = stream.getDict();
@@ -113,7 +129,10 @@ static bool stream_is_single_flate(QPDFObjectHandle const& stream) {
     return false;
 }
 
-// helper: strip metadata
+/**
+ * @brief Removes common metadata objects from a PDF.
+ * @param pdf The QPDF instance to modify.
+ */
 static void strip_metadata(QPDF& pdf) {
     QPDFObjectHandle trailer = pdf.getTrailer();
     if (trailer.isDictionary()) {
@@ -271,8 +290,15 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         throw;
     }
 }
-    // helper to get all raw stream data from a pdf
-    static bool get_all_raw_streams(const std::filesystem::path& path,
+
+/**
+ * @brief Extracts all raw (unfiltered) streams from a PDF file.
+ * This is used for checksum verification.
+ * @param path The path to the PDF file.
+ * @param streams A map to be populated with object numbers and their raw stream data.
+ * @return True on success, false if the PDF could not be processed.
+ */
+static bool get_all_raw_streams(const std::filesystem::path& path,
                                     std::map<int, std::vector<uint8_t>>& streams)
 {
     try {

@@ -17,22 +17,36 @@
 #include "file_utils.hpp"
 
 namespace chisel {
+    /**
+     * @brief libpng error handler that throws a C++ exception.
+     * @param msg The error message from libpng.
+     */
     void png_error_fn(png_structp, const png_const_charp msg) {
         Logger::log(LogLevel::Error, std::string("libpng: ") + msg, "libpng");
         throw std::runtime_error(msg);
     }
 
+    /**
+     * @brief libpng warning handler.
+     * @param msg The warning message from libpng.
+     */
     void png_warning_fn(png_structp, const png_const_charp msg) {
         Logger::log(LogLevel::Warning, std::string("libpng: ") + msg, "libpng");
     }
 
+    /**
+     * @brief RAII wrapper for FILE pointers to ensure they are closed.
+     */
     struct FileCloser {
         void operator()(FILE *f) const { if (f) std::fclose(f); }
     };
 
     using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
-    // wrapper for libpng structures (destroys in case of exceptions)
+    /**
+     * @brief RAII wrapper for libpng read structs (png_structp, png_infop).
+     * Ensures png_destroy_read_struct is called even if exceptions occur.
+     */
     struct PngRead {
         png_structp png = nullptr;
         png_infop info = nullptr;
@@ -44,6 +58,10 @@ namespace chisel {
         }
     };
 
+    /**
+     * @brief RAII wrapper for libpng write structs (png_structp, png_infop).
+     * Ensures png_destroy_write_struct is called even if exceptions occur.
+     */
     struct PngWrite {
         png_structp png = nullptr;
         png_infop info = nullptr;
@@ -55,7 +73,14 @@ namespace chisel {
         }
     };
 
-    // copy selective metadata from reader to writer
+    /**
+     * @brief Copies ancillary chunks (metadata) from a PNG reader to a writer.
+     * @param in_png The source png_structp.
+     * @param in_info The source png_infop.
+     * @param out_png The destination png_structp.
+     * @param out_info The destination png_infop.
+     * @param preserve If true, metadata is copied.
+     */
     void copy_metadata_if_requested(png_structp in_png, png_infop in_info,
                                     png_structp out_png, png_infop out_info,
                                     bool preserve) {
@@ -143,7 +168,10 @@ namespace chisel {
         }
     }
 
-    // helper to pack rgba into a single uint32_t for color counting
+    /**
+     * @brief Packs RGBA color components into a single 32-bit integer.
+     * @return The packed 32-bit color value.
+     */
     inline uint32_t pack_rgba(unsigned char r, unsigned char g, unsigned char b, unsigned char a) {
         return (static_cast<uint32_t>(r) << 24) |
                (static_cast<uint32_t>(g) << 16) |
@@ -151,8 +179,14 @@ namespace chisel {
                (static_cast<uint32_t>(a));
     }
 
-    // helper to read entire image into an rgba8 buffer
-    // (this is a modified version of the existing decode_png_rgba8)
+    /**
+     * @brief Reads and decodes a PNG into a standard 8-bit RGBA buffer.
+     * @param png The libpng read struct.
+     * @param info The libpng info struct.
+     * @param width Output parameter for the image width.
+     * @param height Output parameter for the image height.
+     * @return A vector containing the raw 8-bit RGBA pixel data.
+     */
     std::vector<unsigned char> read_to_rgba8(png_structp png, png_infop info,
                                              png_uint_32& width, png_uint_32& height) {
         int bit_depth, color_type;
@@ -379,6 +413,14 @@ namespace chisel {
         return "";
     }
 
+    /**
+     * @brief Decodes a PNG file into a standard 8-bit RGBA buffer.
+     * This is a standalone utility function used for checksum verification.
+     * @param file The path to the PNG file.
+     * @param width Output parameter for the image width.
+     * @param height Output parameter for the image height.
+     * @return A vector containing the raw 8-bit RGBA pixel data.
+     */
     std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
                                                 png_uint_32 &width,
                                                 png_uint_32 &height) {
