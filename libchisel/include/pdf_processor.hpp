@@ -51,7 +51,7 @@ public:
      * @brief This processor supports recompression (via finalize_extraction).
      * @return true
      */
-    [[nodiscard]] bool can_recompress() const noexcept override { return true; }
+    [[nodiscard]] bool can_recompress() const noexcept override { return false; }
     /**
      * @brief This processor extracts embedded streams.
      * @return true
