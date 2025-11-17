@@ -236,6 +236,15 @@ set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
 set(ZLIB_H_PATH "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
 
+set(ENABLE_STATIC_RUNTIME OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_BINDINGS OFF CACHE BOOL "" FORCE)
+set(taglib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/taglib")
+set(taglib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/taglib-build")
+add_subdirectory(${taglib_SOURCE_DIR} ${taglib_BINARY_DIR} EXCLUDE_FROM_ALL)
+set(taglib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/taglib;${CMAKE_SOURCE_DIR}/third_party/taglib/taglib;${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/toolkit")
+
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
 set(PNG_STATIC ON CACHE BOOL "" FORCE)
@@ -576,6 +585,7 @@ set(CHISEL_LIBS
         SQLite::SQLite3
         mkclean_lib
         zlibstatic
+        tag
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)

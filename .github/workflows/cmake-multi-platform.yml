@@ -691,7 +691,7 @@ jobs:
 
     env:
       BIN_DIR: bin
-      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
+      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif|tag"
 
     steps:
       - name: Setup MSVC Developer Environment

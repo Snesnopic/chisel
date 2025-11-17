@@ -89,6 +89,8 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
         ${CMAKE_SOURCE_DIR}/third_party/flexigif
         ${CMAKE_SOURCE_DIR}/third_party/stb
+        ${taglib_SOURCE_DIR}
+        ${taglib_BINARY_DIR}
 )
 
 if(NOT WIN32)
@@ -109,6 +111,7 @@ elseif(APPLE)
 elseif(UNIX AND NOT APPLE)
     target_compile_definitions(libchisel PUBLIC PLATFORM_LINUX)
 endif()
+target_compile_definitions(libchisel PUBLIC TAGLIB_STATIC)
 
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
@@ -130,6 +133,7 @@ add_dependencies(libchisel jxl jxl_threads)
 add_dependencies(libchisel tiff)
 add_dependencies(libchisel SQLite::SQLite3)
 add_dependencies(libchisel MAC)
+add_dependencies(libchisel tag)
 
 if(NOT WIN32)
     add_dependencies(libchisel libmagic)
