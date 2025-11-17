@@ -7,7 +7,13 @@
 #include <FLAC/all.h>
 #include <stdexcept>
 #include <cstdlib>
+#include <iostream>
 #include <sstream>
+#include <taglib/tag.h>
+#include "audio_metadata_util.hpp"
+#include "file_type.hpp"
+#include "file_utils.hpp"
+#include "random_utils.hpp"
 
 namespace chisel {
 
@@ -108,7 +114,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
     ctx.output = output;
     ctx.preserve_metadata = preserve_metadata;
 
-    // --- metadata copy (optional) ---
+    // metadata copy (optional)
     FLAC__Metadata_Chain* chain = nullptr;
     FLAC__Metadata_Iterator* it = nullptr;
     if (ctx.preserve_metadata) {
@@ -119,8 +125,14 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
             unsigned count = 0;
             do {
                 const FLAC__StreamMetadata* block = FLAC__metadata_iterator_get_block(it);
-                if (block && block->type != FLAC__METADATA_TYPE_STREAMINFO) ++count;
+                // skip streaminfo (handled by encoder) and picture (handled by finalize_extraction)
+                if (block &&
+                    block->type != FLAC__METADATA_TYPE_STREAMINFO &&
+                    block->type != FLAC__METADATA_TYPE_PICTURE) {
+                    ++count;
+                }
             } while (FLAC__metadata_iterator_next(it));
+
             if (count > 0) {
                 ctx.metadata_blocks = static_cast<FLAC__StreamMetadata**>(
                     std::malloc(sizeof(FLAC__StreamMetadata*) * count));
@@ -129,7 +141,9 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
                 unsigned idx = 0;
                 do {
                     const FLAC__StreamMetadata* block = FLAC__metadata_iterator_get_block(it);
-                    if (block && block->type != FLAC__METADATA_TYPE_STREAMINFO) {
+                    if (block &&
+                        block->type != FLAC__METADATA_TYPE_STREAMINFO &&
+                        block->type != FLAC__METADATA_TYPE_PICTURE) {
                         ctx.metadata_blocks[idx++] = FLAC__metadata_object_clone(block);
                     }
                 } while (FLAC__metadata_iterator_next(it));
@@ -137,7 +151,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
         }
     }
 
-    // --- encoder/decoder setup ---
+    // encoder/decoder setup
     ctx.encoder = FLAC__stream_encoder_new();
     if (!ctx.encoder) {
         Logger::log(LogLevel::Error, "Can't create encoder", "flac_processor");
@@ -178,7 +192,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("decoder init failed");
     }
 
-    // --- transcode ---
+    // transcode
     const bool ok = FLAC__stream_decoder_process_until_end_of_stream(decoder);
     const bool failed = (!ok) || ctx.failed;
 
@@ -204,6 +218,102 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 
     Logger::log(LogLevel::Info, "FLAC re-encoding completed: " + output.string(), "flac_processor");
 }
+/**
+ * @brief (Phase 1) Extracts cover art from the FLAC file into a temp directory.
+ *
+ * Uses AudioMetadataUtil to extract all embedded pictures and saves
+ * their metadata into an AudioExtractionState object, which is stored
+ * in the ExtractedContent::extras std::any.
+ *
+ * @param input_path Path to the source FLAC file.
+ * @return std::optional<ExtractedContent> containing extracted files and state.
+ */
+std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
+    const std::filesystem::path& input_path)
+{
+    Logger::log(LogLevel::Info, "FLAC: Preparing cover art extraction for: " + input_path.string(), "flac_processor");
+
+    ExtractedContent content;
+    content.original_path = input_path;
+    content.temp_dir = make_temp_dir_for(input_path, "flac-processor");
+
+    // audiometadatautil does the heavy lifting
+    AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
+
+    if (state.extracted_covers.empty()) {
+        Logger::log(LogLevel::Debug, "FLAC: No embedded cover art found.", "flac_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return std::nullopt; // nothing to extract
+    }
+
+    // populate extracted files for ProcessorExecutor
+    for (const auto& cover_info : state.extracted_covers) {
+        content.extracted_files.push_back(cover_info.temp_file_path);
+    }
+
+    // save state in std::any for phase 3
+    content.extras = std::make_any<AudioExtractionState>(std::move(state));
+
+    Logger::log(LogLevel::Debug, "FLAC: Extracted " + std::to_string(content.extracted_files.size()) + " covers.", "flac_processor");
+    content.format = ContainerFormat::Unknown; // You may want to define ContainerFormat::Flac
+    return content;
+}
+
+/**
+ * @brief (Phase 3) Rebuilds the FLAC file with optimized cover art.
+ *
+ * This function is called *after* recompress (Phase 2) has already
+ * optimized the audio stream and other image processors have optimized
+ * the extracted cover art files in the temp directory.
+ *
+ * @param content The ExtractedContent struct containing the state.
+ * @return Path to the newly created temporary FLAC file.
+ */
+std::filesystem::path FlacProcessor::finalize_extraction(
+    const ExtractedContent &content,
+    [[maybe_unused]] ContainerFormat target_format)
+{
+    Logger::log(LogLevel::Info, "FLAC: Finalizing (re-inserting covers) for: " + content.original_path.string(), "flac_processor");
+
+    // 1. retrieve state from std::any
+    const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
+    if (!state_ptr) {
+        Logger::log(LogLevel::Error, "FLAC: Failed to retrieve extraction state (std::any_cast failed).", "flac_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return {}; // return empty path on failure
+    }
+
+    // 2. define a new temp path for the *final* file
+    const std::filesystem::path& optimized_audio_path = content.original_path; // this is the audio already optimized by recompress
+    const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
+                                                  (optimized_audio_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".flac");
+
+    try {
+        // 3. copy the optimized audio (phase 2) to the final location
+        std::filesystem::copy_file(optimized_audio_path, final_temp_path, std::filesystem::copy_options::overwrite_existing);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, "FLAC: Failed to copy audio file for finalization: " + std::string(e.what()), "flac_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return {};
+    }
+
+    // 4. use audiometadatautil to re-insert covers (read from temp_dir) into the final file
+    //    images in temp_dir were already optimized in phase 2.
+    if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
+        Logger::log(LogLevel::Error, "FLAC: AudioMetadataUtil::rebuildCovers failed for: " + final_temp_path.string(), "flac_processor");
+        cleanup_temp_dir(content.temp_dir);
+        std::filesystem::remove(final_temp_path); // remove the partially good file
+        return {};
+    }
+
+    // 5. cleanup
+    cleanup_temp_dir(content.temp_dir);
+
+    // 6. return path to the finalized file.
+    // processorexecutor will handle replacing the original.
+    return final_temp_path;
+}
+
 
 std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
     FLAC__StreamMetadata* metadata = nullptr;

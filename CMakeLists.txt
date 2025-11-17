@@ -243,8 +243,13 @@ set(BUILD_BINDINGS OFF CACHE BOOL "" FORCE)
 set(taglib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/taglib")
 set(taglib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/taglib-build")
 add_subdirectory(${taglib_SOURCE_DIR} ${taglib_BINARY_DIR} EXCLUDE_FROM_ALL)
-set(taglib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/taglib;${CMAKE_SOURCE_DIR}/third_party/taglib/taglib;${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/toolkit")
-
+list(APPEND taglib_SOURCE_DIR
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib"
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/toolkit"
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/flac"
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/ogg"
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/mpeg/id3v2"
+)
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
 set(PNG_STATIC ON CACHE BOOL "" FORCE)

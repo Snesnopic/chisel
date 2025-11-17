@@ -45,25 +45,26 @@ public:
 
     // --- capabilities ---
     [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-    [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
+    /**
+     * @brief This processor can extract cover art.
+     * @return true
+     */
+    [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
     /**
-     * @brief This format cannot be extracted.
-     * @return std::nullopt
+     * @brief Prepares extraction of embedded cover art.
+     * @param input_path Path to the FLAC file.
+     * @return An ExtractedContent struct containing cover art files and state.
      */
-    std::optional<ExtractedContent> prepare_extraction(
-        [[maybe_unused]]const std::filesystem::path& input_path) override
-    {
-        return std::nullopt;
-    }
+    std::optional<ExtractedContent> prepare_extraction(const std::filesystem::path& input_path) override;
 
     /**
-     * @brief This format cannot be extracted.
-     * @return Empty path.
+     * @brief Rebuilds the FLAC file with optimized cover art.
+     * @param content The ExtractedContent struct from prepare_extraction.
+     * @param target_format (Ignored)
+     * @return Path to the newly finalized FLAC file.
      */
-    std::filesystem::path
-    finalize_extraction(const ExtractedContent &, [[maybe_unused]] ContainerFormat target_format) override {return {};}
-
+    std::filesystem::path finalize_extraction(const ExtractedContent &content, ContainerFormat target_format) override;
     /**
      * @brief Recompresses a FLAC file using libFLAC.
      *

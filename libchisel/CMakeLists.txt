@@ -57,6 +57,8 @@ set(LIBCHISEL_SOURCES
         include/file_utils.hpp
         src/utils/file_utils.cpp
         src/utils/file_utils.hpp
+        include/audio_metadata_util.hpp
+        src/utils/audio_metadata_util.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
