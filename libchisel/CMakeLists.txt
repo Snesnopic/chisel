@@ -56,7 +56,6 @@ set(LIBCHISEL_SOURCES
         src/processors/tga_processor.cpp
         include/file_utils.hpp
         src/utils/file_utils.cpp
-        src/utils/file_utils.hpp
         include/audio_metadata_util.hpp
         src/utils/audio_metadata_util.cpp
 )
