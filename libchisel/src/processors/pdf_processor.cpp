@@ -46,7 +46,7 @@ struct LoggerStreamBuf final : std::stringbuf {
  * @param data The raw (decoded) stream data.
  * @return A string representing the guessed file extension (e.g., ".jpg", ".png").
  */
-static std::string guess_extension(QPDFObjectHandle const& stream,
+std::string guess_extension(QPDFObjectHandle const& stream,
                                    const std::vector<unsigned char>& data) {
     if (!stream.isStream()) return ".bin";
     const QPDFObjectHandle dict = stream.getDict();
@@ -98,7 +98,7 @@ static std::string guess_extension(QPDFObjectHandle const& stream,
  * @param input The raw data to be compressed.
  * @return A vector containing the Zlib-compressed data.
  */
-static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
+std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
     ZopfliOptions opts;
     ZopfliInitOptions(&opts);
     opts.numiterations = 15;
@@ -116,7 +116,7 @@ static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsig
  * @param stream The QPDFObjectHandle for the stream.
  * @return True if the stream uses a single /FlateDecode filter, false otherwise.
  */
-static bool stream_is_single_flate(QPDFObjectHandle const& stream) {
+bool stream_is_single_flate(QPDFObjectHandle const& stream) {
     if (!stream.isStream()) return false;
     const QPDFObjectHandle dict = stream.getDict();
     if (!dict.isDictionary()) return false;
@@ -133,7 +133,7 @@ static bool stream_is_single_flate(QPDFObjectHandle const& stream) {
  * @brief Removes common metadata objects from a PDF.
  * @param pdf The QPDF instance to modify.
  */
-static void strip_metadata(QPDF& pdf) {
+void strip_metadata(QPDF& pdf) {
     QPDFObjectHandle trailer = pdf.getTrailer();
     if (trailer.isDictionary()) {
         if (trailer.hasKey("/Info")) trailer.removeKey("/Info");
