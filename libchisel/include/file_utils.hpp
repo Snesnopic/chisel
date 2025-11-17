@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace chisel {
 
@@ -17,29 +18,28 @@ namespace chisel {
      * @param mode The standard C fopen mode string (e.g., "rb", "wb").
      * @return FILE* pointer or nullptr if open failed.
      */
-    inline FILE* open_file(const std::filesystem::path& path, const char* mode) {
-#ifdef _WIN32
-        // On Windows, convert mode to wstring and use _wfopen, which accepts
-        // wide-char paths (UTF-16), supporting Unicode and long paths.
-        std::wstring wmode;
-        for (const char* p = mode; *p; ++p) wmode += static_cast<wchar_t>(*p);
+    FILE *open_file(const std::filesystem::path &path, const char *mode);
 
-        // get absolute path, required for the long path prefix
-        std::error_code ec;
-        auto abs_path = std::filesystem::absolute(path, ec);
-        if (ec) {
-            // fallback to original behavior on error
-            return _wfopen(path.wstring().c_str(), wmode.c_str());
-        }
+    /**
+     * @brief Creates a unique temporary directory for processing.
+     *
+     * Creates a directory inside the system temp path using a
+     * "chisel-{prefix}-{filename_stem}_{random_suffix}" pattern.
+     *
+     * @param input_path The input file path (used for its stem).
+     * @param prefix A short prefix (e.g., "flac", "pdf").
+     * @return Filesystem path to the newly created temporary directory.
+     */
+    std::filesystem::path make_temp_dir_for(const std::filesystem::path &input_path,
+                                            const std::string &prefix);
 
-        // prepend the magic prefix to bypass MAX_PATH
-        std::wstring long_path = L"\\\\?\\" + abs_path.wstring();
-        return _wfopen(long_path.c_str(), wmode.c_str());
-#else
-        return std::fopen(path.string().c_str(), mode);
-#endif
-    }
-
+    /**
+     * @brief Recursively removes a directory and logs any errors.
+     * @param dir The path to the directory to be removed.
+     * @param tag The logger tag (e.g., "flac_processor").
+     */
+    void cleanup_temp_dir(const std::filesystem::path &dir,
+                          std::string_view tag = "file_utils");
 } // namespace chisel
 
 #endif // CHISEL_FILE_UTILS_HPP

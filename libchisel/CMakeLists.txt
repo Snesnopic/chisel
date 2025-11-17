@@ -55,6 +55,8 @@ set(LIBCHISEL_SOURCES
         include/tga_processor.hpp
         src/processors/tga_processor.cpp
         include/file_utils.hpp
+        src/utils/file_utils.cpp
+        src/utils/file_utils.hpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)

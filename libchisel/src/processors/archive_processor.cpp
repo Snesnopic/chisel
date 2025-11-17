@@ -39,19 +39,6 @@ static const char* processor_tag() {
 // --- helpers ---
 
 /**
- * @brief Creates a unique temporary directory for extraction.
- * @return Filesystem path to the newly created temporary directory.
- */
-static fs::path make_temp_dir() {
-    const auto base = fs::temp_directory_path();
-    const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
-    fs::path dir = base / ("chisel_" + std::to_string(now) + "_" + RandomUtils::random_suffix());
-    std::error_code ec;
-    fs::create_directories(dir, ec);
-    return dir;
-}
-
-/**
  * @brief Converts a string to lowercase.
  * @param s The input string.
  * @return A new string with all characters in lowercase.
@@ -577,7 +564,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
 std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     ExtractedContent content;
     content.original_path = input_path;
-    content.temp_dir = make_temp_dir();
+    content.temp_dir = chisel::make_temp_dir_for(input_path, "archive");
 
     // Detect format
     content.format = detect_format(input_path);
@@ -672,13 +659,7 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
         throw std::runtime_error("ArchiveProcessor: tmp archive missing");
     }
 
-    std::error_code cleanup_ec;
-    fs::remove_all(content.temp_dir, cleanup_ec);
-    if (cleanup_ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + content.temp_dir.filename().string() + " (" + cleanup_ec.message() + ")", processor_tag());
-    } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + content.temp_dir.filename().string(), processor_tag());
-    }
+    chisel::cleanup_temp_dir(content.temp_dir, processor_tag());
 
     return tmp_archive;
 }

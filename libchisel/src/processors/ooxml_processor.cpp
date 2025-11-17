@@ -13,6 +13,7 @@
 #include <system_error>
 #include <vector>
 #include <algorithm>
+#include "file_utils.hpp"
 #include "zlib_container.h"
 #include "zopfli.h"
 
@@ -46,39 +47,6 @@ std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned cha
  */
 static const char* processor_tag() {
     return "OOXMLProcessor";
-}
-
-/**
- * @brief Creates a unique temporary directory for a given input file.
- * @param input The path to the input file, used to create a descriptive directory name.
- * @param prefix A prefix for the temporary directory name.
- * @return The path to the newly created temporary directory.
- */
-static fs::path make_temp_dir_for(const fs::path& input, const std::string& prefix) {
-    const auto base_tmp = fs::temp_directory_path() / "chisel-ooxml";
-    std::error_code ec;
-    fs::create_directories(base_tmp, ec);
-
-    const std::string stem = input.stem().string();
-    const std::string dir_name = prefix + stem + "_" + RandomUtils::random_suffix();
-    auto dir = base_tmp / dir_name;
-
-    fs::create_directories(dir, ec);
-    return dir;
-}
-
-/**
- * @brief Recursively removes a directory and its contents, logging any errors.
- * @param dir The path to the directory to be removed.
- */
-static void cleanup_temp_dir(const fs::path& dir) {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-    if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + dir.string() + " (" + ec.message() + ")", processor_tag());
-    } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + dir.string(), processor_tag());
-    }
 }
 
 std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::filesystem::path& input_path) {

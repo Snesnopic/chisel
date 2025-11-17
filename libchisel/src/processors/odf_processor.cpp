@@ -13,6 +13,7 @@
 #include <system_error>
 #include <vector>
 #include <algorithm>
+#include "file_utils.hpp"
 #include "zlib_container.h"
 #include "zopfli.h"
 
@@ -21,31 +22,6 @@ namespace chisel {
 namespace fs = std::filesystem;
 static const char* processor_tag() {
     return "ODFProcessor";
-}
-
-// helper: create a portable unique temp dir for a given input file
-static fs::path make_temp_dir_for(const fs::path& input, const std::string& prefix) {
-    const auto base_tmp = fs::temp_directory_path() / "chisel-odf";
-    std::error_code ec;
-    fs::create_directories(base_tmp, ec);
-
-    const std::string stem = input.stem().string();
-    const std::string dir_name = prefix + stem + "_" + RandomUtils::random_suffix();
-    auto dir = base_tmp / dir_name;
-
-    fs::create_directories(dir, ec);
-    return dir;
-}
-
-// helper: cleanup a temp dir (best effort)
-static void cleanup_temp_dir(const fs::path& dir) {
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-    if (ec) {
-        Logger::log(LogLevel::Warning, "Can't remove temp dir: " + dir.string() + " (" + ec.message() + ")", processor_tag());
-    } else {
-        Logger::log(LogLevel::Debug, "Removed temp dir: " + dir.string(), processor_tag());
-    }
 }
 
 std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::filesystem::path& input_path) {
