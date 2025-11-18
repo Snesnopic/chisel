@@ -249,6 +249,7 @@ list(APPEND taglib_SOURCE_DIR
         "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/flac"
         "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/ogg"
         "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/mpeg/id3v2"
+        "${CMAKE_SOURCE_DIR}/third_party/taglib/taglib/riff"
 )
 # libpng
 set(PNG_SHARED OFF CACHE BOOL "" FORCE)
