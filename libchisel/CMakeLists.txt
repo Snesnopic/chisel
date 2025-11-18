@@ -60,6 +60,12 @@ set(LIBCHISEL_SOURCES
         src/utils/audio_metadata_util.cpp
         include/mpeg_processor.hpp
         src/processors/mpeg_processor.cpp
+        include/wav_processor.hpp
+        src/processors/wav_processor.cpp
+        include/mp4_processor.hpp
+        include/ogg_processor.hpp
+        src/processors/mp4_processor.cpp
+        src/processors/ogg_processor.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)

@@ -11,15 +11,18 @@
 #include "../../include/jpeg_processor.hpp"
 #include "../../include/jxl_processor.hpp"
 #include "../../include/mkv_processor.hpp"
+#include "../../include/mp4_processor.hpp"
 #include "../../include/mpeg_processor.hpp"
 #include "../../include/mseed_processor.hpp"
 #include "../../include/odf_processor.hpp"
+#include "../../include/ogg_processor.hpp"
 #include "../../include/ooxml_processor.hpp"
 #include "../../include/pdf_processor.hpp"
 #include "../../include/png_processor.hpp"
 #include "../../include/sqlite_processor.hpp"
 #include "../../include/tiff_processor.hpp"
 #include "../../include/tga_processor.hpp"
+#include "../../include/wav_processor.hpp"
 #include "../../include/wavpack_processor.hpp"
 #include "../../include/webp_processor.hpp"
 #include "../../include/zopflipng_processor.hpp"
@@ -49,6 +52,9 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MseedProcessor>());
     processors_.push_back(std::make_unique<MkvProcessor>());
     processors_.push_back(std::make_unique<MpegProcessor>());
+    processors_.push_back(std::make_unique<WavProcessor>());
+    processors_.push_back(std::make_unique<Mp4Processor>());
+    processors_.push_back(std::make_unique<OggProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
