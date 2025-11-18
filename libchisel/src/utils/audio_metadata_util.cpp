@@ -382,21 +382,21 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            TagLib::FLAC::Picture pic;
-            pic.setMimeType(info.mime_type);
-            pic.setDescription(info.description);
-            pic.setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
-            pic.setData(data);
+            auto *pic = new TagLib::FLAC::Picture;
+            pic->setMimeType(info.mime_type);
+            pic->setDescription(info.description);
+            pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
+            pic->setData(data);
 
             // compute technical fields from the *optimized* image data
             int w=0, h=0, d=0, c=0;
             computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
-            if (w > 0) pic.setWidth(w);
-            if (h > 0) pic.setHeight(h);
-            if (d > 0) pic.setColorDepth(d);
-            if (c > 0) pic.setNumColors(c);
+            if (w > 0) pic->setWidth(w);
+            if (h > 0) pic->setHeight(h);
+            if (d > 0) pic->setColorDepth(d);
+            if (c > 0) pic->setNumColors(c);
 
-            flacFile->addPicture(&pic);
+            flacFile->addPicture(pic);
         }
         return flacFile->save();
     }
