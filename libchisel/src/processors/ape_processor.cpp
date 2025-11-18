@@ -4,6 +4,9 @@
 
 #include "../../include/ape_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/audio_metadata_util.hpp"
+#include "../../include/file_utils.hpp"
+#include "../../include/random_utils.hpp"
 #include <MACLib.h>
 #include <APETag.h>
 #include <vector>
@@ -11,6 +14,8 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
+#include <any>
+#include "file_type.hpp"
 
 namespace {
 
@@ -169,11 +174,68 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     if (preserve_metadata) {
         if (!copy_apetag(input, output)) {
-            Logger::log(LogLevel::Warning, "APEv2 metadata copy failed or not present", "ape_processor");
+            Logger::log(LogLevel::Debug, "APEv2 metadata copy skipped or failed", "ape_processor");
         }
     }
 
     Logger::log(LogLevel::Info, "APE re-encoding completed: " + output.string(), "ape_processor");
+}
+
+std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::filesystem::path& input_path) {
+    Logger::log(LogLevel::Info, "APE: Preparing cover art extraction for: " + input_path.string(), "ape_processor");
+
+    ExtractedContent content;
+    content.original_path = input_path;
+    content.temp_dir = make_temp_dir_for(input_path, "ape-processor");
+
+    AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
+
+    if (state.extracted_covers.empty()) {
+        Logger::log(LogLevel::Debug, "APE: No embedded cover art found.", "ape_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return std::nullopt;
+    }
+
+    for (const auto& cover_info : state.extracted_covers) {
+        content.extracted_files.push_back(cover_info.temp_file_path);
+    }
+
+    content.extras = std::make_any<AudioExtractionState>(std::move(state));
+    content.format = ContainerFormat::Unknown;
+    return content;
+}
+
+std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content,
+                                                        ContainerFormat /*target_format*/) {
+    Logger::log(LogLevel::Info, "APE: Finalizing (re-inserting covers) for: " + content.original_path.string(), "ape_processor");
+
+    const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
+    if (!state_ptr) {
+        Logger::log(LogLevel::Error, "APE: Failed to retrieve extraction state.", "ape_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return {};
+    }
+
+    const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
+                                                  (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".ape");
+
+    try {
+        std::filesystem::copy_file(content.original_path, final_temp_path, std::filesystem::copy_options::overwrite_existing);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, "APE: Failed to copy audio file: " + std::string(e.what()), "ape_processor");
+        cleanup_temp_dir(content.temp_dir);
+        return {};
+    }
+
+    if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
+        Logger::log(LogLevel::Error, "APE: rebuildCovers failed", "ape_processor");
+        cleanup_temp_dir(content.temp_dir);
+        std::filesystem::remove(final_temp_path);
+        return {};
+    }
+
+    cleanup_temp_dir(content.temp_dir);
+    return final_temp_path;
 }
 
 std::string ApeProcessor::get_raw_checksum(const std::filesystem::path&) const {

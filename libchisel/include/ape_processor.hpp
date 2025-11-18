@@ -42,7 +42,12 @@ namespace chisel {
 
         // --- capabilities ---
         [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-        [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
+
+        /**
+         * @brief This processor extracts cover art using AudioMetadataUtil.
+         * @return true
+         */
+        [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
         // --- operations ---
 
@@ -54,8 +59,7 @@ namespace chisel {
          *
          * @param input Path to the source APE file.
          * @param output Path to write the optimized APE file.
-         * @param preserve_metadata If true, attempts to copy APEv2 tags
-         * from the input file to the output file.
+         * @param preserve_metadata If true, attempts to copy APEv2 tags.
          * @throws std::runtime_error if the MACLib encoder or decoder fails.
          */
         void recompress(const std::filesystem::path& input,
@@ -63,18 +67,21 @@ namespace chisel {
                         bool preserve_metadata) override;
 
         /**
-         * @brief This format cannot be extracted.
-         * @return std::nullopt
+         * @brief Extracts embedded cover art from the APE file.
+         * @param input_path Path to the APE file.
+         * @return ExtractedContent struct with cover art files, or nullopt.
          */
         std::optional<ExtractedContent> prepare_extraction(
-            [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
+            const std::filesystem::path& input_path) override;
 
         /**
-         * @brief This format cannot be extracted.
-         * @return Empty path.
+         * @brief Re-inserts optimized cover art into the APE file.
+         * @param content Content descriptor from prepare_extraction.
+         * @param target_format Ignored.
+         * @return Path to the finalized APE file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &,
-                                                  [[maybe_unused]] ContainerFormat target_format) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &content,
+                                                  ContainerFormat target_format) override;
 
         // --- integrity check ---
 
