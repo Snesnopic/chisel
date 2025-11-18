@@ -4,17 +4,14 @@
 
 - [ ] Test edge cases: corrupted files, unsupported formats, empty files, mismatched extensions.
 - [ ] Validate metadata preservation across formats (cover art, tags, chapters).
+- [ ] Improve resiliency of mime detection, maybe enforce magic db regeneration on first use.
 
 ## Refactoring / Architecture
 
 - [ ] Normalize MIME detection and extension mapping.
 - [ ] Implement a UriProcessor to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing processors, and reinsert re-encoded content.
 - [ ] Review and clean up unused or redundant CMake variables.
-- [ ] Extend pipeline to add support to embedded images (cover arts) of audio files.
 - [ ] Complete refactoring of third-party library integrations (libFLAC, libwavpack) to use `FILE*` or callback-based APIs instead of filenames, ensuring full Unicode support on Windows.
-## FLAC
-
-- [ ] Improve metadata handling: ensure valid STREAMINFO and preserve PICTURE blocks.
 
 ## WavPack
 
@@ -141,9 +138,13 @@
 
   | Processor          | Lossless | Metadata | Container | Notes                                                                                                                                                                                                   |
   |--------------------|:--------:|:--------:|:---------:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-  | FlacProcessor      |    ✅     |    🟡    |     ❌     | Works. Needs verification on `streamable_subset=false`. <br>Metadata (PICTURE block) needs verification. <br>Add cover art optimization. <br>Consider brute-force presets.                              |
+  | FlacProcessor      |    ✅     |    ✅     |     ✅     | Works. Recompresses audio & optimizes cover art.                                                                                                                                                        |
   | WavPackProcessor   |    ✅     |    🟡    |     ❌     | Needs verification on complete tag copying (ReplayGain, etc.). <br>Test `.wvc` files. <br>Consider brute-force modes.                                                                                   |
-  | ApeProcessor       |    🟡    |    🟡    |     ❌     | Needs verification on tag copying. <br>Add cover art optimization.                                                                                                                                      |
+  | ApeProcessor       |    🟡    |    ✅     |     ✅     | Recompresses audio (MACLib) & optimizes cover art (TagLib).                                                                                                                                             |
+  | MpegProcessor      |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art. Audio recompression pending.                                                                                                                   |
+  | Mp4Processor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes 'covr' atom (JPEG/PNG).                                                                                                                                         |  
+  | OggProcessor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes METADATA_BLOCK_PICTURE (Vorbis/Opus). Stream optimization pending.                                                                                              | 
+  | WavProcessor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art inside RIFF.                                                                                                                                    |
   | JpegProcessor      |    🟡    |    🟡    |   N.A.    | Copies APP/COM markers. <br>Add optional metadata stripping. <br>Integrate other optimizers. <br>raw_equal implemented (pixel compare).                                                                 |
   | PngProcessor       |    🟡    |    🟡    |   N.A.    | Works. Needs formal verification for lossless & metadata (iCCP, sRGB, text chunks...).                                                                                                                  |
   | ZopfliPngProcessor |    🟡    |    🟡    |   N.A.    | raw_equal implemented (pixel compare). <br>Copies standard chunks via `zopflipng_lib`. <br>Needs ability to parameterize iterations.                                                                    |
