@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iterator>
 #include <setjmp.h>
+#include <vector>
 #include <taglib/fileref.h>
 #include "flac/flacfile.h"
 #include "flac/flacpicture.h"
@@ -21,6 +22,10 @@
 #include "../../include/file_utils.hpp"
 #include <png.h>
 #include <jpeglib.h>
+#include "ape/apefile.h"
+#include "ape/apeitem.h"
+#include "ape/apetag.h"
+#include "riff/wav/wavfile.h"
 
 namespace chisel {
 
@@ -87,7 +92,7 @@ struct JpegErrorMgr {
     jpeg_error_mgr pub{};
     jmp_buf setjmp_buffer{};
 };
-void jpeg_error_exit_throw(const j_common_ptr cinfo) {
+void jpeg_error_exit_throw(j_common_ptr cinfo) {
     auto* err = reinterpret_cast<JpegErrorMgr*>(cinfo->err);
     // return control to computeImageProps
     longjmp(err->setjmp_buffer, 1);
@@ -193,6 +198,73 @@ inline int defaultFrontCoverType() {
     return 3;
 }
 
+// helper to map ID3/FLAC image type to APEv2 keys
+TagLib::String getApeCoverKey(int picture_type) {
+    // 3 = Front Cover, 4 = Back Cover. Default a Front.
+    if (picture_type == 4) return "Cover Art (Back)";
+    return "Cover Art (Front)";
+}
+
+// inverse helper
+int getPictureTypeFromApeKey(const TagLib::String &key) {
+    if (key == "Cover Art (Back)") return 4;
+    return 3; // Default Front
+}
+
+// shared helper to extract cover from ID3v2 tag (MP3, WAV)
+void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
+                        const std::filesystem::path& temp_dir,
+                        std::vector<AudioCoverInfo>& extracted_covers) {
+    if (!tag) return;
+
+    int idx = 0;
+    auto frames = tag->frameList("APIC");
+    for (auto frame : frames) {
+        auto *apic = static_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame);
+
+        const char *ext = extFromMime(apic->mimeType().to8Bit(true));
+        std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+
+        std::ofstream out(outPath, std::ios::binary);
+        out.write(apic->picture().data(), apic->picture().size());
+        out.close();
+
+        AudioCoverInfo info;
+        info.temp_file_path = outPath;
+        info.mime_type = apic->mimeType().to8Bit(true);
+        info.description = apic->description().to8Bit(true);
+        info.picture_type = apic->type();
+
+        extracted_covers.push_back(std::move(info));
+        ++idx;
+    }
+}
+
+// Helper condiviso per reinserire cover in un tag ID3v2
+// shared helper to reinsert cover in ID3v2 tag
+// returns true if edits were made
+bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
+                        const std::vector<AudioCoverInfo>& covers) {
+    if (!tag) return false;
+
+    // remove all existing APIC frames to avoid duplicates
+    tag->removeFrames("APIC");
+
+    for (const auto &info : covers) {
+        TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+        if (data.isEmpty()) continue;
+
+        auto *frame = new TagLib::ID3v2::AttachedPictureFrame;
+        frame->setMimeType(info.mime_type);
+        frame->setDescription(info.description);
+        frame->setType(static_cast<TagLib::ID3v2::AttachedPictureFrame::Type>(info.picture_type));
+        frame->setPicture(data);
+
+        tag->addFrame(frame);
+    }
+    return true;
+}
+
 } // namespace
 
 //
@@ -239,28 +311,58 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
 
     // mp3 (id3v2 apic)
     if (auto *mpegFile = dynamic_cast<TagLib::MPEG::File*>(file_ref)) {
-        auto *id3v2tag = mpegFile->ID3v2Tag();
-        if (id3v2tag) {
+        extractId3v2Covers(mpegFile->ID3v2Tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // wav (id3v2 apic)
+    if (auto *wavFile = dynamic_cast<TagLib::RIFF::WAV::File*>(file_ref)) {
+        extractId3v2Covers(wavFile->ID3v2Tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // ape (Monkey's Audio) - use APEv2
+    if (auto *apeFile = dynamic_cast<TagLib::APE::File*>(file_ref)) {
+        if (auto *tag = apeFile->APETag()) {
+            const auto &itemListMap = tag->itemListMap();
+
+            const constexpr char* keys[] = {"Cover Art (Front)", "Cover Art (Back)"};
+
             int idx = 0;
-            auto frames = id3v2tag->frameList("APIC");
-            for (auto frame : frames) {
-                auto *apic = static_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame);
+            for (const auto* key : keys) {
+                if (itemListMap.contains(key)) {
+                    const auto &item = itemListMap[key];
+                    if (item.type() != TagLib::APE::Item::Binary) continue;
 
-                const char *ext = extFromMime(apic->mimeType().to8Bit(true));
-                std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+                    TagLib::ByteVector val = item.binaryData();
 
-                std::ofstream out(outPath, std::ios::binary);
-                out.write(apic->picture().data(), apic->picture().size());
-                out.close();
+                    int nullPos = val.find(0);
+                    if (nullPos < 0) continue; // not valid
 
-                AudioCoverInfo info;
-                info.temp_file_path = outPath;
-                info.mime_type = apic->mimeType().to8Bit(true);
-                info.description = apic->description().to8Bit(true);
-                info.picture_type = apic->type();
+                    TagLib::ByteVector imgData = val.mid(nullPos + 1);
+                    TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
 
-                state.extracted_covers.push_back(std::move(info));
-                ++idx;
+                    std::string mime = "image/jpeg"; // fallback
+                    if (imgData.size() >= 8 && !png_sig_cmp((unsigned char*)imgData.data(), 0, 8)) {
+                        mime = "image/png";
+                    }
+
+                    const char *ext = extFromMime(mime);
+                    std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+
+                    std::ofstream out(outPath, std::ios::binary);
+                    out.write(imgData.data(), imgData.size());
+                    out.close();
+
+                    AudioCoverInfo info;
+                    info.temp_file_path = outPath;
+                    info.mime_type = mime;
+                    info.description = desc.to8Bit(true);
+                    info.picture_type = getPictureTypeFromApeKey(key);
+
+                    state.extracted_covers.push_back(std::move(info));
+                    ++idx;
+                }
             }
         }
         return state;
@@ -354,7 +456,6 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
         return state;
     }
 
-    // TODO: add support for ape and wav containers
     return state;
 }
 
@@ -403,29 +504,47 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // mp3
     if (auto *mpegFile = dynamic_cast<TagLib::MPEG::File*>(file_ref)) {
-        auto *id3v2tag = mpegFile->ID3v2Tag(true); // create tag if not present
-        if (!id3v2tag) return false;
+        if (rebuildId3v2Covers(mpegFile->ID3v2Tag(true), state.extracted_covers)) {
+            return mpegFile->save();
+        }
+        return false;
+    }
 
-        id3v2tag->removeFrames("APIC");
+    // wav
+    if (auto *wavFile = dynamic_cast<TagLib::RIFF::WAV::File*>(file_ref)) {
+        if (rebuildId3v2Covers(wavFile->ID3v2Tag(), state.extracted_covers)) {
+            return wavFile->save();
+        }
+        return false;
+    }
+
+    // ape
+    if (auto *apeFile = dynamic_cast<TagLib::APE::File*>(file_ref)) {
+        auto *tag = apeFile->APETag(true);
+        if (!tag) return false;
+
+        tag->removeItem("Cover Art (Front)");
+        tag->removeItem("Cover Art (Back)");
 
         for (const auto &info : state.extracted_covers) {
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            auto *frame = new TagLib::ID3v2::AttachedPictureFrame;
-            frame->setMimeType(info.mime_type);
-            frame->setDescription(info.description);
-            frame->setType(static_cast<TagLib::ID3v2::AttachedPictureFrame::Type>(info.picture_type));
-            frame->setPicture(data);
+            TagLib::String key = getApeCoverKey(info.picture_type);
 
-            id3v2tag->addFrame(frame); // taglib takes ownership
+            TagLib::ByteVector val;
+            val.append(TagLib::ByteVector(info.description.data(), static_cast<unsigned int>(info.description.size())));
+            val.append(0); // null terminator
+            val.append(data);
+
+            tag->setItem(key, TagLib::APE::Item(key, val, true));
         }
-        return mpegFile->save();
+        return apeFile->save();
     }
 
     // mp4
     if (auto *mp4File = dynamic_cast<TagLib::MP4::File*>(file_ref)) {
-        TagLib::MP4::CoverArtList covers; // this is TagLib::List<CoverArt>
+        TagLib::MP4::CoverArtList covers;
 
         for (const auto &info : state.extracted_covers) {
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
@@ -439,7 +558,6 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
                 fmt = inferFormatFromMime(info.mime_type);
             }
 
-            // use .append() for TagLib::List
             covers.append(TagLib::MP4::CoverArt(fmt, data));
         }
 
@@ -463,7 +581,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            // ogg uses the same picture format as flac
+            // ogg uses the same picture format as flac but doesn't own pointers
             TagLib::FLAC::Picture pic;
             pic.setMimeType(info.mime_type);
             pic.setDescription(info.description);
@@ -511,7 +629,6 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
         return oggOpus->save();
     }
 
-    // TODO: implement reinsertion for ape and wav formats
     return false;
 }
 
