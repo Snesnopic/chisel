@@ -172,6 +172,10 @@ namespace chisel {
                 }
                 scheduled_for_extraction = true;
             } else {
+                if (processor->can_recompress()) {
+                    Logger::log(LogLevel::Warning, "prepare_extraction resulted in no elements for " + path.string(), "Executor");
+                    event_bus_.publish(FileAnalyzeSkippedEvent{path, "Extraction resulted in no elements"});
+                }
                 Logger::log(LogLevel::Error, "prepare_extraction failed for " + path.string(), "Executor");
                 event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
             }
