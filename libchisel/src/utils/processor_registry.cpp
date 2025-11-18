@@ -11,6 +11,7 @@
 #include "../../include/jpeg_processor.hpp"
 #include "../../include/jxl_processor.hpp"
 #include "../../include/mkv_processor.hpp"
+#include "../../include/mpeg_processor.hpp"
 #include "../../include/mseed_processor.hpp"
 #include "../../include/odf_processor.hpp"
 #include "../../include/ooxml_processor.hpp"
@@ -47,6 +48,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<SqliteProcessor>());
     processors_.push_back(std::make_unique<MseedProcessor>());
     processors_.push_back(std::make_unique<MkvProcessor>());
+    processors_.push_back(std::make_unique<MpegProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
