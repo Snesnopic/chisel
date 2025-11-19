@@ -66,6 +66,8 @@ set(LIBCHISEL_SOURCES
         include/ogg_processor.hpp
         src/processors/mp4_processor.cpp
         src/processors/ogg_processor.cpp
+        include/aiff_processor.hpp
+        src/processors/aiff_processor.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)

@@ -3,6 +3,7 @@
 //
 
 #include "../../include/processor_registry.hpp"
+#include "../../include/aiff_processor.hpp"
 #include "../../include/ape_processor.hpp"
 #include "../../include/archive_processor.hpp"
 #include "../../include/flac_processor.hpp"
@@ -55,6 +56,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<WavProcessor>());
     processors_.push_back(std::make_unique<Mp4Processor>());
     processors_.push_back(std::make_unique<OggProcessor>());
+    processors_.push_back(std::make_unique<AiffProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
