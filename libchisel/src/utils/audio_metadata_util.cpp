@@ -22,10 +22,12 @@
 #include "../../include/file_utils.hpp"
 #include <png.h>
 #include <jpeglib.h>
+#include <webp/decode.h>
+#include "aiff/aifffile.h"
 #include "ape/apefile.h"
 #include "ape/apeitem.h"
 #include "ape/apetag.h"
-#include "riff/wav/wavfile.h"
+#include "wav/wavfile.h"
 
 namespace chisel {
 
@@ -46,6 +48,7 @@ inline TagLib::ByteVector readFileToByteVector(const std::filesystem::path &p) {
 inline const char* extFromMime(const std::string &mime) {
     if (mime == "image/png") return ".png";
     if (mime == "image/jpeg" || mime == "image/jpg") return ".jpg";
+    if (mime == "image/webp") return ".webp";
     // fallback: prefer jpg for unknowns
     return ".jpg";
 }
@@ -183,8 +186,22 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
         return; // success
     }
 
-    // TODO: implement for jxl, webp, etc. if needed
-    // ... or create another helper class for this
+    if (mime_type == "image/webp") {
+        unique_FILE fp(chisel::open_file(imagePath, "rb"));
+        if (!fp) return;
+
+        // read basic header (30 bytes is enough for WebPGetInfo)
+        uint8_t header[32];
+        if (fread(header, 1, 30, fp.get()) < 30) return;
+
+        if (WebPGetInfo(header, 30, &width, &height)) {
+            depth = 32; // webp is generally RGBA 8888 internally or similar
+            colors = 0;
+        }
+        return;
+    }
+
+    // TODO: implement for jxl, etc. if needed
     Logger::log(LogLevel::Debug, "computeImageProps: unsupported mime type: " + mime_type, "audio_util");
 }
 
@@ -211,7 +228,7 @@ int getPictureTypeFromApeKey(const TagLib::String &key) {
     return 3; // Default Front
 }
 
-// shared helper to extract cover from ID3v2 tag (MP3, WAV)
+// shared helper to extract cover from ID3v2 tag (MP3, WAV, AIFF)
 void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
                         const std::filesystem::path& temp_dir,
                         std::vector<AudioCoverInfo>& extracted_covers) {
@@ -240,7 +257,6 @@ void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
     }
 }
 
-// Helper condiviso per reinserire cover in un tag ID3v2
 // shared helper to reinsert cover in ID3v2 tag
 // returns true if edits were made
 bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
@@ -321,6 +337,12 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
         return state;
     }
 
+    // aiff (id3v2 apic)
+    if (auto *aiffFile = dynamic_cast<TagLib::RIFF::AIFF::File*>(file_ref)) {
+        extractId3v2Covers(aiffFile->tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
     // ape (Monkey's Audio) - use APEv2
     if (auto *apeFile = dynamic_cast<TagLib::APE::File*>(file_ref)) {
         if (auto *tag = apeFile->APETag()) {
@@ -369,7 +391,6 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     }
 
     // mp4
-    // futureproofing here
     if (auto *mp4File = dynamic_cast<TagLib::MP4::File*>(file_ref)) {
         auto *tag = mp4File->tag();
         if (tag) {
@@ -514,6 +535,14 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     if (auto *wavFile = dynamic_cast<TagLib::RIFF::WAV::File*>(file_ref)) {
         if (rebuildId3v2Covers(wavFile->ID3v2Tag(), state.extracted_covers)) {
             return wavFile->save();
+        }
+        return false;
+    }
+
+    // aiff
+    if (auto *aiffFile = dynamic_cast<TagLib::RIFF::AIFF::File*>(file_ref)) {
+        if (rebuildId3v2Covers(aiffFile->tag(), state.extracted_covers)) {
+            return aiffFile->save();
         }
         return false;
     }
