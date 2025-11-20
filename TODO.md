@@ -5,6 +5,7 @@
 - [ ] Test edge cases: corrupted files, unsupported formats, empty files, mismatched extensions.
 - [ ] Validate metadata preservation across formats (cover art, tags, chapters).
 - [ ] Improve resiliency of mime detection, maybe enforce magic db regeneration on first use.
+- [ ] Validate PNM binary conversion (ensure ASCII P1-P3 inputs are correctly converted to Binary P4-P6).
 
 ## Refactoring / Architecture
 
@@ -39,10 +40,6 @@
 - [ ] Investigate **pdfsizeopt** techniques (image recompression, font unification, metadata stripping)  
   ↳ <https://github.com/pts/pdfsizeopt>
 
-## BMP
-
-- [ ] Manually write a processor with RLE encoding and palette reduction.
-
 ## Archives
 
 - [ ] Remove bzip2 from testing and libarchive supported archives.
@@ -71,9 +68,7 @@
   ↳ <https://github.com/stseelig/libttaR>
 - [ ] MPEG‑4 ALS – investigate reference implementation.  
   ↳ <https://www.iso.org/standard/43345.html>
-- [ ] Ogg Vorbis – investigate recompression techniques (codebook optimization).  
-  ↳ <https://encode.su/threads/3256-Lossless-(Re)compression-of-Ogg-files>
-- [ ] OptiVorbis (Rust) – consider FFI integration.  
+- [ ] Ogg Vorbis – investigate recompression techniques (codebook optimization) like `OptiVorbis` (Rust).  
   ↳ <https://github.com/fhanau/optivorbis>
 - [ ] Lepton (Rust JPEG recompressor) – consider FFI integration.  
   ↳ <https://github.com/dropbox/lepton> (original C++), <https://github.com/microsoft/lepton_jpeg_rust>
@@ -108,42 +103,17 @@
   ↳ <https://github.com/htacg/tidy-html5>
 - [ ] HDR (Radiance RGBE) – add support for HDR file compression using stb_image/stb_image_write.  
   ↳ <https://github.com/nothings/stb>
-
-## Build / CI
-
-- [ ] Add reproducibility checks (deterministic builds, no embedded timestamps).
-- [ ] On MinGW, enforce fully static builds (no runtime DLL dependencies).
-- [ ] Review linker flags and explore options to reduce final binary size (e.g. `-Wl,--gc-sections`, `-s` for stripping symbols, or platform-specific equivalents).
-- [ ] General cleanup and unification of the CMakeLists to remove cruft and ensure consistency across platforms.
-- [ ] Add generation of xcframework for Xcode packaging.
-- [ ] Create a Homebrew tap/formula for macOS distribution.
-- [ ] Publish a Winget manifest for Windows distribution.
-- [ ] Provide Linux packages:
-  - [ ] AppImage
-  - [ ] Snap
-  - [ ] .deb (Debian/Ubuntu)
-
-## Other improvements
-
-- [ ] Add CLI flags for optimization effort (e.g., --zopfli-iterations, --flexigif-effort).
-- [ ] Propagate effort settings from Settings -> ProcessorExecutor -> IProcessor (e.g., via a new virtual setOptimizationEffort method).
-- [ ] Enhance EventBus events (e.g., FileProcessCompleteEvent) to carry detailed benchmark data for all processor attempts (name, time, size).
-- [ ] Update ProcessorExecutor (parallel mode) to capture per-processor timings and sizes.
-- [ ] Update report_generator (CSV) to log detailed benchmark data for analysis.
-- [ ] File hash cache to skip already processed files across runs.
-- [ ] Investigate further metadata preservation strategies across all formats.
-- [ ] Implement lossless recompression of embedded cover art in audio files (FLAC, APE, WavPack, MP3, etc.).
-- [ ] Improve logging granularity and structured output for CI integration.
-- [ ] Future: implement a general XML/HTML minifier (with optional extensions for subtitle formats such as SRT, VTT, ASS).
+- [ ] OpenEXR – integrate openexr/imath for PIZ/ZIP lossless recompression.
+- [ ] FITS – integrate cfitsio for scientific data compression.
 
   | Processor          | Lossless | Metadata | Container | Notes                                                                                                                                                                                                   |
   |--------------------|:--------:|:--------:|:---------:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
   | FlacProcessor      |    ✅     |    ✅     |     ✅     | Works. Recompresses audio & optimizes cover art.                                                                                                                                                        |
   | WavPackProcessor   |    ✅     |    🟡    |     ❌     | Needs verification on complete tag copying (ReplayGain, etc.). <br>Test `.wvc` files. <br>Consider brute-force modes.                                                                                   |
   | ApeProcessor       |    🟡    |    ✅     |     ✅     | Recompresses audio (MACLib) & optimizes cover art (TagLib).                                                                                                                                             |
+  | OggProcessor       |    ✅     |    ✅     |     ✅     | Recompresses Ogg FLAC streams using `libFLAC`. <br>Container-only mode for Vorbis/Opus: extracts/optimizes cover art.                                                                                   |
   | MpegProcessor      |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art. Audio recompression pending.                                                                                                                   |
-  | Mp4Processor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes 'covr' atom (JPEG/PNG).                                                                                                                                         |  
-  | OggProcessor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes METADATA_BLOCK_PICTURE (Vorbis/Opus). Stream optimization pending.                                                                                              | 
+  | Mp4Processor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes 'covr' atom (JPEG/PNG).                                                                                                                                         |
   | WavProcessor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art inside RIFF.                                                                                                                                    |
   | AiffProcessor      |    ❌     |    ✅     |     ✅     | Container-only: extracts/optimizes ID3v2 cover art inside AIFF.                                                                                                                                         |
   | JpegProcessor      |    🟡    |    🟡    |   N.A.    | Copies APP/COM markers. <br>Add optional metadata stripping. <br>Integrate other optimizers. <br>raw_equal implemented (pixel compare).                                                                 |
@@ -153,7 +123,10 @@
   | GifProcessor       |    ❌     |    ❌     |   N.A.    | (gifsicle) **Currently disabled**. <br>Needs fork of `gifsicle` to fix Windows build and make thread-safe.                                                                                              |
   | FlexiGifProcessor  |    🟡    |    ❌     |   N.A.    | (flexigif) Needs verification. <br>Needs ability to parameterize iterations/settings (like Zopfli).                                                                                                     |
   | TiffProcessor      |    🟡    |    🟡    |   N.A.    | Copies standard metadata tags (XMP, EXIF, ICC). <br>Uses Deflate compression. <br>Needs verification.                                                                                                   |
-  | JxlProcessor       |    🟡    |    🟡    |   N.A.    | Re-encode loop implemented. <br>Metadata preservation (JXL box) implemented, but needs verification. <br>raw_equal implemented (pixel compare).                                                         |  | TgaProcessor       |    ✅     |    ❌     |   N.A.    | Uses stb_image to re-apply RLE. <br>`raw_equal` implemented (pixel compare). <br>Metadata not preserved.                                                                                                |
+  | JxlProcessor       |    🟡    |    🟡    |   N.A.    | Re-encode loop implemented. <br>Metadata preservation (JXL box) implemented, but needs verification. <br>raw_equal implemented (pixel compare).                                                         |
+  | TgaProcessor       |    ✅     |    ❌     |   N.A.    | Uses stb_image to re-apply RLE. <br>`raw_equal` implemented (pixel compare). <br>Metadata not preserved.                                                                                                |
+  | BmpProcessor       |    ✅     |    ✅     |   N.A.    | Uses `bmplib`. Supports RLE4, RLE8, RLE24 (OS/2), and Huffman 1D compression. Preserves DPI and ICC profiles.                                                                                           |
+  | PnmProcessor       |    ✅     |   N.A.   |   N.A.    | Uses `stb_image` to read and internal writer. Optimizes by converting ASCII formats (P1-P3) to Binary (P4-P6). Needs verification.                                                                      |
   | SqliteProcessor    |    ✅     |   N.A.   |   N.A.    | `VACUUM` + `ANALYZE` are standard, safe operations. <br>Considered verified.                                                                                                                            |
   | MseedProcessor     |    ✅     |    ✅     |   N.A.    | Metadata is part of header structure. <br>Considered complete. <br>May be extended for JSON header metadata.                                                                                            |
   | MkvProcessor       |    🟡    |    🟡    |     ❌     | Uses `mkclean`. <br>Container extraction/finalization is TODO. <br>Verify chapter/tag/attachment preservation.                                                                                          |
