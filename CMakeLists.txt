@@ -687,9 +687,7 @@ target_include_directories(libchisel SYSTEM PRIVATE
         "${BMPLIB_DIR}"
         "${BMPLIB_BUILD_DIR}"
 )
-if(MSVC)
-    target_compile_definitions(libchisel PRIVATE restrict=__restrict)
-endif ()
+
 add_dependencies(libchisel generate_bmplib_headers)
 
 if(CHISEL_BUILD_CLI)
