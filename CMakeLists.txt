@@ -344,6 +344,20 @@ else()
     target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
 endif()
 
+if(MSVC)
+    list(FILTER BMPLIB_SOURCES EXCLUDE REGEX "bmp-read-loadimage\\.c$")
+
+    set(BMP_ORIGINAL "${BMPLIB_DIR}/bmp-read-loadimage.c")
+    set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
+
+    file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
+    string(REPLACE "[static 4]" "[4]" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
+    file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
+
+    list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
+
+endif()
+
 set_target_properties(gen-huffman PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
@@ -673,7 +687,9 @@ target_include_directories(libchisel SYSTEM PRIVATE
         "${BMPLIB_DIR}"
         "${BMPLIB_BUILD_DIR}"
 )
-
+if(MSVC)
+    target_compile_definitions(libchisel PRIVATE restrict=__restrict)
+endif ()
 add_dependencies(libchisel generate_bmplib_headers)
 
 if(CHISEL_BUILD_CLI)
