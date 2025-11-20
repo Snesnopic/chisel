@@ -21,6 +21,7 @@
 #include "../../include/ooxml_processor.hpp"
 #include "../../include/pdf_processor.hpp"
 #include "../../include/png_processor.hpp"
+#include "../../include/pnm_processor.hpp"
 #include "../../include/sqlite_processor.hpp"
 #include "../../include/tiff_processor.hpp"
 #include "../../include/tga_processor.hpp"
@@ -59,6 +60,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<OggProcessor>());
     processors_.push_back(std::make_unique<AiffProcessor>());
     processors_.push_back(std::make_unique<BmpProcessor>());
+    processors_.push_back(std::make_unique<PnmProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
