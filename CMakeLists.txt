@@ -376,11 +376,17 @@ set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
 set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
 add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
+list(APPEND libebml_SOURCE_DIR
+        "${CMAKE_SOURCE_DIR}/third_party/libebml/ebml"
+        "${CMAKE_BINARY_DIR}/third_party/libebml-build"
+)
 # libMatroska
 set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
 set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
 add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
+list(APPEND libmatroska_SOURCE_DIR
+        "${CMAKE_BINARY_DIR}/third_party/libmatroska-build"
+)
 
 target_include_directories(matroska PRIVATE
         ${libebml_BINARY_DIR}

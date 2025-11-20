@@ -91,6 +91,7 @@ target_include_directories(libchisel
         ${libogg_SOURCE_DIR}/include
         ${libogg_BINARY_DIR}/include
         ${libebml_SOURCE_DIR}
+        ${libmatroska_SOURCE_DIR}
         ${libmatroska_SOURCE_DIR}/src
         ${qpdf_SOURCE_DIR}/include
         ${qpdf_BINARY_DIR}/include
