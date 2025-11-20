@@ -67,11 +67,11 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
     }
 
     do {
-        uint32 width, height;
+        uint32_t width, height;
         TIFFGetField(in, TIFFTAG_IMAGEWIDTH, &width);
         TIFFGetField(in, TIFFTAG_IMAGELENGTH, &height);
 
-        std::vector<uint32> raster(static_cast<size_t>(width) * static_cast<size_t>(height));
+        std::vector<uint32_t> raster(static_cast<size_t>(width) * static_cast<size_t>(height));
         if (raster.empty()) {
             Logger::log(LogLevel::Debug, "Skipping empty TIFF directory", "tiff_processor");
             continue;
@@ -100,7 +100,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         unsigned short extra_samples = 1;
         TIFFSetField(out, TIFFTAG_EXTRASAMPLES, 1, &extra_samples);
 
-        for (uint32 row = 0; row < height; ++row) {
+        for (uint32_t row = 0; row < height; ++row) {
             tdata_t row_data = &raster[static_cast<size_t>(row) * width];
             if (TIFFWriteScanline(out, row_data, row) < 0) {
                 TIFFClose(in);
@@ -147,7 +147,7 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     bool more_a, more_b;
 
     do {
-        uint32 w_a, h_a, w_b, h_b;
+        uint32_t w_a, h_a, w_b, h_b;
         if (!TIFFGetField(in_a, TIFFTAG_IMAGEWIDTH, &w_a)) w_a = 0;
         if (!TIFFGetField(in_a, TIFFTAG_IMAGELENGTH, &h_a)) h_a = 0;
         if (!TIFFGetField(in_b, TIFFTAG_IMAGEWIDTH, &w_b)) w_b = 0;
@@ -165,8 +165,8 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
             continue;
         }
 
-        std::vector<uint32> raster_a(static_cast<size_t>(w_a) * static_cast<size_t>(h_a));
-        std::vector<uint32> raster_b(static_cast<size_t>(w_b) * static_cast<size_t>(h_b));
+        std::vector<uint32_t> raster_a(static_cast<size_t>(w_a) * static_cast<size_t>(h_a));
+        std::vector<uint32_t> raster_b(static_cast<size_t>(w_b) * static_cast<size_t>(h_b));
 
         if (raster_a.empty()) { // both are empty, continue
              more_a = TIFFReadDirectory(in_a);
