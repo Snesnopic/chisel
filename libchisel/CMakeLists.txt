@@ -68,6 +68,8 @@ set(LIBCHISEL_SOURCES
         src/processors/ogg_processor.cpp
         include/aiff_processor.hpp
         src/processors/aiff_processor.cpp
+        include/bmp_processor.hpp
+        src/processors/bmp_processor.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
@@ -105,6 +107,8 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/stb
         ${taglib_SOURCE_DIR}
         ${taglib_BINARY_DIR}
+        ${CMAKE_SOURCE_DIR}/third_party/bmplib
+        ${CMAKE_BINARY_DIR}/bmplib
 )
 
 if(NOT WIN32)

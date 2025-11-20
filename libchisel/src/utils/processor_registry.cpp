@@ -6,6 +6,7 @@
 #include "../../include/aiff_processor.hpp"
 #include "../../include/ape_processor.hpp"
 #include "../../include/archive_processor.hpp"
+#include "../../include/bmp_processor.hpp"
 #include "../../include/flac_processor.hpp"
 #include "../../include/flexigif_processor.hpp"
 #include "../../include/gif_processor.hpp"
@@ -57,6 +58,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<Mp4Processor>());
     processors_.push_back(std::make_unique<OggProcessor>());
     processors_.push_back(std::make_unique<AiffProcessor>());
+    processors_.push_back(std::make_unique<BmpProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

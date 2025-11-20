@@ -321,6 +321,50 @@ target_include_directories(archive_static PRIVATE
 add_dependencies(archive_static liblzma)
 target_compile_definitions(archive_static PRIVATE LZMA_API_STATIC)
 
+# bmplib
+set(BMPLIB_DIR "${CMAKE_SOURCE_DIR}/third_party/bmplib")
+set(BMPLIB_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/bmplib")
+
+file(MAKE_DIRECTORY ${BMPLIB_BUILD_DIR})
+
+if(NOT EXISTS "${BMPLIB_DIR}/config.h")
+    file(READ "${BMPLIB_DIR}/config.h.in" BMP_CONFIG_CONTENT)
+    string(REPLACE "@libversion@" "1.8.0" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
+    string(REPLACE "@insanity_limit_mb@" "1024" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
+    file(WRITE "${BMPLIB_DIR}/config.h" "${BMP_CONFIG_CONTENT}")
+endif()
+
+add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
+target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
+
+set_target_properties(gen-huffman PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BMPLIB_BUILD_DIR}"
+)
+
+set(HUFFMAN_CODES_H "${BMPLIB_BUILD_DIR}/huffman-codes.h")
+
+add_custom_command(
+        OUTPUT "${HUFFMAN_CODES_H}"
+        COMMAND $<TARGET_FILE:gen-huffman> "${HUFFMAN_CODES_H}"
+        DEPENDS gen-huffman
+        COMMENT "Generating huffman-codes.h for bmplib"
+)
+
+add_custom_target(generate_bmplib_headers DEPENDS "${HUFFMAN_CODES_H}")
+
+file(GLOB BMPLIB_SOURCES "${BMPLIB_DIR}/*.c")
+list(REMOVE_ITEM BMPLIB_SOURCES
+        "${BMPLIB_DIR}/gen-huffman.c"
+        "${BMPLIB_DIR}/test-fileio-pipes.c"
+        "${BMPLIB_DIR}/test-read-conversions.c"
+        "${BMPLIB_DIR}/test-read-io.c"
+        "${BMPLIB_DIR}/test-write-io.c"
+)
+
+
+
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
 if(MSVC)
@@ -615,6 +659,15 @@ endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
+
+target_sources(libchisel PRIVATE ${BMPLIB_SOURCES})
+
+target_include_directories(libchisel SYSTEM PRIVATE
+        "${BMPLIB_DIR}"
+        "${BMPLIB_BUILD_DIR}"
+)
+
+add_dependencies(libchisel generate_bmplib_headers)
 
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)

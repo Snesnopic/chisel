@@ -71,3 +71,6 @@
 [submodule "third_party/taglib"]
 	path = third_party/taglib
 	url = https://github.com/taglib/taglib.git
+[submodule "third_party/bmplib"]
+	path = third_party/bmplib
+	url = https://github.com/rupertwh/bmplib.git
