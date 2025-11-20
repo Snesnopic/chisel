@@ -337,6 +337,12 @@ endif()
 add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
 target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
 
+if(MSVC)
+    target_compile_options(gen-huffman PRIVATE "/FIstdbool.h")
+else()
+    target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
+endif()
+
 set_target_properties(gen-huffman PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
