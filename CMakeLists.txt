@@ -344,20 +344,6 @@ else()
     target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
 endif()
 
-if(MSVC)
-    list(FILTER BMPLIB_SOURCES EXCLUDE REGEX "bmp-read-loadimage\\.c$")
-
-    set(BMP_ORIGINAL "${BMPLIB_DIR}/bmp-read-loadimage.c")
-    set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
-
-    file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
-    string(REPLACE "[static " "[" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
-    file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
-
-    list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
-
-endif()
-
 set_target_properties(gen-huffman PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
@@ -384,7 +370,18 @@ list(REMOVE_ITEM BMPLIB_SOURCES
         "${BMPLIB_DIR}/test-write-io.c"
 )
 
+if(MSVC)
+    list(FILTER BMPLIB_SOURCES EXCLUDE REGEX "bmp-read-loadimage\\.c$")
 
+    set(BMP_ORIGINAL "${BMPLIB_DIR}/bmp-read-loadimage.c")
+    set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
+
+    file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
+    string(REPLACE "[static " "[" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
+    file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
+
+    list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
+endif()
 
 # --- mozjpeg via ExternalProject ---
 include(ExternalProject)
