@@ -351,7 +351,7 @@ if(MSVC)
     set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
 
     file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
-    string(REPLACE "[static 4]" "[4]" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
+    string(REPLACE "[static " "[" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
     file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
 
     list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
