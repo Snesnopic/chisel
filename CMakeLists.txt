@@ -338,13 +338,13 @@ endif()
 set(BMP_HEADER_ORIGINAL "${BMPLIB_DIR}/bmplib.h")
 set(BMP_HEADER_PATCHED  "${BMPLIB_BUILD_DIR}/bmplib.h")
 
-if(EXISTS "${BMP_HEADER_ORIGINAL}")
+if(WIN32)
     file(READ "${BMP_HEADER_ORIGINAL}" BMP_HEADER_CONTENT)
     string(REPLACE
             "#if defined (WIN32) || defined (_WIN32)"
-            "#if (defined (WIN32) || defined (_WIN32)) && !defined(BMP_STATIC)"
+            "#if 0"
             BMP_HEADER_CONTENT "${BMP_HEADER_CONTENT}")
-    file(WRITE "${BMP_HEADER_PATCHED}" "${BMP_HEADER_CONTENT}")
+    file(WRITE "${BMP_HEADER_ORIGINAL}" "${BMP_HEADER_CONTENT}")
 endif()
 
 add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
