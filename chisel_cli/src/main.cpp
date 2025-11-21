@@ -28,15 +28,31 @@
 inline void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
     const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
+    std::string eta_str = "??:??";
+    if (done > 0 && total > 0) {
+        const double rate = static_cast<double>(done) / elapsed_seconds; // files per second
+        const double remaining_items = static_cast<double>(total - done);
+        if (rate > 0) {
+            const double eta_seconds = remaining_items / rate;
+            const int eta_h = static_cast<int>(eta_seconds) / 3600;
+            const int eta_m = (static_cast<int>(eta_seconds) % 3600) / 60;
+            const int eta_s = static_cast<int>(eta_seconds) % 60;
 
-    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : (done > 0 ? 1.0 : 0.0);
+            std::ostringstream oss;
+            if (eta_h > 0) oss << eta_h << "h ";
+            oss << std::setfill('0') << std::setw(2) << eta_m << "m "
+                << std::setw(2) << eta_s << "s";
+            eta_str = oss.str();
+        }
+    }
+    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
     const unsigned pos = static_cast<unsigned>(bar_width * progress);
 
     double percent = progress * 100.0;
     if (done < total && percent >= 99.95) {
         percent = 99.9;
     }
-    if (done == total) {
+    if (done == total && total > 0) {
         percent = 100.0;
     }
 
@@ -50,7 +66,8 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
     std::cerr << "] "
               << std::setw(5) << std::fixed << std::setprecision(1) << percent << "%"
               << " (" << done << "/" << total << ")"
-              << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
+              << " ETA: " << eta_str
+              // << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
               << std::flush;
 }
 
@@ -161,7 +178,7 @@ int main(int argc, char* argv[]) {
     }
 
     // progress tracking
-    size_t total = inputs.size();
+    size_t total = 0;
     std::atomic<size_t> done{0};
     auto start_total = std::chrono::steady_clock::now();
 
@@ -172,8 +189,11 @@ int main(int argc, char* argv[]) {
 
     // update total if a container is extracted (finalization step counts as extra work)
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
+        if (e.scheduled) {
+            total++;
+        }
         if (e.extracted) {
-            total += e.num_children;
+            total++;
         }
     });
 
@@ -244,7 +264,7 @@ int main(int argc, char* argv[]) {
         c.success = true;
         c.size_after = e.final_size;
         container_results.push_back(std::move(c));
-
+        on_finish(e);
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
