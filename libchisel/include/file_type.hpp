@@ -102,6 +102,12 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/x-zstd",          ContainerFormat::Zstd },
     { "application/vnd.comicbook+rar",  ContainerFormat::Rar },
     { "application/x-cbr",              ContainerFormat::Rar },
+    { "application/vnd.ms-package.3dmanufacturing-3dmodel+xml", ContainerFormat::Zip },
+    { "application/vnd.google-earth.kmz",       ContainerFormat::Zip },
+    { "application/vsix",                       ContainerFormat::Zip },
+    { "application/zip",                        ContainerFormat::Zip },
+    { "application/java-archive",               ContainerFormat::Zip },
+    { "application/vnd.android.package-archive", ContainerFormat::Apk },
 };
 
 /**
@@ -191,6 +197,12 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "cpio") return ContainerFormat::Cpio;
     if (s == "a" || s == "ar" || s == "lib") return ContainerFormat::Ar;
     if (s == "zst" || s == "zstd" || s == "tzst") return ContainerFormat::Zstd;
+    if (s == "3mf")   return ContainerFormat::Zip;
+    if (s == "kmz")   return ContainerFormat::Zip;
+    if (s == "vsix")  return ContainerFormat::Zip;
+    if (s == "nupkg") return ContainerFormat::Zip;
+    if (s == "war" || s == "ear") return ContainerFormat::Jar;
+    if (s == "aab")   return ContainerFormat::Apk;
     return std::nullopt;
 }
 
@@ -277,6 +289,13 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".oxps",   "application/oxps"},
     {".apk",    "application/vnd.android.package-archive"},
     {".cbr",    "application/vnd.comicbook+rar"},
+    {".3mf",    "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"},
+    {".kmz",    "application/vnd.google-earth.kmz"},
+    {".vsix",   "application/zip"},
+    {".nupkg",  "application/zip"},
+    {".war",    "application/java-archive"},
+    {".ear",    "application/java-archive"},
+    {".aab",    "application/vnd.android.package-archive"},
 
     // images
     {".jpg",    "image/jpeg"},
