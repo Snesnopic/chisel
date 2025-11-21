@@ -100,6 +100,8 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/x-archive",       ContainerFormat::Ar },
     { "application/zstd",            ContainerFormat::Zstd },
     { "application/x-zstd",          ContainerFormat::Zstd },
+    { "application/vnd.comicbook+rar",  ContainerFormat::Rar },
+    { "application/x-cbr",              ContainerFormat::Rar },
 };
 
 /**
@@ -274,6 +276,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".xps",    "application/vnd.ms-xpsdocument"},
     {".oxps",   "application/oxps"},
     {".apk",    "application/vnd.android.package-archive"},
+    {".cbr",    "application/vnd.comicbook+rar"},
 
     // images
     {".jpg",    "image/jpeg"},
