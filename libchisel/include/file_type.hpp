@@ -54,6 +54,10 @@ enum class ContainerFormat {
     Dwfx,
     Xps,
     Apk,
+    Iso,
+    Cpio,
+    Ar,
+    Zstd,
     Unknown
 };
 
@@ -91,6 +95,11 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/vnd.ms-xpsdocument", ContainerFormat::Xps },
     { "application/oxps",               ContainerFormat::Xps },
     { "application/vnd.android.package-archive", ContainerFormat::Apk },
+    { "application/x-iso9660-image", ContainerFormat::Iso },
+    { "application/x-cpio",          ContainerFormat::Cpio },
+    { "application/x-archive",       ContainerFormat::Ar },
+    { "application/zstd",            ContainerFormat::Zstd },
+    { "application/x-zstd",          ContainerFormat::Zstd },
 };
 
 /**
@@ -127,6 +136,10 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Dwfx:     return "dwfx";
         case ContainerFormat::Xps:      return "xps";
         case ContainerFormat::Apk:      return "apk";
+        case ContainerFormat::Iso:      return "iso";
+        case ContainerFormat::Cpio:     return "cpio";
+        case ContainerFormat::Ar:       return "a";
+        case ContainerFormat::Zstd:     return "zst";
         default:                        return "unknown";
     }
 }
@@ -172,6 +185,10 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "pdf")   return ContainerFormat::Pdf;
     if (s == "xps" || s == "oxps") return ContainerFormat::Xps;
     if (s == "apk") return ContainerFormat::Apk;
+    if (s == "iso")  return ContainerFormat::Iso;
+    if (s == "cpio") return ContainerFormat::Cpio;
+    if (s == "a" || s == "ar" || s == "lib") return ContainerFormat::Ar;
+    if (s == "zst" || s == "zstd" || s == "tzst") return ContainerFormat::Zstd;
     return std::nullopt;
 }
 
@@ -220,6 +237,10 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Xps:
         case ContainerFormat::Apk:
         case ContainerFormat::Pdf:
+        case ContainerFormat::Iso:
+        case ContainerFormat::Cpio:
+        case ContainerFormat::Ar:
+        case ContainerFormat::Zstd:
             return true;
         default:
             return false;

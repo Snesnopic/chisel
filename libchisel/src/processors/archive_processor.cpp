@@ -174,6 +174,7 @@ static ContainerFormat detect_format(const fs::path& path) {
         if (fname.ends_with(".tar.gz"))  return ContainerFormat::Tar;
         if (fname.ends_with(".tar.bz2")) return ContainerFormat::Tar;
         if (fname.ends_with(".tar.xz"))  return ContainerFormat::Tar;
+        if (fname.ends_with(".tar.zst") || fname.ends_with(".tzst")) return ContainerFormat::Zstd;
     }
     return ContainerFormat::Unknown;
 }
@@ -372,6 +373,32 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                     archive_write_set_filter_option(a, "xz", "compression-level", "9");
                 }
             }
+            break;
+        case ContainerFormat::Zstd:
+            r = archive_write_set_format_pax_restricted(a);
+            if (r == ARCHIVE_OK) {
+                r = archive_write_add_filter_zstd(a);
+                if (r == ARCHIVE_OK) {
+                    archive_write_set_filter_option(a, "zstd", "compression-level", "22");
+                }
+            }
+            break;
+
+        case ContainerFormat::Iso:
+            r = archive_write_set_format_iso9660(a);
+            if (r == ARCHIVE_OK) {
+                archive_write_set_format_option(a, "iso9660", "joliet", "1");
+                archive_write_set_format_option(a, "iso9660", "rockridge", "1");
+                archive_write_set_format_option(a, "iso9660", "pad", "0");
+            }
+            break;
+
+        case ContainerFormat::Cpio:
+            r = archive_write_set_format_cpio(a);
+            break;
+
+        case ContainerFormat::Ar:
+            r = archive_write_set_format_ar_bsd(a);
             break;
         default:
             Logger::log(LogLevel::Error, "Unsupported output format for writing: " + container_format_to_string(fmt), processor_tag());
