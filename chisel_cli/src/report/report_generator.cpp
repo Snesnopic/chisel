@@ -49,6 +49,23 @@ static std::string strip_ansi(const std::string& s) {
     return std::regex_replace(s, ansi_pattern, "");
 }
 
+static std::string csv_escape(const std::string& data) {
+    if (data.find_first_of(",\"\n\r") == std::string::npos) {
+        return data;
+    }
+    std::string result;
+    result.reserve(data.size() + 4);
+    result.push_back('"');
+    for (char c : data) {
+        if (c == '"') {
+            result.push_back('"'); // escape quote with another quote
+        }
+        result.push_back(c);
+    }
+    result.push_back('"');
+    return result;
+}
+
 void print_console_report(const std::vector<Result>& results,
                           const std::vector<ContainerResult>& container_results,
                           const unsigned num_threads,
@@ -116,7 +133,7 @@ void print_console_report(const std::vector<Result>& results,
               << std::setw(max_result)<< "Result"
               << std::setw(max_error) << "Error"
               << "\n";
-
+    uintmax_t total_original = 0;
     uintmax_t total_saved = 0;
     auto sorted = results;
     std::ranges::sort(sorted, [](const auto& a, const auto& b) {
@@ -133,6 +150,7 @@ void print_console_report(const std::vector<Result>& results,
         std::string outcome = !r.success ? "\033[1;31mFAIL\033[0m"
                                          : r.replaced ? "\033[1;32mOK (replaced)\033[0m"
                                                       : "\033[1;33mOK (skipped)\033[0m";
+        total_original += r.size_before;
         if (r.replaced && r.size_before > r.size_after)
             total_saved += r.size_before - r.size_after;
 
@@ -199,14 +217,19 @@ void print_console_report(const std::vector<Result>& results,
             const auto size_after = c.size_after / 1024;
             const auto fileName = c.filename.filename().string();
             std::cerr << std::left << std::setw(40) << fileName
-<< std::setw(12) << size_before
+                      << std::setw(12) << size_before
                       << std::setw(12) << size_after
                       << std::setw(8)  << delta
                       << c.error_msg
                       << "\n";
         }
     }
+
     std::cerr << "\nTotal saved space: " << (total_saved / 1024) << " KB\n";
+    if (total_original > 0) {
+        double total_pct = 100.0 * (static_cast<double>(total_saved) / static_cast<double>(total_original));
+        std::cerr << "Total reduction: " << std::fixed << std::setprecision(2) << total_pct << "%\n";
+    }
     std::cerr << "Total time: " << std::fixed << std::setprecision(2)
               << total_seconds << " s (" << num_threads << " thread"
               << (num_threads > 1U ? "s" : "") << ")\n";
@@ -243,9 +266,9 @@ void export_csv_report(const std::vector<Result>& results,
             }
         }
 
-        out << '"' << r.path.filename().string() << "\","
-            << '"' << (r.container_origin ? r.container_origin->filename().string() : "") << "\","
-            << r.mime << ","
+        out << csv_escape(r.path.filename().string()) << ","
+            << csv_escape(r.container_origin ? r.container_origin->filename().string() : "") << ","
+            << csv_escape(r.mime) << ","
             << (r.size_before / 1024) << ","
             << (r.size_after / 1024) << ",";
 
@@ -256,9 +279,9 @@ void export_csv_report(const std::vector<Result>& results,
         std::ostringstream osstime;
         osstime << std::fixed << std::setprecision(2) << r.seconds;
         out << osstime.str() << ","
-            << outcome << ","
-            << '"' << codecs_str << "\","
-            << '"' << r.error_msg << "\"\n";
+            << csv_escape(outcome) << ","
+            << csv_escape(codecs_str) << ","
+            << csv_escape(r.error_msg) << "\n";
     }
     if (!container_results.empty()) {
         out << "\n\nContainer,Format,Before(KB),After(KB),Delta(%),Error\n";
@@ -266,14 +289,14 @@ void export_csv_report(const std::vector<Result>& results,
             double pct = c.success && c.size_before
                          ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
                          : 0.0;
-            out << '"' << c.filename.filename().string() << "\","
-                << c.format << ","
+            out << csv_escape(c.filename.filename().string()) << ","
+                << csv_escape(c.format) << ","
                 << (c.size_before / 1024) << ","
                 << (c.size_after / 1024) << ",";
             std::ostringstream osspct;
             osspct << std::fixed << std::setprecision(2) << (c.success ? pct : 0.0);
             out << osspct.str() << ","
-                << '"' << c.error_msg << "\"\n";
+                << csv_escape(c.error_msg) << "\n";
         }
     }
 
