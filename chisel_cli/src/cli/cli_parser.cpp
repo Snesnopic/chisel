@@ -67,7 +67,7 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
 
     app.add_option("--log-level", settings.log_level,
                    "Log level: ERROR, WARNING, INFO, DEBUG, NONE.")
-                   ->default_val("INFO")
+                   ->default_val("WARNING")
                    ->check(CLI::IsMember({"ERROR", "WARNING", "INFO", "DEBUG", "NONE"}, CLI::ignore_case));
 
     // encoding mode option with a map transformer
