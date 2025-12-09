@@ -72,6 +72,8 @@ set(LIBCHISEL_SOURCES
         src/processors/bmp_processor.cpp
         include/pnm_processor.hpp
         src/processors/pnm_processor.cpp
+        include/chisel.hpp
+        src/utils/chisel.cpp
 )
 if(NOT WIN32)
     list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
