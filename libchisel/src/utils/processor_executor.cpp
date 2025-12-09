@@ -269,9 +269,15 @@ namespace chisel {
                             if (size_improved && checksum_ok) {
                                 handle_temp_file(file, last_tmp, orig_size, duration);
                             } else {
-                                std::error_code ec;
-                                fs::remove(last_tmp, ec);
-                                event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                                if (!checksum_ok) {
+                                    std::error_code ec;
+                                    fs::remove(last_tmp, ec);
+                                    event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected"});
+                                } else {
+                                    std::error_code ec;
+                                    fs::remove(last_tmp, ec);
+                                    event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                                }
                             }
                         } else {
                             auto err = std::error_code{};
