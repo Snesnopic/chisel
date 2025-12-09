@@ -269,9 +269,7 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
  * @param content The ExtractedContent struct containing the state.
  * @return Path to the newly created temporary FLAC file.
  */
-std::filesystem::path FlacProcessor::finalize_extraction(
-    const ExtractedContent &content,
-    [[maybe_unused]] ContainerFormat target_format)
+std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content)
 {
     Logger::log(LogLevel::Info, "FLAC: Finalizing (re-inserting covers) for: " + content.original_path.string(), "flac_processor");
 

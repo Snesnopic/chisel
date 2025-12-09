@@ -46,8 +46,7 @@ namespace chisel {
         std::optional<ExtractedContent> prepare_extraction(
             const std::filesystem::path& input_path) override;
 
-        std::filesystem::path finalize_extraction(const ExtractedContent &content,
-                                                  ContainerFormat target_format) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
 
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }
     };

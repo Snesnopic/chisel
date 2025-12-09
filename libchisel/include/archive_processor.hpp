@@ -127,8 +127,7 @@ public:
      * @return Path to the newly created temporary archive file.
      * @throws std::runtime_error if archive creation fails.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content,
-                                              ContainerFormat target_format) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
 
     // --- integrity check ---
 

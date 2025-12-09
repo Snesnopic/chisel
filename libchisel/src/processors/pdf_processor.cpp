@@ -206,8 +206,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content,
-                                                        ContainerFormat /*target_format*/) {
+std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content) {
     Logger::log(LogLevel::Info, "Finalizing PDF container: " + content.original_path.string(), "pdf_processor");
 
     try {

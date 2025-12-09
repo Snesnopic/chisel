@@ -55,8 +55,7 @@ std::optional<ExtractedContent> WavProcessor::prepare_extraction(const fs::path&
     return content;
 }
 
-std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &content,
-                                                        ContainerFormat /*target_format*/) {
+std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &content) {
     Logger::log(LogLevel::Info, "WAV: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

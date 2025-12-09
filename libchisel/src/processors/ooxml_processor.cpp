@@ -152,8 +152,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
     return content;
 }
 
-std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent& content,
-                                                          ContainerFormat /*target_format*/) {
+std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent& content) {
     Logger::log(LogLevel::Info, "Finalizing OOXML: " + content.original_path.filename().string(), processor_tag());
 
     namespace fs = std::filesystem;

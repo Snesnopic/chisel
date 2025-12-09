@@ -100,8 +100,7 @@ public:
      * @return Path to the newly created temporary PDF file.
      * @throws std::runtime_error if qpdf fails.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content,
-                                              ContainerFormat target_format) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
 
     /**
      * @brief Compares two PDF files by their raw stream content.

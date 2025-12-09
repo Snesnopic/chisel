@@ -61,7 +61,6 @@ public:
      *
      * @param registry Reference to a ProcessorRegistry with available processors.
      * @param preserve_metadata Whether to preserve metadata during recompression.
-     * @param format Target container format for unencodable archives (e.g., RAR).
      * @param verify_checksums Whether to verify data integrity after recompression.
      * @param mode Encoding mode (PIPE or PARALLEL).
      * @param dry_run If true, do not write or replace files.
@@ -71,7 +70,6 @@ public:
      */
     explicit ProcessorExecutor(ProcessorRegistry& registry,
                                bool preserve_metadata,
-                               ContainerFormat format,
                                bool verify_checksums,
                                EncodeMode mode,
                                bool dry_run,
@@ -152,10 +150,8 @@ private:
     bool dry_run_;                                ///< If true, no files are written
     std::filesystem::path output_dir_;            ///< Optional output directory
     bool has_output_dir_;                         ///< Convenience flag for !output_dir_.empty()
-    ContainerFormat format_;                      ///< Target format for un-writable containers
     std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
     std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
-    std::mutex log_mutex_;                        ///< (DEPRECATED - logging is now sink-based)
     ThreadPool pool_;                             ///< Thread pool for Phase 2
     std::atomic<bool> stop_flag_{false};       ///< Flag to signal interruption
     EventBus& event_bus_;                         ///< Bus for publishing events

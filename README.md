@@ -138,15 +138,10 @@ sudo cmake --install . --prefix /usr/local
 -   `--regenerate-magic`
     Re-install the libmagic file-detection database. (Linux and macOS)
 
--   `--recompress-unencodable <FORMAT>`
-    Recompress archives that can be opened but not re-written (like RAR)
-    into a different format (zip, 7z, tar, gz, bz2, xz, wim).
-    If not specified, such archives are left untouched.
 
 **Examples:**
 -   `./chisel file.jpg dir/ --recursive --threads 4`
 -   `./chisel archive.zip`
--   `./chisel archive.rar --recompress-unencodable 7z`
 -   `./chisel dir/ --report report.csv`
 -   `cat file.png | ./chisel - -o out.png`
 -   `cat file.png | ./chisel - > out.png`

@@ -21,7 +21,6 @@ namespace fs = std::filesystem;
 namespace chisel {
     ProcessorExecutor::ProcessorExecutor(ProcessorRegistry &registry,
                                          const bool preserve_metadata,
-                                         const ContainerFormat format,
                                          const bool verify_checksums,
                                          const EncodeMode mode,
                                          const bool dry_run,
@@ -34,7 +33,6 @@ namespace chisel {
           dry_run_(dry_run),
           output_dir_(std::move(output_dir)),
           has_output_dir_(!output_dir_.empty()),
-          format_(format),
           pool_(threads),
           event_bus_(bus),
           mode_(mode)
@@ -373,7 +371,7 @@ namespace chisel {
 
             try {
                 auto start = std::chrono::steady_clock::now();
-                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content, format_);
+                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content);
                 auto end = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 

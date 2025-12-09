@@ -117,8 +117,7 @@ public:
      * @return Path to the newly created optimized temporary container, or an
      * empty path if finalization failed or was skipped.
      */
-    virtual std::filesystem::path finalize_extraction(const ExtractedContent &content,
-                                                      ContainerFormat target_format) = 0;
+    virtual std::filesystem::path finalize_extraction(const ExtractedContent &content) = 0;
 
     // --- integrity check ---
 

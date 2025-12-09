@@ -75,8 +75,7 @@ namespace chisel {
          * @brief MiniSEED is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &,
-                                                  [[maybe_unused]] ContainerFormat target_format) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
 
         /**
          * @brief (Not Implemented) Compute a raw checksum.

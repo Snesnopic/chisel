@@ -640,31 +640,8 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     return content;
 }
 
-std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content,
-                                                            const ContainerFormat target_format) {
-    auto out_fmt = ContainerFormat::Unknown;
-
-    if (can_write_format(content.format)) {
-        out_fmt = content.format;
-    } else if (target_format != ContainerFormat::Unknown) {
-        out_fmt = target_format;
-        Logger::log(
-            LogLevel::Info,
-            "Non writable format (" + container_format_to_string(content.format) + "), recompressing in: " +
-            container_format_to_string(out_fmt),
-            processor_tag()
-        );
-    } else {
-        Logger::log(
-            LogLevel::Info,
-            "Non writable format and no alternative format: left intact -> " + content.original_path.filename().string(),
-            processor_tag()
-        );
-        std::error_code ec;
-        fs::remove_all(content.temp_dir, ec);
-        return {};
-    }
-
+std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content) {
+    const auto out_fmt = content.format;
     const fs::path src_path(content.original_path);
     const std::string out_ext = "." + container_format_to_string(out_fmt);
 

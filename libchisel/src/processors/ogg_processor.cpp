@@ -277,8 +277,7 @@ std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path&
     return content;
 }
 
-std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &content,
-                                                        ContainerFormat /*target_format*/) {
+std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &content) {
     Logger::log(LogLevel::Info, "OGG: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

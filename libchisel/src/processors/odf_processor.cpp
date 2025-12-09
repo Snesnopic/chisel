@@ -124,8 +124,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& content,
-                                                        ContainerFormat /*target_format*/) {
+std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& content) {
     Logger::log(LogLevel::Info, "Finalizing ODF: " + content.original_path.filename().string(), processor_tag());
 
     namespace fs = std::filesystem;

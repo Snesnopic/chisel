@@ -85,16 +85,6 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_option("--exclude", settings.exclude_patterns,
                    "Do not process files matching regex PATTERN. (Can be used multiple times).");
 
-    // option with custom validator
-    app.add_option("--recompress-unencodable",
-                   [&settings](const CLI::results_t& res) {
-                       // this lambda is called only if validation passes
-                       settings.unencodable_target_format = parse_container_format(res[0]);
-                       return true;
-                   }, "Recompress archives that can be opened but not recompressed\n"
-                   "into a different format (zip, 7z, tar, gz, bz2, xz, wim).")
-                   ->check(ContainerFormatValidator());
-
     // --- Positional Arguments ---
     app.add_option("inputs", settings.inputs, "One or more files or directories (use '-' for stdin)")
         ->required()

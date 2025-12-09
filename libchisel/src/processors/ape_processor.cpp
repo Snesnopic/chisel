@@ -205,8 +205,7 @@ std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content,
-                                                        ContainerFormat /*target_format*/) {
+std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content) {
     Logger::log(LogLevel::Info, "APE: Finalizing (re-inserting covers) for: " + content.original_path.string(), "ape_processor");
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

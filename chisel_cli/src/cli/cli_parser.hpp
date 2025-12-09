@@ -27,7 +27,6 @@ struct Settings {
     std::string log_level = "INFO";
     std::filesystem::path output_path;
     std::filesystem::path report_path;
-    std::optional<ContainerFormat> unencodable_target_format;
     EncodeMode encode_mode = EncodeMode::PIPE;
     std::vector<std::string> include_patterns;
     std::vector<std::string> exclude_patterns;

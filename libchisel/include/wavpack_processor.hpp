@@ -75,8 +75,7 @@ namespace chisel {
          * @brief This format cannot be extracted.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &,
-                                                  [[maybe_unused]] ContainerFormat target_format) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
 
         // --- integrity check ---
 

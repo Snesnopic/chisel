@@ -80,8 +80,7 @@ namespace chisel {
          * @param target_format Ignored.
          * @return Path to the finalized MP3 file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &content,
-                                                  ContainerFormat target_format) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
 
         // --- integrity check ---
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }

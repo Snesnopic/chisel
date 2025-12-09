@@ -287,7 +287,6 @@ int main(int argc, char* argv[]) {
     // build executor
     ProcessorExecutor executor(registry,
                                 settings.should_preserve_metadata(),
-                        settings.unencodable_target_format.value_or(ContainerFormat::Unknown),
                                settings.verify_checksums,
                                settings.encode_mode,
                                settings.dry_run,

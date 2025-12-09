@@ -64,7 +64,7 @@ public:
      * @param target_format (Ignored)
      * @return Path to the newly finalized FLAC file.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content, ContainerFormat target_format) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
     /**
      * @brief Recompresses a FLAC file using libFLAC.
      *
