@@ -34,45 +34,39 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 20> kMimes = {
+        static constexpr std::array<std::string_view, 14> kMimes = {
             "application/zip",
-            //"application/x-7z-compressed", // 7z write support is complex
+            // "application/x-7z-compressed", // 7z write support is limited/complex
             "application/x-tar",
             //"application/gzip", // Handled as filters, not primary formats
             //"application/x-bzip2",
             //"application/x-xz",
             "application/x-iso9660-image",
             "application/x-cpio",
-            //"application/x-lzma",
+            // "application/x-lzma",
             "application/vnd.ms-cab-compressed",
-            //"application/x-ms-wim", // Write not supported by libarchive
+            // "application/x-ms-wim", // Write not supported
             "application/java-archive",
             "application/x-xpinstall",
             "application/vnd.android.package-archive",
             "application/vnd.comicbook+zip",
             "application/vnd.comicbook+tar",
-            "application/vnd.rar",
-            "application/x-rar-compressed",
             "application/epub+zip",
-            "application/x-iso9660-image",
-            "application/x-cpio",
             "application/x-archive",
             "application/zstd",
-            "application/x-zstd",
-            "application/vnd.comicbook+rar",
-            "application/x-cbr"
+            "application/x-zstd"
         };
         return {kMimes.data(), kMimes.size()};
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 21> kExts = {
-            ".zip", //".7z",
-            ".tar", //".bz2", ".gz",".xz",
-            ".iso", ".cpio", ".lzma", ".cab", //".wim",
+        static constexpr std::array<std::string_view, 17> kExts = {
+            ".zip", // ".7z",
+            ".tar", // ".bz2", ".gz", ".xz",
+            ".iso", ".cpio", ".lzma", ".cab", // ".wim",
             ".jar", ".xpi", ".apk",
-            ".cbz", ".cbt", ".rar", ".cbr",
-            ".epub", ".iso", ".cpio",
+            ".cbz", ".cbt",
+            ".epub",
             ".a", ".ar", ".lib",
             ".zst", ".tzst"
         };
