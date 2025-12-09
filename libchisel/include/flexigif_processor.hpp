@@ -64,6 +64,8 @@ namespace chisel {
                         const std::filesystem::path& output,
                         bool preserve_metadata) override;
 
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
         /**
          * @brief GIF is not a container format.
          * @return std::nullopt
