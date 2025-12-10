@@ -23,48 +23,53 @@ static const char* processor_tag() {
 
 namespace {
 
-    // file* wrappers for unicode path support on windows
+    // Base struct for IO callbacks to access input file
+    struct OggIO {
+        FILE* f_in = nullptr;
+    };
 
     FLAC__StreamDecoderReadStatus read_cb(const FLAC__StreamDecoder*, FLAC__byte buffer[], size_t *bytes, void *client_data) {
-        FILE* f = static_cast<FILE*>(client_data);
+        auto* io = static_cast<OggIO*>(client_data);
         if (*bytes > 0) {
-            *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, f);
-            if (*bytes == 0 && ferror(f)) return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
-            if (*bytes == 0 && feof(f)) return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
+            *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, io->f_in);
+            if (*bytes == 0 && ferror(io->f_in)) return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+            if (*bytes == 0 && feof(io->f_in)) return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
             return FLAC__STREAM_DECODER_READ_STATUS_CONTINUE;
         }
         return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
     }
 
     FLAC__StreamDecoderSeekStatus seek_cb(const FLAC__StreamDecoder*, FLAC__uint64 absolute_byte_offset, void *client_data) {
-        FILE* f = static_cast<FILE*>(client_data);
-        if (fseek(f, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
+        auto* io = static_cast<OggIO*>(client_data);
+        if (fseek(io->f_in, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
         return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
     }
 
     FLAC__StreamDecoderTellStatus tell_cb(const FLAC__StreamDecoder*, FLAC__uint64 *absolute_byte_offset, void *client_data) {
-        const auto f = static_cast<FILE*>(client_data);
-        const long pos = ftell(f);
+        auto* io = static_cast<OggIO*>(client_data);
+        const long pos = ftell(io->f_in);
         if (pos < 0) return FLAC__STREAM_DECODER_TELL_STATUS_ERROR;
         *absolute_byte_offset = static_cast<FLAC__uint64>(pos);
         return FLAC__STREAM_DECODER_TELL_STATUS_OK;
     }
 
     FLAC__StreamDecoderLengthStatus length_cb(const FLAC__StreamDecoder*, FLAC__uint64 *stream_length, void *client_data) {
-        const auto f = static_cast<FILE*>(client_data);
-        const long curr = ftell(f);
-        fseek(f, 0, SEEK_END);
-        const long len = ftell(f);
-        fseek(f, curr, SEEK_SET);
+        auto* io = static_cast<OggIO*>(client_data);
+        const long curr = ftell(io->f_in);
+        fseek(io->f_in, 0, SEEK_END);
+        const long len = ftell(io->f_in);
+        fseek(io->f_in, curr, SEEK_SET);
         if (len < 0) return FLAC__STREAM_DECODER_LENGTH_STATUS_ERROR;
         *stream_length = static_cast<FLAC__uint64>(len);
         return FLAC__STREAM_DECODER_LENGTH_STATUS_OK;
     }
 
     FLAC__bool eof_cb(const FLAC__StreamDecoder*, void *client_data) {
-        const auto f = static_cast<FILE*>(client_data);
-        return feof(f) ? true : false;
+        auto* io = static_cast<OggIO*>(client_data);
+        return feof(io->f_in) ? true : false;
     }
+
+    // --- Encoder Callbacks ---
 
     FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], size_t bytes, unsigned, unsigned, void *client_data) {
         const auto f = static_cast<FILE*>(client_data);
@@ -86,8 +91,9 @@ namespace {
         return FLAC__STREAM_ENCODER_TELL_STATUS_OK;
     }
 
-    // context to share state between decoder and encoder callbacks
-    struct TranscodeContext {
+    // --- Contexts ---
+
+    struct TranscodeContext : OggIO {
         FLAC__StreamEncoder* encoder = nullptr;
         FILE* f_out = nullptr;
         bool encoder_init = false;
@@ -102,13 +108,10 @@ namespace {
         }
     };
 
-    // metadata callback: accumulates tags to preserve
     void dec_metadata_cb(const FLAC__StreamDecoder*, const FLAC__StreamMetadata* metadata, void* client_data) {
         auto* ctx = static_cast<TranscodeContext*>(client_data);
         if (!ctx->preserve_metadata) return;
 
-        // preserve vorbis comments (tags)
-        // pictures are handled separately by finalize_extraction, so we skip them here to avoid duplication/conflicts
         if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
             FLAC__StreamMetadata* copy = FLAC__metadata_object_clone(metadata);
             if (copy) {
@@ -117,22 +120,18 @@ namespace {
         }
     }
 
-    // error callback
     void dec_error_cb(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus status, void*) {
         Logger::log(LogLevel::Warning, "libflac warning: " + std::string(FLAC__StreamDecoderErrorStatusString[status]), processor_tag());
     }
 
-    // decoder write callback: lazy-inits encoder and feeds audio
     FLAC__StreamDecoderWriteStatus dec_write_cb(const FLAC__StreamDecoder*, const FLAC__Frame* frame, const FLAC__int32* const buffer[], void* client_data) {
         auto* ctx = static_cast<TranscodeContext*>(client_data);
 
         if (!ctx->encoder_init) {
-            // configure encoder parameters from first frame
             FLAC__stream_encoder_set_channels(ctx->encoder, frame->header.channels);
             FLAC__stream_encoder_set_bits_per_sample(ctx->encoder, frame->header.bits_per_sample);
             FLAC__stream_encoder_set_sample_rate(ctx->encoder, frame->header.sample_rate);
 
-            // max compression
             FLAC__stream_encoder_set_compression_level(ctx->encoder, 8);
             FLAC__stream_encoder_set_blocksize(ctx->encoder, 0);
             FLAC__stream_encoder_set_do_exhaustive_model_search(ctx->encoder, true);
@@ -143,12 +142,10 @@ namespace {
             FLAC__stream_encoder_set_do_mid_side_stereo(ctx->encoder, true);
             FLAC__stream_encoder_set_loose_mid_side_stereo(ctx->encoder, false);
 
-            // set metadata before init
             if (!ctx->meta_blocks.empty()) {
                 FLAC__stream_encoder_set_metadata(ctx->encoder, ctx->meta_blocks.data(), static_cast<unsigned>(ctx->meta_blocks.size()));
             }
 
-            // init encoder in ogg mode
             if (FLAC__stream_encoder_init_ogg_stream(
                     ctx->encoder,
                     nullptr, write_cb, enc_seek_cb, enc_tell_cb, nullptr,
@@ -167,6 +164,65 @@ namespace {
         }
 
         return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+    }
+
+    // Helper for Raw Equal: Decodes Ogg FLAC to PCM
+    struct DecodeCtx : OggIO {
+        std::vector<int32_t> pcm;
+        unsigned channels = 0;
+        unsigned bps = 0;
+        unsigned sample_rate = 0;
+    };
+
+    FLAC__StreamDecoderWriteStatus raw_write_cb(const FLAC__StreamDecoder*, const FLAC__Frame* frame, const FLAC__int32* const buffer[], void* client_data) {
+        auto* c = static_cast<DecodeCtx*>(client_data);
+        if (c->channels == 0) {
+            c->channels = frame->header.channels;
+            c->bps = frame->header.bits_per_sample;
+            c->sample_rate = frame->header.sample_rate;
+        }
+
+        const size_t n = frame->header.blocksize;
+        for (size_t i = 0; i < n; ++i) {
+            for (unsigned ch = 0; ch < frame->header.channels; ++ch) {
+                c->pcm.push_back(buffer[ch][i]);
+            }
+        }
+        return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+    }
+
+    std::vector<int32_t> decode_ogg_pcm(const fs::path& file, unsigned& sr, unsigned& ch, unsigned& bps) {
+        FILE* f = chisel::open_file(file, "rb");
+        if (!f) return {};
+
+        FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();
+        if (!decoder) {
+            fclose(f);
+            return {};
+        }
+
+        DecodeCtx ctx;
+        ctx.f_in = f; // Set input for callbacks
+
+        auto error_cb_dummy = [](const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus, void*) {};
+
+        bool is_flac = false;
+        if (FLAC__stream_decoder_init_ogg_stream(decoder, read_cb, seek_cb, tell_cb, length_cb, eof_cb,
+                                                 raw_write_cb, nullptr, error_cb_dummy, &ctx) == FLAC__STREAM_DECODER_INIT_STATUS_OK) {
+            is_flac = true;
+            FLAC__stream_decoder_process_until_end_of_stream(decoder);
+        }
+
+        FLAC__stream_decoder_finish(decoder);
+        FLAC__stream_decoder_delete(decoder);
+        fclose(f);
+
+        if (!is_flac) return {};
+
+        sr = ctx.sample_rate;
+        ch = ctx.channels;
+        bps = ctx.bps;
+        return ctx.pcm;
     }
 
 } // namespace
@@ -194,11 +250,10 @@ void OggProcessor::recompress(const fs::path& input,
 
     // prepare context
     TranscodeContext ctx;
+    ctx.f_in = f_in; // FIXED: Set input file for callbacks
     ctx.encoder = encoder;
     ctx.preserve_metadata = preserve_metadata;
 
-    // attempt to init decoder as ogg-flac
-    // note: we don't pass f_out yet, it's opened only if format is confirmed
     FLAC__StreamDecoderInitStatus init_stat = FLAC__stream_decoder_init_ogg_stream(
         decoder,
         read_cb, seek_cb, tell_cb, length_cb, eof_cb,
@@ -209,7 +264,6 @@ void OggProcessor::recompress(const fs::path& input,
     bool is_flac_ogg = (init_stat == FLAC__STREAM_DECODER_INIT_STATUS_OK);
 
     if (!is_flac_ogg) {
-        // cleanup and fallback for non-flac ogg (vorbis, opus)
         FLAC__stream_decoder_delete(decoder);
         FLAC__stream_encoder_delete(encoder);
         fclose(f_in);
@@ -222,7 +276,6 @@ void OggProcessor::recompress(const fs::path& input,
         return;
     }
 
-    // it's ogg-flac, proceed with recompression
     FILE* f_out = chisel::open_file(output, "wb");
     if (!f_out) {
         FLAC__stream_decoder_delete(decoder);
@@ -298,7 +351,6 @@ std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &
         return {};
     }
 
-    // rebuild covers using taglib (preserves other tags, modifies file in-place)
     if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
         Logger::log(LogLevel::Error, "OGG: rebuildCovers failed", processor_tag());
         cleanup_temp_dir(content.temp_dir, processor_tag());
@@ -308,6 +360,32 @@ std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &
 
     cleanup_temp_dir(content.temp_dir, processor_tag());
     return final_temp_path;
+}
+
+std::string OggProcessor::get_raw_checksum(const std::filesystem::path&) const {
+    // raw checksum not available for Ogg streams easily
+    return "";
+}
+
+bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
+    unsigned ra, ca, bpsa;
+    unsigned rb, cb, bpsb;
+
+    auto pcmA = decode_ogg_pcm(a, ra, ca, bpsa);
+    auto pcmB = decode_ogg_pcm(b, rb, cb, bpsb);
+
+    // If both empty, it's likely non-FLAC Ogg (Vorbis/Opus) which we didn't recompress.
+    // In this case, we trust the copy operation.
+    if (pcmA.empty() && pcmB.empty()) {
+        return true;
+    }
+
+    // If one is FLAC and other is not (or broken), fail.
+    if (pcmA.empty() || pcmB.empty()) return false;
+
+    if (ra != rb || ca != cb || bpsa != bpsb) return false;
+
+    return pcmA == pcmB;
 }
 
 } // namespace chisel
