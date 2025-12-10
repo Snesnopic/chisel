@@ -576,36 +576,33 @@ else()
 endif()
 
 # gifsicle
-if(NOT WIN32)
-    add_library(giflib STATIC
-            third_party/gifsicle/src/clp.c
-            third_party/gifsicle/src/fmalloc.c
-            # third_party/gifsicle/src/gifdiff.c
-            third_party/gifsicle/src/giffunc.c
-            third_party/gifsicle/src/gifread.c
-            third_party/gifsicle/src/gifsicle.c
-            third_party/gifsicle/src/giftoc.c
-            third_party/gifsicle/src/gifunopt.c
-            # third_party/gifsicle/src/gifview.c
-            third_party/gifsicle/src/gifwrite.c
-            third_party/gifsicle/src/kcolor.c
-            third_party/gifsicle/src/merge.c
-            third_party/gifsicle/src/optimize.c
-            # third_party/gifsicle/src/opttemplate.c
-            third_party/gifsicle/src/quantize.c
-            # third_party/gifsicle/src/strerror.c
-            third_party/gifsicle/src/support.c
-            third_party/gifsicle/src/ungifwrt.c
-    )
-    if(WIN32 OR NOT APPLE)
-        target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
-    endif()
-    target_include_directories(giflib PUBLIC
-            third_party/gifsicle/include
-            third_party/gifsicle/src
-    )
+add_library(giflib STATIC
+        third_party/gifsicle/src/clp.c
+        third_party/gifsicle/src/fmalloc.c
+        # third_party/gifsicle/src/gifdiff.c
+        third_party/gifsicle/src/giffunc.c
+        third_party/gifsicle/src/gifread.c
+        third_party/gifsicle/src/gifsicle.c
+        third_party/gifsicle/src/giftoc.c
+        third_party/gifsicle/src/gifunopt.c
+        # third_party/gifsicle/src/gifview.c
+        third_party/gifsicle/src/gifwrite.c
+        third_party/gifsicle/src/kcolor.c
+        third_party/gifsicle/src/merge.c
+        third_party/gifsicle/src/optimize.c
+        # third_party/gifsicle/src/opttemplate.c
+        third_party/gifsicle/src/quantize.c
+        # third_party/gifsicle/src/strerror.c
+        third_party/gifsicle/src/support.c
+        third_party/gifsicle/src/ungifwrt.c
+)
+if(WIN32 OR NOT APPLE)
+    target_compile_definitions(giflib PRIVATE HAVE_UINTPTR_T=1)
 endif()
-
+target_include_directories(giflib PUBLIC
+        third_party/gifsicle/include
+        third_party/gifsicle/src
+)
 # Monkey's Audio
 set(MACLIB_HEADER "${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared/MACLib.h")
 if(EXISTS "${MACLIB_HEADER}")
