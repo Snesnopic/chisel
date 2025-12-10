@@ -577,18 +577,13 @@ endif()
 
 # gifsicle
 if(NOT WIN32)
-    configure_file(
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/win32cfg.h
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src/config.h
-            COPYONLY
-    )
     add_library(giflib STATIC
             third_party/gifsicle/src/clp.c
             third_party/gifsicle/src/fmalloc.c
-            third_party/gifsicle/src/gifdiff.c
+            # third_party/gifsicle/src/gifdiff.c
             third_party/gifsicle/src/giffunc.c
             third_party/gifsicle/src/gifread.c
-            # third_party/gifsicle/src/gifsicle.c
+            third_party/gifsicle/src/gifsicle.c
             third_party/gifsicle/src/giftoc.c
             third_party/gifsicle/src/gifunopt.c
             # third_party/gifsicle/src/gifview.c
@@ -672,9 +667,10 @@ set(CHISEL_LIBS
         mkclean_lib
         zlibstatic
         tag
+        giflib
 )
 if(NOT WIN32)
-    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a giflib)
+    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)
 endif()
 
 if(UNIX)

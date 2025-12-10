@@ -46,9 +46,6 @@
 [submodule "third_party/libmseed"]
 	path = third_party/libmseed
 	url = https://github.com/EarthScope/libmseed.git
-[submodule "third_party/gifsicle"]
-	path = third_party/gifsicle
-	url = https://github.com/kohler/gifsicle
 [submodule "third_party/xz"]
 	path = third_party/xz
 	url = https://github.com/tukaani-project/xz.git
@@ -74,3 +71,6 @@
 [submodule "third_party/bmplib"]
 	path = third_party/bmplib
 	url = https://github.com/rupertwh/bmplib.git
+[submodule "third_party/gifsicle"]
+	path = third_party/gifsicle
+	url = https://github.com/Snesnopic/gifsicle.git

@@ -42,7 +42,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<PngProcessor>());
     processors_.push_back(std::make_unique<ZopfliPngProcessor>());
     processors_.push_back(std::make_unique<WebpProcessor>());
-    // processors_.push_back(std::make_unique<GifProcessor>());
+    processors_.push_back(std::make_unique<GifProcessor>());
     processors_.push_back(std::make_unique<TgaProcessor>());
     processors_.push_back(std::make_unique<FlexiGifProcessor>());
     processors_.push_back(std::make_unique<TiffProcessor>());
