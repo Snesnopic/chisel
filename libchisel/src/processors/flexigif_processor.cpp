@@ -158,7 +158,7 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
         equal = false;
     } else {
         size_t totalBytes = static_cast<size_t>(wA) * hA * 4 * framesA;
-        if (std::memcmp(dataA, dataB, totalBytes) != 0) {
+        if (memcmp(dataA, dataB, totalBytes) != 0) {
             Logger::log(LogLevel::Debug, "raw_equal: pixel mismatch", "flexigif_processor");
             equal = false;
         }
