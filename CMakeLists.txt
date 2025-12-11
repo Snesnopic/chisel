@@ -347,6 +347,14 @@ target_include_directories(archive_static PRIVATE
 )
 add_dependencies(archive_static liblzma)
 target_compile_definitions(archive_static PRIVATE LZMA_API_STATIC)
+set(BZIP2_INCLUDE_DIR "${BZIP2_DIR}" CACHE PATH "" FORCE)
+set(BZIP2_LIBRARY_RELEASE bz2_static CACHE STRING "" FORCE)
+set(BZIP2_LIBRARY bz2_static CACHE STRING "" FORCE)
+set(BZIP2_LIBRARIES bz2_static CACHE STRING "" FORCE)
+
+set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "" FORCE)
+set(LIBLZMA_LIBRARY liblzma CACHE STRING "" FORCE)
+set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
 
 # bmplib
 set(BMPLIB_DIR "${CMAKE_SOURCE_DIR}/third_party/bmplib")
