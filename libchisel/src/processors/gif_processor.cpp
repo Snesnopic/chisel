@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <cstdio>
 #include <stdexcept>
+#include <cstring>
 #include <mutex>
 #include "file_utils.hpp"
 #include "stb_image.h"
