@@ -3,14 +3,13 @@ name: Multi-platform build
 on:
   push:
     branches: [ "main", "development" ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
-    name: ${{ matrix.platform_name }}
+    name: build (${{ matrix.id }})
     runs-on: ${{ matrix.runs_on }}
 
     strategy:
@@ -19,188 +18,135 @@ jobs:
         include:
           - id: ubuntu-gcc
             runs_on: ubuntu-latest
-            platform_name: "Linux x64 (GCC)"
-            asset_name: "linux-x64-gcc"
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            binary_path: bin/chisel
+            binary_path: bin/Release/chisel
+            asset_name: "linux-x64-gcc"
 
           - id: ubuntu-clang
             runs_on: ubuntu-latest
-            platform_name: "Linux x64 (Clang)"
-            asset_name: "linux-x64-clang"
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            binary_path: bin/chisel
+            binary_path: bin/Release/chisel
+            asset_name: "linux-x64-clang"
 
           - id: ubuntu-arm
             runs_on: ubuntu-24.04-arm
-            platform_name: "Linux ARM64"
-            asset_name: "linux-arm64-gcc"
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            binary_path: bin/chisel
+            binary_path: bin/Release/chisel
+            asset_name: "linux-arm64"
 
           - id: macos-intel
-            runs_on: macos-13
-            platform_name: "macOS Intel"
-            asset_name: "macos-x64"
+            runs_on: macos-15-intel
             build_type: Release
             c_compiler: gcc-12
             cpp_compiler: g++-12
-            binary_path: bin/chisel
+            binary_path: bin/Release/chisel
+            asset_name: "macos-x64"
 
           - id: macos-arm
-            runs_on: macos-latest
-            platform_name: "macOS Apple Silicon"
-            asset_name: "macos-arm64"
+            runs_on: macos-26
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            binary_path: bin/chisel
+            binary_path: bin/Release/chisel
+            asset_name: "macos-arm64"
 
           - id: windows-x86
             runs_on: windows-latest
-            platform_name: "Windows x86"
-            asset_name: "windows-x86"
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            arch: x86
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chisel.exe
+            asset_name: "windows-x64"
 
           - id: windows-arm
-            runs_on: windows-latest
-            platform_name: "Windows ARM64"
+            runs_on: windows-11-arm
+            build_type: Release
+            c_compiler: cl
+            cpp_compiler: cl
+            binary_path: bin/Release/chisel.exe
             asset_name: "windows-arm64"
-            build_type: Release
-            c_compiler: cl
-            cpp_compiler: cl
-            arch: arm64
-            binary_path: bin/Release/chisel
-
-          - id: windows-msvc
-            runs_on: windows-latest
-            platform_name: "Windows x64"
-            asset_name: "windows-x64"
-            build_type: Release
-            c_compiler: cl
-            cpp_compiler: cl
-            arch: x64
-            binary_path: bin/Release/chisel
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+          lfs: true
 
-      # --- Install Dependencies ---
-      - name: Install dependencies (Linux)
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config autoconf automake libtool m4 nasm yasm ninja-build
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            autoconf automake libtool m4 nasm yasm curl unzip tar gzip python3-pip
 
-      - name: Install dependencies (macOS)
+      - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install pkg-config autoconf automake libtool nasm yasm ninja
-
-      - name: Install dependencies (Windows)
+          brew update
+          brew remove --force $(brew list --formula)
+          brew remove --cask --force $(brew list)
+          brew install autoconf automake libtool nasm yasm cmake gcc@12
+      - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install nasm yasm ninja
+          echo "No Windows-specific build dependencies to install via script."
+        shell: bash
 
-      # --- Versioning ---
+      - name: Set build output directory
+        id: strings
+        shell: bash
+        run: echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: >
+          cmake -B ${{ steps.strings.outputs.build-output-dir }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -S ${{ github.workspace }}
+
+      - name: Build
+        run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+
       - name: Determine Version
-        id: get_version
         shell: bash
         run: |
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/}"
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
-            VERSION="dev"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Detected version: $VERSION"
-
-      # --- Build ---
-      - name: Configure CMake
-        run: >
-          cmake -B bin
-          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          -S ${{ github.workspace }}
-          ${{ (runner.os == 'Windows' && format('-A {0}', matrix.arch)) || '' }}
-
-      - name: Build
-        run: cmake --build bin --config ${{ matrix.build_type }} --parallel
-
-      - name: Test
-        working-directory: bin
-        run: ctest -C ${{ matrix.build_type }} --output-on-failure
-
-      # --- Verification ---
-      - name: Verify static linking (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          echo "Checking dependencies for Linux..."
-          ldd bin/chisel
-          if ldd bin/chisel | grep -E "libarchive|libpng|libjpeg|libflac|libz|libbz2|liblzma|libzstd"; then
-            echo "Error: Forbidden dynamic libraries found!"
-            exit 1
-          else
-            echo "OK: No forbidden dynamic libraries found."
+            echo "VERSION=dev" >> $GITHUB_ENV
           fi
 
-      - name: Verify static linking (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          echo "Checking dependencies for macOS..."
-          otool -L bin/chisel
-          if otool -L bin/chisel | grep -E "libarchive|libpng|libjpeg|libflac|libz\.|libbz2|liblzma|libzstd"; then
-            echo "Error: Forbidden dynamic libraries found!"
-            exit 1
-          else
-            echo "OK: No forbidden dynamic libraries found."
-          fi
-
-      - name: Verify static linking (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          echo "Checking dependencies for Windows..."
-          dumpbin /dependents "${{ matrix.binary_path }}.exe"
-          dumpbin /dependents "${{ matrix.binary_path }}.exe" | findstr /i "archive.dll png.dll jpeg.dll flac.dll zlib.dll bzip2.dll lzma.dll zstd.dll" > nul
-          if %errorlevel% equ 0 (
-            echo Error: Forbidden dynamic libraries found!
-            exit 1
-          ) else (
-            echo OK: No forbidden dynamic libraries found.
-          )
-
-      # --- Rename & Upload ---
       - name: Rename Binary
         shell: bash
         run: |
           EXT=""
           SRC="${{ matrix.binary_path }}"
-          
+
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             EXT=".exe"
-            # Assicurati di aggiungere .exe se non c'è nella variabile matrix
             if [[ "$SRC" != *".exe" ]]; then SRC="$SRC.exe"; fi
           fi
-          
+
           DEST="chisel-${{ matrix.asset_name }}-${{ env.VERSION }}$EXT"
-          
+
           echo "Renaming $SRC to $DEST"
           mv "$SRC" "$DEST"
-          
+
           echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
 
       - name: Upload binary artifact
@@ -210,8 +156,312 @@ jobs:
           path: ${{ env.ARTIFACT_PATH }}
           if-no-files-found: error
 
-  #  verify-static-linking-freebsd:
-  #    name: verify-static-linking (freebsd-${{ matrix.arch }})
+  #  build-freebsd:
+  #    name: build (freebsd-${{ matrix.arch }})
+  #    runs-on: ubuntu-latest
+  #    strategy:
+  #      fail-fast: false
+  #      matrix:
+  #        include:
+  #          - id: freebsd-x86
+  #            arch: amd64
+  #          - id: freebsd-arm
+  #            arch: arm64
+  #
+  #    steps:
+  #      - name: Checkout repository
+  #        uses: actions/checkout@v4
+  #        with:
+  #          submodules: recursive
+  #          fetch-depth: 0
+  #          lfs: true
+  #
+  #      - name: Setup Git LFS
+  #        run: |
+  #          git lfs install
+  #          git lfs pull
+  #
+  #      - name: Build on FreeBSD
+  #        uses: vmactions/freebsd-vm@v1
+  #        with:
+  #          arch: ${{ matrix.arch }}
+  #          release: 14.3
+  #          usesh: true
+  #          prepare: |
+  #            pkg install -y \
+  #              cmake \
+  #              ninja \
+  #              pkgconf \
+  #              autoconf \
+  #              automake \
+  #              libtool \
+  #              m4 \
+  #              nasm \
+  #              yasm \
+  #              gmake \
+  #              git \
+  #              llvm20
+  #          run: |
+  #            echo "--- Starting FreeBSD Build ---"
+  #
+  #            export MAKE=gmake
+  #
+  #            mkdir -p $HOME/bin
+  #            ln -s /usr/local/bin/gmake $HOME/bin/make
+  #            export PATH=$HOME/bin:$PATH
+  #
+  #            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+  #                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+  #                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+  #                  -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+  #                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+  #                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+  #
+  #            cmake --build build --config Release
+  #            echo "--- Build Complete ---"
+  #
+  #      - name: Upload binary artifact
+  #        uses: actions/upload-artifact@v4
+  #        with:
+  #          name: chisel-${{ matrix.id }}
+  #          path: ${{ github.workspace }}/build/bin/Release/chisel
+  #          retention-days: 7
+
+  test:
+    name: test (${{ matrix.id }})
+    needs: build
+    runs-on: ${{ matrix.runs_on }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: ubuntu-gcc
+            runs_on: ubuntu-latest
+          - id: ubuntu-clang
+            runs_on: ubuntu-latest
+          - id: ubuntu-arm
+            runs_on: ubuntu-24.04-arm
+          - id: macos-intel
+            runs_on: macos-15-intel
+          - id: macos-arm
+            runs_on: macos-26
+          - id: windows-x86
+            runs_on: windows-latest
+          # disabled, takes longer than 6 hours
+          #- id: windows-arm
+          #  runs_on: windows-11-arm
+
+    env:
+      TEST_ARCHIVE_NAME: chisel_samples.zip
+      TEST_DIR: test-data
+      BIN_DIR: bin
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chisel-${{ matrix.id }}
+          path: ${{ env.BIN_DIR }}
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x ${{ env.BIN_DIR }}/chisel
+        shell: bash
+
+      - name: Install test dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip unzip
+          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Install test dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install unzip
+          python3 -m venv ${{ github.workspace }}/venv-gdrive
+          ${{ github.workspace }}/venv-gdrive/bin/pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Install test dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+        shell: bash
+
+      - name: Cache test data archive
+        id: cache-test-archive
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TEST_ARCHIVE_NAME }}
+          key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
+
+      - name: Authenticate and Download Test Data from Google Drive
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+        env:
+          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
+          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
+        run: |
+          PY_EXE="python3"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PY_EXE="python"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Point to the python inside the venv
+            PY_EXE="${{ github.workspace }}/venv-gdrive/bin/python3"
+          fi
+
+          "$PY_EXE" -c "
+          import os
+          import io
+          import json
+          import sys
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          
+          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
+          if not creds_json_string:
+            print('::error::Secret GDRIVE_CREDENTIALS_JSON is not set.', file=sys.stderr)
+            sys.exit(1)
+          
+          try:
+            creds_info = json.loads(creds_json_string)
+            creds = service_account.Credentials.from_service_account_info(creds_info)
+          except json.JSONDecodeError:
+            print('::error::Could not decode credentials JSON. Check the secret.', file=sys.stderr)
+            sys.exit(1)
+          except Exception as e:
+            print(f'::error::Failed to load service account credentials: {e}', file=sys.stderr)
+            sys.exit(1)
+          
+          file_id = os.environ.get('GDRIVE_FILE_ID')
+          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
+          
+          if not file_id:
+            print('::error::Secret GDRIVE_FILE_ID is not set.', file=sys.stderr)
+            sys.exit(1)
+          if not output_filename:
+            print('::error::Environment variable TEST_ARCHIVE_NAME is not set.', file=sys.stderr)
+            sys.exit(1)
+          
+            print(f'Authenticating and creating Google Drive service...')
+          try:
+            service = build('drive', 'v3', credentials=creds)
+          except Exception as e:
+            print(f'::error::Failed to build Drive service: {e}', file=sys.stderr)
+            sys.exit(1)
+          
+          print(f'Requesting file ID: {file_id}...')
+          try:
+            request = service.files().get_media(fileId=file_id)
+          except Exception as e:
+            print(f'::error::Failed to create download request for file ID {file_id}: {e}', file=sys.stderr)
+            sys.exit(1)
+          
+          try:
+            print(f'Opening output file: {output_filename}...')
+            fh = io.FileIO(output_filename, 'wb')
+          except Exception as e:
+            print(f'::error::Failed to open output file {output_filename} for writing: {e}', file=sys.stderr)
+            sys.exit(1)
+          
+          downloader = MediaIoBaseDownload(fh, request)
+          done = False
+          print(f'Starting download -> {output_filename}...')
+          try:
+            while done is False:
+              status, done = downloader.next_chunk()
+              if status:
+                print(f'Download {int(status.progress() * 100)}%.')
+          except Exception as e:
+            print(f'::error::Download failed: {e}', file=sys.stderr)
+              # Ensure file handle is closed before attempting removal
+            if not fh.closed:
+              fh.close()
+              # Attempt to remove partially downloaded file
+              try:
+                if os.path.exists(output_filename):
+                  os.remove(output_filename)
+                  print(f'Removed partially downloaded file: {output_filename}')
+              except OSError as oe:
+                print(f'Warning: Could not remove partial file {output_filename}: {oe}', file=sys.stderr)
+              sys.exit(1)
+          finally:
+              # Ensure file handle is closed even if download finished successfully
+            if not fh.closed:
+              fh.close()
+          
+          print(f'Download complete: {output_filename}.')
+            "
+
+        shell: bash
+
+      - name: Extract Test Data
+        run: |
+          echo "Extracting test data..."
+          mkdir ${{ env.TEST_DIR }}
+          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+        shell: bash
+
+      - name: Run Chisel Tests
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel.exe"
+          else
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
+          fi
+          echo "Running chisel from: $CHISEL_EXE"
+          echo "Processing files in: ${{ env.TEST_DIR }}"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --regenerate-magic
+          else
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+          fi
+        shell: bash
+
+      - name: Check for errors in Chisel Log
+        if: always()
+        run: |
+          LOG_FILE="build/chisel.log"
+          if [ ! -f "$LOG_FILE" ]; then
+            if [ -f "${{ github.workspace }}/chisel.log" ]; then
+              LOG_FILE="${{ github.workspace }}/chisel.log"
+            elif [ -f "chisel.log" ]; then
+              LOG_FILE="chisel.log"
+            else
+              echo "Log file not found at build/chisel.log, ${{ github.workspace }}/chisel.log, or current directory."
+              exit 0
+            fi
+          fi
+          echo "Checking log file at: $LOG_FILE"
+          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+            echo "::error::Errors detected in chisel.log!"
+            grep '\[ERROR\]' "$LOG_FILE"
+            exit 1
+          else
+            echo "No [ERROR] lines found in chisel.log."
+            exit 0
+          fi
+        shell: bash
+
+      - name: Upload Chisel Log File
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chisel-log-${{ matrix.id }}
+          path: |
+            build/chisel.log
+            ${{ github.workspace }}/chisel.log
+            chisel.log
+            if-no-files-found: warn
+            retention-days: 7
+
+  #  test-freebsd:
+  #    name: test (freebsd-${{ matrix.arch }})
   #    needs: build-freebsd
   #    runs-on: ubuntu-latest
   #    strategy:
@@ -223,60 +473,362 @@ jobs:
   #          - id: freebsd-arm
   #            arch: arm64
   #    env:
+  #      TEST_ARCHIVE_NAME: chisel_samples.zip
+  #      TEST_DIR: test-data
   #      BIN_DIR: bin
-  #      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
   #    steps:
+  #      - name: Checkout repository
+  #        uses: actions/checkout@v4
   #      - name: Download binary artifact
   #        uses: actions/download-artifact@v4
   #        with:
   #          name: chisel-${{ matrix.id }}
   #          path: ${{ env.BIN_DIR }}
-  #      - name: Verify FreeBSD (ldd)
+  #      - name: Install test dependencies (Linux Host for GDrive)
+  #        run: |
+  #          sudo apt-get update
+  #          sudo apt-get install -y python3-pip unzip
+  #          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+  #      - name: Cache test data archive
+  #        id: cache-test-archive
+  #        uses: actions/cache@v4
+  #        with:
+  #          path: ${{ env.TEST_ARCHIVE_NAME }}
+  #          key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
+  #      - name: Authenticate and Download Test Data from Google Drive
+  #        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+  #        env:
+  #          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
+  #          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
+  #        run: |
+  #          python3 -c "
+  #          import os, io, json, sys
+  #          from google.oauth2 import service_account
+  #          from googleapiclient.discovery import build
+  #          from googleapiclient.http import MediaIoBaseDownload
+  #          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
+  #          if not creds_json_string: sys.exit(1)
+  #          try:
+  #            creds_info = json.loads(creds_json_string)
+  #            creds = service_account.Credentials.from_service_account_info(creds_info)
+  #          except: sys.exit(1)
+  #          file_id = os.environ.get('GDRIVE_FILE_ID')
+  #          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
+  #          if not file_id or not output_filename: sys.exit(1)
+  #          try: service = build('drive', 'v3', credentials=creds)
+  #          except: sys.exit(1)
+  #          try: request = service.files().get_media(fileId=file_id)
+  #          except: sys.exit(1)
+  #          try: fh = io.FileIO(output_filename, 'wb')
+  #          except: sys.exit(1)
+  #          downloader = MediaIoBaseDownload(fh, request)
+  #          done = False
+  #          try:
+  #            while done is False: status, done = downloader.next_chunk()
+  #          except:
+  #            if not fh.closed: fh.close()
+  #            try:
+  #              if os.path.exists(output_filename): os.remove(output_filename)
+  #            except: pass
+  #            sys.exit(1)
+  #          finally:
+  #            if not fh.closed: fh.close()
+  #          "
+  #        shell: bash
+  #      - name: Extract Test Data
+  #        run: |
+  #          echo "Extracting test data..."
+  #          mkdir ${{ env.TEST_DIR }}
+  #          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+  #        shell: bash
+  #      - name: Run Chisel Tests (in FreeBSD VM)
   #        uses: vmactions/freebsd-vm@v1
   #        with:
   #          arch: ${{ matrix.arch }}
   #          usesh: true
   #          run: |
-  #            echo "Checking dependencies for FreeBSD..."
-  #            chmod +x ${{ env.BIN_DIR }}/chisel
-  #            ldd ${{ env.BIN_DIR }}/chisel
-  #            echo "Analyzing dependencies..."
-  #            if ldd ${{ env.BIN_DIR }}/chisel | grep -E "(${FORBIDDEN_LIBS})"; then
-  #              echo "Error: Forbidden dynamic libraries found!"
-  #              exit 1
+  #            echo "--- Starting FreeBSD Test ---"
+  #            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
+  #            chmod +x $CHISEL_EXE
+  #
+  #            echo "Running chisel from: $CHISEL_EXE"
+  #            echo "Processing files in: ${{ env.TEST_DIR }}"
+  #
+  #            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+  #            echo "--- Test Run Complete ---"
+  #      - name: Check for errors in Chisel Log
+  #        if: always()
+  #        run: |
+  #          LOG_FILE="build/chisel.log"
+  #          if [ ! -f "$LOG_FILE" ]; then
+  #            if [ -f "${{ github.workspace }}/chisel.log" ]; then
+  #              LOG_FILE="${{ github.workspace }}/chisel.log"
+  #            elif [ -f "chisel.log" ]; then
+  #              LOG_FILE="chisel.log"
   #            else
-  #              echo "OK: No forbidden dynamic libraries found."
+  #              echo "Log file not found."
+  #              exit 0
   #            fi
+  #          fi
+  #          echo "Checking log file at: $LOG_FILE"
+  #          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+  #            echo "::error::Errors detected in chisel.log!"
+  #            grep '\[ERROR\]' "$LOG_FILE"
+  #            exit 1
+  #          else
+  #            echo "No [ERROR] lines found in chisel.log."
+  #            exit 0
+  #          fi
+  #        shell: bash
+  #      - name: Upload Chisel Log File
+  #        if: always()
+  #        uses: actions/upload-artifact@v4
+  #        with:
+  #          name: chisel-log-${{ matrix.id }}
+  #          path: |
+  #            build/chisel.log
+  #            ${{ github.workspace }}/chisel.log
+  #            chisel.log
+  #            if-no-files-found: warn
+  #            retention-days: 7
 
-  release:
-    needs: build
+  combine-logs:
+    name: combine-logs
+    needs: [test]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/tags/development-latest'
-
+    if: always()
     steps:
-      - name: Download All Artifacts
+      - name: Download all log artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          merge-multiple: true
+          pattern: chisel-log-*
+          path: logs
 
-      - name: Display Downloaded Files
-        run: ls -R artifacts
+      - name: Combine logs
+        run: |
+          mkdir -p combined
+          find logs -type f -name "*.log" -exec cat {} + > combined/chisel-combined.log
+          sort -u combined/chisel-combined.log > combined/chisel-combined-unique.log
 
-      - name: Delete old release (dev only)
-        if: github.ref == 'refs/tags/development-latest'
-        uses: dev-drprasad/delete-tag-and-release@v1.1
+      - name: Upload combined log
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: development-latest
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          delete_release: true
+          name: chisel-combined-logs
+          path: combined/
+          retention-days: 14
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+  publish_nightly:
+    name: Publish Nightly Pre-Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/development'
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build and log artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: ${{ github.ref == 'refs/tags/development-latest' && 'Development Build' || github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          files: artifacts/*
-          draft: false
-          prerelease: ${{ github.ref == 'refs/tags/development-latest' || contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
-          generate_release_notes: true
+          path: artifacts/
+
+      - name: Prepare assets for release
+        run: |
+          mkdir release_assets
+          
+          # --- Linux (gcc) ---
+          mv artifacts/chisel-ubuntu-gcc/chisel release_assets/chisel-ubuntu-gcc
+          tar -czf release_assets/chisel-ubuntu-gcc.tar.gz -C release_assets chisel-ubuntu-gcc
+          rm release_assets/chisel-ubuntu-gcc
+
+          # --- Linux (clang) ---
+          mv artifacts/chisel-ubuntu-clang/chisel release_assets/chisel-ubuntu-clang
+          tar -czf release_assets/chisel-ubuntu-clang.tar.gz -C release_assets chisel-ubuntu-clang
+          rm release_assets/chisel-ubuntu-clang
+
+          # --- Linux (arm) ---
+          mv artifacts/chisel-ubuntu-arm/chisel release_assets/chisel-ubuntu-arm
+          tar -czf release_assets/chisel-ubuntu-arm.tar.gz -C release_assets chisel-ubuntu-arm
+          rm release_assets/chisel-ubuntu-arm
+
+          # --- macOS (intel) ---
+          mv artifacts/chisel-macos-intel/chisel release_assets/chisel-macos-intel
+          tar -czf release_assets/chisel-macos-intel.tar.gz -C release_assets chisel-macos-intel
+          rm release_assets/chisel-macos-intel
+
+          # --- macOS (arm) ---
+          mv artifacts/chisel-macos-arm/chisel release_assets/chisel-macos-arm
+          tar -czf release_assets/chisel-macos-arm.tar.gz -C release_assets chisel-macos-arm
+          rm release_assets/chisel-macos-arm
+
+          # --- Windows (x86) ---
+          mv artifacts/chisel-windows-x86/chisel.exe release_assets/chisel-windows-x86.exe
+          zip -j release_assets/chisel-windows-x86.zip release_assets/chisel-windows-x86.exe
+          rm release_assets/chisel-windows-x86.exe
+
+          # --- Windows (arm) ---
+          mv artifacts/chisel-windows-arm/chisel.exe release_assets/chisel-windows-arm.exe
+          zip -j release_assets/chisel-windows-arm.zip release_assets/chisel-windows-arm.exe
+          rm release_assets/chisel-windows-arm.exe
+          
+          # --- FreeBSD (x86) ---
+          #mv artifacts/chisel-freebsd-x86/chisel release_assets/chisel-freebsd-x86
+          #tar -czf release_assets/chisel-freebsd-x86.tar.gz -C release_assets chisel-freebsd-x86
+          #rm release_assets/chisel-freebsd-x86
+          
+          # --- FreeBSD (arm) ---
+          #mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
+          #tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
+          #rm release_assets/chisel-freebsd-arm
+          
+          find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
+
+      - name: Delete and recreate 'development-latest' release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete development-latest -y || echo "No previous nightly release to delete."
+          
+          git push origin --delete development-latest || echo "No previous nightly tag to delete."
+          
+          gh release create development-latest \
+            --prerelease \
+            --title "Nightly Build" \
+            --notes "Latest successful build from 'development' branch. Not a stable release." \
+            release_assets/*
+  verify-static-linking:
+    name: verify-static-linking (${{ matrix.id }})
+    needs: build
+    runs-on: ${{ matrix.runs_on }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: ubuntu-gcc
+            runs_on: ubuntu-latest
+          - id: ubuntu-clang
+            runs_on: ubuntu-latest
+          - id: ubuntu-arm
+            runs_on: ubuntu-24.04-arm
+          - id: macos-intel
+            runs_on: macos-15-intel
+          - id: macos-arm
+            runs_on: macos-26
+          - id: windows-x86
+            runs_on: windows-latest
+          - id: windows-arm
+            runs_on: windows-11-arm
+
+    env:
+      BIN_DIR: bin
+      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif|tag"
+
+    steps:
+      - name: Setup MSVC Developer Environment
+        if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: ${{ matrix.id == 'windows-arm' && 'arm64' || 'x86' }}
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chisel-${{ matrix.id }}
+          path: ${{ env.BIN_DIR }}
+
+      - name: Make binary executable
+        if: runner.os != 'Windows'
+        run: chmod +x ${{ env.BIN_DIR }}/chisel
+
+      - name: Verify Linux (ldd)
+        if: runner.os == 'Linux'
+        run: |
+          echo "Checking dependencies for Linux..."
+          ldd ${{ env.BIN_DIR }}/chisel
+          echo "---"
+          matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          else
+            echo "OK: No forbidden dynamic libraries found."
+          fi
+
+      - name: Verify macOS (otool)
+        if: runner.os == 'macOS'
+        run: |
+          echo "Checking dependencies for macOS..."
+          otool -L ${{ env.BIN_DIR }}/chisel
+          echo "---"
+          matches=$(otool -L ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          else
+            echo "OK: No forbidden dynamic libraries found."
+          fi
+
+      - name: Verify Windows (dumpbin + PowerShell)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Output "Checking dependencies for Windows..."
+          $deps = & dumpbin /dependents "${{ env.BIN_DIR }}\chisel.exe"
+          $deps | Out-String | Write-Output
+          Write-Output "---"
+          $pattern = [regex]"(${env:FORBIDDEN_LIBS})\.dll"
+          $matches = $deps | Select-String -Pattern $pattern -AllMatches
+          if ($matches) {
+            Write-Error "Found forbidden dynamic libraries!"
+            $matches | ForEach-Object { $_.Matches.Value } | Sort-Object -Unique | ForEach-Object { Write-Output $_ }
+            exit 1
+          } else {
+            Write-Output "OK: No forbidden dynamic libraries found."
+          }
+
+#  verify-static-linking-freebsd:
+#    name: verify-static-linking (freebsd-${{ matrix.arch }})
+#    needs: build-freebsd
+#    runs-on: ubuntu-latest
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        include:
+#          - id: freebsd-x86
+#            arch: amd64
+#          - id: freebsd-arm
+#            arch: arm64
+#    env:
+#      BIN_DIR: bin
+#      FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif"
+#    steps:
+#      - name: Download binary artifact
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: chisel-${{ matrix.id }}
+#          path: ${{ env.BIN_DIR }}
+#      - name: Verify FreeBSD (ldd)
+#        uses: vmactions/freebsd-vm@v1
+#        with:
+#          arch: ${{ matrix.arch }}
+#          usesh: true
+#          run: |
+#            echo "Checking dependencies for FreeBSD..."
+#            chmod +x ${{ env.BIN_DIR }}/chisel
+#            ldd ${{ env.BIN_DIR }}/chisel
+#            echo "---"
+#            matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+#            if [ -n "$matches" ]; then
+#              echo "::error::Found forbidden dynamic libraries!"
+#              echo "$matches"
+#              exit 1
+#            else
+#              echo "OK: No forbidden dynamic libraries found."
+#            fi
