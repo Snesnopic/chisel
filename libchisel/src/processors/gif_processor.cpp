@@ -43,12 +43,13 @@ static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::pat
 
 void GifProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
-                              bool preserve_metadata) {
+                              const bool preserve_metadata) {
 
+#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
     std::exception_ptr error_ptr = nullptr;
-
     std::thread worker([&]() {
         try {
+#endif
             Logger::log(LogLevel::Info, "start gif recompression: " + input.string(), "gif_processor");
 
             FILE* in = chisel::open_file(input, "rb");
@@ -82,17 +83,17 @@ void GifProcessor::recompress(const std::filesystem::path& input,
             std::fclose(out);
 
             Gif_DeleteStream(gfs);
-
+#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
         } catch (...) {
             error_ptr = std::current_exception();
         }
     });
 
     worker.join();
-
     if (error_ptr) {
         std::rethrow_exception(error_ptr);
     }
+#endif
 }
 
 bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
