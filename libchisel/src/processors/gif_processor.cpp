@@ -23,16 +23,16 @@ namespace chisel {
 
 static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::path& path) {
     FILE* f = chisel::open_file(path, "rb");
-    if (f == nullptr) return {};
+    if (!f) return {};
     fseek(f, 0, SEEK_END);
-    const long size = ftell(f);
+    long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size <= 0) {
         fclose(f);
         return {};
     }
     std::vector<unsigned char> buf(size);
-    const size_t read_count = fread(buf.data(), 1, size, f);
+    size_t read_count = fread(buf.data(), 1, size, f);
     fclose(f);
 
     if (read_count != static_cast<size_t>(size)) {
@@ -45,20 +45,19 @@ void GifProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               const bool preserve_metadata) {
 
-#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
     std::exception_ptr error_ptr = nullptr;
+
     std::thread worker([&]() {
         try {
-#endif
-            Logger::log(LogLevel::Info, "start gif recompression: " + input.string(), "gif_processor");
+            Logger::log(LogLevel::Info, "Start GIF recompression: " + input.string(), "gif_processor");
 
             FILE* in = chisel::open_file(input, "rb");
-            if (!in) throw std::runtime_error("cannot open gif input");
+            if (!in) throw std::runtime_error("Cannot open GIF input");
 
             Gif_Stream* gfs = Gif_ReadFile(in);
             std::fclose(in);
 
-            if (!gfs) throw std::runtime_error("failed to read gif structure");
+            if (!gfs) throw std::runtime_error("Failed to read GIF structure");
 
             if (!preserve_metadata) {
                 if (gfs->end_comment) {
@@ -76,14 +75,23 @@ void GifProcessor::recompress(const std::filesystem::path& input,
             FILE* out = chisel::open_file(output, "wb");
             if (!out) {
                 Gif_DeleteStream(gfs);
-                throw std::runtime_error("cannot open gif output");
+                throw std::runtime_error("Cannot open GIF output");
             }
 
-            Gif_FullWriteFile(gfs, &gif_write_info, out);
+            Gif_CompressInfo local_info;
+            std::memset(&local_info, 0, sizeof(local_info));
+            Gif_InitCompressInfo(&local_info);
+
+            if (!Gif_FullWriteFile(gfs, &local_info, out)) {
+                std::fclose(out);
+                Gif_DeleteStream(gfs);
+                throw std::runtime_error("Gif_FullWriteFile failed");
+            }
+
             std::fclose(out);
 
             Gif_DeleteStream(gfs);
-#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
+
         } catch (...) {
             error_ptr = std::current_exception();
         }
@@ -93,7 +101,6 @@ void GifProcessor::recompress(const std::filesystem::path& input,
     if (error_ptr) {
         std::rethrow_exception(error_ptr);
     }
-#endif
 }
 
 bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
@@ -112,6 +119,7 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     );
 
     if (!dataA) {
+        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF A", "gif_processor");
         return false;
     }
 
@@ -123,6 +131,7 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     );
 
     if (!dataB) {
+        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF B", "gif_processor");
         stbi_image_free(dataA);
         if (delaysA) stbi_image_free(delaysA);
         return false;
