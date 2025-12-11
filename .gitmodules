@@ -74,3 +74,6 @@
 [submodule "third_party/gifsicle"]
 	path = third_party/gifsicle
 	url = https://github.com/Snesnopic/gifsicle.git
+[submodule "third_party/bzip2"]
+	path = third_party/bzip2
+	url = https://github.com/libarchive/bzip2.git

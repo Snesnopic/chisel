@@ -148,6 +148,31 @@ if(NOT "${_new_exe_linker_flags}" STREQUAL "")
     set(CMAKE_EXE_LINKER_FLAGS "${_new_exe_linker_flags}" CACHE STRING "Propagated linker flags for external projects" FORCE)
 endif()
 
+# bzip2
+set(BZIP2_DIR "${CMAKE_SOURCE_DIR}/third_party/bzip2")
+
+if(EXISTS "${BZIP2_DIR}/bzlib.c")
+    add_library(bz2_static STATIC
+            ${BZIP2_DIR}/blocksort.c
+            ${BZIP2_DIR}/huffman.c
+            ${BZIP2_DIR}/crctable.c
+            ${BZIP2_DIR}/randtable.c
+            ${BZIP2_DIR}/compress.c
+            ${BZIP2_DIR}/decompress.c
+            ${BZIP2_DIR}/bzlib.c
+    )
+
+    target_include_directories(bz2_static PUBLIC ${BZIP2_DIR})
+
+    if(MSVC)
+        target_compile_definitions(bz2_static PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
+
+    set(BZIP2_INCLUDE_DIR "${BZIP2_DIR}" CACHE PATH "" FORCE)
+    set(BZIP2_LIBRARIES bz2_static CACHE STRING "" FORCE)
+    set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
+endif()
+
 # libmkclean
 add_subdirectory("third_party/libmkclean")
 
@@ -306,6 +331,7 @@ set(ENABLE_NETTLE  OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT   OFF CACHE BOOL "" FORCE)
 set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
+set(ENABLE_BZip2 ON CACHE BOOL "" FORCE)
 set(ENABLE_LIBB2 ON CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
