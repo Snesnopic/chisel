@@ -595,6 +595,7 @@ add_library(giflib STATIC
         # third_party/gifsicle/src/strerror.c
         third_party/gifsicle/src/support.c
         third_party/gifsicle/src/ungifwrt.c
+        third_party/gifsicle/src/xform.c
 )
 if(WIN32)
     target_compile_definitions(giflib PRIVATE
