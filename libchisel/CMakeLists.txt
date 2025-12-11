@@ -28,11 +28,11 @@ set(LIBCHISEL_SOURCES
         include/wavpack_processor.hpp
         include/webp_processor.hpp
         include/zopflipng_processor.hpp
-
         src/processors/ape_processor.cpp
         src/processors/archive_processor.cpp
         src/processors/flac_processor.cpp
         src/processors/flexigif_processor.cpp
+        src/processors/gif_processor.cpp
         src/processors/jpeg_processor.cpp
         src/processors/jxl_processor.cpp
         src/processors/mkv_processor.cpp
@@ -75,9 +75,6 @@ set(LIBCHISEL_SOURCES
         include/chisel.hpp
         src/utils/chisel.cpp
 )
-if(NOT WIN32)
-    list(APPEND LIBCHISEL_SOURCES src/processors/gif_processor.cpp)
-endif()
 
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
