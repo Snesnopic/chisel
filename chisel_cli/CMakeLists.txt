@@ -11,7 +11,9 @@ set(CHISEL_CLI_SOURCES
         src/utils/color.hpp
         src/cli/CLI11.hpp
 )
-
+if(WIN32)
+    list(APPEND CHISEL_CLI_SOURCES chisel.rc)
+endif()
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
 if(APPLE)
