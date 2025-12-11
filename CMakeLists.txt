@@ -152,6 +152,12 @@ endif()
 set(BZIP2_DIR "${CMAKE_SOURCE_DIR}/third_party/bzip2")
 
 if(EXISTS "${BZIP2_DIR}/bzlib.c")
+    set(BZ_VERSION "1.1.0")
+    configure_file(
+            "${BZIP2_DIR}/bz_version.h.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/bzip2_inc/bz_version.h"
+    )
+
     add_library(bz2_static STATIC
             ${BZIP2_DIR}/blocksort.c
             ${BZIP2_DIR}/huffman.c
@@ -162,7 +168,10 @@ if(EXISTS "${BZIP2_DIR}/bzlib.c")
             ${BZIP2_DIR}/bzlib.c
     )
 
-    target_include_directories(bz2_static PUBLIC ${BZIP2_DIR})
+    target_include_directories(bz2_static PUBLIC
+            ${BZIP2_DIR}
+            "${CMAKE_CURRENT_BINARY_DIR}/bzip2_inc"
+    )
 
     if(MSVC)
         target_compile_definitions(bz2_static PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -171,6 +180,9 @@ if(EXISTS "${BZIP2_DIR}/bzlib.c")
     set(BZIP2_INCLUDE_DIR "${BZIP2_DIR}" CACHE PATH "" FORCE)
     set(BZIP2_LIBRARIES bz2_static CACHE STRING "" FORCE)
     set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
+
+    set(BZIP2_LIBRARY_RELEASE bz2_static CACHE STRING "" FORCE)
+    set(BZIP2_LIBRARY bz2_static CACHE STRING "" FORCE)
 endif()
 
 # libmkclean
