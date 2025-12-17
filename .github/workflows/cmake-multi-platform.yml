@@ -238,19 +238,31 @@ jobs:
         include:
           - id: ubuntu-gcc
             runs_on: ubuntu-latest
+            asset_name: "linux-x64-gcc"
+
           - id: ubuntu-clang
             runs_on: ubuntu-latest
+            asset_name: "linux-x64-clang"
+
           - id: ubuntu-arm
             runs_on: ubuntu-24.04-arm
+            asset_name: "linux-arm64"
+
           - id: macos-intel
             runs_on: macos-15-intel
+            asset_name: "macos-x64"
+
           - id: macos-arm
             runs_on: macos-26
+            asset_name: "macos-arm64"
+
           - id: windows-x64
             runs_on: windows-latest
+            asset_name: "windows-x64"
           # disabled, takes longer than 6 hours
           #- id: windows-arm
           #  runs_on: windows-11-arm
+          #  asset_name: "windows-arm64"
 
     env:
       TEST_ARCHIVE_NAME: chisel_samples.zip
@@ -640,51 +652,43 @@ jobs:
         run: |
           mkdir release_assets
           
-          # --- Linux (gcc) ---
-          mv artifacts/chisel-ubuntu-gcc/chisel release_assets/chisel-ubuntu-gcc
-          tar -czf release_assets/chisel-ubuntu-gcc.tar.gz -C release_assets chisel-ubuntu-gcc
-          rm release_assets/chisel-ubuntu-gcc
-
-          # --- Linux (clang) ---
-          mv artifacts/chisel-ubuntu-clang/chisel release_assets/chisel-ubuntu-clang
-          tar -czf release_assets/chisel-ubuntu-clang.tar.gz -C release_assets chisel-ubuntu-clang
-          rm release_assets/chisel-ubuntu-clang
-
-          # --- Linux (arm) ---
-          mv artifacts/chisel-ubuntu-arm/chisel release_assets/chisel-ubuntu-arm
-          tar -czf release_assets/chisel-ubuntu-arm.tar.gz -C release_assets chisel-ubuntu-arm
-          rm release_assets/chisel-ubuntu-arm
-
-          # --- macOS (intel) ---
-          mv artifacts/chisel-macos-intel/chisel release_assets/chisel-macos-intel
-          tar -czf release_assets/chisel-macos-intel.tar.gz -C release_assets chisel-macos-intel
-          rm release_assets/chisel-macos-intel
-
-          # --- macOS (arm) ---
-          mv artifacts/chisel-macos-arm/chisel release_assets/chisel-macos-arm
-          tar -czf release_assets/chisel-macos-arm.tar.gz -C release_assets chisel-macos-arm
-          rm release_assets/chisel-macos-arm
-
-          # --- Windows (x64) ---
-          mv artifacts/chisel-windows-x64/chisel.exe release_assets/chisel-windows-x64.exe
-          zip -j release_assets/chisel-windows-x64.zip release_assets/chisel-windows-x64.exe
-          rm release_assets/chisel-windows-x64.exe
-
-          # --- Windows (arm) ---
-          mv artifacts/chisel-windows-arm/chisel.exe release_assets/chisel-windows-arm.exe
-          zip -j release_assets/chisel-windows-arm.zip release_assets/chisel-windows-arm.exe
-          rm release_assets/chisel-windows-arm.exe
+          function package_unix {
+            SRC_DIR="artifacts/$1"
+            OUT_NAME="$2"
           
-          # --- FreeBSD (x64) ---
-          #mv artifacts/chisel-freebsd-x64/chisel release_assets/chisel-freebsd-x64
-          #tar -czf release_assets/chisel-freebsd-x64.tar.gz -C release_assets chisel-freebsd-x64
-          #rm release_assets/chisel-freebsd-x64
+            mv "$SRC_DIR"/* "release_assets/$OUT_NAME"
+            chmod +x "release_assets/$OUT_NAME"
           
-          # --- FreeBSD (arm) ---
-          #mv artifacts/chisel-freebsd-arm/chisel release_assets/chisel-freebsd-arm
-          #tar -czf release_assets/chisel-freebsd-arm.tar.gz -C release_assets chisel-freebsd-arm
-          #rm release_assets/chisel-freebsd-arm
+            tar -czf "release_assets/$OUT_NAME.tar.gz" -C release_assets "$OUT_NAME"
           
+            rm "release_assets/$OUT_NAME"
+          }
+          
+          function package_windows {
+            SRC_DIR="artifacts/$1"
+            OUT_NAME="$2"
+          
+            mv "$SRC_DIR"/*.exe "release_assets/$OUT_NAME.exe"
+          
+            zip -j "release_assets/$OUT_NAME.zip" "release_assets/$OUT_NAME.exe"
+          
+            rm "release_assets/$OUT_NAME.exe"
+          }
+          
+          # --- Linux ---
+          package_unix "binary-linux-x64-gcc"   "chisel-linux-x64-gcc"
+          package_unix "binary-linux-x64-clang" "chisel-linux-x64-clang"
+          package_unix "binary-linux-arm64"     "chisel-linux-arm64"
+          
+          # --- macOS ---
+          package_unix "binary-macos-x64"       "chisel-macos-x64"
+          package_unix "binary-macos-arm64"     "chisel-macos-arm64"
+          
+          # --- Windows ---
+          package_windows "binary-windows-x64"    "chisel-windows-x64"
+          package_windows "binary-windows-arm64"  "chisel-windows-arm64"
+          
+          # --- Logs ---
           find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
 
       - name: Delete and recreate 'development-latest' release
@@ -701,7 +705,7 @@ jobs:
             --notes "Latest successful build from 'development' branch. Not a stable release." \
             release_assets/*
   verify-static-linking:
-    name: verify-static-linking (${{ matrix.id }})
+    name: verify-static-linking (${{ matrix.asset_name }})
     needs: build
     runs-on: ${{ matrix.runs_on }}
 
@@ -711,18 +715,31 @@ jobs:
         include:
           - id: ubuntu-gcc
             runs_on: ubuntu-latest
+            asset_name: "linux-x64-gcc"
+
           - id: ubuntu-clang
             runs_on: ubuntu-latest
+            asset_name: "linux-x64-clang"
+
           - id: ubuntu-arm
             runs_on: ubuntu-24.04-arm
+            asset_name: "linux-arm64"
+
           - id: macos-intel
             runs_on: macos-15-intel
+            asset_name: "macos-x64"
+
           - id: macos-arm
             runs_on: macos-26
+            asset_name: "macos-arm64"
+
           - id: windows-x64
             runs_on: windows-latest
+            asset_name: "windows-x64"
+
           - id: windows-arm
             runs_on: windows-11-arm
+            asset_name: "windows-arm64"
 
     env:
       BIN_DIR: bin
@@ -738,7 +755,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: chisel-${{ matrix.id }}
+          name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
 
       - name: Make binary executable
@@ -792,7 +809,6 @@ jobs:
           } else {
             Write-Output "OK: No forbidden dynamic libraries found."
           }
-
 #  verify-static-linking-freebsd:
 #    name: verify-static-linking (freebsd-${{ matrix.arch }})
 #    needs: build-freebsd
