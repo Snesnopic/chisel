@@ -276,7 +276,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: chisel-${{ matrix.asset_name }}
+          name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
 
       - name: Make binary executable
