@@ -278,6 +278,17 @@ jobs:
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
+      - name: Restore Binary Name
+        shell: bash
+        run: |
+              cd ${{ env.BIN_DIR }}
+              find . -maxdepth 1 -type f -name "chisel-*" ! -name "chisel" ! -name "chisel.exe" -exec mv {} chisel \; || true
+
+              if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chisel" ]; then
+              mv chisel chisel.exe
+              fi
+
+              ls -la
 
       - name: Make binary executable
         if: runner.os != 'Windows'
@@ -757,6 +768,18 @@ jobs:
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
+
+      - name: Restore Binary Name
+        shell: bash
+        run: |
+          cd ${{ env.BIN_DIR }}
+          find . -maxdepth 1 -type f -name "chisel-*" ! -name "chisel" ! -name "chisel.exe" -exec mv {} chisel \; || true
+          
+          if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chisel" ]; then
+          mv chisel chisel.exe
+          fi
+          
+          ls -la
 
       - name: Make binary executable
         if: runner.os != 'Windows'
