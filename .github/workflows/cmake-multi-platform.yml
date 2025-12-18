@@ -715,6 +715,68 @@ jobs:
             --title "Nightly Build" \
             --notes "Latest successful build from 'development' branch. Not a stable release." \
             release_assets/*
+
+  publish_stable:
+    name: Publish Stable Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build and log artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Prepare assets for release
+        run: |
+          mkdir release_assets
+          
+          function package_unix {
+            SRC_DIR="artifacts/$1"
+            OUT_NAME="$2"
+            mv "$SRC_DIR"/* "release_assets/$OUT_NAME"
+            chmod +x "release_assets/$OUT_NAME"
+            tar -czf "release_assets/$OUT_NAME.tar.gz" -C release_assets "$OUT_NAME"
+            rm "release_assets/$OUT_NAME"
+          }
+          
+          function package_windows {
+            SRC_DIR="artifacts/$1"
+            OUT_NAME="$2"
+            mv "$SRC_DIR"/*.exe "release_assets/$OUT_NAME.exe"
+            zip -j "release_assets/$OUT_NAME.zip" "release_assets/$OUT_NAME.exe"
+            rm "release_assets/$OUT_NAME.exe"
+          }
+          
+          # Packaging
+          package_unix "binary-linux-x64-gcc"   "chisel-linux-x64-gcc"
+          package_unix "binary-linux-x64-clang" "chisel-linux-x64-clang"
+          package_unix "binary-linux-arm64"     "chisel-linux-arm64"
+          package_unix "binary-macos-x64"       "chisel-macos-x64"
+          package_unix "binary-macos-arm64"     "chisel-macos-arm64"
+          package_windows "binary-windows-x64"    "chisel-windows-x64"
+          package_windows "binary-windows-arm64"  "chisel-windows-arm64"
+          
+          # Logs
+          find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Chisel ${{ github.ref_name }}" \
+            --generate-notes \
+            release_assets/*        
+
   verify-static-linking:
     name: verify-static-linking (${{ matrix.asset_name }})
     needs: build
