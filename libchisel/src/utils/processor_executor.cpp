@@ -37,17 +37,43 @@ namespace chisel {
           event_bus_(bus),
           mode_(mode)
            {
-                if (has_output_dir_ && !dry_run_) {
-                    std::error_code ec;
-                    fs::create_directories(output_dir_, ec);
-                    if (ec) {
-                        Logger::log(LogLevel::Error, "Failed to create output directory: " + output_dir_.string(), "Executor");
-                        throw std::runtime_error("Failed to create output directory.");
-                    }
-                }
            }
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
+        if (has_output_dir_ && !dry_run_) {
+            bool create_dir = false;
+            if (inputs.size() > 1) {
+                // Multiple inputs -> Output must be a directory
+                output_is_directory_ = true;
+                create_dir = true;
+            } else {
+                // Single input
+                if (fs::is_directory(output_dir_)) {
+                    // Output exists and is a directory
+                    output_is_directory_ = true;
+                } else {
+                    // Output does not exist OR is a file -> Treat as filename
+                    output_is_directory_ = false;
+
+                    // Create parent directory if needed?
+                    // Standard cp fails if parent doesn't exist, but we can be nice.
+                    if (output_dir_.has_parent_path()) {
+                        std::error_code ec;
+                        fs::create_directories(output_dir_.parent_path(), ec);
+                    }
+                }
+            }
+
+            if (create_dir) {
+                std::error_code ec;
+                fs::create_directories(output_dir_, ec);
+                if (ec) {
+                    Logger::log(LogLevel::Error, "Failed to create output directory: " + output_dir_.string(), "Executor");
+                    return; // Abort if we can't create output dir
+                }
+            }
+        }
+
         for (const auto &path: inputs) {
             if (stop_flag_.load(std::memory_order_relaxed)) return;
             analyze_path(path);
@@ -78,21 +104,24 @@ namespace chisel {
             fs::remove(temp_file, ec);
 
         } else if (has_output_dir_) {
-            const fs::path dest = output_dir_ / original_file.filename();
+            const fs::path dest = output_is_directory_
+                                  ? (output_dir_ / original_file.filename())
+                                  : output_dir_;
+
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, dest, ec);
                 if (!ec) break;
 
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
-
-                Logger::log(LogLevel::Debug, "Rename (output dir) failed (sharing violation), retrying in 250ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                constexpr auto retry_ms = 250;
+                Logger::log(LogLevel::Debug, "Rename (output) failed (sharing violation), retrying in " + std::to_string(retry_ms) + "ms...", "Executor");
+                std::this_thread::sleep_for(std::chrono::milliseconds(retry_ms));
                 --retries;
             }
             if (ec) {
                 const std::string rename_error = ec.message();
-                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + rename_error + ")", "Executor");
+                Logger::log(LogLevel::Error, "Rename failed: " + original_file.string() + " -> " + dest.string() + " (" + rename_error + ")", "Executor");
                 fs::remove(temp_file, ec);
                 event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + rename_error});
                 return;
@@ -106,9 +135,9 @@ namespace chisel {
                 if (!ec) break; // success
 
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
-
-                Logger::log(LogLevel::Debug, "Rename failed (sharing/lock violation), retrying in 500ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                constexpr auto retry_ms = 500;
+                Logger::log(LogLevel::Debug, "Rename failed (sharing/lock violation), retrying in " + std::to_string(retry_ms) + "ms...", "Executor");
+                std::this_thread::sleep_for(std::chrono::milliseconds(retry_ms));
                 --retries;
             }
             if (ec) {

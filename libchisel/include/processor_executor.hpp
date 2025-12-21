@@ -150,6 +150,7 @@ private:
     bool dry_run_;                                ///< If true, no files are written
     std::filesystem::path output_dir_;            ///< Optional output directory
     bool has_output_dir_;                         ///< Convenience flag for !output_dir_.empty()
+    bool output_is_directory_ = true;             ///< True if the output path refers to a directory
     std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
     std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
     ThreadPool pool_;                             ///< Thread pool for Phase 2
