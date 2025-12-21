@@ -27,7 +27,7 @@
 // simple progress bar printer
 inline void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
     const unsigned term_width = get_terminal_width();
-    const unsigned int bar_width = std::max(10u, term_width > 40u ? term_width - 40u : 20u);
+    const unsigned int bar_width = std::max(10U, term_width > 40U ? term_width - 40U : 20U);
     std::string eta_str = "??:??";
     if (done > 0 && total > 0) {
         const double rate = static_cast<double>(done) / elapsed_seconds; // files per second
@@ -39,7 +39,9 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
             const int eta_s = static_cast<int>(eta_seconds) % 60;
 
             std::ostringstream oss;
-            if (eta_h > 0) oss << eta_h << "h ";
+            if (eta_h > 0) {
+                oss << eta_h << "h ";
+            }
             oss << std::setfill('0') << std::setw(2) << eta_m << "m "
                 << std::setw(2) << eta_s << "s";
             eta_str = oss.str();
@@ -153,8 +155,10 @@ int main(int argc, char* argv[]) {
 
     // set file logger
     Logger::clear_sinks();
-    auto fileSink = std::make_unique<FileLogSink>("chisel.log",false);
-    Logger::add_sink(std::move(fileSink));
+    if (!settings.log_file.empty()) {
+        auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
+        Logger::add_sink(std::move(fileSink));
+    }
 
     if (!settings.quiet) {
         auto consoleSink = std::make_unique<ConsoleLogSink>();

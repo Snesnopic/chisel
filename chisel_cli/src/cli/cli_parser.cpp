@@ -67,8 +67,11 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
 
     app.add_option("--log-level", settings.log_level,
                    "Log level: ERROR, WARNING, INFO, DEBUG, NONE.")
-                   ->default_val("WARNING")
+                   ->default_val("ERROR")
                    ->check(CLI::IsMember({"ERROR", "WARNING", "INFO", "DEBUG", "NONE"}, CLI::ignore_case));
+
+    app.add_option("--log-file", settings.log_file,
+                   "Write logs to a specific file (default: no file logging).");
 
     // encoding mode option with a map transformer
     app.add_option("--mode", settings.encode_mode, "Encoding mode: 'pipe' (default) or 'parallel'.")

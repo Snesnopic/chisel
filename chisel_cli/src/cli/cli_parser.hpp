@@ -24,7 +24,8 @@ struct Settings {
     bool regenerate_magic = false;
 
     unsigned num_threads = 1;
-    std::string log_level = "INFO";
+    std::string log_level = "ERROR";
+    std::string log_file;
     std::filesystem::path output_path;
     std::filesystem::path report_path;
     EncodeMode encode_mode = EncodeMode::PIPE;
