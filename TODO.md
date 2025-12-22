@@ -42,7 +42,6 @@
 
 ## Archives
 
-- [ ] Remove bzip2 from testing and libarchive supported archives.
 - [ ] Add support for 7Z recompression using 7zip SDK.
 - [ ] Investigate integration of BestCFBF (<https://papas-best.com/downloads/bestcfbf/stable/bestcfbf.cpp>) for optimizing MSI, DOC, PPT, XLS:
   - On Windows: adapt and integrate directly with COM Structured Storage APIs.
@@ -69,7 +68,7 @@
 - [ ] MPEG‑4 ALS – investigate reference implementation.  
   ↳ <https://www.iso.org/standard/43345.html>
 - [ ] Ogg Vorbis – investigate recompression techniques (codebook optimization) like `OptiVorbis` (Rust).  
-  ↳ <https://github.com/fhanau/optivorbis>
+  ↳ <https://github.com/OptiVorbis/OptiVorbis>
 - [ ] Lepton (Rust JPEG recompressor) – consider FFI integration.  
   ↳ <https://github.com/dropbox/lepton> (original C++), <https://github.com/microsoft/lepton_jpeg_rust>
 - [ ] WOFF/WOFF2 – recompression via zlib/Brotli.  
