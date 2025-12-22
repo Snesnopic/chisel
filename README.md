@@ -122,7 +122,10 @@ sudo cmake --install . --prefix /usr/local
     Number of worker threads to use (default: half of available cores).
 
 -   `--log-level <LEVEL>`
-    Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE). Default is INFO.
+    Set logging verbosity (ERROR, WARNING, INFO, DEBUG, NONE). Default is ERROR.
+
+-   `--log-file <FILE>`
+    Write logs to the specified file (default: no file logging).
 
 -   `--include <PATTERN>`
     Process only files matching regex PATTERN. (Can be used multiple times).
