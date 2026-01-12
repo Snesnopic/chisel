@@ -57,7 +57,8 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     config.sample_rate      = static_cast<int32_t>(WavpackGetSampleRate(ctx_in));
     config.qmode            = 0;
     config.block_samples    = 0;
-    config.flags            = CONFIG_VERY_HIGH_FLAG; // max compression
+    config.flags            = CONFIG_VERY_HIGH_FLAG | CONFIG_EXTRA_MODE;
+    config.xmode            = 6;
     config.flags &= ~CONFIG_HYBRID_FLAG;             // force lossless
 
     if (!WavpackSetConfiguration(ctx_out, &config, -1)) {
