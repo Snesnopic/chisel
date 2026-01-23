@@ -19,14 +19,14 @@ std::string chisel::MimeDetector::detect(const std::filesystem::path& path)
 {
 #ifndef _WIN32
     const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
-    if (!magic) return {};
+    if (magic == nullptr) return {};
     if (magic_load(magic, nullptr) != 0)
     {
         magic_close(magic);
         return {};
     }
     const char* mime = magic_file(magic, path.string().c_str());
-    std::string result = mime ? mime : "";
+    std::string result = (mime != nullptr) ? mime : "";
     magic_close(magic);
     return result;
 #else
@@ -41,7 +41,7 @@ bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
 {
 #ifndef _WIN32
     const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
-    if (!magic) return false;
+    if (magic == nullptr) return false;
     if (magic_load(magic, nullptr) != 0)
     {
         magic_close(magic);
@@ -49,7 +49,7 @@ bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
     }
     const char* desc = magic_file(magic, path.string().c_str());
     bool ok = false;
-    if (desc)
+    if (desc != nullptr)
     {
         std::string s(desc);
         if (s.find("MPEG") != std::string::npos &&
@@ -117,7 +117,7 @@ std::filesystem::path chisel::MimeDetector::get_magic_file_path()
 {
 #ifdef __APPLE__
     const char* home = getenv("HOME");
-    return std::filesystem::path(home ? home : ".") /
+    return std::filesystem::path((home != nullptr) ? home : ".") /
         "Library/Application Support/chisel/magic.mgc";
 #else
     const char* home = getenv("HOME");
@@ -130,7 +130,27 @@ void chisel::MimeDetector::ensure_magic_installed()
 {
 #ifndef _WIN32
     const auto target = get_magic_file_path();
-    if (!std::filesystem::exists(target))
+    bool need_install = !std::filesystem::exists(target);
+    if (!need_install) {
+        std::error_code ec;
+
+        if (std::filesystem::file_size(target, ec) < 1024UL * 1024UL) {
+             need_install = true;
+             Logger::log(LogLevel::Warning, "Local magic database too small or suspicious, regenerating...", "libmagic");
+        }
+        else {
+            magic_t test_magic = magic_open(MAGIC_NONE);
+            if (test_magic != nullptr) {
+                if (magic_load(test_magic, target.c_str()) != 0) {
+                    need_install = true;
+                    Logger::log(LogLevel::Warning, "Local magic database corrupt (load failed), regenerating...", "libmagic");
+                }
+                magic_close(test_magic);
+            }
+        }
+    }
+
+    if (need_install)
     {
         Logger::log(LogLevel::Info, "Installing embedded magic.mgc to " + target.string(), "libmagic");
         std::filesystem::create_directories(target.parent_path());

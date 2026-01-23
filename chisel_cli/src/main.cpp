@@ -139,9 +139,7 @@ int main(int argc, char* argv[]) {
     init_utf8_locale();
 
     try {
-        if (settings.regenerate_magic) {
-            MimeDetector::ensure_magic_installed();
-        }
+        MimeDetector::ensure_magic_installed();
     } catch (const std::exception& e) {
         // log if magic file init fails
         Logger::log(LogLevel::Error, "Failed to initialize magic file: " + std::string(e.what()), "main");

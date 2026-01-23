@@ -44,9 +44,6 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_flag("-q,--quiet", settings.quiet,
                  "Suppress non-error console output (progress bar, results).");
 
-    app.add_flag("--regenerate-magic", settings.regenerate_magic,
-                 "Re-install libmagic file-detection database.");
-
     app.add_flag("--verify-checksums", settings.verify_checksums,
                  "Verify raw checksums before replacing files.");
 

@@ -21,7 +21,6 @@ struct Settings {
     bool dry_run = false;
     bool quiet = false;
     bool verify_checksums = false;
-    bool regenerate_magic = false;
 
     unsigned num_threads = 1;
     std::string log_level = "ERROR";
