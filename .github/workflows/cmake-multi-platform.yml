@@ -440,9 +440,9 @@ jobs:
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --regenerate-magic --log-file chisel.log
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --log-file chisel.log
           else
-            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic --log-file chisel.log
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --log-file chisel.log
           fi
         shell: bash
 
@@ -577,7 +577,7 @@ jobs:
   #            echo "Running chisel from: $CHISEL_EXE"
   #            echo "Processing files in: ${{ env.TEST_DIR }}"
   #
-  #            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --regenerate-magic
+  #            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4ì
   #            echo "--- Test Run Complete ---"
   #      - name: Check for errors in Chisel Log
   #        if: always()
