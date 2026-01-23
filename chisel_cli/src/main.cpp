@@ -24,13 +24,31 @@
 #include "../../libchisel/include/mime_detector.hpp"
 #include "utils/file_log_sink.hpp"
 
-// simple progress bar printer
-inline void print_progress_bar(const size_t done, const size_t total, const double elapsed_seconds) {
+// Global mutex to synchronize console output from multiple threads
+static std::mutex g_console_mtx;
+static std::vector<std::string> g_active_files;
+
+// Helper to clear the current line
+inline void clear_line_internal() {
     const unsigned term_width = get_terminal_width();
-    const unsigned int bar_width = std::max(10U, term_width > 40U ? term_width - 40U : 20U);
-    std::string eta_str = "??:??";
+    std::cerr << "\r" << std::string(term_width - 1, ' ') << "\r";
+}
+
+// Updated Progress bar printer that accepts status text
+inline void print_progress_bar_internal(const size_t done, const size_t total, const double elapsed_seconds, const std::string& status_text) {
+    const unsigned term_width = get_terminal_width();
+
+    // Base info length estimation (~40 chars for stats)
+    const unsigned int available_width = term_width > 50 ? term_width - 1 : 40;
+    unsigned int bar_width = 20;
+
+    // Dynamic adjustment
+    if (available_width > 80) bar_width = 30;
+    else if (available_width < 60) bar_width = 10;
+
+    std::string eta_str = "--:--";
     if (done > 0 && total > 0) {
-        const double rate = static_cast<double>(done) / elapsed_seconds; // files per second
+        const double rate = static_cast<double>(done) / elapsed_seconds;
         const double remaining_items = static_cast<double>(total - done);
         if (rate > 0) {
             const double eta_seconds = remaining_items / rate;
@@ -39,24 +57,19 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
             const int eta_s = static_cast<int>(eta_seconds) % 60;
 
             std::ostringstream oss;
-            if (eta_h > 0) {
-                oss << eta_h << "h ";
-            }
+            if (eta_h > 0) oss << eta_h << "h ";
             oss << std::setfill('0') << std::setw(2) << eta_m << "m "
                 << std::setw(2) << eta_s << "s";
             eta_str = oss.str();
         }
     }
-    const double progress = total ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
+
+    const double progress = (total != 0U) ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
     const unsigned pos = static_cast<unsigned>(bar_width * progress);
 
     double percent = progress * 100.0;
-    if (done < total && percent >= 99.95) {
-        percent = 99.9;
-    }
-    if (done == total && total > 0) {
-        percent = 100.0;
-    }
+    if (done < total && percent >= 99.95) percent = 99.9;
+    if (done == total && total > 0) percent = 100.0;
 
     std::cerr << "\r[";
     for (unsigned i = 0; i < bar_width; ++i) {
@@ -66,11 +79,15 @@ inline void print_progress_bar(const size_t done, const size_t total, const doub
         else std::cerr << " ";
     }
     std::cerr << "] "
-              << std::setw(5) << std::fixed << std::setprecision(1) << percent << "%"
-              << " (" << done << "/" << total << ")"
-              << " ETA: " << eta_str
-              // << " elapsed: " << std::fixed << std::setprecision(1) << elapsed_seconds << "s"
-              << std::flush;
+              << std::setw(5) << std::fixed << std::setprecision(1) << percent << "% "
+              << "(" << done << "/" << total << ") "
+              << "ETA: " << eta_str;
+
+    if (!status_text.empty()) {
+        std::cerr << " " << status_text;
+    }
+
+    std::cerr << "\033[K" << std::flush; // ANSI Clear Line to right
 }
 
 using namespace chisel;
@@ -81,11 +98,13 @@ static std::atomic<chisel::ProcessorExecutor*> g_executor{nullptr};
 // handle ctrl+c or termination signals
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
+        // Protect interrupt message so it doesn't mix with progress bar
+        std::lock_guard<std::mutex> lock(g_console_mtx);
         std::cerr << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
         auto* executor_ptr = g_executor.load(std::memory_order_relaxed);
-        if (executor_ptr) {
+        if (executor_ptr != nullptr) {
             executor_ptr->request_stop();
         }
     }
@@ -199,14 +218,46 @@ int main(int argc, char* argv[]) {
         }
     });
 
-    // generic handler for "finished" events to update progress bar
-    auto on_finish = [&](auto&&) {
-        const size_t current = ++done;
-        const double elapsed = std::chrono::duration<double>(
-            std::chrono::steady_clock::now() - start_total).count();
-        if (!settings.quiet) {
-            print_progress_bar(current, total, elapsed);
+    // Process Start: Update the "Processing: ..." text dynamically
+    bus.subscribe<FileProcessStartEvent>([&](const FileProcessStartEvent& e) {
+        if (settings.quiet) return;
+
+        std::scoped_lock lock(g_console_mtx);
+        g_active_files.push_back(e.path.filename().string());
+
+        std::string status_text;
+        if (g_active_files.size() > 1) {
+            status_text = "Processing: " + std::to_string(g_active_files.size()) + " files";
+        } else {
+            status_text = "Processing: " + g_active_files.back();
         }
+
+        // Force an immediate redraw of the bar with the new status
+        double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
+        print_progress_bar_internal(done.load(), total, elapsed, status_text);
+    });
+
+    // generic handler for "finished" events to update progress bar
+    auto on_finish = [&](const std::string& finished_filename) {
+        const size_t current = ++done;
+        if (settings.quiet) return;
+
+        std::scoped_lock lock(g_console_mtx);
+
+        auto it = std::find(g_active_files.begin(), g_active_files.end(), finished_filename);
+        if (it != g_active_files.end()) {
+            g_active_files.erase(it);
+        }
+
+        std::string status_text;
+        if (g_active_files.empty()) {
+        } else if (g_active_files.size() > 1) {
+            status_text = "Processing: " + std::to_string(g_active_files.size()) + " files";
+        } else {
+            status_text = "Processing: " + g_active_files.front();
+        }
+        double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
+        print_progress_bar_internal(current, total, elapsed, status_text);
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
@@ -219,12 +270,17 @@ int main(int argc, char* argv[]) {
                              (settings.output_path.empty() ? " [replaced]" : " [OK]");
             }
 
-            std::cerr
-                << (e.replaced ? GREEN : YELLOW)
-                << "\n[DONE] " << e.path.filename().string()
-                << " (" << e.original_size << " -> " << e.new_size << " bytes)"
-                << status_msg
-                << RESET << std::endl;
+            {
+                std::scoped_lock lock(g_console_mtx);
+                clear_line_internal();
+
+                std::cerr
+                    << (e.replaced ? GREEN : YELLOW)
+                    << "[DONE] " << e.path.filename().string()
+                    << " (" << e.original_size << " -> " << e.new_size << " bytes)"
+                    << status_msg
+                    << RESET << std::endl;
+            }
         }
         Result r;
         r.path = e.path;
@@ -236,11 +292,15 @@ int main(int argc, char* argv[]) {
         r.seconds = static_cast<double>(e.duration.count()) / 1000.0;
         results.push_back(std::move(r));
 
-        on_finish(e);
+        on_finish(e.path.filename().string());
     });
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
-        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
+        {
+            std::lock_guard<std::mutex> lock(g_console_mtx);
+            clear_line_internal();
+            Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
+        }
 
         Result r;
         r.path = e.path;
@@ -249,10 +309,12 @@ int main(int argc, char* argv[]) {
         r.error_msg = e.error_message;
         results.push_back(std::move(r));
 
-        on_finish(e);
+        on_finish(e.path.filename().string());
     });
 
-    bus.subscribe<FileProcessSkippedEvent>(on_finish);
+    bus.subscribe<FileProcessSkippedEvent>([&](const FileProcessSkippedEvent& e) {
+        on_finish(e.path.filename().string());
+    });
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
         auto it = std::find_if(results.begin(), results.end(),
@@ -266,11 +328,15 @@ int main(int argc, char* argv[]) {
         c.success = true;
         c.size_after = e.final_size;
         container_results.push_back(std::move(c));
-        on_finish(e);
+        on_finish(e.path.filename().string());
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
-        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
+        {
+            std::lock_guard<std::mutex> lock(g_console_mtx);
+            clear_line_internal();
+            Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
+        }
 
         ContainerResult c;
         c.filename = e.path;
@@ -278,7 +344,7 @@ int main(int argc, char* argv[]) {
         c.error_msg = e.error_message;
         container_results.push_back(std::move(c));
 
-        on_finish(e);
+        on_finish(e.path.filename().string());
     });
 
     std::filesystem::path executor_output_dir;
@@ -299,6 +365,14 @@ int main(int argc, char* argv[]) {
     // run processing
     executor.process(inputs);
     g_executor.store(nullptr);
+
+    // Final cleanup of the progress bar line
+    if (!settings.quiet) {
+        std::lock_guard<std::mutex> lock(g_console_mtx);
+        double total_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
+        print_progress_bar_internal(total, total, total_seconds, "Completed.");
+        std::cerr << std::endl;
+    }
 
     auto end_total = std::chrono::steady_clock::now();
     double total_seconds = std::chrono::duration<double>(end_total - start_total).count();
