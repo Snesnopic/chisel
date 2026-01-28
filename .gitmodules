@@ -77,3 +77,9 @@
 [submodule "third_party/bzip2"]
 	path = third_party/bzip2
 	url = https://github.com/libarchive/bzip2.git
+[submodule "third_party/optivorbis"]
+	path = third_party/optivorbis
+	url = https://github.com/OptiVorbis/OptiVorbis
+[submodule "third_party/corrosion"]
+	path = third_party/corrosion
+	url = https://github.com/corrosion-rs/corrosion.git

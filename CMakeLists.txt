@@ -731,7 +731,7 @@ elseif(WIN32)
             libmseed
     )
 endif()
-
+add_subdirectory(third_party/corrosion)
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 

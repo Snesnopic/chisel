@@ -80,6 +80,11 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
       - name: Setup Git LFS
         run: |
           git lfs install
@@ -200,7 +205,8 @@ jobs:
   #              yasm \
   #              gmake \
   #              git \
-  #              llvm20
+  #              llvm20 \
+  #              rust
   #          run: |
   #            echo "--- Starting FreeBSD Build ---"
   #

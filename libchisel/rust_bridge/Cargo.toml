@@ -1,0 +1,12 @@
+[package]
+name = "chisel_optivorbis_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+
+optivorbis = { path = "../../third_party/optivorbis/packages/optivorbis" }
+libc = "0.2"

@@ -13,6 +13,7 @@ The project builds all its dependencies automatically via Git submodules. You on
   -   `git` (with LFS support: run `git lfs install` once)
   -   `cmake` (≥ 3.20)
   -   `ninja` (recommended)
+  -   Rust toolchain (required for OptiVorbis integration; install via [rustup.rs](https://rustup.rs))
 -   **Linux:**
   -   A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
   -   `build-essential`, `pkg-config`

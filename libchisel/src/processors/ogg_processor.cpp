@@ -14,6 +14,10 @@
 #include <FLAC/all.h>
 #include "file_type.hpp"
 
+extern "C" {
+    int chisel_optimize_vorbis(const char* input, const char* output);
+}
+
 namespace chisel {
 namespace fs = std::filesystem;
 
@@ -22,7 +26,41 @@ static const char* processor_tag() {
 }
 
 namespace {
+    bool is_vorbis_stream(FILE* f) {
+        if (f == nullptr) return false;
 
+        const long start_pos = ftell(f);
+        fseek(f, 0, SEEK_SET);
+
+        unsigned char header[27];
+        if (fread(header, 1, 27, f) != 27) {
+            fseek(f, start_pos, SEEK_SET);
+            return false;
+        }
+
+        if (memcmp(header, "OggS", 4) != 0) {
+            fseek(f, start_pos, SEEK_SET);
+            return false;
+        }
+
+        int num_segments = header[26];
+
+        if (fseek(f, num_segments, SEEK_CUR) != 0) {
+            fseek(f, start_pos, SEEK_SET);
+            return false;
+        }
+
+        unsigned char signature[7];
+        if (fread(signature, 1, 7, f) != 7) {
+            fseek(f, start_pos, SEEK_SET);
+            return false;
+        }
+
+        const bool is_vorbis = (memcmp(signature, "\x01vorbis", 7) == 0);
+
+        fseek(f, start_pos, SEEK_SET);
+        return is_vorbis;
+    }
     // Base struct for IO callbacks to access input file
     struct OggIO {
         FILE* f_in = nullptr;
@@ -157,7 +195,7 @@ namespace {
             ctx->encoder_init = true;
         }
 
-        if (!FLAC__stream_encoder_process(ctx->encoder, buffer, frame->header.blocksize)) {
+        if (FLAC__stream_encoder_process(ctx->encoder, buffer, frame->header.blocksize) == 0) {
             Logger::log(LogLevel::Error, "Encoding process failed", processor_tag());
             ctx->failed = true;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
@@ -193,10 +231,10 @@ namespace {
 
     std::vector<int32_t> decode_ogg_pcm(const fs::path& file, unsigned& sr, unsigned& ch, unsigned& bps) {
         FILE* f = chisel::open_file(file, "rb");
-        if (!f) return {};
+        if (f == nullptr) return {};
 
         FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();
-        if (!decoder) {
+        if (decoder == nullptr) {
             fclose(f);
             return {};
         }
@@ -229,20 +267,20 @@ namespace {
 
 void OggProcessor::recompress(const fs::path& input,
                               const fs::path& output,
-                              bool preserve_metadata) {
+                              const bool preserve_metadata) {
     Logger::log(LogLevel::Info, "Analyzing Ogg stream: " + input.string(), processor_tag());
 
     FILE* f_in = chisel::open_file(input, "rb");
-    if (!f_in) throw std::runtime_error("OggProcessor: cannot open input");
+    if (f_in == nullptr) throw std::runtime_error("OggProcessor: cannot open input");
 
     FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();
-    if (!decoder) {
+    if (decoder == nullptr) {
         fclose(f_in);
         throw std::runtime_error("OggProcessor: failed to create decoder");
     }
 
     FLAC__StreamEncoder* encoder = FLAC__stream_encoder_new();
-    if (!encoder) {
+    if (encoder == nullptr) {
         FLAC__stream_decoder_delete(decoder);
         fclose(f_in);
         throw std::runtime_error("OggProcessor: failed to create encoder");
@@ -250,7 +288,7 @@ void OggProcessor::recompress(const fs::path& input,
 
     // prepare context
     TranscodeContext ctx;
-    ctx.f_in = f_in; // FIXED: Set input file for callbacks
+    ctx.f_in = f_in;
     ctx.encoder = encoder;
     ctx.preserve_metadata = preserve_metadata;
 
@@ -261,49 +299,56 @@ void OggProcessor::recompress(const fs::path& input,
         &ctx
     );
 
-    bool is_flac_ogg = (init_stat == FLAC__STREAM_DECODER_INIT_STATUS_OK);
+    const bool is_ok = (init_stat == FLAC__STREAM_DECODER_INIT_STATUS_OK);
+    bool is_vorbis = is_vorbis_stream(f_in);
+    if (is_ok) {
+        if (is_vorbis) {
+            FLAC__stream_decoder_delete(decoder);
+            FLAC__stream_encoder_delete(encoder);
+            fclose(f_in);
 
-    if (!is_flac_ogg) {
-        FLAC__stream_decoder_delete(decoder);
-        FLAC__stream_encoder_delete(encoder);
-        fclose(f_in);
+            const std::string input_str = input.string();
+            const std::string output_str = output.string();
 
-        Logger::log(LogLevel::Info, "Stream is not Ogg-FLAC (likely Vorbis/Opus), skipping recompression", processor_tag());
+            int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str());
+            if (result != 0) {
+                const std::string msg = "OptiVorbis failed with error code: " + std::to_string(result);
+                Logger::log(LogLevel::Error, msg, processor_tag());
+                throw std::runtime_error(msg);
+            }
+        } else {
+            FILE* f_out = chisel::open_file(output, "wb");
+            if (f_out == nullptr) {
+                FLAC__stream_decoder_delete(decoder);
+                FLAC__stream_encoder_delete(encoder);
+                fclose(f_in);
+                throw std::runtime_error("OggProcessor: cannot open output");
+            }
+            ctx.f_out = f_out;
 
-        std::error_code ec;
-        fs::copy_file(input, output, fs::copy_options::overwrite_existing, ec);
-        if (ec) throw std::runtime_error("Fallback copy failed: " + ec.message());
-        return;
-    }
+            Logger::log(LogLevel::Info, "Recompressing Ogg-FLAC stream...", processor_tag());
+            const bool success = FLAC__stream_decoder_process_until_end_of_stream(decoder) != 0;
 
-    FILE* f_out = chisel::open_file(output, "wb");
-    if (!f_out) {
-        FLAC__stream_decoder_delete(decoder);
-        FLAC__stream_encoder_delete(encoder);
-        fclose(f_in);
-        throw std::runtime_error("OggProcessor: cannot open output");
-    }
-    ctx.f_out = f_out;
+            if (ctx.encoder_init) {
+                FLAC__stream_encoder_finish(encoder);
+            }
 
-    Logger::log(LogLevel::Info, "Recompressing Ogg-FLAC stream...", processor_tag());
-    bool success = FLAC__stream_decoder_process_until_end_of_stream(decoder);
+            FLAC__stream_encoder_delete(encoder);
+            FLAC__stream_decoder_delete(decoder);
+            fclose(f_in);
+            fclose(f_out);
 
-    if (ctx.encoder_init) {
-        FLAC__stream_encoder_finish(encoder);
-    }
-
-    FLAC__stream_encoder_delete(encoder);
-    FLAC__stream_decoder_delete(decoder);
-    fclose(f_in);
-    fclose(f_out);
-
-    if (!success || ctx.failed) {
-        std::error_code ec;
-        fs::remove(output, ec);
+            if (!success || ctx.failed) {
+                std::error_code ec;
+                fs::remove(output, ec);
+                throw std::runtime_error("OggProcessor: recompression failed or aborted");
+            }
+        }
+    } else {
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
     }
 
-    Logger::log(LogLevel::Info, "Ogg-FLAC recompression completed", processor_tag());
+    Logger::log(LogLevel::Info, "Ogg recompression completed", processor_tag());
 }
 
 std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path& input_path) {
@@ -367,25 +412,36 @@ std::string OggProcessor::get_raw_checksum(const std::filesystem::path&) const {
     return "";
 }
 
-bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
+    bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
     unsigned ra, ca, bpsa;
     unsigned rb, cb, bpsb;
 
-    auto pcmA = decode_ogg_pcm(a, ra, ca, bpsa);
-    auto pcmB = decode_ogg_pcm(b, rb, cb, bpsb);
+    const auto pcmA = decode_ogg_pcm(a, ra, ca, bpsa);
+    const auto pcmB = decode_ogg_pcm(b, rb, cb, bpsb);
 
-    // If both empty, it's likely non-FLAC Ogg (Vorbis/Opus) which we didn't recompress.
-    // In this case, we trust the copy operation.
-    if (pcmA.empty() && pcmB.empty()) {
-        return true;
+    // both are valid flac
+    if (!pcmA.empty() && !pcmB.empty()) {
+        if (ra != rb || ca != cb || bpsa != bpsb) return false;
+        return pcmA == pcmB;
     }
 
-    // If one is FLAC and other is not (or broken), fail.
-    if (pcmA.empty() || pcmB.empty()) return false;
+    // mismatch: one flac, one not
+    if (!pcmA.empty() || !pcmB.empty()) {
+        return false;
+    }
 
-    if (ra != rb || ca != cb || bpsa != bpsb) return false;
+    // neither is flac, assume vorbis
+    FILE* fA = fopen(a.string().c_str(), "rb");
+    FILE* fB = fopen(b.string().c_str(), "rb");
 
-    return pcmA == pcmB;
+    const bool validA = is_vorbis_stream(fA);
+    const bool validB = is_vorbis_stream(fB);
+
+    if (fA != nullptr) fclose(fA);
+    if (fB != nullptr) fclose(fB);
+
+    // both must be valid vorbis to trust the lossless recompression
+    return validA && validB;
 }
 
 } // namespace chisel

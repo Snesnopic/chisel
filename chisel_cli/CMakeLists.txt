@@ -16,13 +16,15 @@ if(WIN32)
 endif()
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
+set_target_properties(chisel PROPERTIES OUTPUT_NAME "chsl")
+
 if(APPLE)
     add_custom_command(TARGET chisel POST_BUILD
             COMMAND strip -x $<TARGET_FILE:chisel>
             COMMENT "Stripping symbols from chisel (macOS)")
 endif()
 
-target_link_libraries(chisel PRIVATE libchisel)
+target_link_libraries(chisel PRIVATE libchisel chisel_optivorbis_bridge)
 
 target_include_directories(chisel PRIVATE
         $<TARGET_PROPERTY:libchisel,INTERFACE_INCLUDE_DIRECTORIES>
@@ -49,7 +51,7 @@ if(NOT WIN32)
     if(HELP2MAN_EXECUTABLE)
         message(STATUS "Found help2man, manpage will be generated: ${HELP2MAN_EXECUTABLE}")
 
-        set(MANPAGE_FILE "${CMAKE_CURRENT_BINARY_DIR}/chisel.1")
+        set(MANPAGE_FILE "${CMAKE_CURRENT_BINARY_DIR}/chsl.1")
 
         add_custom_command(
                 OUTPUT ${MANPAGE_FILE}
@@ -58,7 +60,7 @@ if(NOT WIN32)
                 --name="Lossless file recompressor"
                 $<TARGET_FILE:chisel> > ${MANPAGE_FILE}
                 DEPENDS chisel
-                COMMENT "Generating manpage chisel.1 using help2man"
+                COMMENT "Generating manpage chsl.1 using help2man"
                 VERBATIM
         )
         add_custom_target(manpage ALL DEPENDS ${MANPAGE_FILE})
@@ -70,7 +72,7 @@ if(NOT WIN32)
         )
 
     else()
-        message(WARNING "help2man not found. Manpage (chisel.1) will not be generated.")
+        message(WARNING "help2man not found. Manpage (chsl.1) will not be generated.")
     endif()
 
 endif()
