@@ -21,7 +21,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chsl
             asset_name: "linux-x64-gcc"
 
           - id: ubuntu-clang
@@ -29,7 +29,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chsl
             asset_name: "linux-x64-clang"
 
           - id: ubuntu-arm
@@ -37,7 +37,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chsl
             asset_name: "linux-arm64"
 
           - id: macos-intel
@@ -45,7 +45,7 @@ jobs:
             build_type: Release
             c_compiler: gcc-12
             cpp_compiler: g++-12
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chsl
             asset_name: "macos-x64"
 
           - id: macos-arm
@@ -53,7 +53,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            binary_path: bin/Release/chisel
+            binary_path: bin/Release/chsl
             asset_name: "macos-arm64"
 
           - id: windows-x64
@@ -61,7 +61,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            binary_path: bin/Release/chisel.exe
+            binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
           - id: windows-arm
@@ -69,7 +69,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            binary_path: bin/Release/chisel.exe
+            binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 
     steps:
@@ -147,7 +147,7 @@ jobs:
             if [[ "$SRC" != *".exe" ]]; then SRC="$SRC.exe"; fi
           fi
 
-          DEST="chisel-${{ matrix.asset_name }}-${{ env.VERSION }}$EXT"
+          DEST="chsl-${{ matrix.asset_name }}-${{ env.VERSION }}$EXT"
 
           echo "Renaming $SRC to $DEST"
           mv "$SRC" "$DEST"
@@ -229,8 +229,8 @@ jobs:
   #      - name: Upload binary artifact
   #        uses: actions/upload-artifact@v4
   #        with:
-  #          name: chisel-${{ matrix.id }}
-  #          path: ${{ github.workspace }}/build/bin/Release/chisel
+  #          name: chsl-${{ matrix.id }}
+  #          path: ${{ github.workspace }}/build/bin/Release/chsl
   #          retention-days: 7
 
   test:
@@ -288,17 +288,17 @@ jobs:
         shell: bash
         run: |
               cd ${{ env.BIN_DIR }}
-              find . -maxdepth 1 -type f -name "chisel-*" ! -name "chisel" ! -name "chisel.exe" -exec mv {} chisel \; || true
+              find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" ! -name "chsl.exe" -exec mv {} chsl \; || true
 
-              if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chisel" ]; then
-              mv chisel chisel.exe
+              if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chsl" ]; then
+              mv chsl chsl.exe
               fi
 
               ls -la
 
       - name: Make binary executable
         if: runner.os != 'Windows'
-        run: chmod +x ${{ env.BIN_DIR }}/chisel
+        run: chmod +x ${{ env.BIN_DIR }}/chsl
         shell: bash
 
       - name: Install test dependencies (Linux)
@@ -439,9 +439,9 @@ jobs:
       - name: Run Chisel Tests
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel.exe"
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chsl.exe"
           else
-            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
           fi
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
@@ -511,7 +511,7 @@ jobs:
   #      - name: Download binary artifact
   #        uses: actions/download-artifact@v4
   #        with:
-  #          name: chisel-${{ matrix.id }}
+  #          name: chsl-${{ matrix.id }}
   #          path: ${{ env.BIN_DIR }}
   #      - name: Install test dependencies (Linux Host for GDrive)
   #        run: |
@@ -577,7 +577,7 @@ jobs:
   #          usesh: true
   #          run: |
   #            echo "--- Starting FreeBSD Test ---"
-  #            CHISEL_EXE="./${{ env.BIN_DIR }}/chisel"
+  #            CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
   #            chmod +x $CHISEL_EXE
   #
   #            echo "Running chisel from: $CHISEL_EXE"
@@ -613,7 +613,7 @@ jobs:
   #        if: always()
   #        uses: actions/upload-artifact@v4
   #        with:
-  #          name: chisel-log-${{ matrix.id }}
+  #          name: chsl-log-${{ matrix.id }}
   #          path: |
   #            build/chisel.log
   #            ${{ github.workspace }}/chisel.log
@@ -693,17 +693,17 @@ jobs:
           }
           
           # --- Linux ---
-          package_unix "binary-linux-x64-gcc"   "chisel-linux-x64-gcc"
-          package_unix "binary-linux-x64-clang" "chisel-linux-x64-clang"
-          package_unix "binary-linux-arm64"     "chisel-linux-arm64"
+          package_unix "binary-linux-x64-gcc"   "chsl-linux-x64-gcc"
+          package_unix "binary-linux-x64-clang" "chsl-linux-x64-clang"
+          package_unix "binary-linux-arm64"     "chsl-linux-arm64"
           
           # --- macOS ---
-          package_unix "binary-macos-x64"       "chisel-macos-x64"
-          package_unix "binary-macos-arm64"     "chisel-macos-arm64"
+          package_unix "binary-macos-x64"       "chsl-macos-x64"
+          package_unix "binary-macos-arm64"     "chsl-macos-arm64"
           
           # --- Windows ---
-          package_windows "binary-windows-x64"    "chisel-windows-x64"
-          package_windows "binary-windows-arm64"  "chisel-windows-arm64"
+          package_windows "binary-windows-x64"    "chsl-windows-x64"
+          package_windows "binary-windows-arm64"  "chsl-windows-arm64"
           
           # --- Logs ---
           find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
@@ -763,13 +763,13 @@ jobs:
           }
           
           # Packaging
-          package_unix "binary-linux-x64-gcc"   "chisel-linux-x64-gcc"
-          package_unix "binary-linux-x64-clang" "chisel-linux-x64-clang"
-          package_unix "binary-linux-arm64"     "chisel-linux-arm64"
-          package_unix "binary-macos-x64"       "chisel-macos-x64"
-          package_unix "binary-macos-arm64"     "chisel-macos-arm64"
-          package_windows "binary-windows-x64"    "chisel-windows-x64"
-          package_windows "binary-windows-arm64"  "chisel-windows-arm64"
+          package_unix "binary-linux-x64-gcc"   "chsl-linux-x64-gcc"
+          package_unix "binary-linux-x64-clang" "chsl-linux-x64-clang"
+          package_unix "binary-linux-arm64"     "chsl-linux-arm64"
+          package_unix "binary-macos-x64"       "chsl-macos-x64"
+          package_unix "binary-macos-arm64"     "chsl-macos-arm64"
+          package_windows "binary-windows-x64"    "chsl-windows-x64"
+          package_windows "binary-windows-arm64"  "chsl-windows-arm64"
           
           # Logs
           find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
@@ -841,25 +841,25 @@ jobs:
         shell: bash
         run: |
           cd ${{ env.BIN_DIR }}
-          find . -maxdepth 1 -type f -name "chisel-*" ! -name "chisel" ! -name "chisel.exe" -exec mv {} chisel \; || true
+          find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" ! -name "chsl.exe" -exec mv {} chsl \; || true
           
-          if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chisel" ]; then
-          mv chisel chisel.exe
+          if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chsl" ]; then
+          mv chsl chsl.exe
           fi
           
           ls -la
 
       - name: Make binary executable
         if: runner.os != 'Windows'
-        run: chmod +x ${{ env.BIN_DIR }}/chisel
+        run: chmod +x ${{ env.BIN_DIR }}/chsl
 
       - name: Verify Linux (ldd)
         if: runner.os == 'Linux'
         run: |
           echo "Checking dependencies for Linux..."
-          ldd ${{ env.BIN_DIR }}/chisel
+          ldd ${{ env.BIN_DIR }}/chsl
           echo "---"
-          matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          matches=$(ldd ${{ env.BIN_DIR }}/chsl | grep -iE "(${FORBIDDEN_LIBS})" || true)
           if [ -n "$matches" ]; then
             echo "::error::Found forbidden dynamic libraries!"
             echo "$matches"
@@ -872,9 +872,9 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           echo "Checking dependencies for macOS..."
-          otool -L ${{ env.BIN_DIR }}/chisel
+          otool -L ${{ env.BIN_DIR }}/chsl
           echo "---"
-          matches=$(otool -L ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+          matches=$(otool -L ${{ env.BIN_DIR }}/chsl | grep -iE "(${FORBIDDEN_LIBS})" || true)
           if [ -n "$matches" ]; then
             echo "::error::Found forbidden dynamic libraries!"
             echo "$matches"
@@ -888,7 +888,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Output "Checking dependencies for Windows..."
-          $deps = & dumpbin /dependents "${{ env.BIN_DIR }}\chisel.exe"
+          $deps = & dumpbin /dependents "${{ env.BIN_DIR }}\chsl.exe"
           $deps | Out-String | Write-Output
           Write-Output "---"
           $pattern = [regex]"(${env:FORBIDDEN_LIBS})\.dll"
@@ -919,7 +919,7 @@ jobs:
 #      - name: Download binary artifact
 #        uses: actions/download-artifact@v4
 #        with:
-#          name: chisel-${{ matrix.id }}
+#          name: chsl-${{ matrix.id }}
 #          path: ${{ env.BIN_DIR }}
 #      - name: Verify FreeBSD (ldd)
 #        uses: vmactions/freebsd-vm@v1
@@ -928,10 +928,10 @@ jobs:
 #          usesh: true
 #          run: |
 #            echo "Checking dependencies for FreeBSD..."
-#            chmod +x ${{ env.BIN_DIR }}/chisel
-#            ldd ${{ env.BIN_DIR }}/chisel
+#            chmod +x ${{ env.BIN_DIR }}/chsl
+#            ldd ${{ env.BIN_DIR }}/chsl
 #            echo "---"
-#            matches=$(ldd ${{ env.BIN_DIR }}/chisel | grep -iE "(${FORBIDDEN_LIBS})" || true)
+#            matches=$(ldd ${{ env.BIN_DIR }}/chsl | grep -iE "(${FORBIDDEN_LIBS})" || true)
 #            if [ -n "$matches" ]; then
 #              echo "::error::Found forbidden dynamic libraries!"
 #              echo "$matches"
