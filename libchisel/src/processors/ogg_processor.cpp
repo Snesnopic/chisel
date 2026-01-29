@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 #include <FLAC/all.h>
 #include "file_type.hpp"
@@ -38,7 +39,7 @@ namespace {
             return false;
         }
 
-        if (memcmp(header, "OggS", 4) != 0) {
+        if (std::memcmp(header, "OggS", 4) != 0) {
             fseek(f, start_pos, SEEK_SET);
             return false;
         }
@@ -56,7 +57,7 @@ namespace {
             return false;
         }
 
-        const bool is_vorbis = (memcmp(signature, "\x01vorbis", 7) == 0);
+        const bool is_vorbis = (std::memcmp(signature, "\x01vorbis", 7) == 0);
 
         fseek(f, start_pos, SEEK_SET);
         return is_vorbis;
