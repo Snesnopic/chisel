@@ -80,11 +80,6 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
       - name: Setup Git LFS
         run: |
           git lfs install
@@ -109,6 +104,11 @@ jobs:
         run: |
           echo "No Windows-specific build dependencies to install via script."
         shell: bash
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Set build output directory
         id: strings
