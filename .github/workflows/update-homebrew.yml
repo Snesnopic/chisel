@@ -79,7 +79,7 @@ jobs:
             end
 
             test do
-              assert_match "chsl", shell_output("#{bin}/chsl --help")
+              assert_match "chisel", shell_output("#{bin}/chsl --help")
             end
           end
           EOF
