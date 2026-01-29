@@ -1,0 +1,99 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Homebrew Tap
+        uses: actions/checkout@v4
+        with:
+          repository: Snesnopic/homebrew-chsl
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Formula
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          CLEAN_VER="${TAG_NAME#v}"
+          echo "Updating Formula for version: $CLEAN_VER (Tag: $TAG_NAME)"
+          
+          BASE_URL="https://github.com/Snesnopic/chisel/releases/download/${TAG_NAME}"
+          
+          wget -q "${BASE_URL}/chsl-macos-arm64.tar.gz"
+          wget -q "${BASE_URL}/chsl-macos-x64.tar.gz"
+          wget -q "${BASE_URL}/chsl-linux-x64-gcc.tar.gz"
+          wget -q "${BASE_URL}/chsl-linux-arm64.tar.gz"
+          
+          SHA_MAC_ARM=$(sha256sum chsl-macos-arm64.tar.gz | awk '{print $1}')
+          SHA_MAC_INTEL=$(sha256sum chsl-macos-x64.tar.gz | awk '{print $1}')
+          SHA_LINUX_INTEL=$(sha256sum chsl-linux-x64-gcc.tar.gz | awk '{print $1}')
+          SHA_LINUX_ARM=$(sha256sum chsl-linux-arm64.tar.gz | awk '{print $1}')
+          
+          cat > homebrew-tap/chsl.rb <<EOF
+          class Chisel < Formula
+            desc "Experimental project aiming to recreate the functionality of FileOptimizer"
+            homepage "https://github.com/Snesnopic/chisel"
+            version "${CLEAN_VER}"
+            license "MIT"
+
+            head "https://github.com/Snesnopic/chisel.git", branch: "main"
+          
+            depends_on "cmake" => :build
+            depends_on "rust" => :build
+
+            if OS.mac? && Hardware::CPU.arm?
+              url "${BASE_URL}/chsl-macos-arm64.tar.gz"
+              sha256 "${SHA_MAC_ARM}"
+            elsif OS.mac? && Hardware::CPU.intel?
+              url "${BASE_URL}/chsl-macos-x64.tar.gz"
+              sha256 "${SHA_MAC_INTEL}"
+            elsif OS.linux? && Hardware::CPU.intel?
+              url "${BASE_URL}/chsl-linux-x64-gcc.tar.gz"
+              sha256 "${SHA_LINUX_INTEL}"
+            elsif OS.linux? && Hardware::CPU.arm?
+              url "${BASE_URL}/chsl-linux-arm64.tar.gz"
+              sha256 "${SHA_LINUX_ARM}"
+            end
+
+            def install
+              if build.head?
+                system "cmake", "-S", ".", "-B", "build", *std_cmake_args
+                system "cmake", "--build", "build", "--config", "Release"
+                bin.install "build/bin/Release/chsl"
+              else
+                if OS.mac? && Hardware::CPU.arm?
+                  bin.install "chsl-macos-arm64" => "chsl"
+                elsif OS.mac? && Hardware::CPU.intel?
+                  bin.install "chsl-macos-x64" => "chsl"
+                elsif OS.linux? && Hardware::CPU.intel?
+                  bin.install "chsl-linux-x64-gcc" => "chsl"
+                elsif OS.linux? && Hardware::CPU.arm?
+                  bin.install "chsl-linux-arm64" => "chsl"
+                end
+              end
+            end
+
+            test do
+              assert_match "chsl", shell_output("#{bin}/chsl --help")
+            end
+          end
+          EOF
+
+      - name: Commit and Push
+        run: |
+          cd homebrew-tap
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          if [[ -n $(git status -s) ]]; then
+            git add chsl.rb
+            git commit -m "Update chisel formula to ${TAG_NAME}"
+            git push
+          else
+            echo "Formula already up to date."
+          fi
