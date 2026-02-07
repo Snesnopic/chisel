@@ -102,7 +102,7 @@ jobs:
       - name: Install OCaml Dependencies
         if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
         run: |
-          opam install dune --yes
+          opam install dune dune-configurator --yes
           opam exec -- ocamlopt -version
 
       - name: Install build dependencies (Linux)
