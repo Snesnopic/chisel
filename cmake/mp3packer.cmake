@@ -1,48 +1,16 @@
 function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
-    find_program(OPAM_EXE opam)
-    set(OPAM_HINTS "")
-    set(OPAM_BIN_DIR "")
+    find_program(OPAM_EXE opam REQUIRED)
 
-    if(OPAM_EXE)
-        execute_process(
-                COMMAND ${OPAM_EXE} var bin
-                OUTPUT_VARIABLE OPAM_BIN_OUTPUT
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-                ERROR_QUIET
-        )
-
-        if(OPAM_BIN_OUTPUT)
-            string(STRIP "${OPAM_BIN_OUTPUT}" OPAM_BIN_RAW)
-
-            file(TO_CMAKE_PATH "${OPAM_BIN_RAW}" OPAM_BIN_CMAKE)
-            list(APPEND OPAM_HINTS "${OPAM_BIN_CMAKE}")
-
-            set(OPAM_BIN_DIR "${OPAM_BIN_CMAKE}")
-        endif()
-    endif()
-
-    find_program(DUNE_EXE dune HINTS ${OPAM_HINTS} REQUIRED)
-    find_program(OCAMLOPT_EXE ocamlopt HINTS ${OPAM_HINTS} REQUIRED)
-
-
-    if(OPAM_BIN_DIR)
-        if(WIN32)
-            file(TO_NATIVE_PATH "${OPAM_BIN_DIR}" OPAM_BIN_NATIVE)
-            file(TO_NATIVE_PATH "$ENV{PATH}" CURRENT_PATH_NATIVE)
-
-            set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${OPAM_BIN_NATIVE};${CURRENT_PATH_NATIVE}")
-        else()
-            set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${OPAM_BIN_DIR}:$ENV{PATH}")
-        endif()
-    else()
-        set(ENV_WRAPPER ${CMAKE_COMMAND} -E env)
-    endif()
+    set(DUNE_CMD ${OPAM_EXE} exec -- dune)
+    set(OCAMLOPT_CMD ${OPAM_EXE} exec -- ocamlopt)
 
     execute_process(
-            COMMAND ${OCAMLOPT_EXE} -where
+            COMMAND ${OCAMLOPT_CMD} -where
             OUTPUT_VARIABLE OCAML_LIB_PATH
             OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND_ERROR_IS_FATAL ANY
     )
+    string(STRIP "${OCAML_LIB_PATH}" OCAML_LIB_PATH)
     file(TO_CMAKE_PATH "${OCAML_LIB_PATH}" OCAML_LIB_PATH)
 
     if(WIN32)
@@ -70,18 +38,14 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     add_custom_command(
             OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
-
-            COMMAND ${ENV_WRAPPER} ${DUNE_EXE} build --root ${MP3PACKER_ROOT} mp3packer.cmxa libmp3packer_stubs${STATIC_LIB_EXT}
-
-            COMMAND ${ENV_WRAPPER} ${OCAMLOPT_EXE} -thread -output-obj -o ${GLUE_OBJ}
+            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa libmp3packer_stubs${STATIC_LIB_EXT}
+            COMMAND ${OCAMLOPT_CMD} -thread -output-obj -o ${GLUE_OBJ}
             -I ${BUILD_DIR}
             -I +unix -I +str -I +threads
             -linkall
             unix.cmxa str.cmxa threads.cmxa
             ${MP3_CMXA}
-
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Building OCaml mp3packer static library and glue..."
             VERBATIM
     )
 
@@ -117,5 +81,5 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
         target_link_libraries(${TARGET_NAME} INTERFACE pthread dl m)
     endif()
 
-    message(STATUS "OCaml mp3packer configured. Runtime at: ${OCAML_LIB_PATH}")
+    message(STATUS "OCaml mp3packer configured via opam. Runtime at: ${OCAML_LIB_PATH}")
 endfunction()
