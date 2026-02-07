@@ -51,10 +51,9 @@ static FLAC__StreamDecoderWriteStatus write_callback(
         FLAC__stream_encoder_set_blocksize(ctx->encoder, 0);
         FLAC__stream_encoder_set_do_mid_side_stereo(ctx->encoder, true);
         FLAC__stream_encoder_set_loose_mid_side_stereo(ctx->encoder, false);
-        FLAC__stream_encoder_set_apodization(ctx->encoder, "tukey(0.5);partial_tukey(2);punchout_tukey(3);gauss(0.2)");
-        FLAC__stream_encoder_set_max_lpc_order(ctx->encoder, 16);
+        FLAC__stream_encoder_set_apodization(ctx->encoder, "tukey(0.5);partial_tukey(2);punchout_tukey(3);welch;nutall;blackman;blackman_harris_4kb;gauss(0.5)");        FLAC__stream_encoder_set_max_lpc_order(ctx->encoder, 16);
         FLAC__stream_encoder_set_min_residual_partition_order(ctx->encoder, 0);
-        FLAC__stream_encoder_set_max_residual_partition_order(ctx->encoder, 6);
+        FLAC__stream_encoder_set_max_residual_partition_order(ctx->encoder, 8);
         FLAC__stream_encoder_set_do_exhaustive_model_search(ctx->encoder, true);
         FLAC__stream_encoder_set_streamable_subset(ctx->encoder, false);
 
