@@ -82,7 +82,7 @@ sudo cmake --install . --prefix /usr/local
 
 ## Usage
 
-`./chisel <file-or-directory>... [options]`
+`./chsl <file-or-directory>... [options]`
 
 **Arguments:**
 -   `inputs...`
@@ -144,11 +144,11 @@ sudo cmake --install . --prefix /usr/local
 
 
 **Examples:**
--   `./chisel file.jpg dir/ --recursive --threads 4`
--   `./chisel archive.zip`
--   `./chisel dir/ --report report.csv`
--   `cat file.png | ./chisel - -o out.png`
--   `cat file.png | ./chisel - > out.png`
+-   `./chsl file.jpg dir/ --recursive --threads 4`
+-   `./chsl archive.zip`
+-   `./chsl dir/ --report report.csv`
+-   `cat file.png | ./chsl - -o out.png`
+-   `cat file.png | ./chsl - > out.png`
 
 ---
 
