@@ -83,3 +83,7 @@
 [submodule "third_party/corrosion"]
 	path = third_party/corrosion
 	url = https://github.com/corrosion-rs/corrosion.git
+[submodule "third_party/mp3packer"]
+	path = third_party/mp3packer
+	url = https://github.com/Snesnopic/mp3packer
+	branch = lib

@@ -28,6 +28,15 @@
 static std::mutex g_console_mtx;
 static std::vector<std::string> g_active_files;
 
+#ifdef HAVE_MP3PACKER
+extern "C" {
+#include <caml/mlvalues.h>
+#include <caml/callback.h>
+#include <caml/alloc.h>
+}
+#undef flush // otherwise we can't use std::flush later
+#endif
+
 // Helper to clear the current line
 inline void clear_line_internal() {
     const unsigned term_width = get_terminal_width();
@@ -164,6 +173,14 @@ int main(int argc, char* argv[]) {
         Logger::log(LogLevel::Error, "Failed to initialize magic file: " + std::string(e.what()), "main");
         // this is often non-fatal, so we continue
     }
+#ifdef HAVE_MP3PACKER
+    try {
+        caml_startup(argv);
+    } catch (...) {
+        Logger::log(LogLevel::Error, "Failed to initialize OCaml runtime", "main");
+    }
+
+#endif
 
     // set console logger
     // auto sink = std::make_unique<ConsoleLogSink>();

@@ -690,6 +690,15 @@ target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopfli
 )
 
+# mp3packer (ocaml)
+option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
+
+if(ENABLE_MP3PACKER)
+    include(cmake/mp3packer.cmake)
+
+    add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
+endif()
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -720,6 +729,11 @@ set(CHISEL_LIBS
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)
+endif()
+
+if(ENABLE_MP3PACKER)
+    list(APPEND CHISEL_LIBS mp3packer_static)
+    add_compile_definitions(HAVE_MP3PACKER=1)
 endif()
 
 if(UNIX)

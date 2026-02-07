@@ -22,8 +22,7 @@ namespace chisel {
      *
      * @details This processor acts as a container for extracting and
      * re-inserting cover art (ID3v2 APIC tags), allowing the image
-     * files to be processed by image optimizers. Audio recompression
-     * logic (Phase 2) is left as a future implementation task.
+     * files to be processed by image optimizers.
      */
     class MpegProcessor final : public IProcessor {
     public:
@@ -44,10 +43,17 @@ namespace chisel {
 
         // --- capabilities ---
         /**
-         * @brief Audio recompression is planned for the future.
-         * @return false
-         */
-        [[nodiscard]] bool can_recompress() const noexcept override { return false; }
+        * @brief Recompression support depends on whether the project was compiled with
+        * MP3Packer integration enabled (HAVE_MP3PACKER).
+        * @return true if MP3Packer integration is available, false otherwise.
+        */
+        [[nodiscard]] bool can_recompress() const noexcept override {
+#ifdef HAVE_MP3PACKER
+            return true;
+#else
+            return false;
+#endif
+        }
 
         /**
          * @brief This processor extracts cover art.
@@ -58,9 +64,9 @@ namespace chisel {
         // --- operations ---
 
         /**
-         * @brief (Placeholder) Direct recompression is not implemented yet.
-         *
-         * @throws std::runtime_error always, if this is called improperly.
+         * @brief Performs lossless MP3 recompression via MP3Packer (if enabled).
+         * Falls back to a standard copy if HAVE_MP3PACKER is undefined.
+         * @throws std::runtime_error On compression failure or IO error.
          */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output,
@@ -77,7 +83,6 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the MP3 file.
          * @param content Content descriptor from prepare_extraction.
-         * @param target_format Ignored.
          * @return Path to the finalized MP3 file.
          */
         std::filesystem::path finalize_extraction(const ExtractedContent &content) override;

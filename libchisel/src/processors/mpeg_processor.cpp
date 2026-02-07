@@ -9,6 +9,90 @@
 #include "../../include/random_utils.hpp"
 #include <stdexcept>
 #include <filesystem>
+#include <mutex>
+#include <cstdio>
+#include <fcntl.h>
+
+// main's print mutex, since we redirect stdout and stderr to null while compressing with mp3
+// TODO: edit cloned mp3packer's branch to remove all prints
+extern std::mutex g_console_mtx;
+
+#ifdef HAVE_MP3PACKER
+
+extern "C" {
+#include <caml/mlvalues.h>
+#include <caml/callback.h>
+#include <caml/alloc.h>
+}
+
+#ifdef _WIN32
+    #include <io.h>
+    #define DUP _dup
+    #define DUP2 _dup2
+    #define FILENO _fileno
+    #define CLOSE _close
+    #define NULL_DEVICE "NUL"
+    #ifndef STDOUT_FILENO
+        #define STDOUT_FILENO 1
+    #endif
+    #ifndef STDERR_FILENO
+        #define STDERR_FILENO 2
+    #endif
+#else
+    #include <unistd.h>
+    #define DUP dup
+    #define DUP2 dup2
+    #define FILENO fileno
+    #define CLOSE close
+    #define NULL_DEVICE "/dev/null"
+#endif
+
+// mutex to serialize mp3packer calls
+static std::mutex g_mp3packer_mutex;
+
+namespace {
+    class ScopedOutputSilencer {
+        int original_stdout;
+        int original_stderr;
+        int null_fd;
+        bool active;
+
+    public:
+        explicit ScopedOutputSilencer(bool silence = true) : active(silence) {
+            if (!active) return;
+
+            fflush(stdout);
+            fflush(stderr);
+
+            original_stdout = DUP(STDOUT_FILENO);
+            original_stderr = DUP(STDERR_FILENO);
+
+            null_fd = open(NULL_DEVICE, O_WRONLY);
+
+            if (null_fd >= 0) {
+                DUP2(null_fd, STDOUT_FILENO);
+                DUP2(null_fd, STDERR_FILENO);
+            }
+        }
+
+        ~ScopedOutputSilencer() {
+            if (!active) return;
+
+            fflush(stdout);
+            fflush(stderr);
+
+            DUP2(original_stdout, STDOUT_FILENO);
+            DUP2(original_stderr, STDERR_FILENO);
+
+            CLOSE(original_stdout);
+            CLOSE(original_stderr);
+            if (null_fd >= 0) CLOSE(null_fd);
+        }
+    };
+}
+
+#endif // HAVE_MP3PACKER
+
 #include "file_type.hpp"
 
 namespace chisel {
@@ -21,14 +105,54 @@ static const char* processor_tag() {
 void MpegProcessor::recompress(const fs::path& input,
                               const fs::path& output,
                               bool preserve_metadata) {
-    Logger::log(LogLevel::Error, "Recompress called on MpegProcessor placeholder.", processor_tag());
+
+#ifdef HAVE_MP3PACKER
+    std::scoped_lock lock(g_mp3packer_mutex, g_console_mtx);
+
+    Logger::log(LogLevel::Info, "MP3: Starting compression via OCaml: " + input.string(), processor_tag());
+
+    const value* func = caml_named_value("caml_pack_mp3");
+    if (func == nullptr) {
+        throw std::runtime_error("OCaml function 'caml_pack_mp3' not found. Runtime not initialized?");
+    }
+
+    if (fs::exists(output)) {
+        fs::remove(output);
+    }
+
+    const value v_input = caml_copy_string(input.string().c_str());
+    const value v_output = caml_copy_string(output.string().c_str());
+
+    int result_code = 1;
+
+    try {
+        ScopedOutputSilencer hush(true);
+
+        const value res = caml_callback2(*func, v_input, v_output);
+        result_code = Int_val(res);
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception during OCaml execution: " + std::string(e.what()));
+    }
+
+    if (result_code != 0) {
+        throw std::runtime_error("MP3Packer failed with exit code: " + std::to_string(result_code));
+    }
+
+    Logger::log(LogLevel::Debug, "MP3: Compression successful.", processor_tag());
+
+#else
+
+    Logger::info(LogLevel::Warning, "MP3Packer disabled inside build", processor_tag());
 
     std::error_code ec;
     fs::copy_file(input, output, fs::copy_options::overwrite_existing, ec);
 
     if (ec) {
-        throw std::runtime_error("Placeholder recompress failed to copy file.");
+        throw std::runtime_error("Copy failed: " + ec.message());
     }
+
+#endif // HAVE_MP3PACKER
 }
 
 std::optional<ExtractedContent> MpegProcessor::prepare_extraction(const fs::path& input_path) {
@@ -59,13 +183,13 @@ std::filesystem::path MpegProcessor::finalize_extraction(const ExtractedContent 
     Logger::log(LogLevel::Info, "MP3: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
-    if (!state_ptr) {
+    if (state_ptr == nullptr) {
         Logger::log(LogLevel::Error, "MP3: Failed to retrieve extraction state.", processor_tag());
         cleanup_temp_dir(content.temp_dir, processor_tag());
         return {};
     }
 
-    const fs::path final_temp_path = fs::temp_directory_path() /
+    fs::path final_temp_path = fs::temp_directory_path() /
                                      (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".mp3");
 
     try {

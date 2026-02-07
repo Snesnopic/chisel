@@ -21,6 +21,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
+            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-x64-gcc"
 
@@ -29,6 +30,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
+            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-x64-clang"
 
@@ -37,6 +39,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
+            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-arm64"
 
@@ -45,6 +48,7 @@ jobs:
             build_type: Release
             c_compiler: gcc-12
             cpp_compiler: g++-12
+            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
 
@@ -53,6 +57,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
+            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-arm64"
 
@@ -61,6 +66,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
+            ocaml_version: "4.14.1+msvc64"
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
@@ -69,6 +75,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
+            extra_cmake_args: "-DENABLE_MP3PACKER=OFF"
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 
@@ -84,6 +91,19 @@ jobs:
         run: |
           git lfs install
           git lfs pull
+
+      - name: Set up OCaml
+        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml_version }}
+          dune-cache: true
+
+      - name: Install OCaml Dependencies
+        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
+        run: |
+          opam install dune --yes
+          opam exec -- ocamlopt -version
 
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
