@@ -33,6 +33,7 @@ extern "C" {
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
 #include <caml/alloc.h>
+#include <caml/threads.h>
 }
 #undef flush // otherwise we can't use std::flush later
 #endif
@@ -176,6 +177,7 @@ int main(int argc, char* argv[]) {
 #ifdef HAVE_MP3PACKER
     try {
         caml_startup(argv);
+        caml_release_runtime_system();
     } catch (...) {
         Logger::log(LogLevel::Error, "Failed to initialize OCaml runtime", "main");
     }
