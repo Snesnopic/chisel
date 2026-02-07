@@ -12,13 +12,15 @@
 #include <mutex>
 #include <cstdio>
 #include <fcntl.h>
+#include <fstream>
+
+#include "../../../third_party/vbrfix/include/vbrfix/vbrfix.hpp"
 
 // main's print mutex, since we redirect stdout and stderr to null while compressing with mp3
 // TODO: edit cloned mp3packer's branch to remove all prints
 extern std::mutex g_console_mtx;
 
 #ifdef HAVE_MP3PACKER
-
 extern "C" {
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
@@ -140,7 +142,26 @@ void MpegProcessor::recompress(const fs::path& input,
     }
 
     Logger::log(LogLevel::Debug, "MP3: Compression successful.", processor_tag());
+    try {
 
+        vbrfix::FixParams params;
+        params.always_skip = false;
+
+        const std::vector<uint8_t> fixed_data = vbrfix::fix_mp3(output, params);
+
+        std::ofstream ofs(output, std::ios::binary | std::ios::trunc);
+        if (!ofs.is_open()) {
+            throw std::runtime_error("Failed to open output file for writing VBR fix data.");
+        }
+
+        ofs.write(reinterpret_cast<const char*>(fixed_data.data()), static_cast<std::streamsize>(fixed_data.size()));
+        ofs.close();
+
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Exception during compression processing: " + std::string(e.what()));
+    }
+
+    Logger::log(LogLevel::Debug, "MP3: Compression and VBR fix successful.", processor_tag());
 #else
 
     Logger::info(LogLevel::Warning, "MP3Packer disabled inside build", processor_tag());

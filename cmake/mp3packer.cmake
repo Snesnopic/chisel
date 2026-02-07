@@ -62,7 +62,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
     else()
         set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/${OCAML_STDLIB_THREADS}")
     endif()
-
+    target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
     target_link_libraries(${TARGET_NAME} INTERFACE
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_UNIX}"
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_STR}"

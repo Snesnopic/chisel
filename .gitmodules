@@ -87,3 +87,7 @@
 	path = third_party/mp3packer
 	url = https://github.com/Snesnopic/mp3packer
 	branch = lib
+[submodule "third_party/vbrfix"]
+	path = third_party/vbrfix
+	url = https://github.com/Snesnopic/vbrfix
+	branch = development
