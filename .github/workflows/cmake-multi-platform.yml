@@ -75,7 +75,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: "-DENABLE_MP3PACKER=OFF"
+            extra_cmake_args: -DENABLE_MP3PACKER=OFF
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 
