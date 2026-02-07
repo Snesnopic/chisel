@@ -1,6 +1,26 @@
 function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
-    find_program(DUNE_EXE dune REQUIRED)
-    find_program(OCAMLOPT_EXE ocamlopt REQUIRED)
+
+    find_program(OPAM_EXE opam)
+    set(OPAM_HINTS "")
+
+    if(OPAM_EXE)
+        execute_process(
+                COMMAND ${OPAM_EXE} var bin
+                OUTPUT_VARIABLE OPAM_BIN_OUTPUT
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+        )
+
+        if(OPAM_BIN_OUTPUT)
+            string(STRIP "${OPAM_BIN_OUTPUT}" OPAM_BIN_DIR)
+            file(TO_CMAKE_PATH "${OPAM_BIN_DIR}" OPAM_BIN_DIR)
+            list(APPEND OPAM_HINTS "${OPAM_BIN_DIR}")
+            message(STATUS "Opam bin directory found via 'opam var bin': ${OPAM_BIN_DIR}")
+        endif()
+    endif()
+
+    find_program(DUNE_EXE dune HINTS ${OPAM_HINTS} REQUIRED)
+    find_program(OCAMLOPT_EXE ocamlopt HINTS ${OPAM_HINTS} REQUIRED)
 
     execute_process(
             COMMAND ${OCAMLOPT_EXE} -where
@@ -57,12 +77,14 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
             INTERFACE_LINK_LIBRARIES "${GLUE_OBJ}"
     )
 
+    target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
+
     if(EXISTS "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
         set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
     else()
         set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/${OCAML_STDLIB_THREADS}")
     endif()
-    target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
+
     target_link_libraries(${TARGET_NAME} INTERFACE
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_UNIX}"
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_STR}"
