@@ -12,23 +12,28 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
         )
 
         if(OPAM_BIN_OUTPUT)
-            string(STRIP "${OPAM_BIN_OUTPUT}" OPAM_BIN_DIR)
-            file(TO_CMAKE_PATH "${OPAM_BIN_DIR}" OPAM_BIN_DIR)
-            list(APPEND OPAM_HINTS "${OPAM_BIN_DIR}")
+            string(STRIP "${OPAM_BIN_OUTPUT}" OPAM_BIN_RAW)
+
+            file(TO_CMAKE_PATH "${OPAM_BIN_RAW}" OPAM_BIN_CMAKE)
+            list(APPEND OPAM_HINTS "${OPAM_BIN_CMAKE}")
+
+            set(OPAM_BIN_DIR "${OPAM_BIN_CMAKE}")
         endif()
     endif()
 
     find_program(DUNE_EXE dune HINTS ${OPAM_HINTS} REQUIRED)
     find_program(OCAMLOPT_EXE ocamlopt HINTS ${OPAM_HINTS} REQUIRED)
 
-    if(WIN32)
-        set(PATH_SEP ";")
-    else()
-        set(PATH_SEP ":")
-    endif()
 
     if(OPAM_BIN_DIR)
-        set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${OPAM_BIN_DIR}${PATH_SEP}$ENV{PATH}")
+        if(WIN32)
+            file(TO_NATIVE_PATH "${OPAM_BIN_DIR}" OPAM_BIN_NATIVE)
+            file(TO_NATIVE_PATH "$ENV{PATH}" CURRENT_PATH_NATIVE)
+
+            set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${OPAM_BIN_NATIVE};${CURRENT_PATH_NATIVE}")
+        else()
+            set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${OPAM_BIN_DIR}:$ENV{PATH}")
+        endif()
     else()
         set(ENV_WRAPPER ${CMAKE_COMMAND} -E env)
     endif()
