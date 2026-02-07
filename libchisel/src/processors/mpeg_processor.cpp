@@ -25,6 +25,8 @@ extern "C" {
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
 #include <caml/alloc.h>
+#include <caml/memory.h>
+#include <caml/threads.h>
 }
 
 #ifdef _WIN32
@@ -91,6 +93,28 @@ namespace {
             if (null_fd >= 0) CLOSE(null_fd);
         }
     };
+
+    int run_ocaml_mp3packer(const std::string& input, const std::string& output) {
+        if (caml_c_thread_register() == 0) {
+            return -999;
+        }
+
+        CAMLparam0();
+        CAMLlocal3(v_input, v_output, v_res);
+
+        int result = -1;
+        const value* func = caml_named_value("caml_pack_mp3");
+
+        if (func != nullptr) {
+            v_input = caml_copy_string(input.c_str());
+            v_output = caml_copy_string(output.c_str());
+            v_res = caml_callback2(*func, v_input, v_output);
+            result = Int_val(v_res);
+        }
+
+        caml_c_thread_unregister();
+        CAMLreturnT(int, result);
+    }
 }
 
 #endif // HAVE_MP3PACKER
@@ -113,36 +137,33 @@ void MpegProcessor::recompress(const fs::path& input,
 
     Logger::log(LogLevel::Info, "MP3: Starting compression via OCaml: " + input.string(), processor_tag());
 
-    const value* func = caml_named_value("caml_pack_mp3");
-    if (func == nullptr) {
-        throw std::runtime_error("OCaml function 'caml_pack_mp3' not found. Runtime not initialized?");
-    }
-
     if (fs::exists(output)) {
         fs::remove(output);
     }
-
-    const value v_input = caml_copy_string(input.string().c_str());
-    const value v_output = caml_copy_string(output.string().c_str());
 
     int result_code = 1;
 
     try {
         ScopedOutputSilencer hush(true);
-
-        const value res = caml_callback2(*func, v_input, v_output);
-        result_code = Int_val(res);
+        result_code = run_ocaml_mp3packer(input.string(), output.string());
 
     } catch (const std::exception& e) {
-        throw std::runtime_error("Exception during OCaml execution: " + std::string(e.what()));
+        throw std::runtime_error("Exception during OCaml execution wrapper: " + std::string(e.what()));
     }
 
+    if (result_code == -999) {
+        throw std::runtime_error("Failed to register worker thread with OCaml runtime.");
+    }
+    if (result_code == -1) {
+        throw std::runtime_error("OCaml function 'caml_pack_mp3' not found. Runtime not initialized?");
+    }
     if (result_code != 0) {
         throw std::runtime_error("MP3Packer failed with exit code: " + std::to_string(result_code));
     }
 
     Logger::log(LogLevel::Debug, "MP3: Compression successful.", processor_tag());
     try {
+        ScopedOutputSilencer hush_vbr(true);
 
         vbrfix::FixParams params;
         params.always_skip = false;
@@ -158,7 +179,7 @@ void MpegProcessor::recompress(const fs::path& input,
         ofs.close();
 
     } catch (const std::exception& e) {
-        throw std::runtime_error("Exception during compression processing: " + std::string(e.what()));
+        throw std::runtime_error("Exception during VBR fix processing: " + std::string(e.what()));
     }
 
     Logger::log(LogLevel::Debug, "MP3: Compression and VBR fix successful.", processor_tag());
