@@ -39,3 +39,7 @@ CTestCustom.cmake
 /test/
 /Makefile
 bin/
+
+Cargo.lock
+/libchisel/rust_bridge/target/
+/.obsidian/
