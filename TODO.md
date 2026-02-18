@@ -58,8 +58,6 @@
 
 ## New MIME types / Codecs
 
-- [ ] MP3 – integrate `mp3packer` for frame-level repacking.  
-  ↳ <https://github.com/da-x/mp3packer>
 - [ ] ALAC – investigate integration via libavcodec or standalone decoder.
 - [ ] TAK – closed source, not feasible (note).
 - [ ] LA (Lossless Audio) – abandoned, not feasible (note).
