@@ -21,6 +21,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
         set(OCAML_STDLIB_UNIX "libunix${LIB_EXT}")
         set(OCAML_STDLIB_STR "libcamlstr${LIB_EXT}")
         set(OCAML_STDLIB_THREADS "libthreadsnat${LIB_EXT}")
+        set(DUNE_TARGETS "mp3packer.cmxa")
     else()
         set(OBJ_EXT ".o")
         set(LIB_EXT ".a")
@@ -29,6 +30,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
         set(OCAML_STDLIB_UNIX "libunix${LIB_EXT}")
         set(OCAML_STDLIB_STR "libcamlstr${LIB_EXT}")
         set(OCAML_STDLIB_THREADS "libthreadsnat${LIB_EXT}")
+        set(DUNE_TARGETS "mp3packer.cmxa" "libmp3packer_stubs${STATIC_LIB_EXT}")
     endif()
 
     set(BUILD_DIR "${MP3PACKER_ROOT}/_build/default")
@@ -38,7 +40,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     add_custom_command(
             OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
-            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa
+            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} ${DUNE_TARGETS}
             COMMAND ${OCAMLOPT_CMD} -thread -output-obj -o ${GLUE_OBJ}
             -I ${BUILD_DIR}
             -I +unix -I +str -I +threads
