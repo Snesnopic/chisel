@@ -14,23 +14,30 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
     file(TO_CMAKE_PATH "${OCAML_LIB_PATH}" OCAML_LIB_PATH)
 
     if(WIN32)
+        set(OBJ_EXT ".o")
         set(LIB_EXT ".lib")
+        set(STATIC_LIB_EXT ".lib")
+        set(OCAML_STDLIB_ASM "libasmrun${LIB_EXT}")
+        set(OCAML_STDLIB_UNIX "libunix${LIB_EXT}")
+        set(OCAML_STDLIB_STR "libcamlstr${LIB_EXT}")
+        set(OCAML_STDLIB_THREADS "libthreadsnat${LIB_EXT}")
     else()
+        set(OBJ_EXT ".o")
         set(LIB_EXT ".a")
+        set(STATIC_LIB_EXT ".a")
+        set(OCAML_STDLIB_ASM "libasmrun${LIB_EXT}")
+        set(OCAML_STDLIB_UNIX "libunix${LIB_EXT}")
+        set(OCAML_STDLIB_STR "libcamlstr${LIB_EXT}")
+        set(OCAML_STDLIB_THREADS "libthreadsnat${LIB_EXT}")
     endif()
 
-    set(OCAML_STDLIB_ASM "libasmrun${LIB_EXT}")
-    set(OCAML_STDLIB_UNIX "libunix${LIB_EXT}")
-    set(OCAML_STDLIB_STR "libcamlstr${LIB_EXT}")
-    set(OCAML_STDLIB_THREADS "libthreadsnat${LIB_EXT}")
-
     set(BUILD_DIR "${MP3PACKER_ROOT}/_build/default")
+    set(GLUE_OBJ "${BUILD_DIR}/glue${OBJ_EXT}")
+    set(MP3_STUBS "${BUILD_DIR}/libmp3packer_stubs${STATIC_LIB_EXT}")
     set(MP3_CMXA "${BUILD_DIR}/mp3packer.cmxa")
 
-    set(GLUE_OBJ "${BUILD_DIR}/glue.o")
-
     add_custom_command(
-            OUTPUT ${GLUE_OBJ}
+            OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
             COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa
             COMMAND ${OCAMLOPT_CMD} -thread -output-obj -o ${GLUE_OBJ}
             -I ${BUILD_DIR}
@@ -42,10 +49,15 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
             VERBATIM
     )
 
-    add_custom_target(${TARGET_NAME}_build DEPENDS ${GLUE_OBJ})
+    add_custom_target(${TARGET_NAME}_build DEPENDS ${GLUE_OBJ} ${MP3_STUBS})
 
-    add_library(${TARGET_NAME} INTERFACE IMPORTED GLOBAL)
+    add_library(${TARGET_NAME} STATIC IMPORTED GLOBAL)
     add_dependencies(${TARGET_NAME} ${TARGET_NAME}_build)
+
+    set_target_properties(${TARGET_NAME} PROPERTIES
+            IMPORTED_LOCATION "${MP3_STUBS}"
+            INTERFACE_LINK_LIBRARIES "${GLUE_OBJ}"
+    )
 
     target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
 
@@ -56,7 +68,6 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
     endif()
 
     target_link_libraries(${TARGET_NAME} INTERFACE
-            "${GLUE_OBJ}"
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_UNIX}"
             "${OCAML_LIB_PATH}/${OCAML_STDLIB_STR}"
             "${THREADS_LIB_FULL}"
