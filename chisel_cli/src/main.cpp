@@ -25,7 +25,7 @@
 #include "utils/file_log_sink.hpp"
 
 // Global mutex to synchronize console output from multiple threads
-std::mutex g_console_mtx;
+extern std::mutex g_console_mtx;
 static std::vector<std::string> g_active_files;
 
 #ifdef HAVE_MP3PACKER

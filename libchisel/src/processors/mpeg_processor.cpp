@@ -17,9 +17,10 @@
 
 // main's print mutex, since we redirect stdout and stderr to null while compressing with mp3
 // TODO: edit cloned mp3packer's branch to remove all prints
-extern std::mutex g_console_mtx;
 
 #ifdef HAVE_MP3PACKER
+std::mutex g_console_mtx;
+static std::mutex g_mp3packer_mutex;
 extern "C" {
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
@@ -50,7 +51,6 @@ extern "C" {
     #define NULL_DEVICE "/dev/null"
 #endif
 
-static std::mutex g_mp3packer_mutex;
 
 namespace {
     class ScopedOutputSilencer {
