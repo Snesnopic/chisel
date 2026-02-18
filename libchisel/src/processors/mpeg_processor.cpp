@@ -13,7 +13,6 @@
 #include <cstdio>
 #include <fcntl.h>
 #include <fstream>
-
 #include "../../../third_party/vbrfix/include/vbrfix/vbrfix.hpp"
 
 // main's print mutex, since we redirect stdout and stderr to null while compressing with mp3
@@ -51,7 +50,6 @@ extern "C" {
     #define NULL_DEVICE "/dev/null"
 #endif
 
-// mutex to serialize mp3packer calls
 static std::mutex g_mp3packer_mutex;
 
 namespace {
@@ -94,10 +92,26 @@ namespace {
         }
     };
 
-    int run_ocaml_mp3packer(const std::string& input, const std::string& output) {
-        if (caml_c_thread_register() == 0) {
-            return -999;
+    struct scoped_ocaml_lock {
+        scoped_ocaml_lock() {
+            caml_acquire_runtime_system();
         }
+        ~scoped_ocaml_lock() {
+            caml_release_runtime_system();
+        }
+    };
+
+    int run_ocaml_mp3packer(const std::string& input, const std::string& output) {
+        // register thread once per lifecycle
+        thread_local bool is_registered = false;
+        if (!is_registered) {
+            if (caml_c_thread_register() == 0) {
+                return -999;
+            }
+            is_registered = true;
+        }
+
+        scoped_ocaml_lock lock;
 
         CAMLparam0();
         CAMLlocal3(v_input, v_output, v_res);
@@ -112,7 +126,6 @@ namespace {
             result = Int_val(v_res);
         }
 
-        caml_c_thread_unregister();
         CAMLreturnT(int, result);
     }
 }
