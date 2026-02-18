@@ -38,7 +38,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     add_custom_command(
             OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
-            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa libmp3packer_stubs${STATIC_LIB_EXT}
+            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa
             COMMAND ${OCAMLOPT_CMD} -thread -output-obj -o ${GLUE_OBJ}
             -I ${BUILD_DIR}
             -I +unix -I +str -I +threads
