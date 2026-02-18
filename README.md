@@ -7,13 +7,14 @@ It focuses on lossless recompression of various file formats by integrating mult
 
 ## Requirements
 
-The project builds all its dependencies automatically via Git submodules. You only need a C++23 build toolchain and basic build tools.
+The project builds all its dependencies automatically via Git submodules.
 
 -   **All Platforms:**
   -   `git` (with LFS support: run `git lfs install` once)
   -   `cmake` (≥ 3.20)
   -   `ninja` (recommended)
   -   Rust toolchain (required for OptiVorbis integration; install via [rustup.rs](https://rustup.rs))
+  -   `opam` (OCaml package manager, optional for MP3 integration via mp3packer)
 -   **Linux:**
   -   A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
   -   `build-essential`, `pkg-config`
@@ -34,15 +35,25 @@ This command installs only the build tools. All libraries are submodules.
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build help2man pkg-config git \
-autoconf automake libtool m4 nasm yasm ccache
+autoconf automake libtool m4 nasm yasm ccache opam
 curl https://sh.rustup.rs -sSf | sh
+
+# Initialize OCaml toolchain for MP3 support
+opam init -y --disable-sandboxing
+eval $(opam env)
+opam install dune dune-configurator -y
 ```
 
 ### macOS (Homebrew)
 ```bash
 brew update
-brew install cmake ninja pkg-config git autoconf help2man automake libtool nasm yasm
+brew install cmake ninja pkg-config git autoconf help2man automake libtool nasm yasm opam
 curl https://sh.rustup.rs -sSf | sh
+
+# Initialize OCaml toolchain for MP3 support
+opam init -y
+eval $(opam env)
+opam install dune dune-configurator -y
 ```
 
 ### Windows
@@ -60,6 +71,14 @@ Invoke-WebRequest "https://aka.ms/vs/17/release/vs_community.exe" -OutFile vs.ex
 # Install Rust toolchain
 Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 .\rustup-init.exe -y
+
+# Install OCaml/Opam via winget (or official installer)
+winget install OCaml.OCaml
+
+# After installation, open a new shell and initialize:
+opam init -y
+Invoke-Expression (&opam env)
+opam install dune dune-configurator -y
 ```
 ---
 
@@ -86,6 +105,9 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
+
+### Opting out of specific encoders
+If you do not want to install the OCaml toolchain, you can disable MP3 optimization (mp3packer) by passing `-DENABLE_MP3PACKER=OFF` to CMake during configuration.
 
 ## Installing (Optional)
 
