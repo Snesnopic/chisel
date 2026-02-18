@@ -295,6 +295,9 @@ set(PNG_STATIC ON CACHE BOOL "" FORCE)
 set(PNG_TESTS OFF CACHE BOOL "" FORCE)
 set(libpng_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libpng")
 set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
+if(WIN32)
+set(AWK "AWK-NOTFOUND" CACHE FILEPATH "Force libpng to use prebuilt config" FORCE)
+endif()
 add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libogg
