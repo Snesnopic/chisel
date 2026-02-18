@@ -59,7 +59,7 @@ std::filesystem::path AiffProcessor::finalize_extraction(const ExtractedContent 
     Logger::log(LogLevel::Info, "AIFF: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
-    if (!state_ptr) {
+    if (state_ptr == nullptr) {
         Logger::log(LogLevel::Error, "AIFF: Failed to retrieve extraction state.", processor_tag());
         cleanup_temp_dir(content.temp_dir, processor_tag());
         return {};
