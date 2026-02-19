@@ -15,24 +15,39 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     if(WIN32)
         set(OBJ_EXT ".o")
-        set(SYS_LIB_EXT ".lib")
+        set(MP3_STUBS_FILE "libmp3packer_stubs.a")
+        set(DUNE_TARGETS "mp3packer.cmxa")
     else()
         set(OBJ_EXT ".o")
-        set(SYS_LIB_EXT ".a")
+        set(MP3_STUBS_FILE "libmp3packer_stubs.a")
+        set(DUNE_TARGETS "mp3packer.cmxa" "${MP3_STUBS_FILE}")
     endif()
-
-    set(OCAML_STDLIB_ASM "libasmrun${SYS_LIB_EXT}")
-    set(OCAML_STDLIB_UNIX "libunix${SYS_LIB_EXT}")
-    set(OCAML_STDLIB_STR "libcamlstr${SYS_LIB_EXT}")
-    set(OCAML_STDLIB_THREADS "libthreadsnat${SYS_LIB_EXT}")
-
-    set(MP3_STUBS_FILE "libmp3packer_stubs.a")
-    set(DUNE_TARGETS "mp3packer.cmxa" "${MP3_STUBS_FILE}")
 
     set(BUILD_DIR "${MP3PACKER_ROOT}/_build/default")
     set(GLUE_OBJ "${BUILD_DIR}/glue${OBJ_EXT}")
     set(MP3_STUBS "${BUILD_DIR}/${MP3_STUBS_FILE}")
     set(MP3_CMXA "${BUILD_DIR}/mp3packer.cmxa")
+
+    set(OCAML_SYS_LIBS "")
+    foreach(LIB_BASENAME unix camlstr threadsnat asmrun)
+        set(FOUND_LIB "NOTFOUND")
+        foreach(SEARCH_PATH "${OCAML_LIB_PATH}" "${OCAML_LIB_PATH}/threads")
+            foreach(PREFIX "lib" "")
+                foreach(EXT ".a" ".lib")
+                    set(CANDIDATE "${SEARCH_PATH}/${PREFIX}${LIB_BASENAME}${EXT}")
+                    if(EXISTS "${CANDIDATE}" AND FOUND_LIB STREQUAL "NOTFOUND")
+                        set(FOUND_LIB "${CANDIDATE}")
+                    endif()
+                endforeach()
+            endforeach()
+        endforeach()
+
+        if(FOUND_LIB STREQUAL "NOTFOUND")
+            message(FATAL_ERROR "Impossibile trovare la libreria di sistema OCaml: ${LIB_BASENAME}")
+        else()
+            list(APPEND OCAML_SYS_LIBS "${FOUND_LIB}")
+        endif()
+    endforeach()
 
     add_custom_command(
             OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
@@ -59,17 +74,8 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
 
-    if(EXISTS "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
-        set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
-    else()
-        set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/${OCAML_STDLIB_THREADS}")
-    endif()
-
     target_link_libraries(${TARGET_NAME} INTERFACE
-            "${OCAML_LIB_PATH}/${OCAML_STDLIB_UNIX}"
-            "${OCAML_LIB_PATH}/${OCAML_STDLIB_STR}"
-            "${THREADS_LIB_FULL}"
-            "${OCAML_LIB_PATH}/${OCAML_STDLIB_ASM}"
+            ${OCAML_SYS_LIBS}
     )
 
     if(WIN32)
