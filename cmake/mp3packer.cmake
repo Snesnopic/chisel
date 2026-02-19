@@ -4,34 +4,80 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
     set(DUNE_CMD ${OPAM_EXE} exec -- dune)
     set(OCAMLOPT_CMD ${OPAM_EXE} exec -- ocamlopt)
 
-    set(BUILD_DIR "${MP3PACKER_ROOT}/_build/default")
-    set(GLUE_OBJ "${BUILD_DIR}/glue.o")
+    execute_process(
+            COMMAND ${OCAMLOPT_CMD} -where
+            OUTPUT_VARIABLE OCAML_LIB_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND_ERROR_IS_FATAL ANY
+    )
+    string(STRIP "${OCAML_LIB_PATH}" OCAML_LIB_PATH)
+    file(TO_CMAKE_PATH "${OCAML_LIB_PATH}" OCAML_LIB_PATH)
 
-    set(DIAGNOSTIC_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/diagnose.cmake")
-    file(WRITE "${DIAGNOSTIC_SCRIPT}" "
-file(GLOB ALL_LIBS \"${BUILD_DIR}/*.a\" \"${BUILD_DIR}/*.lib\")
-message(WARNING \"\\n\\n=============================================================\")
-message(WARNING \"FILE DI LIBRERIA GENERATI DA DUNE NELLA CARTELLA:\")
-foreach(f \${ALL_LIBS})
-    message(WARNING \"---> \${f}\")
-endforeach()
-message(WARNING \"=============================================================\\n\\n\")
-")
+    if(WIN32)
+        set(OBJ_EXT ".o")
+        set(SYS_LIB_EXT ".lib")
+    else()
+        set(OBJ_EXT ".o")
+        set(SYS_LIB_EXT ".a")
+    endif()
+
+    set(OCAML_STDLIB_ASM "libasmrun${SYS_LIB_EXT}")
+    set(OCAML_STDLIB_UNIX "libunix${SYS_LIB_EXT}")
+    set(OCAML_STDLIB_STR "libcamlstr${SYS_LIB_EXT}")
+    set(OCAML_STDLIB_THREADS "libthreadsnat${SYS_LIB_EXT}")
+
+    set(MP3_STUBS_FILE "libmp3packer_stubs.a")
+    set(DUNE_TARGETS "mp3packer.cmxa" "${MP3_STUBS_FILE}")
+
+    set(BUILD_DIR "${MP3PACKER_ROOT}/_build/default")
+    set(GLUE_OBJ "${BUILD_DIR}/glue${OBJ_EXT}")
+    set(MP3_STUBS "${BUILD_DIR}/${MP3_STUBS_FILE}")
+    set(MP3_CMXA "${BUILD_DIR}/mp3packer.cmxa")
 
     add_custom_command(
-            OUTPUT ${GLUE_OBJ}
-            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} mp3packer.cmxa
-            COMMAND ${CMAKE_COMMAND} -P "${DIAGNOSTIC_SCRIPT}"
+            OUTPUT ${GLUE_OBJ} ${MP3_STUBS}
+            COMMAND ${DUNE_CMD} build --root ${MP3PACKER_ROOT} ${DUNE_TARGETS}
+            COMMAND ${OCAMLOPT_CMD} -thread -output-obj -o ${GLUE_OBJ}
+            -I ${BUILD_DIR}
+            -I +unix -I +str -I +threads
+            -linkall
+            unix.cmxa str.cmxa threads.cmxa
+            ${MP3_CMXA}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             VERBATIM
     )
 
-    add_custom_target(${TARGET_NAME}_build DEPENDS ${GLUE_OBJ})
+    add_custom_target(${TARGET_NAME}_build DEPENDS ${GLUE_OBJ} ${MP3_STUBS})
 
     add_library(${TARGET_NAME} STATIC IMPORTED GLOBAL)
     add_dependencies(${TARGET_NAME} ${TARGET_NAME}_build)
 
     set_target_properties(${TARGET_NAME} PROPERTIES
-            IMPORTED_LOCATION "${GLUE_OBJ}"
+            IMPORTED_LOCATION "${MP3_STUBS}"
+            INTERFACE_LINK_LIBRARIES "${GLUE_OBJ}"
     )
+
+    target_include_directories(${TARGET_NAME} INTERFACE ${OCAML_LIB_PATH})
+
+    if(EXISTS "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
+        set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/threads/${OCAML_STDLIB_THREADS}")
+    else()
+        set(THREADS_LIB_FULL "${OCAML_LIB_PATH}/${OCAML_STDLIB_THREADS}")
+    endif()
+
+    target_link_libraries(${TARGET_NAME} INTERFACE
+            "${OCAML_LIB_PATH}/${OCAML_STDLIB_UNIX}"
+            "${OCAML_LIB_PATH}/${OCAML_STDLIB_STR}"
+            "${THREADS_LIB_FULL}"
+            "${OCAML_LIB_PATH}/${OCAML_STDLIB_ASM}"
+    )
+
+    if(WIN32)
+        target_link_libraries(${TARGET_NAME} INTERFACE ws2_32 iphlpapi)
+    elseif(APPLE)
+    else()
+        target_link_libraries(${TARGET_NAME} INTERFACE pthread dl m)
+    endif()
+
+    message(STATUS "OCaml mp3packer configured via opam. Runtime at: ${OCAML_LIB_PATH}")
 endfunction()
