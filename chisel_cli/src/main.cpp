@@ -24,11 +24,11 @@
 #include "../../libchisel/include/mime_detector.hpp"
 #include "utils/file_log_sink.hpp"
 
-// Global mutex to synchronize console output from multiple threads
-extern std::mutex g_console_mtx;
 static std::vector<std::string> g_active_files;
 
 #ifdef HAVE_MP3PACKER
+// Global mutex to synchronize console output from multiple threads
+extern std::mutex g_console_mtx;
 extern "C" {
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
@@ -36,6 +36,9 @@ extern "C" {
 #include <caml/threads.h>
 }
 #undef flush // otherwise we can't use std::flush later
+#else
+// Global mutex to synchronize console output from multiple threads
+std::mutex g_console_mtx;
 #endif
 
 // Helper to clear the current line
@@ -176,7 +179,7 @@ int main(int argc, char* argv[]) {
     }
 #ifdef HAVE_MP3PACKER
     try {
-        caml_startup(argv);
+        caml_startup((char_os**)argv);
         caml_release_runtime_system();
     } catch (...) {
         Logger::log(LogLevel::Error, "Failed to initialize OCaml runtime", "main");
