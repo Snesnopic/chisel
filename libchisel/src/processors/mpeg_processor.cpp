@@ -198,7 +198,7 @@ void MpegProcessor::recompress(const fs::path& input,
     Logger::log(LogLevel::Debug, "MP3: Compression and VBR fix successful.", processor_tag());
 #else
 
-    Logger::info(LogLevel::Warning, "MP3Packer disabled inside build", processor_tag());
+    Logger::log(LogLevel::Warning, "MP3Packer disabled inside build", processor_tag());
 
     std::error_code ec;
     fs::copy_file(input, output, fs::copy_options::overwrite_existing, ec);
