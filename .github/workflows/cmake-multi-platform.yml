@@ -80,6 +80,9 @@ jobs:
             asset_name: "windows-arm64"
 
     steps:
+      - name: Disable Git AutoCRLF
+        if: runner.os == 'Windows' && (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
+        run: git config --global core.autocrlf false
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
