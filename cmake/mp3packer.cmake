@@ -15,7 +15,7 @@ function(add_mp3packer_library TARGET_NAME MP3PACKER_ROOT)
 
     if(WIN32)
         set(OBJ_EXT ".o")
-        set(MP3_STUBS_FILE "libmp3packer_stubs.a")
+        set(MP3_STUBS_FILE "mp3packer.a")
         set(DUNE_TARGETS "mp3packer.cmxa")
     else()
         set(OBJ_EXT ".o")
