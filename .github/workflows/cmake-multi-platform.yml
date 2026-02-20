@@ -66,7 +66,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            ocaml_version: "ocaml-variants.4.14.2+options,ocaml-option-msvc"
+            ocaml_version: "5.4.1"
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
