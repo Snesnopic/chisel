@@ -9,23 +9,6 @@
 #include <algorithm>
 #include <map>
 
-namespace {
-// helper for validating container format string
-struct ContainerFormatValidator : CLI::Validator {
-    ContainerFormatValidator() {
-        name_ = "ContainerFormat";
-        func_ = [](const std::string& str) {
-            auto fmt = parse_container_format(str);
-            if (!fmt.has_value()) {
-                return std::string("Invalid format: '") + str +
-                       "'. Must be one of: zip, 7z, tar, gz, bz2, xz, wim.";
-            }
-            return std::string(); // ok
-        };
-    }
-};
-} // namespace
-
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags
     app.set_help_flag("-h,--help", "Show this help message and exit.");
