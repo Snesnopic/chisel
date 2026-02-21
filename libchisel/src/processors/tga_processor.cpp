@@ -32,34 +32,30 @@ namespace {
 
 namespace chisel {
 
-    static const char* processor_tag() {
-        return "TgaProcessor";
-    }
-
     void TgaProcessor::recompress(const std::filesystem::path& input,
                                    const std::filesystem::path& output,
                                    bool /*preserve_metadata*/) {
 
-        Logger::log(LogLevel::Info, "Recompressing TGA with RLE: " + input.string(), processor_tag());
+        Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
         int width, height, channels;
         unique_FILE in_file(chisel::open_file(input, "rb"));
         if (!in_file) {
-            Logger::log(LogLevel::Error, "Failed to open input file", processor_tag());
+            Logger::log(LogLevel::Error, "Failed to open input file", get_name());
             throw std::runtime_error("TgaProcessor: Cannot open input");
         }
         // load the image
         unsigned char* data = stbi_load_from_file(in_file.get(), &width, &height, &channels, 0);
         in_file.reset();
         if (!data) {
-            Logger::log(LogLevel::Error, std::string("Failed to load TGA: ") + stbi_failure_reason(), processor_tag());
+            Logger::log(LogLevel::Error, std::string("Failed to load tga: ") + stbi_failure_reason(), get_name());
             throw std::runtime_error("TgaProcessor: Failed to load TGA");
         }
 
         unique_FILE out_file(chisel::open_file(output, "wb"));
         if (!out_file) {
             stbi_image_free(data);
-            Logger::log(LogLevel::Error, "Failed to open output file", processor_tag());
+            Logger::log(LogLevel::Error, "Failed to open output file", get_name());
             throw std::runtime_error("TgaProcessor: Cannot open output");
         }
 
@@ -76,11 +72,11 @@ namespace chisel {
         stbi_image_free(data);
 
         if (!success) {
-            Logger::log(LogLevel::Error, "Failed to write RLE TGA: " + output.string(), processor_tag());
+            Logger::log(LogLevel::Error, "Failed to write rle tga: " + output.string(), get_name());
             throw std::runtime_error("TgaProcessor: Failed to write TGA");
         }
 
-        Logger::log(LogLevel::Debug, "TGA RLE recompression complete: " + output.string(), processor_tag());
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
 
     std::string TgaProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {
@@ -95,12 +91,12 @@ static std::vector<unsigned char> decode_tga_rgba8(const std::filesystem::path& 
     // force 4 channels (rgba) for consistent comparison
     const unique_FILE in_file(chisel::open_file(file, "rb"));
     if (!in_file) {
-        Logger::log(LogLevel::Warning, "raw_equal: Failed to open TGA: " + file.string(), processor_tag());
+        Logger::log(LogLevel::Warning, "Raw_equal: Failed to open tga: " + file.string(), "TgaProcessor");
         return {};
     }
     unsigned char* data = stbi_load_from_file(in_file.get(), &width, &height, &channels, 4);
     if (!data) {
-        Logger::log(LogLevel::Warning, std::string("raw_equal: Failed to load TGA: ") + stbi_failure_reason(), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("Raw_equal: Failed to load tga: ") + stbi_failure_reason(), "TgaProcessor");
         return {};
     }
 
@@ -127,14 +123,14 @@ bool TgaProcessor::raw_equal(const std::filesystem::path &a,
     try {
         pcmA = decode_tga_rgba8(a, wa, ha, ca);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "raw_equal: Error decoding " + a.string() + ": " + e.what(), processor_tag());
+        Logger::log(LogLevel::Error, "Raw_equal: Error decoding " + a.string() + ": " + e.what(), get_name());
         return false;
     }
 
     try {
         pcmB = decode_tga_rgba8(b, wb, hb, cb);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "raw_equal: Error decoding " + b.string() + ": " + e.what(), processor_tag());
+        Logger::log(LogLevel::Error, "Raw_equal: Error decoding " + b.string() + ": " + e.what(), get_name());
         return false;
     }
 
@@ -146,13 +142,13 @@ bool TgaProcessor::raw_equal(const std::filesystem::path &a,
 
     // compare dimensions
     if (wa != wb || ha != hb || ca != cb) {
-        Logger::log(LogLevel::Debug, "raw_equal: TGA dimension mismatch", processor_tag());
+        Logger::log(LogLevel::Debug, "Raw_equal: tga dimension mismatch", get_name());
         return false;
     }
 
     // compare raw pixel data
     if (pcmA != pcmB) {
-        Logger::log(LogLevel::Debug, "raw_equal: TGA pixel data mismatch", processor_tag());
+        Logger::log(LogLevel::Debug, "Raw_equal: tga pixel data mismatch", get_name());
         return false;
     }
 

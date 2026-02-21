@@ -51,18 +51,18 @@ namespace chisel {
 void TiffProcessor::recompress(const std::filesystem::path& input,
                                const std::filesystem::path& output,
                                bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Re-encoding " + input.string(), "tiff_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     TIFF* in = TIFFOpen(input.string().c_str(), "r");
     if (!in) {
-        Logger::log(LogLevel::Error, "Failed to open input TIFF: " + input.string(), "tiff_processor");
+        Logger::log(LogLevel::Error, "Failed to open input tiff: " + input.string(), get_name());
         throw std::runtime_error("TiffProcessor: cannot open input");
     }
 
     TIFF* out = TIFFOpen(output.string().c_str(), "w");
     if (!out) {
         TIFFClose(in);
-        Logger::log(LogLevel::Error, "Failed to open output TIFF: " + output.string(), "tiff_processor");
+        Logger::log(LogLevel::Error, "Failed to open output tiff: " + output.string(), get_name());
         throw std::runtime_error("TiffProcessor: cannot open output");
     }
 
@@ -73,7 +73,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
 
         std::vector<uint32_t> raster(static_cast<size_t>(width) * static_cast<size_t>(height));
         if (raster.empty()) {
-            Logger::log(LogLevel::Debug, "Skipping empty TIFF directory", "tiff_processor");
+            Logger::log(LogLevel::Debug, "Skipping empty tiff directory", get_name());
             continue;
         }
 
@@ -81,7 +81,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         if (!TIFFReadRGBAImageOriented(in, width, height, raster.data(), ORIENTATION_TOPLEFT, 0)) {
             TIFFClose(in);
             TIFFClose(out);
-            Logger::log(LogLevel::Error, "Failed to read TIFF image data: " + input.string(), "tiff_processor");
+            Logger::log(LogLevel::Error, "Failed to read tiff image data: " + input.string(), get_name());
             throw std::runtime_error("TiffProcessor: TIFFReadRGBAImageOriented failed");
         }
 
@@ -105,7 +105,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
             if (TIFFWriteScanline(out, row_data, row) < 0) {
                 TIFFClose(in);
                 TIFFClose(out);
-                Logger::log(LogLevel::Error, "Failed to write TIFF scanline for: " + output.string(), "tiff_processor");
+                Logger::log(LogLevel::Error, "Failed to write tiff scanline for: " + output.string(), get_name());
                 throw std::runtime_error("TiffProcessor: write scanline failed");
             }
         }
@@ -113,7 +113,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         if (!TIFFWriteDirectory(out)) {
             TIFFClose(in);
             TIFFClose(out);
-            Logger::log(LogLevel::Error, "Failed to write TIFF directory for: " + output.string(), "tiff_processor");
+            Logger::log(LogLevel::Error, "Failed to write tiff directory for: " + output.string(), get_name());
             throw std::runtime_error("TiffProcessor: write directory failed");
         }
 
@@ -122,7 +122,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
     TIFFClose(in);
     TIFFClose(out);
 
-    Logger::log(LogLevel::Info, "Re-encoding complete: " + output.string(), "tiff_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const {
@@ -132,14 +132,14 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     bool TiffProcessor::raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const {
     TIFF* in_a = TIFFOpen(a.string().c_str(), "r");
     if (!in_a) {
-        Logger::log(LogLevel::Warning, "raw_equal: Failed to open TIFF: " + a.string(), "tiff_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: Failed to open tiff: " + a.string(), get_name());
         return false;
     }
 
     TIFF* in_b = TIFFOpen(b.string().c_str(), "r");
     if (!in_b) {
         TIFFClose(in_a);
-        Logger::log(LogLevel::Warning, "raw_equal: Failed to open TIFF: " + b.string(), "tiff_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: Failed to open tiff: " + b.string(), get_name());
         return false;
     }
 
@@ -154,7 +154,7 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
         if (!TIFFGetField(in_b, TIFFTAG_IMAGELENGTH, &h_b)) h_b = 0;
 
         if (w_a != w_b || h_a != h_b) {
-            Logger::log(LogLevel::Debug, "raw_equal: dimension mismatch", "tiff_processor");
+            Logger::log(LogLevel::Debug, "Raw_equal: dimension mismatch", get_name());
             same = false;
             break;
         }
@@ -175,18 +175,18 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
         }
 
         if (!TIFFReadRGBAImageOriented(in_a, w_a, h_a, raster_a.data(), ORIENTATION_TOPLEFT, 0)) {
-            Logger::log(LogLevel::Warning, "raw_equal: Failed to read TIFF data: " + a.string(), "tiff_processor");
+            Logger::log(LogLevel::Warning, "Raw_equal: Failed to read tiff data: " + a.string(), get_name());
             same = false;
             break;
         }
         if (!TIFFReadRGBAImageOriented(in_b, w_b, h_b, raster_b.data(), ORIENTATION_TOPLEFT, 0)) {
-            Logger::log(LogLevel::Warning, "raw_equal: Failed to read TIFF data: " + b.string(), "tiff_processor");
+            Logger::log(LogLevel::Warning, "Raw_equal: Failed to read tiff data: " + b.string(), get_name());
             same = false;
             break;
         }
 
         if (raster_a != raster_b) {
-             Logger::log(LogLevel::Debug, "raw_equal: pixel mismatch", "tiff_processor");
+             Logger::log(LogLevel::Debug, "Raw_equal: pixel mismatch", get_name());
             same = false;
             break;
         }
@@ -197,7 +197,7 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     } while (more_a && more_b);
 
     if (more_a != more_b) { // one file has more pages
-        Logger::log(LogLevel::Debug, "raw_equal: page count mismatch", "tiff_processor");
+        Logger::log(LogLevel::Debug, "Raw_equal: page count mismatch", get_name());
         same = false;
     }
 

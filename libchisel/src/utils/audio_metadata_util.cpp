@@ -66,11 +66,11 @@ using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
 // libpng error handlers (quiet)
 void png_error_fn_quiet(png_structp, png_const_charp msg) {
-    Logger::log(LogLevel::Debug, std::string("libpng (header read): ") + msg, "audio_util");
+    Logger::log(LogLevel::Debug, std::string("Libpng (header read): ") + msg, "AudioMetadataUtil");
     throw std::runtime_error(msg);
 }
 void png_warning_fn_quiet(png_structp, png_const_charp msg) {
-    Logger::log(LogLevel::Debug, std::string("libpng (header read warn): ") + msg, "audio_util");
+    Logger::log(LogLevel::Debug, std::string("Libpng (header read warn): ") + msg, "AudioMetadataUtil");
 }
 
 // raii wrapper for libpng read structs
@@ -148,7 +148,7 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
             }
             return; // success
         } catch (const std::exception& e) {
-            Logger::log(LogLevel::Warning, "failed to read png header: " + imagePath.string() + " (" + e.what() + ")", "audio_util");
+            Logger::log(LogLevel::Warning, "Failed to read png header: " + imagePath.string() + " (" + e.what() + ")", "AudioMetadataUtil");
             return;
         }
     }
@@ -166,7 +166,7 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
         if (setjmp(jsrcerr.setjmp_buffer)) {
             // if libjpeg hits an error, it will jump here
             jpeg_destroy_decompress(&cinfo);
-            Logger::log(LogLevel::Warning, "failed to read jpeg header: " + imagePath.string(), "audio_util");
+            Logger::log(LogLevel::Warning, "Failed to read jpeg header: " + imagePath.string(), "AudioMetadataUtil");
             return;
         }
 
@@ -202,7 +202,7 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
     }
 
     // TODO: implement for jxl, etc. if needed
-    Logger::log(LogLevel::Debug, "computeImageProps: unsupported mime type: " + mime_type, "audio_util");
+    Logger::log(LogLevel::Debug, "Computeimageprops: unsupported mime type: " + mime_type, "AudioMetadataUtil");
 }
 
 // normalize picture type flac

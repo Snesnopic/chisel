@@ -20,12 +20,9 @@
 namespace chisel {
 
 namespace fs = std::filesystem;
-static const char* processor_tag() {
-    return "ODFProcessor";
-}
 
 std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::filesystem::path& input_path) {
-    Logger::log(LogLevel::Info, "Preparing ODF: " + input_path.filename().string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.filename().string(), get_name());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -45,13 +42,13 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     archive_read_support_format_zip(in);
     int open_r = archive_read_open_filename(in, input_path.string().c_str(), 10240);
     if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
-        Logger::log(LogLevel::Error, "Failed to open ODF for reading: " + std::string(archive_error_string(in)), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to open odf for reading: " + std::string(archive_error_string(in)), get_name());
         archive_read_free(in);
         cleanup_temp_dir(temp_dir);
         return content;
     }
     if (open_r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), get_name());
     }
 
     archive_entry* entry = nullptr;
@@ -59,7 +56,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     while ((r = archive_read_next_header(in, &entry)) == ARCHIVE_OK) {
         const char* ename = archive_entry_pathname(entry);
         if (!ename) {
-            Logger::log(LogLevel::Warning, "Entry with null name skipped", processor_tag());
+            Logger::log(LogLevel::Warning, "Entry with null name skipped", get_name());
             archive_read_data_skip(in);
             continue;
         }
@@ -71,7 +68,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
         if (filetype == AE_IFDIR) {
             fs::create_directories(out_path, ec);
             if (ec) {
-                Logger::log(LogLevel::Error, "Failed to create directory: " + out_path.string(), processor_tag());
+                Logger::log(LogLevel::Error, "Failed to create directory: " + out_path.string(), get_name());
             }
             archive_read_data_skip(in);
             continue;
@@ -81,14 +78,14 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
         if (ec) {
             Logger::log(LogLevel::Error,
                         "Failed to create parent dir: " + out_path.parent_path().string() + " (" + ec.message() + ")",
-                        processor_tag());
+                        get_name());
             archive_read_data_skip(in);
             continue;
         }
 
         std::ofstream ofs(out_path, std::ios::binary);
         if (!ofs) {
-            Logger::log(LogLevel::Error, "Failed to create file during extraction: " + out_path.string(), processor_tag());
+            Logger::log(LogLevel::Error, "Failed to create file during extraction: " + out_path.string(), get_name());
             archive_read_data_skip(in);
             continue;
         }
@@ -100,7 +97,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
             const int rb = archive_read_data_block(in, &buff, &size, &offset);
             if (rb == ARCHIVE_EOF) break;
             if (rb != ARCHIVE_OK) {
-                Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), processor_tag());
+                Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), get_name());
                 break;
             }
             ofs.write(reinterpret_cast<const char*>(buff), static_cast<std::streamsize>(size));
@@ -111,21 +108,19 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     }
 
     if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::Error, "Iteration error: " + std::string(archive_error_string(in)), processor_tag());
+        Logger::log(LogLevel::Error, "Iteration error: " + std::string(archive_error_string(in)), get_name());
     }
 
     archive_read_close(in);
     archive_read_free(in);
 
-    Logger::log(LogLevel::Debug,
-                "ODF prepare complete: " + std::to_string(content.extracted_files.size()) + " files",
-                processor_tag());
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
 
     return content;
 }
 
 std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& content) {
-    Logger::log(LogLevel::Info, "Finalizing ODF: " + content.original_path.filename().string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.filename().string(), get_name());
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -136,17 +131,17 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
     archive* out = archive_write_new();
     if (!out) {
-        Logger::log(LogLevel::Error, "archive_write_new failed", processor_tag());
+        Logger::log(LogLevel::Error, "Archive_write_new failed", get_name());
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: archive_write_new failed");
     }
 
     int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
     }
     if (set_fmt != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to set ZIP format: " + std::string(archive_error_string(out)), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to set zip format: " + std::string(archive_error_string(out)), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: set_format_zip failed");
@@ -155,10 +150,10 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
     }
     if (open_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to open temp ODF for writing: " + std::string(archive_error_string(out)), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to open temp odf for writing: " + std::string(archive_error_string(out)), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: open_filename failed");
@@ -184,7 +179,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
             std::ifstream ifs(file, std::ios::binary);
             if (!ifs) {
-                Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), processor_tag());
+                Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), get_name());
                 continue;
             }
             std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
@@ -194,7 +189,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
             if (rel.filename() == "mimetype") {
                 final_data = buf;
-                Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", processor_tag());
+                Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", get_name());
                 // option is already 'store', do nothing
             } else if (ext == ".xml") {
                 ZopfliOptions opts;
@@ -209,15 +204,15 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
                 free(out_data);
                 final_data = result;
 
-                Logger::log(LogLevel::Debug, "Recompressed XML with Zopfli: " + rel.string(), processor_tag());
+                Logger::log(LogLevel::Debug, "Recompressed xml with zopfli: " + rel.string(), get_name());
             } else {
                 final_data = buf;
-                Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), processor_tag());
+                Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), get_name());
             }
 
             archive_entry* entry = archive_entry_new();
             if (!entry) {
-                Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());
+                Logger::log(LogLevel::Error, "Archive_entry_new failed", get_name());
                 throw std::runtime_error("ODFProcessor: archive_entry_new failed");
             }
 
@@ -229,12 +224,12 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
             int wh = archive_write_header(out, entry);
             if (wh == ARCHIVE_WARN) {
-                Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), processor_tag());
+                Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
             }
             if (wh != ARCHIVE_OK) {
                 Logger::log(LogLevel::Error,
                             "Failed to write header for: " + rel.string() +
-                            " (" + std::string(archive_error_string(out)) + ")", processor_tag());
+                            " (" + std::string(archive_error_string(out)) + ")", get_name());
                 archive_entry_free(entry);
                 throw std::runtime_error("ODFProcessor: write_header failed");
             }
@@ -243,7 +238,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
             if (wrote < 0) {
                 Logger::log(LogLevel::Error,
                             "Failed to write data for: " + rel.string() +
-                            " (" + std::string(archive_error_string(out)) + ")", processor_tag());
+                            " (" + std::string(archive_error_string(out)) + ")", get_name());
                 archive_entry_free(entry);
                 throw std::runtime_error("ODFProcessor: write_data failed");
             }
@@ -254,14 +249,14 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
         }
     } catch (const std::exception& e) {
         // log the error before cleanup
-        Logger::log(LogLevel::Error, "Failed to finalize ODF: " + std::string(e.what()) + " for file: " + content.original_path.filename().string(), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to finalize odf: " + std::string(e.what()) + " for file: " + content.original_path.filename().string(), get_name());
         archive_write_close(out);
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw;
     } catch (...) {
         // log unknown error
-        Logger::log(LogLevel::Error, "Failed to finalize ODF: Unknown exception for file: " + content.original_path.filename().string(), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to finalize odf: unknown exception for file: " + content.original_path.filename().string(), get_name());
         archive_write_close(out);
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
@@ -270,11 +265,12 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
 
     int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), processor_tag());
+        Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: write_close failed");
     }
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
     archive_write_free(out);
 
     cleanup_temp_dir(content.temp_dir);

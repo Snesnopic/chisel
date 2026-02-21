@@ -16,14 +16,14 @@ namespace chisel {
 void WavPackProcessor::recompress(const std::filesystem::path& input,
                                   const std::filesystem::path& output,
                                   bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Starting WavPack recompression: " + input.string(), "wavpack_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     char error[128]{};
 
     // open input context
     WavpackContext* ctx_in = WavpackOpenFileInput(input.string().c_str(), error, OPEN_TAGS, 0);
     if (!ctx_in) {
-        Logger::log(LogLevel::Error, std::string("WavPack open failed: ") + error, "wavpack_processor");
+        Logger::log(LogLevel::Error, std::string("Wavpack open failed: ") + error, get_name());
         throw std::runtime_error("WavPack open failed");
     }
 
@@ -109,14 +109,14 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
                         if (!WavpackAppendTagItem(ctx_out, tag_name, value.data(), size)) {
                             Logger::log(LogLevel::Warning,
                                         std::string("Failed to append tag: ") + tag_name,
-                                        "wavpack_processor");
+                                        get_name());
                         }
                     }
                 }
             }
         }
         if (!WavpackWriteTag(ctx_out)) {
-            Logger::log(LogLevel::Warning, "Failed to write tags", "wavpack_processor");
+            Logger::log(LogLevel::Warning, "Failed to write tags", get_name());
         }
     }
 
@@ -124,7 +124,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     std::fclose(out);
     WavpackCloseFile(ctx_in);
 
-    Logger::log(LogLevel::Info, "WavPack recompression completed: " + output.string(), "wavpack_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::string WavPackProcessor::get_raw_checksum(const std::filesystem::path&) const {

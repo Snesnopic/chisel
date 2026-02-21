@@ -150,7 +150,7 @@ void strip_metadata(QPDF& pdf) {
 namespace chisel {
 
 std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::filesystem::path& input_path) {
-    Logger::log(LogLevel::Info, "Preparing PDF container: " + input_path.string(), "pdf_processor");
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -184,7 +184,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
             info.decodable = true;
         } catch (QPDFExc& e) {
             Logger::log(LogLevel::Debug,"Stream " + std::to_string(i) + " is not decodable, falling back to raw: " + e.what(),
-                                    "pdf_processor");
+                                    get_name());
             buf = obj.getRawStreamData();
             data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
             info.decodable = false;
@@ -203,11 +203,13 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
 
     state_[content.original_path] = std::move(st);
     content.format = ContainerFormat::Pdf;
+
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
     return content;
 }
 
 std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content) {
-    Logger::log(LogLevel::Info, "Finalizing PDF container: " + content.original_path.string(), "pdf_processor");
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     try {
         PdfState st;
@@ -254,7 +256,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                 } catch (QPDFExc& e) {
                     Logger::log(LogLevel::Debug,
                                 "Skipping stream " + std::to_string(i) + " (not decodable now): " + std::string(e.what()),
-                                "pdf_processor");
+                                get_name());
                     continue;
                 }
             }
@@ -281,11 +283,11 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         cleanup_temp_dir(st.temp_dir);
         state_.erase(content.original_path);
 
-        Logger::log(LogLevel::Info, "PDF container finalized at: " + tmp_path.string(), "pdf_processor");
+        Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
 
         return tmp_path;
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, std::string("Exception during PDF finalize: ") + e.what(), "pdf_processor");
+        Logger::log(LogLevel::Error, std::string("Exception during pdf finalize: ") + e.what(), get_name());
         throw;
     }
 }
@@ -319,7 +321,7 @@ static bool get_all_raw_streams(const std::filesystem::path& path,
         }
         return true;
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Warning, "Failed to read PDF streams: " + std::string(e.what()), "pdf_processor");
+        Logger::log(LogLevel::Warning, "Failed to read pdf streams: " + std::string(e.what()), "PdfProcessor");
         return false;
     }
 }
@@ -370,7 +372,7 @@ void PdfProcessor::cleanup_temp_dir(const std::filesystem::path& dir) {
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
     if (ec) {
-        Logger::log(LogLevel::Warning, "Failed to cleanup temp dir: " + dir.string(), "pdf_processor");
+        Logger::log(LogLevel::Warning, "Failed to cleanup temp dir: " + dir.string(), "PdfProcessor");
     }
 }
 

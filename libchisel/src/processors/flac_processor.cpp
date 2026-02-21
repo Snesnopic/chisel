@@ -66,16 +66,16 @@ static FLAC__StreamDecoderWriteStatus write_callback(
         if (st != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
             Logger::log(LogLevel::Error,
                         std::string("FLAC init error: ") + FLAC__StreamEncoderInitStatusString[st],
-                        "flac_processor");
+                        "FlacProcessor");
             ctx->failed = true;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }
         ctx->encoder_initialized = true;
-        Logger::log(LogLevel::Debug, "encoder initialized", "flac_processor");
+        Logger::log(LogLevel::Debug, "Encoder initialized", "FlacProcessor");
     }
 
     if (!FLAC__stream_encoder_process(ctx->encoder, buffer, frame->header.blocksize)) {
-        Logger::log(LogLevel::Error, "encoder process failed", "flac_processor");
+        Logger::log(LogLevel::Error, "Encoder process failed", "FlacProcessor");
         ctx->failed = true;
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
     }
@@ -103,7 +103,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
                                const std::filesystem::path& output,
                                const bool preserve_metadata)
 {
-    Logger::log(LogLevel::Info, "Starting FLAC re-encoding: " + input.string(), "flac_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     if (std::filesystem::exists(output)) {
         std::filesystem::remove(output);
@@ -153,7 +153,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
     // encoder/decoder setup
     ctx.encoder = FLAC__stream_encoder_new();
     if (!ctx.encoder) {
-        Logger::log(LogLevel::Error, "Can't create encoder", "flac_processor");
+        Logger::log(LogLevel::Error, "Can't create encoder", get_name());
         if (ctx.metadata_blocks) {
             for (unsigned i = 0; i < ctx.num_blocks; ++i) FLAC__metadata_object_delete(ctx.metadata_blocks[i]);
             std::free(ctx.metadata_blocks);
@@ -165,7 +165,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 
     FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();
     if (!decoder) {
-        Logger::log(LogLevel::Error, "Can't create decoder", "flac_processor");
+        Logger::log(LogLevel::Error, "Can't create decoder", get_name());
         FLAC__stream_encoder_delete(ctx.encoder);
         if (ctx.metadata_blocks) {
             for (unsigned i = 0; i < ctx.num_blocks; ++i) FLAC__metadata_object_delete(ctx.metadata_blocks[i]);
@@ -179,7 +179,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
     const auto ist = FLAC__stream_decoder_init_file(
         decoder, input.string().c_str(), write_callback, metadata_callback, error_callback, &ctx);
     if (ist != FLAC__STREAM_DECODER_INIT_STATUS_OK) {
-        Logger::log(LogLevel::Error, "decoder init failed", "flac_processor");
+        Logger::log(LogLevel::Error, "Decoder init failed", get_name());
         FLAC__stream_decoder_delete(decoder);
         FLAC__stream_encoder_delete(ctx.encoder);
         if (ctx.metadata_blocks) {
@@ -211,11 +211,11 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
     if (chain) FLAC__metadata_chain_delete(chain);
 
     if (failed) {
-        Logger::log(LogLevel::Error, "decoding or encoding failed", "flac_processor");
+        Logger::log(LogLevel::Error, "Decoding or encoding failed", get_name());
         throw std::runtime_error("FLAC transcoding failed");
     }
 
-    Logger::log(LogLevel::Info, "FLAC re-encoding completed: " + output.string(), "flac_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 /**
  * @brief (Phase 1) Extracts cover art from the FLAC file into a temp directory.
@@ -230,7 +230,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
     const std::filesystem::path& input_path)
 {
-    Logger::log(LogLevel::Info, "FLAC: Preparing cover art extraction for: " + input_path.string(), "flac_processor");
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -240,7 +240,7 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
     AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
 
     if (state.extracted_covers.empty()) {
-        Logger::log(LogLevel::Debug, "FLAC: No embedded cover art found.", "flac_processor");
+        Logger::log(LogLevel::Info, "No embedded cover art found", get_name());
         cleanup_temp_dir(content.temp_dir);
         return std::nullopt; // nothing to extract
     }
@@ -253,8 +253,9 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
     // save state in std::any for phase 3
     content.extras = std::make_any<AudioExtractionState>(std::move(state));
 
-    Logger::log(LogLevel::Debug, "FLAC: Extracted " + std::to_string(content.extracted_files.size()) + " covers.", "flac_processor");
+    Logger::log(LogLevel::Info, "Extracted " + std::to_string(content.extracted_files.size()) + " covers", get_name());
     content.format = ContainerFormat::Unknown; // You may want to define ContainerFormat::Flac
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
     return content;
 }
 
@@ -270,12 +271,12 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
  */
 std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content)
 {
-    Logger::log(LogLevel::Info, "FLAC: Finalizing (re-inserting covers) for: " + content.original_path.string(), "flac_processor");
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     // 1. retrieve state from std::any
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
     if (!state_ptr) {
-        Logger::log(LogLevel::Error, "FLAC: Failed to retrieve extraction state (std::any_cast failed).", "flac_processor");
+        Logger::log(LogLevel::Error, "Failed to retrieve extraction state", get_name());
         cleanup_temp_dir(content.temp_dir);
         return {}; // return empty path on failure
     }
@@ -289,7 +290,7 @@ std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent 
         // 3. copy the optimized audio (phase 2) to the final location
         std::filesystem::copy_file(optimized_audio_path, final_temp_path, std::filesystem::copy_options::overwrite_existing);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "FLAC: Failed to copy audio file for finalization: " + std::string(e.what()), "flac_processor");
+        Logger::log(LogLevel::Error, "Failed to copy audio file for finalization: " + std::string(e.what()), get_name());
         cleanup_temp_dir(content.temp_dir);
         return {};
     }
@@ -297,7 +298,7 @@ std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent 
     // 4. use audiometadatautil to re-insert covers (read from temp_dir) into the final file
     //    images in temp_dir were already optimized in phase 2.
     if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
-        Logger::log(LogLevel::Error, "FLAC: AudioMetadataUtil::rebuildCovers failed for: " + final_temp_path.string(), "flac_processor");
+        Logger::log(LogLevel::Error, "RebuildCovers failed for: " + final_temp_path.string(), get_name());
         cleanup_temp_dir(content.temp_dir);
         std::filesystem::remove(final_temp_path); // remove the partially good file
         return {};
@@ -308,6 +309,7 @@ std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent 
 
     // 6. return path to the finalized file.
     // processorexecutor will handle replacing the original.
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), get_name());
     return final_temp_path;
 }
 

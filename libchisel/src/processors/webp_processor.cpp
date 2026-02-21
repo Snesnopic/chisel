@@ -16,36 +16,36 @@ namespace chisel {
 void WebpProcessor::recompress(const std::filesystem::path& input,
                                const std::filesystem::path& output,
                                bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Starting WebP recompression: " + input.string(), "webp_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // read input file into memory
     std::ifstream file(input, std::ios::binary | std::ios::ate);
     if (!file) {
-        Logger::log(LogLevel::Error, "WebpProcessor: cannot open input file: " + input.string(), "webp_processor");
+        Logger::log(LogLevel::Error, "Cannot open input file: " + input.string(), get_name());
         throw std::runtime_error("WebpProcessor: cannot open input file");
     }
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
     std::vector<uint8_t> input_data(size);
     if (!file.read(reinterpret_cast<char*>(input_data.data()), size)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: failed to read input file: " + input.string(), "webp_processor");
+        Logger::log(LogLevel::Error, "Failed to read input file: " + input.string(), get_name());
         throw std::runtime_error("WebpProcessor: failed to read input file");
     }
 
     // inspect bitstream features
     WebPBitstreamFeatures features;
     if (WebPGetFeatures(input_data.data(), input_data.size(), &features) != VP8_STATUS_OK) {
-        Logger::log(LogLevel::Error, "WebpProcessor: feature detection failed for: " + input.string(), "webp_processor");
+        Logger::log(LogLevel::Error, "Feature detection failed for: " + input.string(), get_name());
         throw std::runtime_error("WebpProcessor: feature detection failed");
     }
 
     // skip lossy
     if (features.format != 2) {
-        Logger::log(LogLevel::Info, "Input is lossy WebP, skipping recompression", "webp_processor");
+        Logger::log(LogLevel::Info, "Input is lossy webp, skipping recompression", get_name());
         try {
             std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
         } catch (const std::exception& e) {
-            Logger::log(LogLevel::Error, std::string("Failed to copy lossy WebP: ") + e.what(), "webp_processor");
+            Logger::log(LogLevel::Error, std::string("Failed to copy lossy webp: ") + e.what(), get_name());
             throw std::runtime_error("Failed to copy skipped lossy WebP");
         }
         return;
@@ -55,32 +55,32 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     int width = 0, height = 0;
     uint8_t* decoded = WebPDecodeRGBA(input_data.data(), input_data.size(), &width, &height);
     if (!decoded) {
-        Logger::log(LogLevel::Error, "WebpProcessor: decode failed (RGBA) for: " + input.string(), "webp_processor");
+        Logger::log(LogLevel::Error, "Decode failed (rgba) for: " + input.string(), get_name());
         throw std::runtime_error("WebpProcessor: decode failed");
     }
 
     WebPConfig config;
     if (!WebPConfigInit(&config)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPConfigInit failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPConfigInit failed", get_name());
         WebPFree(decoded);
         throw std::runtime_error("WebpProcessor: WebPConfigInit failed");
     }
     if (!WebPConfigLosslessPreset(&config, 9)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPConfigLosslessPreset(9) failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPConfigLosslessPreset(9) failed", get_name());
         WebPFree(decoded);
         throw std::runtime_error("WebpProcessor: WebPConfigLosslessPreset failed");
     }
 
     WebPPicture picture;
     if (!WebPPictureInit(&picture)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPPictureInit failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPPictureInit failed", get_name());
         WebPFree(decoded);
         throw std::runtime_error("WebpProcessor: WebPPictureInit failed");
     }
     picture.width = width;
     picture.height = height;
     if (!WebPPictureImportRGBA(&picture, decoded, width * 4)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPPictureImportRGBA failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPPictureImportRGBA failed", get_name());
         WebPPictureFree(&picture);
         WebPFree(decoded);
         throw std::runtime_error("WebpProcessor: WebPPictureImportRGBA failed");
@@ -93,7 +93,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     picture.custom_ptr = &writer;
 
     if (!WebPEncode(&config, &picture)) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPEncode failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPEncode failed", get_name());
         WebPPictureFree(&picture);
         WebPMemoryWriterClear(&writer);
         throw std::runtime_error("WebpProcessor: WebPEncode failed");
@@ -103,7 +103,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     WebPData output_image{ writer.mem, writer.size };
     WebPMux* mux = WebPMuxCreate(&output_image, 1);
     if (!mux) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPMuxCreate failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPMuxCreate failed", get_name());
         WebPMemoryWriterClear(&writer);
         throw std::runtime_error("WebpProcessor: WebPMuxCreate failed");
     }
@@ -118,13 +118,13 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
             if (WebPMuxGetChunk(mux_in, "ICCP", &chunk) == WEBP_MUX_OK) WebPMuxSetChunk(mux, "ICCP", &chunk, 1);
             WebPMuxDelete(mux_in);
         } else {
-            Logger::log(LogLevel::Error, "WebpProcessor: WebPMuxCreate(mux_in) failed while preserving metadata", "webp_processor");
+            Logger::log(LogLevel::Error, "WebPMuxCreate(mux_in) failed while preserving metadata", get_name());
         }
     }
 
     WebPData final_data;
     if (WebPMuxAssemble(mux, &final_data) != WEBP_MUX_OK) {
-        Logger::log(LogLevel::Error, "WebpProcessor: WebPMuxAssemble failed", "webp_processor");
+        Logger::log(LogLevel::Error, "WebPMuxAssemble failed", get_name());
         WebPMuxDelete(mux);
         WebPMemoryWriterClear(&writer);
         throw std::runtime_error("WebpProcessor: WebPMuxAssemble failed");
@@ -132,7 +132,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
 
     std::ofstream out(output, std::ios::binary);
     if (!out) {
-        Logger::log(LogLevel::Error, "WebpProcessor: cannot open output file: " + output.string(), "webp_processor");
+        Logger::log(LogLevel::Error, "Cannot open output file: " + output.string(), get_name());
         WebPMuxDelete(mux);
         WebPMemoryWriterClear(&writer);
         WebPDataClear(&final_data);
@@ -144,7 +144,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     WebPMemoryWriterClear(&writer);
     WebPDataClear(&final_data);
 
-    Logger::log(LogLevel::Info, "WebP recompression completed: " + output.string(), "webp_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
     // helper to decode webp to raw rgba buffer
     static bool decode_webp_rgba8(const std::filesystem::path& path,

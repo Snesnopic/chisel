@@ -42,12 +42,12 @@ namespace chisel {
 void JxlProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Re-encoding " + input.string(), "jxl_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // read input file
     std::vector<uint8_t> input_buf;
     if (!read_file(input, input_buf)) {
-        Logger::log(LogLevel::Error, "Failed to read input file", "jxl_processor");
+        Logger::log(LogLevel::Error, "Failed to read input file", get_name());
         throw std::runtime_error("JxlProcessor: cannot read input");
     }
 
@@ -162,7 +162,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
         JxlEncoderStoreJPEGMetadata(enc, JXL_TRUE);
         for (const auto& [type, data] : metadata_boxes) {
             if (JXL_ENC_SUCCESS != JxlEncoderAddBox(enc, type.c_str(), data.data(), data.size(), JXL_FALSE)) {
-                Logger::log(LogLevel::Warning, "Failed to add metadata box to JXL encoder", "jxl_processor");
+                Logger::log(LogLevel::Warning, "Failed to add metadata box to jxl encoder", get_name());
             }
         }
     }
@@ -206,7 +206,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     }
 
     JxlEncoderDestroy(enc);
-    Logger::log(LogLevel::Info, "Re-encoding complete: " + output.string(), "jxl_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
     // helper to decode jxl to raw rgba8 buffer
     static bool decode_jxl_rgba8(const std::filesystem::path& path,

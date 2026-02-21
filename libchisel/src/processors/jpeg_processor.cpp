@@ -27,7 +27,7 @@ struct JpegErrorMgr {
 void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     auto *err = reinterpret_cast<JpegErrorMgr *>(cinfo->err);
     (*cinfo->err->format_message)(cinfo, err->msg);
-    Logger::log(LogLevel::Warning, std::string("libjpeg: ") + err->msg, "libjpeg");
+    Logger::log(LogLevel::Warning, std::string("Libjpeg: ") + err->msg, "libjpeg");
     throw std::runtime_error(err->msg);
 }
 
@@ -100,17 +100,17 @@ namespace chisel {
 void JpegProcessor::recompress(const std::filesystem::path& input,
                                const std::filesystem::path& output,
                                bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Start JPEG recompression: " + input.string(), "jpeg_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     unique_FILE infile(chisel::open_file(input.string().c_str(), "rb"));
     if (!infile) {
-        Logger::log(LogLevel::Error, "Cannot open JPEG input: " + input.string(), "jpeg_processor");
+        Logger::log(LogLevel::Error, "Cannot open jpeg input: " + input.string(), get_name());
         throw std::runtime_error("Cannot open JPEG input");
     }
     unique_FILE outfile(chisel::open_file(output.string().c_str(), "wb"));
     if (!outfile) {
         // infile is closed automatically by raii
-        Logger::log(LogLevel::Error, "Cannot open JPEG output: " + output.string(), "jpeg_processor");
+        Logger::log(LogLevel::Error, "Cannot open jpeg output: " + output.string(), get_name());
         throw std::runtime_error("Cannot open JPEG output");
     }
 
@@ -137,8 +137,8 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         }
 
         Logger::log(LogLevel::Debug,
-                    std::string("JPEG ") + (srcinfo.progressive_mode ? "progressive" : "baseline"),
-                    "jpeg_processor");
+                    std::string("Jpeg ") + (srcinfo.progressive_mode ? "progressive" : "baseline"),
+                    get_name());
 
         jvirt_barray_ptr *coef_arrays = jpeg_read_coefficients(&srcinfo);
         jpeg_copy_critical_parameters(&srcinfo, &dstinfo);
@@ -163,34 +163,34 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
 
         // explicitly flush stdio buffer to disk before returning
         if (fflush(outfile.get()) != 0) {
-            Logger::log(LogLevel::Warning, "fflush failed for " + output.string(), "jpeg_processor");
+            Logger::log(LogLevel::Warning, "Fflush failed for " + output.string(), get_name());
         }
         outfile.reset();
 
-        Logger::log(LogLevel::Info, "JPEG recompression completed: " + output.string(), "jpeg_processor");
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 
     } catch (const std::exception& e) {
         infile.reset();
         outfile.reset();
         Logger::log(LogLevel::Error,
-                    "JPEG recompression failed: " + std::string(e.what()),
-                    "jpeg_processor");
+                    "Recompression failed: " + std::string(e.what()),
+                    get_name());
 
         // safely cleanup libjpeg structures
         try {
             jpeg_destroy_compress(&dstinfo);
         } catch (...) {
             Logger::log(LogLevel::Warning,
-                        "jpeg_destroy_compress threw an exception during cleanup",
-                        "jpeg_processor");
+                        "Jpeg_destroy_compress threw an exception during cleanup",
+                        get_name());
         }
 
         try {
             jpeg_destroy_decompress(&srcinfo);
         } catch (...) {
             Logger::log(LogLevel::Warning,
-                        "jpeg_destroy_decompress threw an exception during cleanup",
-                        "jpeg_processor");
+                        "Jpeg_destroy_decompress threw an exception during cleanup",
+                        get_name());
         }
     }
 

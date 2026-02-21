@@ -13,19 +13,15 @@
 
 namespace chisel {
 
-static const char* processor_tag() {
-    return "PnmProcessor";
-}
-
 void PnmProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               bool /*preserve_metadata*/) {
-    Logger::log(LogLevel::Info, "Recompressing PNM: " + input.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     int width, height, channels;
     // force loading as grey (1) or rgb (3); alpha not supported in standard pnm
     if (!stbi_info(input.string().c_str(), &width, &height, &channels)) {
-         Logger::log(LogLevel::Error, "Failed to parse PNM header", processor_tag());
+         Logger::log(LogLevel::Error, "Failed to parse pnm header", get_name());
          throw std::runtime_error("PnmProcessor: invalid input");
     }
 
@@ -40,7 +36,7 @@ void PnmProcessor::recompress(const std::filesystem::path& input,
     fclose(f_in);
 
     if (!data) {
-        Logger::log(LogLevel::Error, "Failed to load PNM data", processor_tag());
+        Logger::log(LogLevel::Error, "Failed to load pnm data", get_name());
         throw std::runtime_error("PnmProcessor: decode failed");
     }
 
@@ -69,7 +65,7 @@ void PnmProcessor::recompress(const std::filesystem::path& input,
     fclose(f_out);
     stbi_image_free(data);
 
-    Logger::log(LogLevel::Info, "PNM recompression finished: " + output.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::string PnmProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {

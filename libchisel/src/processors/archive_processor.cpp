@@ -28,14 +28,6 @@ namespace chisel {
 
 namespace fs = std::filesystem;
 
-/**
- * @brief Returns the tag used for logging by this processor.
- * @return A constant string identifier.
- */
-static const char* processor_tag() {
-    return "ArchiveProcessor";
-}
-
 // --- helpers ---
 
 /**
@@ -212,10 +204,10 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
         int r = archive_read_open_filename(a, archive_path.string().c_str(), 10240);
     #endif
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "archive_read_open_filename: " + std::string(archive_error_string(a)), processor_tag());
+        Logger::log(LogLevel::Error, "Archive_read_open_filename: " + std::string(archive_error_string(a)), "ArchiveProcessor");
         archive_read_free(a);
         return false;
     }
@@ -232,13 +224,13 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
 
         fs::path out_path;
         if (!sanitize_archive_entry_path(current, dest_dir, out_path)) {
-            Logger::log(LogLevel::Warning, "Skipping suspicious archive entry (path traversal): " + std::string(current), processor_tag());
+            Logger::log(LogLevel::Warning, "Skipping suspicious archive entry (path traversal): " + std::string(current), "ArchiveProcessor");
             archive_read_data_skip(a);
             continue;
         }
 
         if (!ensure_parent_dirs(out_path, ec)) {
-            Logger::log(LogLevel::Error, "Can't create folder for: " + out_path.string(), processor_tag());
+            Logger::log(LogLevel::Error, "Can't create folder for: " + out_path.string(), "ArchiveProcessor");
             archive_read_data_skip(a);
             continue;
         }
@@ -269,7 +261,7 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
 
         FILE* out = chisel::open_file(out_path, "wb");
         if (!out) {
-            Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), processor_tag());
+            Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), "ArchiveProcessor");
             archive_read_data_skip(a);
             continue;
         }
@@ -281,14 +273,14 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
         fclose(out);
 
         if (size_read < 0) {
-            Logger::log(LogLevel::Error, "Error reading data: " + std::string(archive_error_string(a)), processor_tag());
+            Logger::log(LogLevel::Error, "Error reading data: " + std::string(archive_error_string(a)), "ArchiveProcessor");
             archive_read_free(a);
             return false;
         }
     }
 
     if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::Error, "Error during iteration: " + std::string(archive_error_string(a)), processor_tag());
+        Logger::log(LogLevel::Error, "Error during iteration: " + std::string(archive_error_string(a)), "ArchiveProcessor");
         archive_read_free(a);
         return false;
     }
@@ -401,15 +393,15 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             r = archive_write_set_format_ar_bsd(a);
             break;
         default:
-            Logger::log(LogLevel::Error, "Unsupported output format for writing: " + container_format_to_string(fmt), processor_tag());
+            Logger::log(LogLevel::Error, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveProcessor");
             archive_write_free(a);
             return false;
     }
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Setting format/filter failed: " + std::string(archive_error_string(a)), processor_tag());
+        Logger::log(LogLevel::Error, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
         archive_write_free(a);
         return false;
     }
@@ -420,10 +412,10 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         r = archive_write_open_filename(a, out_path.string().c_str());
     #endif
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
     }
     if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "archive_write_open_filename: " + std::string(archive_error_string(a)), processor_tag());
+        Logger::log(LogLevel::Error, "Archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveProcessor");
         archive_write_free(a);
         return false;
     }
@@ -450,7 +442,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
 
             int rh = archive_write_header(a, entry);
             if (rh != ARCHIVE_OK && rh != ARCHIVE_WARN) {
-                Logger::log(LogLevel::Error, "archive_write_header (mimetype): " + std::string(archive_error_string(a)), processor_tag());
+                Logger::log(LogLevel::Error, "Archive_write_header (mimetype): " + std::string(archive_error_string(a)), "ArchiveProcessor");
                 archive_entry_free(entry);
                 archive_write_close(a);
                 archive_write_free(a);
@@ -459,7 +451,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             if (!buf.empty()) {
                 la_ssize_t wrote = archive_write_data(a, buf.data(), buf.size());
                 if (wrote < 0) {
-                    Logger::log(LogLevel::Error, "archive_write_data (mimetype): " + std::string(archive_error_string(a)), processor_tag());
+                    Logger::log(LogLevel::Error, "Archive_write_data (mimetype): " + std::string(archive_error_string(a)), "ArchiveProcessor");
                     archive_entry_free(entry);
                     archive_write_close(a);
                     archive_write_free(a);
@@ -492,7 +484,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
 
         archive_entry* entry = archive_entry_new();
         if (!entry) {
-            Logger::log(LogLevel::Error, "archive_entry_new failed", processor_tag());
+            Logger::log(LogLevel::Error, "Archive_entry_new failed", "ArchiveProcessor");
             archive_write_close(a);
             archive_write_free(a);
             return false;
@@ -539,10 +531,10 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
 
         r = archive_write_header(a, entry);
         if (r == ARCHIVE_WARN) {
-            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), processor_tag());
+            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
         }
         if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, processor_tag());
+            Logger::log(LogLevel::Error, "Archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, "ArchiveProcessor");
             archive_entry_free(entry);
             archive_write_close(a);
             archive_write_free(a);
@@ -554,7 +546,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             if (!skip_data) {
                 std::ifstream ifs(p, std::ios::binary);
                 if (!ifs) {
-                    Logger::log(LogLevel::Error, "Can't open file for reading: " + p.string(), processor_tag());
+                    Logger::log(LogLevel::Error, "Can't open file for reading: " + p.string(), "ArchiveProcessor");
                     archive_entry_free(entry);
                     archive_write_close(a);
                     archive_write_free(a);
@@ -566,7 +558,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                     if (got > 0) {
                         la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<size_t>(got));
                         if (wrote < 0) {
-                            Logger::log(LogLevel::Error, "archive_write_data: " + std::string(archive_error_string(a)), processor_tag());
+                            Logger::log(LogLevel::Error, "Archive_write_data: " + std::string(archive_error_string(a)), "ArchiveProcessor");
                             archive_entry_free(entry);
                             archive_write_close(a);
                             archive_write_free(a);
@@ -589,31 +581,22 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
 // --- IProcessor implementation ---
 
 std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::filesystem::path& input_path) {
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
+
     ExtractedContent content;
     content.original_path = input_path;
     content.temp_dir = chisel::make_temp_dir_for(input_path, "archive");
 
     // Detect format
     content.format = detect_format(input_path);
-    /*
-    if (content.format == ContainerFormat::Xpi) {
-        std::cerr << "WARNING: Recompressing .xpi will invalidate its digital signature.\n"
-                     "You must re-sign the extension to install it.\n" << std::endl;
-    }
-    if (content.format == ContainerFormat::Apk) {
-        std::cerr << "WARNING: Recompressing .apk will invalidate its digital signature.\n"
-                     "You must re-sign the APK to install it.\n" << std::endl;
-    }*/
 
     if (!can_read_format(content.format)) {
-        Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + input_path.filename().string(), processor_tag());
+        Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + input_path.filename().string(), get_name());
         return content;
     }
 
-    Logger::log(LogLevel::Info, "Extracting archive: " + input_path.filename().string() + " -> " + content.temp_dir.filename().string(), processor_tag());
-
     if (!extract_with_libarchive(input_path, content.temp_dir)) {
-        Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), processor_tag());
+        Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
         return content;
     }
 
@@ -622,7 +605,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
         if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
             ContainerFormat inner_fmt;
             if (is_archive_file(p.path(), inner_fmt)) {
-                Logger::log(LogLevel::Debug, "Found nested archive: " + p.path().string(), processor_tag());
+                Logger::log(LogLevel::Debug, "Found nested archive: " + p.path().string(), get_name());
                 // Push nested content path to extracted_files; ProcessorExecutor will recurse
                 content.extracted_files.push_back(p.path());
             } else {
@@ -632,15 +615,18 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     }
 
     Logger::log(
-        LogLevel::Debug,
+        LogLevel::Info,
         "Extracted files: " + std::to_string(content.extracted_files.size()),
-        processor_tag()
+        get_name()
     );
 
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
     return content;
 }
 
 std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content) {
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
+
     const auto out_fmt = content.format;
     const fs::path src_path(content.original_path);
     const std::string out_ext = "." + container_format_to_string(out_fmt);
@@ -648,23 +634,22 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
     const fs::path tmp_archive = fs::temp_directory_path() /
                                  (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + out_ext);
 
-    Logger::log(LogLevel::Info, "Recreating archive: " + tmp_archive.string(), processor_tag());
-
     if (!create_with_libarchive(content.temp_dir, tmp_archive, out_fmt)) {
-        Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), processor_tag());
+        Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), get_name());
         fs::remove_all(content.temp_dir);
         throw std::runtime_error("ArchiveProcessor: create_with_libarchive failed");
     }
 
     std::error_code ec;
     if (!fs::exists(tmp_archive, ec) || ec) {
-        Logger::log(LogLevel::Error, "Compressed archive not found: " + tmp_archive.string(), processor_tag());
+        Logger::log(LogLevel::Error, "Compressed archive not found: " + tmp_archive.string(), get_name());
         fs::remove_all(content.temp_dir);
         throw std::runtime_error("ArchiveProcessor: tmp archive missing");
     }
 
-    chisel::cleanup_temp_dir(content.temp_dir, processor_tag());
+    chisel::cleanup_temp_dir(content.temp_dir, get_name());
 
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_archive.string(), get_name());
     return tmp_archive;
 }
 

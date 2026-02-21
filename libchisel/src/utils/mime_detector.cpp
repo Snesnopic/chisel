@@ -13,6 +13,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <vector>
+#include <string>
 #include <zlib.h>
 
 std::string chisel::MimeDetector::detect(const std::filesystem::path& path)
@@ -136,14 +137,14 @@ void chisel::MimeDetector::ensure_magic_installed()
 
         if (std::filesystem::file_size(target, ec) < 1024UL * 1024UL) {
              need_install = true;
-             Logger::log(LogLevel::Warning, "Local magic database too small or suspicious, regenerating...", "libmagic");
+             Logger::log(LogLevel::Warning, "Local magic database too small or suspicious, regenerating...", "MimeDetector");
         }
         else {
             magic_t test_magic = magic_open(MAGIC_NONE);
             if (test_magic != nullptr) {
                 if (magic_load(test_magic, target.c_str()) != 0) {
                     need_install = true;
-                    Logger::log(LogLevel::Warning, "Local magic database corrupt (load failed), regenerating...", "libmagic");
+                    Logger::log(LogLevel::Warning, "Local magic database corrupt (load failed), regenerating...", "MimeDetector");
                 }
                 magic_close(test_magic);
             }
@@ -152,7 +153,7 @@ void chisel::MimeDetector::ensure_magic_installed()
 
     if (need_install)
     {
-        Logger::log(LogLevel::Info, "Installing embedded magic.mgc to " + target.string(), "libmagic");
+        Logger::log(LogLevel::Info, "Installing embedded magic.mgc to " + target.string(), "MimeDetector");
         std::filesystem::create_directories(target.parent_path());
 
         const auto decompressed = decompress_gzip(embedded_magic_mgc, embedded_magic_mgc_len);

@@ -179,7 +179,7 @@ namespace chisel {
         }
 
         if (procs.empty()) {
-            Logger::log(LogLevel::Warning, "no processor for " + path.string(), "Executor");
+            Logger::log(LogLevel::Warning, "No processor for " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{path, "Unsupported format"});
             return;
         }
@@ -200,10 +200,10 @@ namespace chisel {
                 scheduled_for_extraction = true;
             } else {
                 if (processor->can_recompress()) {
-                    Logger::log(LogLevel::Warning, "prepare_extraction resulted in no elements for " + path.string(), "Executor");
+                    Logger::log(LogLevel::Warning, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeSkippedEvent{path, "Extraction resulted in no elements"});
                 } else {
-                    Logger::log(LogLevel::Error, "prepare_extraction failed for " + path.string(), "Executor");
+                    Logger::log(LogLevel::Error, "Prepare_extraction failed for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
                 }
             }
@@ -219,7 +219,7 @@ namespace chisel {
                 event_bus_.publish(FileAnalyzeCompleteEvent{path, false, scheduled_for_recompression});
             }
         } else {
-            Logger::log(LogLevel::Debug, "file ignored: " + path.string(), "Executor");
+            Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{path, "No operations available"});
         }
     }
@@ -240,7 +240,7 @@ namespace chisel {
                     candidates = registry_.find_by_extension(file.extension().string());
                 }
                 if (candidates.empty()) {
-                    Logger::log(LogLevel::Warning, "no processor for " + file.string(), "Executor");
+                    Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
                     event_bus_.publish(FileProcessSkippedEvent{file, "Unsupported format"});
                     return;
                 }
@@ -377,7 +377,7 @@ namespace chisel {
                         }
                     }
                 } catch (const std::exception &e) {
-                    Logger::log(LogLevel::Error, "error on " + file.string() + ": " + std::string(e.what()),
+                    Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()),
                                 "Executor");
                     event_bus_.publish(FileProcessErrorEvent{file, e.what()});
                 }
@@ -398,7 +398,7 @@ namespace chisel {
                 procs = registry_.find_by_extension(content.original_path.extension().string());
             }
             if (procs.empty()) {
-                Logger::log(LogLevel::Warning, "no processor to finalize: " + content.original_path.string(),
+                Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(),
                             "Executor");
                 event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Unsupported format"});
                 continue;

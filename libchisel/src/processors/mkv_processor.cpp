@@ -18,7 +18,7 @@ namespace chisel {
 void MkvProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Starting Matroska optimization: " + input.string(), "mkv_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -27,7 +27,7 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     fs::copy_file(input, temp_input, fs::copy_options::overwrite_existing, ec);
 
     if (ec) {
-        Logger::log(LogLevel::Error, "Failed to create temporary copy: " + ec.message(), "mkv_processor");
+        Logger::log(LogLevel::Error, "Failed to create temporary copy: " + ec.message(), get_name());
         throw std::runtime_error("MkvProcessor: temp copy failed");
     }
 
@@ -55,11 +55,11 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     try {
         return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "mkclean_optimize exception: " + std::string(e.what()), "mkv_processor");
+        Logger::log(LogLevel::Error, "Mkclean_optimize exception: " + std::string(e.what()), get_name());
         fs::remove(temp_input, ec);
         throw;
     } catch (...) {
-        Logger::log(LogLevel::Error, "mkclean_optimize unknown exception", "mkv_processor");
+        Logger::log(LogLevel::Error, "Mkclean_optimize unknown exception", get_name());
         fs::remove(temp_input, ec);
         throw;
     }
@@ -67,11 +67,11 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     fs::remove(temp_input, ec);
 
     if (return_code != 0) {
-        Logger::log(LogLevel::Error, "mkclean failed with exit code " + std::to_string(return_code), "mkv_processor");
+        Logger::log(LogLevel::Error, "Mkclean failed with exit code " + std::to_string(return_code), get_name());
         throw std::runtime_error("MkvProcessor: mkclean failed");
     }
 
-    Logger::log(LogLevel::Info, "Matroska optimization completed: " + output.string(), "mkv_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::optional<ExtractedContent> MkvProcessor::prepare_extraction(const std::filesystem::path&) {

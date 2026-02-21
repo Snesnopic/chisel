@@ -48,7 +48,7 @@ namespace chisel {
         if (ec) {
             Logger::log(LogLevel::Error,
                 "Failed to create temp dir: " + dir.string() + " (" + ec.message() + ")",
-                "file_utils");
+                "FileUtils");
         }
         return dir;
     }

@@ -53,19 +53,15 @@ namespace {
 
 namespace chisel {
 
-static const char* processor_tag() {
-    return "BmpProcessor";
-}
-
 void BmpProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Recompressing BMP: " + input.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // 1. READ
     ScopedBmp in(input, "rb");
     if (!in.f) {
-        Logger::log(LogLevel::Error, "Failed to open input BMP", processor_tag());
+        Logger::log(LogLevel::Error, "Failed to open input BMP", get_name());
         throw std::runtime_error("BmpProcessor: cannot open input");
     }
 
@@ -80,14 +76,15 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
 
         // If it's an array (BA), extraction should handle it, but recompress can't.
         if (res == BMP_RESULT_ARRAY) {
-             Logger::log(LogLevel::Warning, "Input is a Bitmap Array (BA), skipping recompression.", processor_tag());
+             Logger::log(LogLevel::Warning, "Input is a Bitmap Array (BA), skipping recompression.", get_name());
              // We stop here without throwing to avoid flagging it as a critical error in the batch
              std::error_code ec;
              std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing, ec);
+             Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
              return;
         }
 
-        Logger::log(LogLevel::Error, "Bmplib read error: " + err, processor_tag());
+        Logger::log(LogLevel::Error, "Bmplib read error: " + err, get_name());
         throw std::runtime_error("BmpProcessor: failed to load info");
     }
 
@@ -121,7 +118,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
         if (icc_size > 0) {
              // buffer is allocated by bmplib
              if (bmpread_load_iccprofile(in.h, &icc_profile) != BMP_RESULT_OK) {
-                 Logger::log(LogLevel::Warning, "Failed to load ICC profile, continuing without it.", processor_tag());
+                 Logger::log(LogLevel::Warning, "Failed to load ICC profile, continuing without it.", get_name());
                  if (icc_profile) { free(icc_profile); icc_profile = nullptr; }
                  icc_size = 0;
              }
@@ -157,7 +154,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
         std::string err = bmp_errmsg(in.h);
         if (err.empty()) err = bmplib_result_to_string(res);
         free_resources();
-        Logger::log(LogLevel::Error, "Failed to load image data: " + err, processor_tag());
+        Logger::log(LogLevel::Error, "Failed to load image data: " + err, get_name());
         throw std::runtime_error("BmpProcessor: failed to load image data");
     }
 
@@ -165,7 +162,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
     ScopedBmp out(output, "wb");
     if (!out.f) {
         free_resources();
-        Logger::log(LogLevel::Error, "Failed to open output BMP", processor_tag());
+        Logger::log(LogLevel::Error, "Failed to open output BMP", get_name());
         throw std::runtime_error("BmpProcessor: cannot open output");
     }
 
@@ -181,7 +178,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
     // 64-bit Handling
     if (is_64bit) {
         bmpwrite_set_64bit(out.h);
-        Logger::log(LogLevel::Debug, "Encoding as 64-bit BMP", processor_tag());
+        Logger::log(LogLevel::Debug, "Encoding as 64-bit BMP", get_name());
     }
 
     // Metadata: Resolution
@@ -204,12 +201,12 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
              bmpwrite_allow_huffman(out.h);
              // Set foreground index optimization (optional but good practice)
              bmpwrite_set_huffman_img_fg_idx(out.h, 1);
-             Logger::log(LogLevel::Debug, "Allowed Huffman 1D compression for 1-bit image", processor_tag());
+             Logger::log(LogLevel::Debug, "Allowed Huffman 1D compression for 1-bit image", get_name());
         }
 
         // Auto RLE handles RLE8, RLE4 and Huffman if allowed
         bmpwrite_set_rle(out.h, BMP_RLE_AUTO);
-        Logger::log(LogLevel::Debug, "Encoding as indexed with auto RLE/Huffman", processor_tag());
+        Logger::log(LogLevel::Debug, "Encoding as indexed with auto RLE/Huffman", get_name());
     } else {
         // RGB
         if (!is_64bit && channels == 3 && bits == 8) {
@@ -217,9 +214,9 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
             // We enable it to allow maximum compression.
             bmpwrite_allow_rle24(out.h);
             bmpwrite_set_rle(out.h, BMP_RLE_AUTO);
-            Logger::log(LogLevel::Debug, "Allowed RLE24 compression for RGB image", processor_tag());
+            Logger::log(LogLevel::Debug, "Allowed RLE24 compression for RGB image", get_name());
         } else {
-            Logger::log(LogLevel::Debug, "Encoding as uncompressed RGB/RGBA", processor_tag());
+            Logger::log(LogLevel::Debug, "Encoding as uncompressed RGB/RGBA", get_name());
         }
     }
 
@@ -227,12 +224,12 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
     if (bmpwrite_save_image(out.h, img_buffer) != BMP_RESULT_OK) {
         const std::string err = bmp_errmsg(out.h);
         free_resources();
-        Logger::log(LogLevel::Error, "Bmplib write error: " + err, processor_tag());
+        Logger::log(LogLevel::Error, "Bmplib write error: " + err, get_name());
         throw std::runtime_error("BmpProcessor: failed to write image");
     }
 
     free_resources();
-    Logger::log(LogLevel::Info, "BMP recompression finished: " + output.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::string BmpProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {

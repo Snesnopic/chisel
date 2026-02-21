@@ -112,7 +112,7 @@ namespace chisel {
 void ZopfliPngProcessor::recompress(const fs::path& input,
                                     const fs::path& output,
                                     bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Starting PNG optimization with ZopfliPNG: " + input.string(), "zopflipng_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
         // configure options
@@ -133,7 +133,7 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         // read input file
         std::ifstream ifs(input, std::ios::binary);
         if (!ifs) {
-            Logger::log(LogLevel::Error, "Failed to open input file", "zopflipng_processor");
+            Logger::log(LogLevel::Error, "Failed to open input file", get_name());
             throw std::runtime_error("ZopflipngProcessor: cannot open input");
         }
         auto size = fs::file_size(input);
@@ -145,7 +145,7 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         // optimize
         std::vector<unsigned char> resultpng;
         if (ZopfliPNGOptimize(origpng, opts, false, &resultpng) != 0) {
-            Logger::log(LogLevel::Error, "ZopfliPNG optimization failed for: " + input.string(), "zopflipng_processor");
+            Logger::log(LogLevel::Error, "Zopflipng optimization failed for: " + input.string(), get_name());
             throw std::runtime_error("ZopflipngProcessor: optimization failed");
         }
 
@@ -153,10 +153,10 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         std::ofstream ofs(output, std::ios::binary);
         ofs.write(reinterpret_cast<const char*>(resultpng.data()), resultpng.size());
 
-        Logger::log(LogLevel::Info, "PNG optimization finished: " + output.string(), "zopflipng_processor");
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
     catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, std::string("Exception during ZopfliPNG optimization: ") + e.what(), "zopflipng_processor");
+        Logger::log(LogLevel::Error, std::string("Exception during zopflipng optimization: ") + e.what(), get_name());
         throw;
     }
 }
@@ -189,24 +189,24 @@ bool ZopfliPngProcessor::raw_equal(const std::filesystem::path &a,
     try {
         imgA = decode_png_rgba8(a, wa, ha);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Warning, std::string("raw_equal: Failed to decode PNG (A): ") + a.string() + " (" + e.what() + ")", "zopflipng_processor");
+        Logger::log(LogLevel::Warning, std::string("Raw_equal: Failed to decode png (a): ") + a.string() + " (" + e.what() + ")", get_name());
         return false;
     }
 
     try {
         imgB = decode_png_rgba8(b, wb, hb);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Warning, std::string("raw_equal: Failed to decode PNG (B): ") + b.string() + " (" + e.what() + ")", "zopflipng_processor");
+        Logger::log(LogLevel::Warning, std::string("Raw_equal: Failed to decode png (b): ") + b.string() + " (" + e.what() + ")", get_name());
         return false;
     }
 
     if (wa != wb || ha != hb) {
-        Logger::log(LogLevel::Debug, "raw_equal: dimension mismatch", "zopflipng_processor");
+        Logger::log(LogLevel::Debug, "Raw_equal: dimension mismatch", get_name());
         return false;
     }
 
     if (imgA != imgB) {
-        Logger::log(LogLevel::Debug, "raw_equal: pixel data mismatch", "zopflipng_processor");
+        Logger::log(LogLevel::Debug, "Raw_equal: pixel data mismatch", get_name());
         return false;
     }
 

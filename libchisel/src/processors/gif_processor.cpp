@@ -49,7 +49,7 @@ void GifProcessor::recompress(const std::filesystem::path& input,
 
     std::thread worker([&]() {
         try {
-            Logger::log(LogLevel::Info, "Start GIF recompression: " + input.string(), "gif_processor");
+            Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
             FILE* in = chisel::open_file(input, "rb");
             if (!in) throw std::runtime_error("Cannot open GIF input");
@@ -92,6 +92,8 @@ void GifProcessor::recompress(const std::filesystem::path& input,
 
             Gif_DeleteStream(gfs);
 
+            Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+
         } catch (...) {
             error_ptr = std::current_exception();
         }
@@ -119,7 +121,7 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     );
 
     if (!dataA) {
-        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF A", "gif_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: Failed to decode gif a", get_name());
         return false;
     }
 
@@ -131,7 +133,7 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     );
 
     if (!dataB) {
-        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF B", "gif_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: Failed to decode gif b", get_name());
         stbi_image_free(dataA);
         if (delaysA) stbi_image_free(delaysA);
         return false;

@@ -197,7 +197,7 @@ namespace {
     }
 
     void dec_error_cb(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus status, void*) {
-        Logger::log(LogLevel::Warning, "libflac warning: " + std::string(FLAC__StreamDecoderErrorStatusString[status]), processor_tag());
+        Logger::log(LogLevel::Warning, "Libflac warning: " + std::string(FLAC__StreamDecoderErrorStatusString[status]), "OggProcessor");
     }
 
     FLAC__StreamDecoderWriteStatus dec_write_cb(const FLAC__StreamDecoder*, const FLAC__Frame* frame, const FLAC__int32* const buffer[], void* client_data) {
@@ -305,7 +305,7 @@ namespace {
 void OggProcessor::recompress(const fs::path& input,
                               const fs::path& output,
                               const bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Analyzing Ogg stream: " + input.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     FILE* f_in = chisel::open_file(input, "rb");
     if (f_in == nullptr) throw std::runtime_error("OggProcessor: cannot open input");
@@ -319,22 +319,24 @@ void OggProcessor::recompress(const fs::path& input,
 
         int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str());
         if (result != 0) {
-            const std::string msg = "OptiVorbis failed with error code: " + std::to_string(result);
-            Logger::log(LogLevel::Error, msg, processor_tag());
+            const std::string msg = "Optivorbis failed with error code: " + std::to_string(result);
+            Logger::log(LogLevel::Error, msg, get_name());
             throw std::runtime_error(msg);
         }
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
         return;
     }
 
     // handle opus with direct copy
     if (is_opus_stream(f_in)) {
         fclose(f_in);
-        Logger::log(LogLevel::Info, "Direct copy for Opus stream", processor_tag());
+        Logger::log(LogLevel::Warning, "Unsupported opus stream, falling back to direct copy", get_name());
         try {
             fs::copy_file(input, output, fs::copy_options::overwrite_existing);
         } catch (const fs::filesystem_error&) {
             throw std::runtime_error("OggProcessor: direct copy for Opus failed");
         }
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
         return;
     }
 
@@ -382,7 +384,7 @@ void OggProcessor::recompress(const fs::path& input,
     }
     ctx.f_out = f_out;
 
-    Logger::log(LogLevel::Info, "Recompressing Ogg-FLAC stream...", processor_tag());
+    Logger::log(LogLevel::Info, "Recompressing ogg-flac stream...", get_name());
     const bool success = FLAC__stream_decoder_process_until_end_of_stream(decoder) != 0;
 
     if (ctx.encoder_init) {
@@ -400,11 +402,11 @@ void OggProcessor::recompress(const fs::path& input,
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
     }
 
-    Logger::log(LogLevel::Info, "Ogg recompression completed", processor_tag());
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path& input_path) {
-    Logger::log(LogLevel::Info, "OGG: Preparing cover art extraction for: " + input_path.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -413,8 +415,8 @@ std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path&
     AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
 
     if (state.extracted_covers.empty()) {
-        Logger::log(LogLevel::Debug, "OGG: No embedded cover art found", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Info, "No embedded cover art found", get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }
 
@@ -424,16 +426,18 @@ std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path&
 
     content.extras = std::make_any<AudioExtractionState>(std::move(state));
     content.format = ContainerFormat::Unknown;
+
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
     return content;
 }
 
 std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &content) {
-    Logger::log(LogLevel::Info, "OGG: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
     if (!state_ptr) {
-        Logger::log(LogLevel::Error, "OGG: Failed to retrieve extraction state", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "Failed to retrieve extraction state", get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         return {};
     }
 
@@ -443,19 +447,20 @@ std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &
     try {
         fs::copy_file(content.original_path, final_temp_path, fs::copy_options::overwrite_existing);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "OGG: Failed to copy audio file: " + std::string(e.what()), processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "Failed to copy audio file: " + std::string(e.what()), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         return {};
     }
 
     if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
-        Logger::log(LogLevel::Error, "OGG: rebuildCovers failed", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "RebuildCovers failed", get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         fs::remove(final_temp_path);
         return {};
     }
 
-    cleanup_temp_dir(content.temp_dir, processor_tag());
+    cleanup_temp_dir(content.temp_dir, get_name());
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), get_name());
     return final_temp_path;
 }
 

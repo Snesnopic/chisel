@@ -16,9 +16,7 @@ namespace chisel {
 void FlexiGifProcessor::recompress(const std::filesystem::path& input,
                                    const std::filesystem::path& output,
                                    bool /*preserve_metadata*/) {
-    Logger::log(LogLevel::Info,
-                "Start flexiGIF recompression: " + input.string(),
-                "flexigif_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
         GifImage gif(input.string());
@@ -26,8 +24,8 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
         const unsigned int numFrames = gif.getNumFrames();
         if (numFrames == 0) {
             Logger::log(LogLevel::Error,
-                        "Decoded GIF has no frames; skipping: " + input.string(),
-                        "flexigif_processor");
+                        "Decoded gif has no frames; skipping: " + input.string(),
+                        get_name());
             return;
         }
 
@@ -40,8 +38,8 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
 
             if (indices.empty()) {
                 Logger::log(LogLevel::Warning,
-                            "Empty GIF frame; skipping frame " + std::to_string(frameIndex + 1),
-                            "flexigif_processor");
+                            "Empty gif frame; skipping frame " + std::to_string(frameIndex + 1),
+                            get_name());
                 optimizedBits.emplace_back();
                 continue;
             }
@@ -81,20 +79,18 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
 
         gif.writeOptimized(output.string(), optimizedBits);
 
-        Logger::log(LogLevel::Info,
-                    "flexiGIF recompression completed: " + output.string(),
-                    "flexigif_processor");
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
     catch (const std::exception& e) {
         Logger::log(LogLevel::Error,
-                    std::string("flexiGIF error: ") + e.what(),
-                    "flexigif_processor");
+                    std::string("Flexigif error: ") + e.what(),
+                    get_name());
         throw;
     }
     catch (...) {
         Logger::log(LogLevel::Error,
-                    "Unknown flexiGIF error while processing " + input.string(),
-                    "flexigif_processor");
+                    "Unknown flexigif error while processing " + input.string(),
+                    get_name());
         throw;
     }
 }
@@ -120,7 +116,7 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
     auto bufB = read_file_to_buffer(b);
 
     if (bufA.empty() || bufB.empty()) {
-        Logger::log(LogLevel::Warning, "raw_equal: empty or unreadable file(s)", "flexigif_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: empty or unreadable file(s)", get_name());
         return false;
     }
 
@@ -133,7 +129,7 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
     );
 
     if (!dataA) {
-        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF A", "flexigif_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: failed to decode gif a", get_name());
         return false;
     }
 
@@ -145,7 +141,7 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
     );
 
     if (!dataB) {
-        Logger::log(LogLevel::Warning, "raw_equal: failed to decode GIF B", "flexigif_processor");
+        Logger::log(LogLevel::Warning, "Raw_equal: failed to decode gif b", get_name());
         stbi_image_free(dataA);
         if (delaysA) stbi_image_free(delaysA);
         return false;
@@ -154,12 +150,12 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
     bool equal = true;
 
     if (wA != wB || hA != hB || framesA != framesB) {
-        Logger::log(LogLevel::Debug, "raw_equal: dimension/frame count mismatch", "flexigif_processor");
+        Logger::log(LogLevel::Debug, "Raw_equal: dimension/frame count mismatch", get_name());
         equal = false;
     } else {
         size_t totalBytes = static_cast<size_t>(wA) * hA * 4 * framesA;
         if (std::memcmp(dataA, dataB, totalBytes) != 0) {
-            Logger::log(LogLevel::Debug, "raw_equal: pixel mismatch", "flexigif_processor");
+            Logger::log(LogLevel::Debug, "Raw_equal: pixel mismatch", get_name());
             equal = false;
         }
     }

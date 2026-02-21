@@ -58,11 +58,11 @@ bool copy_apetag(const std::filesystem::path &input,
         return outTag.Save();
     } catch (const std::exception& e) {
         // log known exceptions
-        Logger::log(LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ape_processor");
+        Logger::log(LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ApeProcessor");
         return false;
     } catch (...) {
         // log unknown exceptions
-        Logger::log(LogLevel::Warning, "Failed to copy APE tag: Unknown exception caught", "ape_processor");
+        Logger::log(LogLevel::Warning, "Failed to copy APE tag: Unknown exception caught", "ApeProcessor");
         return false;
     }
 }
@@ -74,7 +74,7 @@ namespace chisel {
 void ApeProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output,
                               bool preserve_metadata) {
-    Logger::log(LogLevel::Info, "Starting APE re-encoding: " + input.string(), "ape_processor");
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     if (std::filesystem::exists(output)) {
         std::filesystem::remove(output);
@@ -174,15 +174,15 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     if (preserve_metadata) {
         if (!copy_apetag(input, output)) {
-            Logger::log(LogLevel::Debug, "APEv2 metadata copy skipped or failed", "ape_processor");
+            Logger::log(LogLevel::Debug, "APEv2 metadata copy skipped or failed", get_name());
         }
     }
 
-    Logger::log(LogLevel::Info, "APE re-encoding completed: " + output.string(), "ape_processor");
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
 std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::filesystem::path& input_path) {
-    Logger::log(LogLevel::Info, "APE: Preparing cover art extraction for: " + input_path.string(), "ape_processor");
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -191,7 +191,7 @@ std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::file
     AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
 
     if (state.extracted_covers.empty()) {
-        Logger::log(LogLevel::Debug, "APE: No embedded cover art found.", "ape_processor");
+        Logger::log(LogLevel::Info, "No embedded cover art found", get_name());
         cleanup_temp_dir(content.temp_dir);
         return std::nullopt;
     }
@@ -202,15 +202,17 @@ std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::file
 
     content.extras = std::make_any<AudioExtractionState>(std::move(state));
     content.format = ContainerFormat::Unknown;
+
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
     return content;
 }
 
 std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content) {
-    Logger::log(LogLevel::Info, "APE: Finalizing (re-inserting covers) for: " + content.original_path.string(), "ape_processor");
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
     if (!state_ptr) {
-        Logger::log(LogLevel::Error, "APE: Failed to retrieve extraction state.", "ape_processor");
+        Logger::log(LogLevel::Error, "Failed to retrieve extraction state", get_name());
         cleanup_temp_dir(content.temp_dir);
         return {};
     }
@@ -221,19 +223,20 @@ std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &
     try {
         std::filesystem::copy_file(content.original_path, final_temp_path, std::filesystem::copy_options::overwrite_existing);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "APE: Failed to copy audio file: " + std::string(e.what()), "ape_processor");
+        Logger::log(LogLevel::Error, "Failed to copy audio file: " + std::string(e.what()), get_name());
         cleanup_temp_dir(content.temp_dir);
         return {};
     }
 
     if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
-        Logger::log(LogLevel::Error, "APE: rebuildCovers failed", "ape_processor");
+        Logger::log(LogLevel::Error, "RebuildCovers failed", get_name());
         cleanup_temp_dir(content.temp_dir);
         std::filesystem::remove(final_temp_path);
         return {};
     }
 
     cleanup_temp_dir(content.temp_dir);
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), get_name());
     return final_temp_path;
 }
 

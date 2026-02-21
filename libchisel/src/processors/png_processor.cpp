@@ -225,13 +225,13 @@ namespace chisel {
                                   const std::filesystem::path &output,
                                   const bool preserve_metadata) {
 
-        Logger::log(LogLevel::Info, "Start PNG recompression: " + input.string(), "png_encoder");
+        Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
         // --- PASS 1: READ + ANALYZE ---
 
         unique_FILE fp_in(chisel::open_file(input.string().c_str(), "rb"));
         if (!fp_in) {
-            Logger::log(LogLevel::Error, "Cannot open PNG input: " + input.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "Cannot open png input: " + input.string(), get_name());
             throw std::runtime_error("Cannot open PNG input (pass 1)");
         }
 
@@ -288,7 +288,7 @@ namespace chisel {
 
         const unique_FILE fp_out(chisel::open_file(output.string().c_str(), "wb"));
         if (!fp_out) {
-            Logger::log(LogLevel::Error, "Cannot open PNG output: " + output.string(), "png_encoder");
+            Logger::log(LogLevel::Error, "Cannot open png output: " + output.string(), get_name());
             throw std::runtime_error("Cannot open PNG output");
         }
 
@@ -404,7 +404,7 @@ namespace chisel {
 
         png_write_end(wr.png, wr.info);
 
-        Logger::log(LogLevel::Info, "PNG reencoding completed: " + output.string(), "png_encoder");
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
 
 
