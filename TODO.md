@@ -3,9 +3,7 @@
 ## Testing
 
 - [ ] Test edge cases: corrupted files, unsupported formats, empty files, mismatched extensions.
-- [ ] Validate metadata preservation across formats (cover art, tags, chapters).
 - [ ] Improve resiliency of mime detection, maybe enforce magic db regeneration on first use.
-- [ ] Validate PNM binary conversion (ensure ASCII P1-P3 inputs are correctly converted to Binary P4-P6).
 
 ## Refactoring / Architecture
 
@@ -16,8 +14,6 @@
 
 ## WavPack
 
-- [ ] Validate complete tag copying (ReplayGain, cuesheet, etc.).
-- [ ] Add tests with both `.wv` and `.wvc` inputs.
 - [ ] Implement brute-force recompression across compression modes and select the smallest output.
 
 ## JPEG
@@ -30,10 +26,6 @@
 
 - [ ] Improve `WebpEncoder` with advanced lossless options (`-m 6`, `-q 100`).
 - [ ] Support removal of non-essential chunks (XMP, ICC).
-
-## GIF
-
-- [ ] Plan a fork of `gifsicle` to refactor away global variables and enable true multithreaded GifProcessor execution.
 
 ## PDF
 
@@ -65,7 +57,6 @@
   ↳ <https://github.com/stseelig/libttaR>
 - [ ] MPEG‑4 ALS – investigate reference implementation.  
   ↳ <https://www.iso.org/standard/43345.html>
-- [ ] Ogg Vorbis – investigate recompression techniques (codebook optimization) like `OptiVorbis` (Rust).  
   ↳ <https://github.com/OptiVorbis/OptiVorbis>
 - [ ] Lepton (Rust JPEG recompressor) – consider FFI integration.  
   ↳ <https://github.com/dropbox/lepton> (original C++), <https://github.com/microsoft/lepton_jpeg_rust>
@@ -106,30 +97,29 @@
   | Processor          | Lossless | Metadata | Container | Notes                                                                                                                                                                                                   |
   |--------------------|:--------:|:--------:|:---------:|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
   | FlacProcessor      |    ✅     |    ✅     |     ✅     | Works. Recompresses audio & optimizes cover art.                                                                                                                                                        |
-  | WavPackProcessor   |    ✅     |    🟡    |     ❌     | Needs verification on complete tag copying (ReplayGain, etc.). <br>Test `.wvc` files. <br>Consider brute-force modes.                                                                                   |
-  | ApeProcessor       |    🟡    |    ✅     |     ✅     | Recompresses audio (MACLib) & optimizes cover art (TagLib).                                                                                                                                             |
-  | OggProcessor       |    ✅     |    ✅     |     ✅     | Recompresses Ogg FLAC streams using `libFLAC`. <br>Container-only mode for Vorbis/Opus: extracts/optimizes cover art.                                                                                   |
-  | MpegProcessor      |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art. Audio recompression pending.                                                                                                                   |
-  | Mp4Processor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes 'covr' atom (JPEG/PNG).                                                                                                                                         |
+  | WavPackProcessor   |    ✅     |    ✅     |     ✅     | Works. Consider additional compression methods.                                                                                                                                                         |
+  | ApeProcessor       |    ✅     |    ✅     |     ✅     | Recompresses audio (MACLib) & optimizes cover art (TagLib).                                                                                                                                             |
+  | OggProcessor       |    ✅     |    ✅     |     ✅     | Recompresses Ogg FLAC (`libFLAC`) and Ogg Vorbis (`OptiVorbis`). Direct copy for Opus. Extracts/optimizes cover art securely avoiding memory leaks.                                                     |
+  | MpegProcessor      |    ✅     |    ✅     |     ✅     | Recompresses MP3 audio using `mp3packer` (except on Windows). Extracts/optimizes ID3v2 cover art.                                                                                                       |  | Mp4Processor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes 'covr' atom (JPEG/PNG).                                                                                                                                         |
   | WavProcessor       |    ❌     |    ✅     |     ✅     | Container-only mode: extracts/optimizes ID3v2 cover art inside RIFF.                                                                                                                                    |
   | AiffProcessor      |    ❌     |    ✅     |     ✅     | Container-only: extracts/optimizes ID3v2 cover art inside AIFF.                                                                                                                                         |
-  | JpegProcessor      |    🟡    |    🟡    |   N.A.    | Copies APP/COM markers. <br>Add optional metadata stripping. <br>Integrate other optimizers. <br>raw_equal implemented (pixel compare).                                                                 |
-  | PngProcessor       |    🟡    |    🟡    |   N.A.    | Works. Needs formal verification for lossless & metadata (iCCP, sRGB, text chunks...).                                                                                                                  |
-  | ZopfliPngProcessor |    🟡    |    🟡    |   N.A.    | raw_equal implemented (pixel compare). <br>Copies standard chunks via `zopflipng_lib`. <br>Needs ability to parameterize iterations.                                                                    |
-  | WebpProcessor      |    🟡    |    🟡    |   N.A.    | Copies EXIF/XMP/ICCP chunks. <br>Improve lossless options (`-m 6`, `-q 100`). <br>Add optional chunk removal. <br>raw_equal implemented (pixel compare).                                                |
-  | GifProcessor       |    ❌     |    ❌     |   N.A.    | (gifsicle) **Currently disabled**. <br>Needs fork of `gifsicle` to fix Windows build and make thread-safe.                                                                                              |
-  | FlexiGifProcessor  |    🟡    |    ❌     |   N.A.    | (flexigif) Needs verification. <br>Needs ability to parameterize iterations/settings (like Zopfli).                                                                                                     |
-  | TiffProcessor      |    🟡    |    🟡    |   N.A.    | Copies standard metadata tags (XMP, EXIF, ICC). <br>Uses Deflate compression. <br>Needs verification.                                                                                                   |
-  | JxlProcessor       |    🟡    |    🟡    |   N.A.    | Re-encode loop implemented. <br>Metadata preservation (JXL box) implemented, but needs verification. <br>raw_equal implemented (pixel compare).                                                         |
+  | JpegProcessor      |    ✅     |    🟡    |   N.A.    | Copies APP/COM markers. <br>Add optional metadata stripping. <br>Integrate other optimizers. <br>raw_equal implemented (pixel compare).                                                                 |
+  | PngProcessor       |    ✅     |    🟡    |   N.A.    | Works. Needs formal verification for lossless & metadata (iCCP, sRGB, text chunks...).                                                                                                                  |
+  | ZopfliPngProcessor |    ✅     |    🟡    |   N.A.    | raw_equal implemented (pixel compare). <br>Copies standard chunks via `zopflipng_lib`. <br>Needs ability to parameterize iterations.                                                                    |
+  | WebpProcessor      |    ✅     |    🟡    |   N.A.    | Copies EXIF/XMP/ICCP chunks. <br>Improve lossless options (`-m 6`, `-q 100`). <br>Add optional chunk removal. <br>raw_equal implemented (pixel compare).                                                |
+  | GifProcessor       |    ✅     |    ✅     |   N.A.    | Works. Could use a better fork.                                                                                                                                                                         |
+  | FlexiGifProcessor  |    ✅     |    ❌     |   N.A.    | <br>Needs ability to parameterize iterations/settings (like Zopfli).                                                                                                                                    |
+  | TiffProcessor      |    ✅     |    🟡    |   N.A.    | Copies standard metadata tags (XMP, EXIF, ICC). <br>Uses Deflate compression. <br>Needs verification.                                                                                                   |
+  | JxlProcessor       |    ✅     |    🟡    |   N.A.    | Re-encode loop implemented. <br>Metadata preservation (JXL box) implemented, but needs verification. <br>raw_equal implemented (pixel compare).                                                         |
   | TgaProcessor       |    ✅     |    ❌     |   N.A.    | Uses stb_image to re-apply RLE. <br>`raw_equal` implemented (pixel compare). <br>Metadata not preserved.                                                                                                |
   | BmpProcessor       |    ✅     |    ✅     |   N.A.    | Uses `bmplib`. Supports RLE4, RLE8, RLE24 (OS/2), and Huffman 1D compression. Preserves DPI and ICC profiles.                                                                                           |
   | PnmProcessor       |    ✅     |   N.A.   |   N.A.    | Uses `stb_image` to read and internal writer. Optimizes by converting ASCII formats (P1-P3) to Binary (P4-P6). Needs verification.                                                                      |
   | SqliteProcessor    |    ✅     |   N.A.   |   N.A.    | `VACUUM` + `ANALYZE` are standard, safe operations. <br>Considered verified.                                                                                                                            |
   | MseedProcessor     |    ✅     |    ✅     |   N.A.    | Metadata is part of header structure. <br>Considered complete. <br>May be extended for JSON header metadata.                                                                                            |
   | MkvProcessor       |    🟡    |    🟡    |     ❌     | Uses `mkclean`. <br>Container extraction/finalization is TODO. <br>Verify chapter/tag/attachment preservation.                                                                                          |
-  | ArchiveProcessor   |    ❌     |   N.A.   |    🟡     | Core extractor/rebuilder using `libarchive`. <br>Needs extensive testing for archive types (ZIP, TAR, RAR...). <br>Rewrite hardlink handling. <br>Add 7z SDK support.                                   |
-  | PdfProcessor       |    🟡    |   N.A.   |    🟡     | Extracts streams, recompresses Flate streams with Zopfli using `qpdf`. <br>Complex format, needs verification. <br>Investigate `pdfsizeopt` techniques. <br>raw_equal implemented (raw stream compare). |
-  | OOXMLProcessor     |    ❌     |   N.A.   |    🟡     | Extracts ZIP, recompresses embedded PNG/JPG with Zopfli. <br>Needs verification. <br>Explore Leanify-style recursive optimization.                                                                      |
-  | OdfProcessor       |    ❌     |   N.A.   |    🟡     | Extracts ZIP, recompresses embedded XML with Zopfli. <br>Stores `mimetype` uncompressed. <br>Needs verification. <br>Explore Leanify-style recursive optimization.                                      |
+  | ArchiveProcessor   |    ✅     |   N.A.   |    🟡     | Core extractor/rebuilder using `libarchive`. <br>Needs extensive testing for archive types (ZIP, TAR, RAR...). <br>Rewrite hardlink handling. <br>Add 7z SDK support.                                   |
+  | PdfProcessor       |    ✅     |   N.A.   |    🟡     | Extracts streams, recompresses Flate streams with Zopfli using `qpdf`. <br>Complex format, needs verification. <br>Investigate `pdfsizeopt` techniques. <br>raw_equal implemented (raw stream compare). |
+  | OOXMLProcessor     |    ✅     |   N.A.   |    🟡     | Extracts ZIP, recompresses embedded PNG/JPG with Zopfli. <br>Needs verification. <br>Explore Leanify-style recursive optimization.                                                                      |
+  | OdfProcessor       |    ✅     |   N.A.   |    🟡     | Extracts ZIP, recompresses embedded XML with Zopfli. <br>Stores `mimetype` uncompressed. <br>Needs verification. <br>Explore Leanify-style recursive optimization.                                      |
 
 *(Legend: ✅ = Verified, 🟡 = Partially implemented/Needs verification, ❌ = Not implemented/Missing, N.A. = Not Applicable)*
