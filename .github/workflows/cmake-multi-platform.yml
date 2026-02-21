@@ -66,7 +66,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            ocaml_version: "4.14.3"
+            extra_cmake_args: -DENABLE_MP3PACKER=OFF
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
