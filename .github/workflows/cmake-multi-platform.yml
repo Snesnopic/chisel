@@ -470,9 +470,9 @@ jobs:
           echo "Running chisel from: $CHISEL_EXE"
           echo "Processing files in: ${{ env.TEST_DIR }}"
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --log-file chisel.log
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 3 --log-level=ALL --log-file chisel.log
           else
-            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --log-file chisel.log
+            "$CHISEL_EXE" "${{ env.TEST_DIR }}" --recursive --threads 4 --log-level=ALL --log-file chisel.log
           fi
         shell: bash
 
