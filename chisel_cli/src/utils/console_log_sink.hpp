@@ -21,6 +21,8 @@ public:
             return;
         }
 
+        std::cerr << "\r\033[K";
+
         switch (level) {
             case LogLevel::Debug:
                 std::cerr << "[DEBUG][" << tag << "] " << message << std::endl;
