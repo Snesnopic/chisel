@@ -14,7 +14,6 @@ The project builds all its dependencies automatically via Git submodules.
   -   `cmake` (≥ 3.20)
   -   `ninja` (recommended)
   -   Rust toolchain (required for OptiVorbis integration; install via [rustup.rs](https://rustup.rs))
-  -   `opam` (OCaml package manager, optional for MP3 integration via mp3packer)
 -   **Linux:**
   -   A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
   -   `build-essential`, `pkg-config`
@@ -71,14 +70,6 @@ Invoke-WebRequest "https://aka.ms/vs/17/release/vs_community.exe" -OutFile vs.ex
 # Install Rust toolchain
 Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 .\rustup-init.exe -y
-
-# Install OCaml/Opam via winget (or official installer)
-winget install OCaml.OCaml
-
-# After installation, open a new shell and initialize:
-opam init -y
-Invoke-Expression (&opam env)
-opam install dune dune-configurator -y
 ```
 ---
 
