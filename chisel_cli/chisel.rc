@@ -20,7 +20,7 @@ BEGIN
             VALUE "FileDescription",  "Chisel - Native file optimizer"
             VALUE "FileVersion",      "1.0.1.0"
             VALUE "InternalName",     "chisel"
-            VALUE "LegalCopyright",   "Copyright (C) 2025"
+            VALUE "LegalCopyright",   "Copyright (C) 2026"
             VALUE "OriginalFilename", "chisel.exe"
             VALUE "ProductName",      "Chisel CLI"
             VALUE "ProductVersion",   "1.0.1"
