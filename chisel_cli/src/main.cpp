@@ -196,6 +196,7 @@ int main(int argc, char* argv[]) {
     Logger::clear_sinks();
     if (!settings.log_file.empty()) {
         auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
+        fileSink->log_level = Logger::string_to_level(settings.log_level);
         Logger::add_sink(std::move(fileSink));
     }
 

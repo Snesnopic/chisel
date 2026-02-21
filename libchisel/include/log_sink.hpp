@@ -23,10 +23,12 @@
  * They can be used by sinks to filter or format output accordingly.
  */
 enum class LogLevel {
+    All = 0, ///< Lowest level, logs everything
     Debug,   ///< Detailed diagnostic information, useful for developers
     Info,    ///< General informational messages about normal operation
     Warning, ///< Indications of potential issues or unexpected states
-    Error    ///< Errors that require attention or intervention
+    Error,   ///< Errors that require attention or intervention
+    Off      ///< Highest level, disables logging entirely
 };
 
 /**

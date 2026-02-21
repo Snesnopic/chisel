@@ -46,9 +46,9 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
                    ->check(CLI::PositiveNumber);
 
     app.add_option("--log-level", settings.log_level,
-                   "Log level: ERROR, WARNING, INFO, DEBUG, NONE.")
+                   "Log level: ALL, DEBUG, INFO, WARNING, ERROR, OFF.")
                    ->default_val("ERROR")
-                   ->check(CLI::IsMember({"ERROR", "WARNING", "INFO", "DEBUG", "NONE"}, CLI::ignore_case));
+                   ->check(CLI::IsMember({"ALL", "DEBUG", "INFO", "WARNING", "ERROR", "OFF"}, CLI::ignore_case));
 
     app.add_option("--log-file", settings.log_file,
                    "Write logs to a specific file (default: no file logging).");

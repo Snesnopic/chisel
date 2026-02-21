@@ -11,29 +11,30 @@
 class ConsoleLogSink final : public ILogSink {
 public:
     LogLevel log_level = LogLevel::Error;
+
     void log(const LogLevel level,
              const std::string_view message,
              const std::string_view tag) override {
+
+        // drop messages below threshold or if completely disabled
+        if (level < log_level || log_level == LogLevel::Off || level == LogLevel::Off) {
+            return;
+        }
+
         switch (level) {
             case LogLevel::Debug:
-                if (log_level == LogLevel::Debug) {
-                    std::cerr << "[DEBUG][" << tag << "] " << message << std::endl;
-                }
+                std::cerr << "[DEBUG][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Info:
-                if (log_level == LogLevel::Info) {
-                    std::cerr << "[INFO ][" << tag << "] " << message << std::endl;
-                }
+                std::cerr << "[INFO ][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Warning:
-                if (log_level == LogLevel::Warning) {
-                    std::cerr << "[WARN ][" << tag << "] " << message << std::endl;
-                }
+                std::cerr << "[WARN ][" << tag << "] " << message << std::endl;
                 break;
             case LogLevel::Error:
-                if (log_level == LogLevel::Error) {
-                    std::cerr << "[ERROR][" << tag << "] " << message << std::endl;
-                }
+                std::cerr << "[ERROR][" << tag << "] " << message << std::endl;
+                break;
+            default:
                 break;
         }
     }

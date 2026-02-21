@@ -60,10 +60,12 @@ public:
      */
     static const char* level_to_string(const LogLevel level) {
         switch (level) {
+            case LogLevel::All:     return "ALL";
             case LogLevel::Debug:   return "DEBUG";
             case LogLevel::Info:    return "INFO";
             case LogLevel::Warning: return "WARN";
             case LogLevel::Error:   return "ERROR";
+            case LogLevel::Off:     return "OFF";
         }
         return "";
     }
@@ -75,12 +77,16 @@ public:
      * @return The corresponding LogLevel enum.
      */
     static LogLevel string_to_level(const std::string& level) {
+        if (level == "ALL")
+            return LogLevel::All;
         if (level == "DEBUG")
             return LogLevel::Debug;
         if (level == "INFO")
             return LogLevel::Info;
         if (level == "WARNING")
             return LogLevel::Warning;
+        if (level == "OFF")
+            return LogLevel::Off;
         return LogLevel::Error; // Default fallback
     }
 private:

@@ -13,12 +13,19 @@
 
 class FileLogSink final : public ILogSink {
 public:
+    LogLevel log_level = LogLevel::Error;
+
     explicit FileLogSink(const std::string& filename, const bool append = true)
         : out_(filename, append ? std::ios::app : std::ios::trunc) {}
 
     void log(const LogLevel level,
              const std::string_view message,
              const std::string_view tag) override {
+        // drop messages below threshold or if completely disabled
+        if (level < log_level || log_level == LogLevel::Off || level == LogLevel::Off) {
+            return;
+        }
+
         if (!out_.is_open()) return;
 
         std::lock_guard lock(mtx_);
