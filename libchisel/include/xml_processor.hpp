@@ -15,6 +15,7 @@
 #include <memory>
 #include <vector>
 #include <utility>
+#include <array>
 
 namespace chisel {
 
