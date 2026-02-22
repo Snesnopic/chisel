@@ -12,7 +12,7 @@
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags
     app.set_help_flag("-h,--help", "Show this help message and exit.");
-    app.set_version_flag("--version", "1.0.1");
+    app.set_version_flag("--version", "1.1.0");
 
     // --- Flags (booleans) ---
     app.add_flag("--no-meta", settings.no_meta,
