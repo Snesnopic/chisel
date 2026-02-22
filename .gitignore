@@ -43,3 +43,4 @@ bin/
 Cargo.lock
 /libchisel/rust_bridge/target/
 /.obsidian/
+./doc/
