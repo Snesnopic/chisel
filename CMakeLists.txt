@@ -297,6 +297,9 @@ set(libpng_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libpng")
 set(libpng_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libpng-build")
 add_subdirectory(${libpng_SOURCE_DIR} ${libpng_BINARY_DIR} EXCLUDE_FROM_ALL)
 
+# pugixml
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/pugixml EXCLUDE_FROM_ALL)
+
 # libogg
 set(libogg_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libogg")
 set(libogg_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libogg-build")
@@ -727,6 +730,7 @@ set(CHISEL_LIBS
         zlibstatic
         tag
         giflib
+        pugixml
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)

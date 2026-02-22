@@ -25,6 +25,7 @@
 #include "../../include/sqlite_processor.hpp"
 #include "../../include/tiff_processor.hpp"
 #include "../../include/tga_processor.hpp"
+#include "xml_processor.hpp"
 #include "../../include/wav_processor.hpp"
 #include "../../include/wavpack_processor.hpp"
 #include "../../include/webp_processor.hpp"
@@ -61,6 +62,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<AiffProcessor>());
     processors_.push_back(std::make_unique<BmpProcessor>());
     processors_.push_back(std::make_unique<PnmProcessor>());
+    processors_.push_back(std::make_unique<XmlProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
