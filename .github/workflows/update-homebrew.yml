@@ -7,6 +7,8 @@ on:
 jobs:
   update-tap:
     runs-on: ubuntu-latest
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
       - name: Checkout Homebrew Tap
         uses: actions/checkout@v4
@@ -16,8 +18,6 @@ jobs:
           path: homebrew-tap
 
       - name: Update Formula
-        env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
           CLEAN_VER="${TAG_NAME#v}"
           echo "Updating Formula for version: $CLEAN_VER (Tag: $TAG_NAME)"
@@ -66,15 +66,7 @@ jobs:
                 system "cmake", "--build", "build", "--config", "Release"
                 bin.install "build/bin/Release/chsl"
               else
-                if OS.mac? && Hardware::CPU.arm?
-                  bin.install "chsl-macos-arm64" => "chsl"
-                elsif OS.mac? && Hardware::CPU.intel?
-                  bin.install "chsl-macos-x64" => "chsl"
-                elsif OS.linux? && Hardware::CPU.intel?
-                  bin.install "chsl-linux-x64-gcc" => "chsl"
-                elsif OS.linux? && Hardware::CPU.arm?
-                  bin.install "chsl-linux-arm64" => "chsl"
-                end
+                bin.install "chsl"
               end
             end
 
