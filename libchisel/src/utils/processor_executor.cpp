@@ -15,6 +15,7 @@
 #include <stack>
 #include <string>
 #include <chrono>
+#include "random_utils.hpp"
 
 namespace fs = std::filesystem;
 
@@ -254,7 +255,7 @@ namespace chisel {
                 try {
                     const auto orig_size = safe_size(file);
                     auto start = std::chrono::steady_clock::now();
-
+                    const std::string job_suffix = RandomUtils::random_suffix();
                     if (mode_ == EncodeMode::PIPE) {
                         fs::path current = file;
                         fs::path last_tmp;
@@ -265,9 +266,7 @@ namespace chisel {
                                 pipeline_ok = false;
                                 break;
                             }
-
-                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + ".pipe." + std::to_string(i) + ".tmp");
-
+                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             candidates[i]->recompress(current, tmp, preserve_metadata_);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
@@ -328,8 +327,7 @@ namespace chisel {
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
-                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + ".cand." + std::to_string(i) + ".tmp");
-                            Result r{tmp, 0, false};
+                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".cand." + std::to_string(i) + ".tmp");                            Result r{tmp, 0, false};
                             try {
                                 candidates[i]->recompress(file, tmp, preserve_metadata_);
                                 auto sz = safe_size(tmp);
