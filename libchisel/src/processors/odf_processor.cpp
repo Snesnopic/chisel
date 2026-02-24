@@ -6,6 +6,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
 #include "../../include/file_type.hpp"
+#include "../../include/zopfli_compressor.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -14,8 +15,6 @@
 #include <vector>
 #include <algorithm>
 #include "file_utils.hpp"
-#include "zlib_container.h"
-#include "zopfli.h"
 
 namespace chisel {
 
@@ -55,7 +54,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     int r = ARCHIVE_OK;
     while ((r = archive_read_next_header(in, &entry)) == ARCHIVE_OK) {
         const char* ename = archive_entry_pathname(entry);
-        if (!ename) {
+        if (ename == nullptr) {
             Logger::log(LogLevel::Warning, "Entry with null name skipped", get_name());
             archive_read_data_skip(in);
             continue;
@@ -100,7 +99,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
                 Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), get_name());
                 break;
             }
-            ofs.write(reinterpret_cast<const char*>(buff), static_cast<std::streamsize>(size));
+            ofs.write(static_cast<const char*>(buff), static_cast<std::streamsize>(size));
         }
         ofs.close();
 
@@ -123,14 +122,13 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.filename().string(), get_name());
 
     namespace fs = std::filesystem;
-    std::error_code ec;
 
     const fs::path src_path(content.original_path);
     const fs::path tmp_path = fs::temp_directory_path() /
                               (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + src_path.extension().string());
 
     archive* out = archive_write_new();
-    if (!out) {
+    if (out == nullptr) {
         Logger::log(LogLevel::Error, "Archive_write_new failed", get_name());
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: archive_write_new failed");
@@ -173,6 +171,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
     }
 
     try {
+        std::error_code ec;
         for (const auto& file : files_ordered) {
             fs::path rel = fs::relative(file, content.temp_dir, ec);
             if (ec) rel = fs::path(file).filename();
@@ -192,17 +191,11 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
                 Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", get_name());
                 // option is already 'store', do nothing
             } else if (ext == ".xml") {
-                ZopfliOptions opts;
-                ZopfliInitOptions(&opts);
-                opts.numiterations = 15;
-                opts.blocksplitting = 1;
-                unsigned char* out_data = nullptr;
-                size_t out_size = 0;
-                ZopfliZlibCompress(&opts, buf.data(), buf.size(), &out_data, &out_size);
-
-                std::vector<unsigned char> result(out_data, out_data + out_size);
-                free(out_data);
-                final_data = result;
+                final_data = ZopfliCompressor::compress(
+                    buf,
+                    options.iterations,
+                    ZopfliFormat::DEFLATE
+                );
 
                 Logger::log(LogLevel::Debug, "Recompressed xml with zopfli: " + rel.string(), get_name());
             } else {
@@ -211,7 +204,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
             }
 
             archive_entry* entry = archive_entry_new();
-            if (!entry) {
+            if (entry == nullptr) {
                 Logger::log(LogLevel::Error, "Archive_entry_new failed", get_name());
                 throw std::runtime_error("ODFProcessor: archive_entry_new failed");
             }
@@ -221,6 +214,9 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
             archive_entry_set_filetype(entry, AE_IFREG);
             archive_entry_set_perm(entry, 0644);
             archive_entry_set_mtime(entry, 0, 0);
+
+            // TODO: ZIP readers might complain if we write compressed data into a "Stored" entry.
+            // Ideally, we should explicitly tell libarchive that this entry is "Raw deflate".
 
             int wh = archive_write_header(out, entry);
             if (wh == ARCHIVE_WARN) {

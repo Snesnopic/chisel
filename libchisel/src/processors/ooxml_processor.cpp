@@ -16,30 +16,11 @@
 #include "file_utils.hpp"
 #include "zlib_container.h"
 #include "zopfli.h"
+#include "zopfli_compressor.hpp"
 
 namespace chisel {
 
 namespace fs = std::filesystem;
-
-/**
- * @brief Recompresses a byte vector using Zopfli's Zlib implementation.
- * @param input The raw data to be compressed.
- * @return A vector containing the Zlib-compressed data.
- */
-std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
-        ZopfliOptions opts;
-        ZopfliInitOptions(&opts);
-        opts.numiterations = 15;
-        opts.blocksplitting = 1;
-
-        unsigned char* out_data = nullptr;
-        size_t out_size = 0;
-        ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
-
-        std::vector<unsigned char> result(out_data, out_data + out_size);
-        free(out_data);
-        return result;
-    }
 
 std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.filename().string(), get_name());
@@ -214,7 +195,11 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
 
             // recompress only PNG/JPG images, leave XML and others untouched
             if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                final_data = recompress_with_zopfli(buf);
+                final_data = ZopfliCompressor::compress(
+                    buf,
+                    options.iterations,
+                    ZopfliFormat::DEFLATE
+                );
                 Logger::log(LogLevel::Debug,
                             "Recompressed image: " + rel.string() + " (" +
                             std::to_string(buf.size()) + " -> " +

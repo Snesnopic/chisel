@@ -160,21 +160,6 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
     }
 }
 
-std::vector<unsigned char> ZopfliPngProcessor::recompress_with_zopfli(const std::vector<unsigned char>& input) {
-    ZopfliOptions opts;
-    ZopfliInitOptions(&opts);
-    opts.numiterations = 15;
-    opts.blocksplitting = 1;
-
-    unsigned char* out_data = nullptr;
-    size_t out_size = 0;
-    ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
-
-    std::vector<unsigned char> result(out_data, out_data + out_size);
-    free(out_data);
-    return result;
-}
-
 std::string ZopfliPngProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw PNG data
     return "";

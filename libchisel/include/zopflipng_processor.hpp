@@ -96,13 +96,6 @@ namespace chisel {
          * @return true if pixel data and dimensions match, false otherwise.
          */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
-
-        /**
-         * @brief (Static Helper) Recompresses a raw zlib data buffer with Zopfli.
-         * @param input Raw data to compress.
-         * @return A vector containing the Zopfli-compressed zlib stream.
-         */
-        static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input);
     };
 
 } // namespace chisel

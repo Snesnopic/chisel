@@ -77,6 +77,8 @@ set(LIBCHISEL_SOURCES
         include/xml_processor.hpp
         src/processors/xml_processor.cpp
         include/options.hpp
+        include/zopfli_compressor.hpp
+        src/utils/zopfli_compressor.cpp
 )
 corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
