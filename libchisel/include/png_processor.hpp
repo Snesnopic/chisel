@@ -60,7 +60,7 @@ namespace chisel {
          * @brief This format cannot be extracted.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- operations ---
 
@@ -74,13 +74,12 @@ namespace chisel {
          *
          * @param input Path to the source PNG file.
          * @param output Path to write the optimized PNG file.
-         * @param preserve_metadata If true, copies common metadata chunks
-         * (iCCP, sRGB, gAMA, tEXt, etc.) to the new file.
+         * @param options
+         * @param options
          * @throws std::runtime_error if libpng encounters a fatal error.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         // --- integrity check ---
 

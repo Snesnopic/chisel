@@ -222,8 +222,7 @@ namespace chisel {
 
     // single pass recompress with optimization
     void PngProcessor::recompress(const std::filesystem::path &input,
-                                  const std::filesystem::path &output,
-                                  const bool preserve_metadata) {
+                                  const std::filesystem::path &output, const ProcessingOptions &options) {
 
         Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
@@ -349,7 +348,7 @@ namespace chisel {
             png_init_io(rd_meta.png, fp_in_meta.get());
             png_read_info(rd_meta.png, rd_meta.info);
 
-            copy_metadata_if_requested(rd_meta.png, rd_meta.info, wr.png, wr.info, preserve_metadata);
+            copy_metadata_if_requested(rd_meta.png, rd_meta.info, wr.png, wr.info, options.preserve_metadata);
         } // meta read structs destroyed here
 
         png_write_info(wr.png, wr.info);

@@ -119,7 +119,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& content) {
+std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.filename().string(), get_name());
 
     namespace fs = std::filesystem;

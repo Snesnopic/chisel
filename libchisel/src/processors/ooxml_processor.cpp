@@ -142,7 +142,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
     return content;
 }
 
-std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent& content) {
+std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.filename().string(), get_name());
 
     namespace fs = std::filesystem;

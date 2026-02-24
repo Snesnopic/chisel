@@ -13,6 +13,7 @@
 #include <span>
 #include <string_view>
 #include <stdexcept>
+#include "options.hpp"
 
 enum class ContainerFormat;
 
@@ -95,11 +96,10 @@ public:
      * @brief Perform direct, lossless recompression if supported.
      * @param input_path Path to the original file.
      * @param output_path Path where the optimized file should be written.
-     * @param preserve_metadata Whether to preserve metadata blocks.
+     * @param options Processing options, such as metadata preservation and iteration count, if applicable. Can be expanded.
      */
     virtual void recompress(const std::filesystem::path& input_path,
-                            const std::filesystem::path& output_path,
-                            bool preserve_metadata) = 0;
+                            const std::filesystem::path& output_path, const ProcessingOptions &options) = 0;
 
     /**
      * @brief Extract processable internal contents if supported.
@@ -113,11 +113,11 @@ public:
     /**
      * @brief Rebuild the original container file after its contents have been modified.
      * @param content The ExtractedContent struct returned by prepare_extraction().
-     * @param target_format Target format, if the current one cannot be re-written.
+     * @param options Processing options, such as metadata preservation and iteration count, if applicable. Can be expanded.
      * @return Path to the newly created optimized temporary container, or an
      * empty path if finalization failed or was skipped.
      */
-    virtual std::filesystem::path finalize_extraction(const ExtractedContent &content) = 0;
+    virtual std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) = 0;
 
     // --- integrity check ---
 

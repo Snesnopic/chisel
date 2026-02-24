@@ -40,8 +40,7 @@ size_t get_bytes_per_channel(const JxlDataType data_type) {
 namespace chisel {
 
 void JxlProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              bool preserve_metadata) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // read input file
@@ -110,7 +109,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
                                                               frame.pixels.size())) { ok = false; break; }
             frames.push_back(std::move(frame));
         } else if (status == JXL_DEC_BOX) {
-            if (!preserve_metadata) {
+            if (!options.preserve_metadata) {
                 // advance the decoder past this box, ignoring its content
                 if (JXL_DEC_SUCCESS != JxlDecoderProcessInput(dec)) {
                     ok = false;
@@ -158,7 +157,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("JxlProcessor: failed to set basic info");
     }
 
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         JxlEncoderStoreJPEGMetadata(enc, JXL_TRUE);
         for (const auto& [type, data] : metadata_boxes) {
             if (JXL_ENC_SUCCESS != JxlEncoderAddBox(enc, type.c_str(), data.data(), data.size(), JXL_FALSE)) {

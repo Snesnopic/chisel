@@ -40,13 +40,12 @@ namespace chisel {
         [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         std::optional<ExtractedContent> prepare_extraction(
             const std::filesystem::path& input_path) override;
 
-        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }
     };

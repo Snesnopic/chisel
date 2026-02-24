@@ -110,8 +110,7 @@ namespace { // anonymous namespace for helpers
 namespace chisel {
 
 void ZopfliPngProcessor::recompress(const fs::path& input,
-                                    const fs::path& output,
-                                    bool preserve_metadata) {
+                                    const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
@@ -120,10 +119,10 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.lossy_transparent = false;
         opts.lossy_8bit = false;
         opts.use_zopfli = true;
-        opts.num_iterations = 15;
-        opts.num_iterations_large = 5;
+        opts.num_iterations = options.iterations;
+        opts.num_iterations_large = options.iterations_large;
 
-        if (preserve_metadata) {
+        if (options.preserve_metadata) {
             // keep common metadata chunks
             opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs"};
         } else {

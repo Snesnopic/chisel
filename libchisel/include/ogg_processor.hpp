@@ -53,8 +53,7 @@ namespace chisel {
          * direct copy to preserve data.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief Extracts cover art (METADATA_BLOCK_PICTURE) using TagLib.
@@ -65,7 +64,7 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the processed file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // integrity check
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;

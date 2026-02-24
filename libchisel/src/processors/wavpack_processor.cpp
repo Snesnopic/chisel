@@ -14,8 +14,7 @@
 namespace chisel {
 
 void WavPackProcessor::recompress(const std::filesystem::path& input,
-                                  const std::filesystem::path& output,
-                                  bool preserve_metadata) {
+                                  const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     char error[128]{};
@@ -97,7 +96,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     }
 
     // copy metadata
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         const int num_tags = WavpackGetNumTagItems(ctx_in);
         for (int i = 0; i < num_tags; ++i) {
             char tag_name[256];

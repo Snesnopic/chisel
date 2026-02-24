@@ -56,13 +56,12 @@ namespace chisel {
          *
          * @param input Path to the source MiniSEED file.
          * @param output Path to write the optimized MiniSEED file.
-         * @param preserve_metadata (Ignored) Metadata is intrinsic
-         * to the MiniSEED record structure and is always preserved.
+         * @param options
+         * @param options
          * @throws std::runtime_error if libmseed fails to read or write.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief MiniSEED is not a container format.
@@ -75,7 +74,7 @@ namespace chisel {
          * @brief MiniSEED is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         /**
          * @brief (Not Implemented) Compute a raw checksum.

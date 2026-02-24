@@ -14,8 +14,7 @@
 namespace chisel {
 
 void FlexiGifProcessor::recompress(const std::filesystem::path& input,
-                                   const std::filesystem::path& output,
-                                   bool /*preserve_metadata*/) {
+                                   const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
@@ -50,15 +49,17 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
             settings.minCodeSize         = frame.codeSize;
             settings.startWithClearCode  = true;
             settings.verbose             = false;
-            settings.greedy              = true;
-            settings.minNonGreedyMatch   = 2;
-            settings.minImprovement      = 1;
+            settings.greedy              = false;
+            settings.minNonGreedyMatch   = 1;
+            settings.minImprovement      = 0;
             settings.maxDictionary       = 4096;
-            settings.maxTokens           = 10000;
-            settings.splitRuns           = false;
-            settings.alignment           = 10;
+            // change 3: eliminate arbitrary block splitting. set to a huge value (e.g., 1GB)
+            settings.maxTokens           = 1073741824;
+            settings.maxTokens           = options.maxTokens;
+            settings.splitRuns           = true;
+            settings.alignment           = 1;
             settings.readOnlyBest        = false;
-            settings.avoidNonGreedyAgain = true;
+            settings.avoidNonGreedyAgain = false;
 
             // pre-pass
             const int lastPos = static_cast<int>(indices.size()) - 1;

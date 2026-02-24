@@ -100,8 +100,7 @@ static void error_callback(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorS
 }
 
 void FlacProcessor::recompress(const std::filesystem::path& input,
-                               const std::filesystem::path& output,
-                               const bool preserve_metadata)
+                               const std::filesystem::path& output, const ProcessingOptions &options)
 {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
@@ -111,7 +110,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 
     TranscodeContext ctx;
     ctx.output = output;
-    ctx.preserve_metadata = preserve_metadata;
+    ctx.preserve_metadata = options.preserve_metadata;
 
     // metadata copy (optional)
     FLAC__Metadata_Chain* chain = nullptr;
@@ -267,9 +266,10 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
  * the extracted cover art files in the temp directory.
  *
  * @param content The ExtractedContent struct containing the state.
+ * @param options
  * @return Path to the newly created temporary FLAC file.
  */
-std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content)
+std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options)
 {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 

@@ -56,13 +56,12 @@ namespace chisel {
          *
          * @param input Path to the source GIF file.
          * @param output Path to write the optimized GIF file.
-         * @param preserve_metadata This processor currently does not
-         * support metadata preservation.
+         * @param options
+         * @param options
          * @throws std::runtime_error if flexigif init or processing fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 
@@ -77,7 +76,7 @@ namespace chisel {
          * @brief GIF is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

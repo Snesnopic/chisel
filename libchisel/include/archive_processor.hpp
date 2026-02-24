@@ -93,8 +93,7 @@ public:
      * @brief (Not Implemented) Direct recompression is not supported.
      */
     void recompress(const std::filesystem::path&,
-                    const std::filesystem::path&,
-                    bool) override {}
+                    const std::filesystem::path&, const ProcessingOptions &options) override {}
 
     /**
      * @brief Extracts all files from a supported archive into a temp directory.
@@ -117,11 +116,12 @@ public:
      * re-package the contents into the `target_format` (e.g., ZIP).
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
+     * @param options
      * @param target_format The fallback format if the original is read-only.
      * @return Path to the newly created temporary archive file.
      * @throws std::runtime_error if archive creation fails.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
     // --- integrity check ---
 

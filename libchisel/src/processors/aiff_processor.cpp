@@ -15,8 +15,7 @@ namespace chisel {
 namespace fs = std::filesystem;
 
 void AiffProcessor::recompress(const fs::path& input,
-                              const fs::path& output,
-                              bool /*preserve_metadata*/) {
+                               const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
     Logger::log(LogLevel::Error, "Recompress called on AiffProcessor placeholder.", get_name());
 
@@ -55,7 +54,7 @@ std::optional<ExtractedContent> AiffProcessor::prepare_extraction(const fs::path
     return content;
 }
 
-std::filesystem::path AiffProcessor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path AiffProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

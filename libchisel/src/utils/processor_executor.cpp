@@ -21,16 +21,14 @@ namespace fs = std::filesystem;
 
 namespace chisel {
     ProcessorExecutor::ProcessorExecutor(ProcessorRegistry &registry,
-                                         const bool preserve_metadata,
-                                         const bool verify_checksums,
+                                         const ProcessingOptions &options,
                                          const EncodeMode mode,
                                          const bool dry_run,
                                          fs::path output_dir,
                                          EventBus &bus,
                                          const unsigned threads)
         : registry_(registry),
-          preserve_metadata_(preserve_metadata),
-          verify_checksums_(verify_checksums),
+          m_options(options),
           dry_run_(dry_run),
           output_dir_(std::move(output_dir)),
           has_output_dir_(!output_dir_.empty()),
@@ -90,7 +88,7 @@ namespace chisel {
                                              const uintmax_t original_size,
                                              const std::chrono::milliseconds duration) const {
         std::error_code ec;
-        auto new_size = fs::file_size(temp_file, ec);
+        const auto new_size = fs::file_size(temp_file, ec);
         if (ec || new_size == 0) {
             Logger::log(LogLevel::Warning, "Temp file is invalid or empty: " + temp_file.string(), "Executor");
             fs::remove(temp_file, ec);
@@ -267,7 +265,7 @@ namespace chisel {
                                 break;
                             }
                             fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
-                            candidates[i]->recompress(current, tmp, preserve_metadata_);
+                            candidates[i]->recompress(current, tmp, m_options);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
                                 pipeline_ok = false;
@@ -291,7 +289,7 @@ namespace chisel {
                             // accept the recompressed file only if it is smaller than the original
                             // and, if checksum verification is enabled, the raw checksums match
                             const bool size_improved = (new_size > 0 && new_size < orig_size);
-                            const bool checksum_ok = !verify_checksums_ ||
+                            const bool checksum_ok = !m_options.verify_checksums ||
                                 candidates[0]->raw_equal(file, last_tmp);
 
                             if (size_improved && checksum_ok) {
@@ -329,7 +327,7 @@ namespace chisel {
                             if (st.stop_requested()) break;
                             fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".cand." + std::to_string(i) + ".tmp");                            Result r{tmp, 0, false};
                             try {
-                                candidates[i]->recompress(file, tmp, preserve_metadata_);
+                                candidates[i]->recompress(file, tmp, m_options);
                                 auto sz = safe_size(tmp);
                                 if (sz > 0) {
                                     r.size = sz;
@@ -404,7 +402,7 @@ namespace chisel {
 
             try {
                 auto start = std::chrono::steady_clock::now();
-                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content);
+                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content, m_options);
                 auto end = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 

@@ -624,7 +624,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     return content;
 }
 
-std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content) {
+std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const auto out_fmt = content.format;

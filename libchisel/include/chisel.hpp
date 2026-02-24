@@ -111,24 +111,24 @@ public:
      * @brief Sets the observer for progress events.
      * The caller retains ownership of the observer.
      */
-    void setObserver(ChiselObserver* observer);
+    void setObserver(ChiselObserver* observer) const;
 
     // --- Execution ---
 
     /**
      * @brief Recompresses a list of files. Blocks until completion.
      */
-    void recompress(const std::vector<std::filesystem::path>& paths);
+    void recompress(const std::vector<std::filesystem::path>& paths) const;
 
-    void recompress(const std::filesystem::path& path);
-    void recompress(const std::vector<std::string>& paths);
+    void recompress(const std::filesystem::path& path) const;
+    void recompress(const std::vector<std::string>& paths) const;
 
     // --- Control ---
 
     /**
      * @brief Requests cancellation. Thread-safe.
      */
-    void stop();
+    void stop() const;
 
 private:
     struct Impl;

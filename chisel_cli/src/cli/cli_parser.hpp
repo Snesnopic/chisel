@@ -16,12 +16,11 @@ namespace CLI { class App; }
 enum class ContainerFormat;
 
 struct Settings {
-    bool no_meta = false;
     bool recursive = false;
     bool dry_run = false;
     bool quiet = false;
-    bool verify_checksums = false;
 
+    chisel::ProcessingOptions options;
     unsigned num_threads = 1;
     std::string log_level = "ERROR";
     std::string log_file;
@@ -34,7 +33,7 @@ struct Settings {
     std::vector<std::filesystem::path> inputs;
 
     bool is_pipe = false;
-    [[nodiscard]] bool should_preserve_metadata() const { return !no_meta; }
+    [[nodiscard]] bool should_preserve_metadata() const { return !options.preserve_metadata; }
 };
 
 /**

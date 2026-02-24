@@ -35,13 +35,12 @@ namespace chisel {
 
         // --- operations ---
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         std::optional<ExtractedContent> prepare_extraction(
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 

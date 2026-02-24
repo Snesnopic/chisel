@@ -56,13 +56,12 @@ namespace chisel {
          *
          * @param input Path to the source PNG file.
          * @param output Path to write the optimized PNG file.
-         * @param preserve_metadata If true, attempts to keep common
-         * text and ancillary chunks.
+         * @param options
+         * @param options
          * @throws std::runtime_error if optimization fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief This format cannot be extracted.
@@ -75,7 +74,7 @@ namespace chisel {
          * @brief This format cannot be extracted.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

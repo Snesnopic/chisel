@@ -16,8 +16,7 @@ extern "C" int mkclean_optimize(int argc, char* argv[]);
 namespace chisel {
 
 void MkvProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              bool preserve_metadata) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     namespace fs = std::filesystem;
@@ -34,7 +33,7 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     std::vector<std::string> args;
     args.emplace_back("mkclean");
 
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         args.emplace_back("--optimize");
         args.emplace_back("--keep-cues");
     } else {
@@ -79,7 +78,7 @@ std::optional<ExtractedContent> MkvProcessor::prepare_extraction(const std::file
     return std::nullopt;
 }
 
-std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &) {
+std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) {
     return {};
     // TODO: implement container rebuild after track modifications
 }

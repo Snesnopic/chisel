@@ -98,8 +98,7 @@ void copy_saved_markers(const j_decompress_ptr srcinfo,
 namespace chisel {
 
 void JpegProcessor::recompress(const std::filesystem::path& input,
-                               const std::filesystem::path& output,
-                               bool preserve_metadata) {
+                               const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     unique_FILE infile(chisel::open_file(input.string().c_str(), "rb"));
@@ -130,7 +129,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_create_compress(&dstinfo);
 
         jpeg_stdio_src(&srcinfo, infile.get());
-        setup_marker_saving(&srcinfo, preserve_metadata);
+        setup_marker_saving(&srcinfo, options.preserve_metadata);
 
         if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
             throw std::runtime_error("Invalid JPEG header");
@@ -151,7 +150,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         jpeg_stdio_dest(&dstinfo, outfile.get());
         jpeg_write_coefficients(&dstinfo, coef_arrays);
 
-        copy_saved_markers(&srcinfo, &dstinfo, preserve_metadata);
+        copy_saved_markers(&srcinfo, &dstinfo, options.preserve_metadata);
 
         jpeg_finish_compress(&dstinfo);
         jpeg_finish_decompress(&srcinfo);

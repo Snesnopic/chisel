@@ -377,8 +377,7 @@ int main(int argc, char* argv[]) {
 
     // build executor
     ProcessorExecutor executor(registry,
-                                settings.should_preserve_metadata(),
-                               settings.verify_checksums,
+                               settings.options,
                                settings.encode_mode,
                                settings.dry_run,
                                executor_output_dir,

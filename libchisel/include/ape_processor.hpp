@@ -59,12 +59,11 @@ namespace chisel {
          *
          * @param input Path to the source APE file.
          * @param output Path to write the optimized APE file.
-         * @param preserve_metadata If true, attempts to copy APEv2 tags.
+         * @param options
          * @throws std::runtime_error if the MACLib encoder or decoder fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief Extracts embedded cover art from the APE file.
@@ -77,10 +76,11 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the APE file.
          * @param content Content descriptor from prepare_extraction.
+         * @param options
          * @param target_format Ignored.
          * @return Path to the finalized APE file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // --- integrity check ---
 

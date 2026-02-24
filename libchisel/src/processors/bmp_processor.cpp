@@ -54,8 +54,7 @@ namespace {
 namespace chisel {
 
 void BmpProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              bool preserve_metadata) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // 1. READ
@@ -113,7 +112,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
     // Handle ICC Profile (Metadata)
     unsigned char* icc_profile = nullptr;
     size_t icc_size = 0;
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         icc_size = bmpread_iccprofile_size(in.h);
         if (icc_size > 0) {
              // buffer is allocated by bmplib
@@ -127,7 +126,7 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
 
     // Get Resolution (DPI) - Metadata
     int xdpi = 0, ydpi = 0;
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         xdpi = bmpread_resolution_xdpi(in.h);
         ydpi = bmpread_resolution_ydpi(in.h);
     }
@@ -182,12 +181,12 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
     }
 
     // Metadata: Resolution
-    if (preserve_metadata && (xdpi > 0 || ydpi > 0)) {
+    if (options.preserve_metadata && (xdpi > 0 || ydpi > 0)) {
         bmpwrite_set_resolution(out.h, xdpi, ydpi);
     }
 
     // Metadata: ICC Profile
-    if (preserve_metadata && icc_size > 0 && icc_profile) {
+    if (options.preserve_metadata && icc_size > 0 && icc_profile) {
         bmpwrite_set_iccprofile(out.h, icc_size, icc_profile);
     }
 

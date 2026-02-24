@@ -57,13 +57,12 @@ namespace chisel {
          *
          * @param input Path to the source WebP file.
          * @param output Path to write the optimized WebP file.
-         * @param preserve_metadata If true, copies EXIF, XMP, and ICCP chunks
-         * from the original file using the WebPMux API.
+         * @param options
+         * @param options
          * @throws std::runtime_error if libwebp init or processing fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief WebP is not a container format.
@@ -76,7 +75,7 @@ namespace chisel {
          * @brief WebP is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

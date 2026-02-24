@@ -105,8 +105,7 @@ std::string base64_encode(const std::vector<uint8_t>& bytes_to_encode) {
 namespace chisel {
 
 void XmlProcessor::recompress(const std::filesystem::path& input_path,
-                              const std::filesystem::path& output_path,
-                              bool /*preserve_metadata*/) {
+                              const std::filesystem::path& output_path, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input_path.filename().string(), get_name());
 
     pugi::xml_document doc;
@@ -193,7 +192,7 @@ std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& content) {
+std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.filename().string(), get_name());
 
     if (!content.extras.has_value()) {

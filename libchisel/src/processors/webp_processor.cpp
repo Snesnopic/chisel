@@ -14,8 +14,7 @@
 namespace chisel {
 
 void WebpProcessor::recompress(const std::filesystem::path& input,
-                               const std::filesystem::path& output,
-                               bool preserve_metadata) {
+                               const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // read input file into memory
@@ -108,7 +107,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("WebpProcessor: WebPMuxCreate failed");
     }
 
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         WebPData input_webp{ input_data.data(), input_data.size() };
         WebPMux* mux_in = WebPMuxCreate(&input_webp, 0);
         if (mux_in) {

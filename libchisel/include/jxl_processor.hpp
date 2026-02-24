@@ -56,13 +56,12 @@ namespace chisel {
          *
          * @param input Path to the source JXL file.
          * @param output Path to write the optimized JXL file.
-         * @param preserve_metadata If true, attempts to store
-         * JPEG metadata (if any was present).
+         * @param options
+         * @param options
          * @throws std::runtime_error if libjxl init or processing fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief JXL is not a container format.
@@ -75,7 +74,7 @@ namespace chisel {
          * @brief JXL is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

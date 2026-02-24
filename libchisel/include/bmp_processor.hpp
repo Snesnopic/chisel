@@ -58,13 +58,11 @@ namespace chisel {
          *
          * @param input Path to the source BMP file.
          * @param output Path to write the optimized BMP file.
-         * @param preserve_metadata BMP headers contain minimal metadata which is preserved;
-         * auxiliary data at EOF is currently dropped.
+         * @param options
          * @throws std::runtime_error if reading or writing fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief BMP is not a container format.
@@ -77,7 +75,7 @@ namespace chisel {
          * @brief BMP is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override { return {}; }
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override { return {}; }
 
         // --- integrity check ---
 

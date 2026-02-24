@@ -63,8 +63,7 @@ int MseedProcessor::choose_reclen(const uint8_t original_version,
     return MIN_RECLEN;
 }
 void MseedProcessor::recompress(const std::filesystem::path& input,
-                                const std::filesystem::path& output,
-                                [[maybe_unused]] bool preserve_metadata) {
+                                const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     ms_rloginit(nullptr, nullptr, [](const char* _){}, nullptr, 0);

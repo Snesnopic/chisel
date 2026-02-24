@@ -19,8 +19,7 @@ static const char* processor_tag() {
 }
 
 void WavProcessor::recompress(const fs::path& input,
-                              const fs::path& output,
-                              bool /*preserve_metadata*/) {
+                              const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Error, "Recompress called on WavProcessor placeholder.", processor_tag());
 
     std::error_code ec;
@@ -55,7 +54,7 @@ std::optional<ExtractedContent> WavProcessor::prepare_extraction(const fs::path&
     return content;
 }
 
-std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Info, "WAV: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
