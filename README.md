@@ -4,6 +4,18 @@
 It focuses on lossless recompression of various file formats by integrating multiple specialized encoders.
 
 ---
+## Installation
+
+### Quick Install (macOS / Linux)
+The easiest way to install `chisel` is via [Homebrew](https://brew.sh). This method automatically handles updates and dependencies.
+
+```bash
+brew update
+brew tap snesnopic/chsl
+brew install chsl
+```
+### Building from Source
+If you prefer to compile chisel manually, or if you are using Windows, please follow the build instructions below.
 
 ## Requirements
 
@@ -217,7 +229,7 @@ Extending `chisel` with a new encoder or format requires just a few operations:
 
 2. **Implement the core logic:**
    Write the implementation in `libchisel/src/processors/`.
-* Implement `recompress()`, making sure to respect the `preserve_metadata` flag if applicable for your format.
+* Implement `recompress()`, making sure to respect the `options.preserve_metadata` flag if applicable for your format.
 * If your processor is a container, you must override `prepare_extraction()` and `finalize_extraction()`, ensuring the exact structure of the container is restored during finalization.
 * *Note:* Implementing the `raw_equal()` method (used to verify that the meaningful content is bit-identical before and after compression) isn't strictly required to run the tool, but all tests run on the GitHub CI workers will execute with the `--verify-checksums` flag enabled, so it is highly recommended.
 
@@ -229,7 +241,7 @@ Extending `chisel` with a new encoder or format requires just a few operations:
 
 ## Supported formats
 
-| Category   | Format                   | MIME                                                                                                                                                                                                                                                                       | Extensions                                        | Library/Libraries                  |
+| Category   | Format                   | MIME                                                                                                                                                                                                                                                                       | Extensions                                        | Libraries                          |
 |------------|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|------------------------------------|
 | Images     | JPEG                     | image/jpeg, image/jpg                                                                                                                                                                                                                                                      | .jpg, .jpeg                                       | mozjpeg                            |
 | Images     | GIF                      | image/gif                                                                                                                                                                                                                                                                  | .gif                                              | gifsicle, flexigif                 |
