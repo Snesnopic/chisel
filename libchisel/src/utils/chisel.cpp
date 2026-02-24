@@ -51,8 +51,6 @@ struct Chisel::Impl {
 
     Impl() {
         if (numThreads == 0) numThreads = 1;
-        options.preserve_metadata = true;
-        options.verify_checksums = false;
     }
 
     // map public enum to internal global enum
