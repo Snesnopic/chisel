@@ -40,6 +40,41 @@ namespace chisel {
      */
     void cleanup_temp_dir(const std::filesystem::path &dir,
                           std::string_view tag = "file_utils");
+
+    /**
+     * @brief Converts a string to lowercase copy.
+     */
+    std::string to_lower_copy(std::string s);
+
+    /**
+     * @brief Ensures that the parent directory for a given path exists.
+     */
+    bool ensure_parent_dirs(const std::filesystem::path& p, std::error_code& ec);
+
+    /**
+     * @brief Calculates the relative path of a file with respect to a root directory.
+     * Returns filename if relative path cannot be computed.
+     */
+    std::string rel_path_of(const std::filesystem::path& root, const std::filesystem::path& p);
+
+    /**
+     * @brief Performs a "natural" string comparison (e.g. file2.txt < file10.txt).
+     */
+    bool natural_less_string(const std::string& sa, const std::string& sb);
+
+    /**
+     * @brief Performs a "natural" path comparison based on relative paths from a root.
+     */
+    bool natural_less_path(const std::filesystem::path& a, const std::filesystem::path& b, const std::filesystem::path& root);
+
+    /**
+     * @brief Sanitizes an archive entry path to prevent directory traversal (zip-slip).
+     * @param entry_name The raw entry name from the archive.
+     * @param dest_dir The extraction destination.
+     * @param out_path [Output] The resulting safe absolute path.
+     * @return True if safe, false if malicious or invalid.
+     */
+    bool sanitize_archive_entry_path(const std::string& entry_name, const std::filesystem::path& dest_dir, std::filesystem::path& out_path);
 } // namespace chisel
 
 #endif // CHISEL_FILE_UTILS_HPP
