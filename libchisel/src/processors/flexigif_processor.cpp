@@ -49,17 +49,15 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
             settings.minCodeSize         = frame.codeSize;
             settings.startWithClearCode  = true;
             settings.verbose             = false;
-            settings.greedy              = false;
-            settings.minNonGreedyMatch   = 1;
-            settings.minImprovement      = 0;
+            settings.greedy              = true;
+            settings.minNonGreedyMatch   = 2;
+            settings.minImprovement      = 1;
             settings.maxDictionary       = 4096;
-            // change 3: eliminate arbitrary block splitting. set to a huge value (e.g., 1GB)
-            settings.maxTokens           = 1073741824;
             settings.maxTokens           = options.maxTokens;
-            settings.splitRuns           = true;
-            settings.alignment           = 1;
+            settings.splitRuns           = false;
+            settings.alignment           = 10;
             settings.readOnlyBest        = false;
-            settings.avoidNonGreedyAgain = false;
+            settings.avoidNonGreedyAgain = true;
 
             // pre-pass
             const int lastPos = static_cast<int>(indices.size()) - 1;
