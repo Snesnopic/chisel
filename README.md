@@ -174,13 +174,19 @@ sudo cmake --install . --prefix /usr/local
 -   `--exclude <PATTERN>`
     Do not process files matching regex PATTERN. (Can be used multiple times).
 
+-   `--iterations <N>`
+    Number of iterations for Zopfli based compression (default: 15).
+
+-   `--iterations-large <N>`
+    Number of iterations for Zopfli on large images (default: 5).
+
+-   `--max-tokens <N>`
+    Number of tokens for FlexiGif compression (default: 10000).
+
 -   `--mode <MODE>`
     Select how multiple encoders are applied to a file (`pipe` or `parallel`).
     `pipe` (default): Encoders are chained; output of one is input to the next.
     `parallel`: All encoders run on the original file; the smallest result is chosen.
-
--   `--regenerate-magic`
-    Re-install the libmagic file-detection database. (Linux and macOS)
 
 
 **Examples:**
