@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source JXL file.
          * @param output Path to write the optimized JXL file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if libjxl init or processing fails.
          */
         void recompress(const std::filesystem::path& input,

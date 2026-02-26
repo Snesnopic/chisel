@@ -59,7 +59,7 @@ namespace chisel {
          *
          * @param input Path to the source APE file.
          * @param output Path to write the optimized APE file.
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if the MACLib encoder or decoder fails.
          */
         void recompress(const std::filesystem::path& input,
@@ -76,8 +76,7 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the APE file.
          * @param content Content descriptor from prepare_extraction.
-         * @param options
-         * @param target_format Ignored.
+         * @param options Processing options (e.g. metadata preservation).
          * @return Path to the finalized APE file.
          */
         std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;

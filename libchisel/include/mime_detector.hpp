@@ -47,6 +47,7 @@ namespace chisel {
 
         /**
          * @brief Gets the platform-specific path for the magic.mgc file.
+         * @return Path to the magic.mgc file.
          */
         static std::filesystem::path get_magic_file_path();
     };

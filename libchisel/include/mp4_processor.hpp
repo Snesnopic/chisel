@@ -39,14 +39,36 @@ namespace chisel {
         [[nodiscard]] bool can_recompress() const noexcept override { return false; }
         [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
+        /**
+         * @brief (Not Implemented) Direct recompression is not supported.
+         * @param input Path to the source MP4 file.
+         * @param output Path to write the optimized MP4 file.
+         * @param options Processing options.
+         */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output, const ProcessingOptions &options) override;
 
+        /**
+         * @brief Prepares extraction of cover art.
+         * @param input_path Path to the MP4 file.
+         * @return ExtractedContent struct or nullopt.
+         */
         std::optional<ExtractedContent> prepare_extraction(
             const std::filesystem::path& input_path) override;
 
+        /**
+         * @brief Rebuilds the MP4 file with optimized cover art.
+         * @param content The ExtractedContent struct.
+         * @param options Processing options (e.g. metadata preservation).
+         * @return Path to the finalized MP4 file.
+         */
         std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
+        /**
+         * @brief (Not Implemented) Compute a raw checksum.
+         * @param file_path Path to the file.
+         * @return An empty string.
+         */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }
     };
 

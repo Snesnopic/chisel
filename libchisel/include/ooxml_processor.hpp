@@ -88,9 +88,7 @@ public:
      * The archive is then rebuilt as a ZIP using libarchive.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
-     * @param options
-     * @param options
-     * @param target_format (Ignored) This processor always writes a ZIP.
+     * @param options Processing options (e.g. metadata preservation).
      * @return Path to the newly created temporary OOXML file.
      * @throws std::runtime_error if archive creation fails.
      */

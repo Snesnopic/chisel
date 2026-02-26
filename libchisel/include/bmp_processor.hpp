@@ -58,7 +58,7 @@ namespace chisel {
          *
          * @param input Path to the source BMP file.
          * @param output Path to write the optimized BMP file.
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if reading or writing fails.
          */
         void recompress(const std::filesystem::path& input,

@@ -48,12 +48,29 @@ namespace chisel {
 
         // --- operations ---
 
+        /**
+         * @brief Recompresses an AIFF file.
+         * @param input Path to the source AIFF file.
+         * @param output Path to write the optimized file.
+         * @param options Processing options.
+         */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output, const ProcessingOptions &options) override;
 
+        /**
+         * @brief Prepares extraction of AIFF contents.
+         * @param input_path Path to the AIFF file.
+         * @return ExtractedContent struct or nullopt.
+         */
         std::optional<ExtractedContent> prepare_extraction(
             const std::filesystem::path& input_path) override;
 
+        /**
+         * @brief Rebuilds the AIFF file from extracted contents.
+         * @param content The ExtractedContent struct.
+         * @param options Processing options.
+         * @return Path to the finalized AIFF file.
+         */
         std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // --- integrity check ---

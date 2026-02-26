@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source PNG file.
          * @param output Path to write the optimized PNG file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if optimization fails.
          */
         void recompress(const std::filesystem::path& input,

@@ -95,9 +95,7 @@ public:
      * Uses `QPDFWriter` to write a new, linearized, and optimized PDF.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
-     * @param options
-     * @param options
-     * @param target_format (Ignored) This processor always writes a PDF.
+     * @param options Processing options (e.g. metadata preservation).
      * @return Path to the newly created temporary PDF file.
      * @throws std::runtime_error if qpdf fails.
      */

@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source SQLite file.
          * @param output Path to write the optimized SQLite file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if sqlite3 fails to open or execute commands.
          */
         void recompress(const std::filesystem::path& input,

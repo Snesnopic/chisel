@@ -51,24 +51,45 @@ namespace chisel {
          * If the input is Ogg FLAC, decodes and re-encodes with maximum compression,
          * preserving Vorbis comments. If input is lossy (Vorbis/Opus), performs a
          * direct copy to preserve data.
+         *
+         * @param input Path to the source Ogg file.
+         * @param output Path to write the optimized file.
+         * @param options Processing options.
          */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief Extracts cover art (METADATA_BLOCK_PICTURE) using TagLib.
+         * @param input_path Path to the Ogg file.
+         * @return ExtractedContent struct or nullopt.
          */
         std::optional<ExtractedContent> prepare_extraction(
             const std::filesystem::path& input_path) override;
 
         /**
          * @brief Re-inserts optimized cover art into the processed file.
+         * @param content The ExtractedContent struct.
+         * @param options Processing options (e.g. metadata preservation).
+         * @return Path to the finalized Ogg file.
          */
         std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // integrity check
+
+        /**
+         * @brief Compute a raw checksum.
+         * @param file_path Path to the file.
+         * @return Checksum string.
+         */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
+        /**
+         * @brief Compares two Ogg files.
+         * @param a First Ogg file.
+         * @param b Second Ogg file.
+         * @return true if files are identical.
+         */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
     };
 

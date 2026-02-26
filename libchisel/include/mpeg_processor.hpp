@@ -82,8 +82,7 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the MP3 file.
          * @param content Content descriptor from prepare_extraction.
-         * @param options
-         * @param options
+         * @param options Processing options (e.g. metadata preservation).
          * @return Path to the finalized MP3 file.
          */
         std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;

@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source TGA file.
          * @param output Path to write the optimized TGA file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if stb_image fails to load or write.
          */
         void recompress(const std::filesystem::path& input,

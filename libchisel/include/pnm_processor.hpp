@@ -59,8 +59,7 @@ namespace chisel {
          *
          * @param input Path to the source PNM file.
          * @param output Path to write the optimized PNM file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output, const ProcessingOptions &options) override;

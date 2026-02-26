@@ -113,11 +113,10 @@ public:
      *
      * Uses `archive_write_...` (libarchive) to create a new archive.
      * If the original format is not writable (e.g., RAR), it will
-     * re-package the contents into the `target_format` (e.g., ZIP).
+     * re-package the contents into a ZIP archive.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
-     * @param options
-     * @param target_format The fallback format if the original is read-only.
+     * @param options Processing options (e.g. metadata preservation).
      * @return Path to the newly created temporary archive file.
      * @throws std::runtime_error if archive creation fails.
      */

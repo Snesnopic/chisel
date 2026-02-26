@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source GIF file.
          * @param output Path to write the optimized GIF file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if flexigif init or processing fails.
          */
         void recompress(const std::filesystem::path& input,

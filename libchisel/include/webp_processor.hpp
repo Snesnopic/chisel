@@ -57,8 +57,7 @@ namespace chisel {
          *
          * @param input Path to the source WebP file.
          * @param output Path to write the optimized WebP file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if libwebp init or processing fails.
          */
         void recompress(const std::filesystem::path& input,

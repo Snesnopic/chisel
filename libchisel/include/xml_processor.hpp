@@ -86,8 +86,7 @@ public:
      * @brief recompresses an XML file by parsing and saving it in raw format (minified).
      * @param input_path path to the original XML file.
      * @param output_path path where the minified XML should be written.
-     * @param options
-     * @param options
+     * @param options Processing options.
      */
     void recompress(const std::filesystem::path& input_path,
                     const std::filesystem::path& output_path, const ProcessingOptions &options) override;
@@ -103,8 +102,7 @@ public:
     /**
      * @brief re-encodes previously extracted and processed assets back to base64 into the dom.
      * @param content the ExtractedContent struct with processor state and file paths.
-     * @param options
-     * @param options
+     * @param options Processing options (e.g. metadata preservation).
      * @return path to the newly created minified XML file containing the updated assets.
      */
     std::filesystem::path finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) override;

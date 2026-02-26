@@ -90,9 +90,7 @@ namespace chisel {
          * All other files (e.g., images) are re-added using standard Deflate.
          *
          * @param content The ExtractedContent struct from `prepare_extraction`.
-         * @param options
-         * @param options
-         * @param target_format (Ignored) This processor always writes a ZIP.
+         * @param options Processing options (e.g. metadata preservation).
          * @return Path to the newly created temporary ODF file.
          * @throws std::runtime_error if archive creation fails.
          */

@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source MiniSEED file.
          * @param output Path to write the optimized MiniSEED file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if libmseed fails to read or write.
          */
         void recompress(const std::filesystem::path& input,

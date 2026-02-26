@@ -56,8 +56,7 @@ namespace chisel {
          *
          * @param input Path to the source WavPack file (.wv).
          * @param output Path to write the optimized WavPack file.
-         * @param options
-         * @param options
+         * @param options Processing options.
          * @throws std::runtime_error if the libwavpack encoder or decoder fails.
          */
         void recompress(const std::filesystem::path& input,
