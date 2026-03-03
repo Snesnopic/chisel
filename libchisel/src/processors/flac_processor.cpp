@@ -117,7 +117,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
     FLAC__Metadata_Iterator* it = nullptr;
     if (ctx.preserve_metadata) {
         chain = FLAC__metadata_chain_new();
-        if (chain && FLAC__metadata_chain_read(chain, input.string().c_str())) {
+        if ((chain != nullptr) && FLAC__metadata_chain_read(chain, input.string().c_str())) {
             it = FLAC__metadata_iterator_new();
             FLAC__metadata_iterator_init(it, chain);
             unsigned count = 0;
