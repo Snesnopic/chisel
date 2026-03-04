@@ -16,64 +16,20 @@
 #include <string>
 #include <zlib.h>
 
-#ifndef _WIN32
-namespace {
-    // thread-local instances to avoid reloading db and race conditions
-    thread_local magic_t tl_magic_mime = nullptr;
-    thread_local magic_t tl_magic_desc = nullptr;
-
-    magic_t get_magic_mime() {
-        if (tl_magic_mime != nullptr) return tl_magic_mime;
-
-        tl_magic_mime = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
-        if (tl_magic_mime == nullptr) return nullptr;
-
-        // try default system db first
-        if (magic_load(tl_magic_mime, nullptr) == 0) {
-            return tl_magic_mime;
-        }
-
-        // fallback to extracted local db
-        const auto target = chisel::MimeDetector::get_magic_file_path();
-        if (magic_load(tl_magic_mime, target.c_str()) == 0) {
-            return tl_magic_mime;
-        }
-
-        magic_close(tl_magic_mime);
-        tl_magic_mime = nullptr;
-        return nullptr;
-    }
-
-    magic_t get_magic_desc() {
-        if (tl_magic_desc != nullptr) return tl_magic_desc;
-
-        tl_magic_desc = magic_open(MAGIC_NONE | MAGIC_ERROR);
-        if (tl_magic_desc == nullptr) return nullptr;
-
-        if (magic_load(tl_magic_desc, nullptr) == 0) {
-            return tl_magic_desc;
-        }
-
-        const auto target = chisel::MimeDetector::get_magic_file_path();
-        if (magic_load(tl_magic_desc, target.c_str()) == 0) {
-            return tl_magic_desc;
-        }
-
-        magic_close(tl_magic_desc);
-        tl_magic_desc = nullptr;
-        return nullptr;
-    }
-}
-#endif
-
 std::string chisel::MimeDetector::detect(const std::filesystem::path& path)
 {
 #ifndef _WIN32
-    const magic_t magic = get_magic_mime();
+    const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
     if (magic == nullptr) return {};
-
+    if (magic_load(magic, nullptr) != 0)
+    {
+        magic_close(magic);
+        return {};
+    }
     const char* mime = magic_file(magic, path.string().c_str());
-    return (mime != nullptr) ? mime : "";
+    std::string result = (mime != nullptr) ? mime : "";
+    magic_close(magic);
+    return result;
 #else
     auto ext = path.extension().string();
     std::ranges::transform(ext, ext.begin(), ::tolower);
@@ -85,10 +41,15 @@ std::string chisel::MimeDetector::detect(const std::filesystem::path& path)
 bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
 {
 #ifndef _WIN32
-    magic_t magic = get_magic_desc();
+    const magic_t magic = magic_open(MAGIC_MIME_TYPE | MAGIC_ERROR);
     if (magic == nullptr) return false;
-
+    if (magic_load(magic, nullptr) != 0)
+    {
+        magic_close(magic);
+        return false;
+    }
     const char* desc = magic_file(magic, path.string().c_str());
+    bool ok = false;
     if (desc != nullptr)
     {
         std::string s(desc);
@@ -96,10 +57,11 @@ bool chisel::MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
             s.find("layer III") != std::string::npos &&
             (s.find("v1") != std::string::npos || s.find("version 1") != std::string::npos))
         {
-            return true;
+            ok = true;
         }
     }
-    return false;
+    magic_close(magic);
+    return ok;
 #else
     // fallback: only check .mp3 extension
     return path.extension() == ".mp3";
@@ -168,16 +130,6 @@ std::filesystem::path chisel::MimeDetector::get_magic_file_path()
 void chisel::MimeDetector::ensure_magic_installed()
 {
 #ifndef _WIN32
-    // test if system db works natively
-    magic_t test_magic = magic_open(MAGIC_NONE);
-    if (test_magic != nullptr) {
-        if (magic_load(test_magic, nullptr) == 0) {
-            magic_close(test_magic);
-            return;
-        }
-        magic_close(test_magic);
-    }
-
     const auto target = get_magic_file_path();
     bool need_install = !std::filesystem::exists(target);
     if (!need_install) {
@@ -188,13 +140,13 @@ void chisel::MimeDetector::ensure_magic_installed()
              Logger::log(LogLevel::Warning, "Local magic database too small or suspicious, regenerating...", "MimeDetector");
         }
         else {
-            magic_t test_load = magic_open(MAGIC_NONE);
-            if (test_load != nullptr) {
-                if (magic_load(test_load, target.c_str()) != 0) {
+            magic_t test_magic = magic_open(MAGIC_NONE);
+            if (test_magic != nullptr) {
+                if (magic_load(test_magic, target.c_str()) != 0) {
                     need_install = true;
                     Logger::log(LogLevel::Warning, "Local magic database corrupt (load failed), regenerating...", "MimeDetector");
                 }
-                magic_close(test_load);
+                magic_close(test_magic);
             }
         }
     }
@@ -209,6 +161,7 @@ void chisel::MimeDetector::ensure_magic_installed()
         ofs.write(reinterpret_cast<const char*>(decompressed.data()), static_cast<long>(decompressed.size()));
         ofs.close();
     }
+    setenv("MAGIC", target.c_str(), 1);
 #else
     // _putenv_s("MAGIC", target.string().c_str());
 #endif
