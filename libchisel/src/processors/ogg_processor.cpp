@@ -303,8 +303,7 @@ namespace {
 } // namespace
 
 void OggProcessor::recompress(const fs::path& input,
-                              const fs::path& output,
-                              const bool preserve_metadata) {
+                              const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     FILE* f_in = chisel::open_file(input, "rb");
@@ -358,7 +357,7 @@ void OggProcessor::recompress(const fs::path& input,
     TranscodeContext ctx;
     ctx.f_in = f_in;
     ctx.encoder = encoder;
-    ctx.preserve_metadata = preserve_metadata;
+    ctx.preserve_metadata = options.preserve_metadata;
 
     FLAC__StreamDecoderInitStatus init_stat = FLAC__stream_decoder_init_ogg_stream(
         decoder,
@@ -431,7 +430,7 @@ std::optional<ExtractedContent> OggProcessor::prepare_extraction(const fs::path&
     return content;
 }
 
-std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path OggProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

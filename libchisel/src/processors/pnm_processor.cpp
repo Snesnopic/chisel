@@ -14,8 +14,7 @@
 namespace chisel {
 
 void PnmProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              bool /*preserve_metadata*/) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     int width, height, channels;

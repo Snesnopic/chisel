@@ -59,16 +59,15 @@ namespace chisel {
          *
          * @param input Path to the source PNM file.
          * @param output Path to write the optimized PNM file.
-         * @param preserve_metadata Ignored (PNM has no metadata standard).
+         * @param options Processing options.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         std::optional<ExtractedContent> prepare_extraction(
             [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
 
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override { return {}; }
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override { return {}; }
 
         // --- integrity check ---
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;

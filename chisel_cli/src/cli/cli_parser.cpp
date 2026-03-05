@@ -12,11 +12,12 @@
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags
     app.set_help_flag("-h,--help", "Show this help message and exit.");
-    app.set_version_flag("--version", "1.1.0");
+    app.set_version_flag("--version", "1.2.0");
 
     // --- Flags (booleans) ---
-    app.add_flag("--no-meta", settings.no_meta,
-                    "Don't preserve files metadata.");
+    app.add_flag("--no-meta", [&](const int count) {
+        settings.options.preserve_metadata = (count == 0);
+    }, "Don't preserve files metadata.");
 
     app.add_flag("-r,--recursive", settings.recursive,
                  "Recursively scan input folders.");
@@ -27,7 +28,7 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_flag("-q,--quiet", settings.quiet,
                  "Suppress non-error console output (progress bar, results).");
 
-    app.add_flag("--verify-checksums", settings.verify_checksums,
+    app.add_flag("--verify-checksums", settings.options.verify_checksums,
                  "Verify raw checksums before replacing files.");
 
     app.add_option("-o,--output", settings.output_path,
@@ -37,6 +38,18 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_option("--report", settings.report_path,
                    "CSV report export filename.")
                    ->take_last(); // if used multiple times, take the last one
+
+    app.add_option("--iterations", settings.options.iterations,
+                   "Number of iterations for Zopfli based compression.")
+                   ->default_val(settings.options.iterations);
+
+    app.add_option("--iterations-large", settings.options.iterations_large,
+                   "Number of iterations for Zopfli on large images.")
+                   ->default_val(settings.options.iterations_large);
+
+    app.add_option("--max-tokens", settings.options.maxTokens,
+                   "Number of tokens for FlexiGif compression.")
+                   ->default_val(settings.options.maxTokens);
 
     // calculate default thread count
     settings.num_threads = std::max(1U, std::thread::hardware_concurrency() / 2);

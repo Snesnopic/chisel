@@ -49,8 +49,7 @@ void copy_tags_with_metadata(TIFF* in, TIFF* out, const bool preserve_metadata) 
 namespace chisel {
 
 void TiffProcessor::recompress(const std::filesystem::path& input,
-                               const std::filesystem::path& output,
-                               bool preserve_metadata) {
+                               const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     TIFF* in = TIFFOpen(input.string().c_str(), "r");
@@ -86,7 +85,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         }
 
         TIFFCreateDirectory(out);
-        copy_tags_with_metadata(in, out, preserve_metadata);
+        copy_tags_with_metadata(in, out, options.preserve_metadata);
 
         // override tags for rgba output
         TIFFSetField(out, TIFFTAG_IMAGEWIDTH, width);

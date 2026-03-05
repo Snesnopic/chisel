@@ -28,119 +28,6 @@ namespace chisel {
 
 namespace fs = std::filesystem;
 
-// --- helpers ---
-
-/**
- * @brief Converts a string to lowercase.
- * @param s The input string.
- * @return A new string with all characters in lowercase.
- */
-static std::string to_lower_copy(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
-/**
- * @brief Calculates the relative path of a file with respect to a root directory.
- * @param root The base directory.
- * @param p The full path to the file.
- * @return A string representing the relative path.
- */
-static std::string rel_path_of(const fs::path& root, const fs::path& p) {
-    std::error_code ec;
-    const auto rel = fs::relative(p, root, ec);
-    std::string s = rel.generic_string();
-    return s.empty() ? p.filename().generic_string() : s;
-}
-
-/**
- * @brief Ensures that the parent directory for a given path exists.
- * @param p The full path to the file.
- * @param ec Error code to capture filesystem errors.
- * @return True if the parent directory exists or was created successfully, false otherwise.
- */
-static bool ensure_parent_dirs(const fs::path& p, std::error_code& ec) {
-    const auto parent = p.parent_path();
-    if (parent.empty()) return true;
-    if (fs::exists(parent, ec)) return !ec;
-    fs::create_directories(parent, ec);
-    return !ec;
-}
-
-/**
- * @brief Performs a "natural" string comparison, correctly handling numeric sequences.
- * For example, "file10.txt" comes after "file2.txt".
- * @param sa The first string.
- * @param sb The second string.
- * @return True if sa is less than sb in natural order.
- */
-static bool natural_less_string(const std::string& sa, const std::string& sb) {
-    size_t i = 0, j = 0;
-    while (i < sa.size() && j < sb.size()) {
-        if (std::isdigit(static_cast<unsigned char>(sa[i])) && std::isdigit(static_cast<unsigned char>(sb[j]))) {
-            size_t ia = i, jb = j;
-            while (ia < sa.size() && std::isdigit(static_cast<unsigned char>(sa[ia]))) ++ia;
-            while (jb < sb.size() && std::isdigit(static_cast<unsigned char>(sb[jb]))) ++jb;
-            std::string as = sa.substr(i, ia - i);
-            std::string bs = sb.substr(j, jb - j);
-            auto strip_leading = [](const std::string &s)->std::string {
-                size_t k = 0;
-                while (k + 1 < s.size() && s[k] == '0') ++k;
-                return s.substr(k);
-            };
-            std::string as2 = strip_leading(as);
-            std::string bs2 = strip_leading(bs);
-            if (as2.size() != bs2.size()) return as2.size() < bs2.size();
-            if (as2 != bs2) return as2 < bs2;
-            i = ia; j = jb;
-        } else {
-            if (sa[i] != sb[j]) return sa[i] < sb[j];
-            ++i; ++j;
-        }
-    }
-    return sa.size() < sb.size();
-}
-
-/**
- * @brief Performs a "natural" path comparison based on relative paths.
- * @param a The first path.
- * @param b The second path.
- * @param root The root directory to make paths relative to.
- * @return True if path a is less than path b in natural order.
- */
-static bool natural_less_path(const fs::path& a, const fs::path& b, const fs::path& root) {
-    const std::string sa = rel_path_of(root, a);
-    const std::string sb = rel_path_of(root, b);
-    return natural_less_string(sa, sb);
-}
-
-/**
- * @brief Sanitizes an archive entry path to prevent directory traversal attacks (zip-slip).
- * @param entry_name The raw path from the archive entry.
- * @param dest_dir The target extraction directory.
- * @param out_path The sanitized, absolute path if validation succeeds.
- * @return True if the path is safe, false otherwise.
- */
-static bool sanitize_archive_entry_path(const std::string& entry_name, const fs::path& dest_dir, fs::path& out_path) {
-    if (entry_name.empty()) return false;
-    if (entry_name.find('\0') != std::string::npos) return false;
-
-    std::string s = entry_name;
-    for (auto& c : s) { if (c == '\\') c = '/'; }
-    while (!s.empty() && s.front() == '/') s.erase(s.begin());
-
-    fs::path candidate = fs::path(dest_dir) / fs::path(s).relative_path();
-    auto normalized = candidate.lexically_normal();
-    auto base = fs::path(dest_dir).lexically_normal();
-
-    const auto ns = normalized.string();
-    const auto bs = base.string();
-    if (ns.size() < bs.size()) return false;
-    if (ns.compare(0, bs.size(), bs) != 0) return false;
-
-    out_path = normalized;
-    return true;
-}
 
 // --- format detection ---
 
@@ -624,7 +511,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     return content;
 }
 
-std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content) {
+std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const auto out_fmt = content.format;

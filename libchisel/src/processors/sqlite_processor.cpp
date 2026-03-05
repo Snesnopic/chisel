@@ -13,8 +13,7 @@
 namespace chisel {
 
 void SqliteProcessor::recompress(const std::filesystem::path& input,
-                                 const std::filesystem::path& output,
-                                 bool /*preserve_metadata*/) {
+                                 const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     // copy input to output

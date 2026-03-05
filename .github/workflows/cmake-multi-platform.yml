@@ -697,23 +697,23 @@ jobs:
             SRC_DIR="artifacts/$1"
             OUT_NAME="$2"
           
-            mv "$SRC_DIR"/* "release_assets/$OUT_NAME"
-            chmod +x "release_assets/$OUT_NAME"
+            mv "$SRC_DIR"/* "release_assets/chsl"
+            chmod +x "release_assets/chsl"
           
-            tar -czf "release_assets/$OUT_NAME.tar.gz" -C release_assets "$OUT_NAME"
+            tar -czf "release_assets/$OUT_NAME.tar.gz" -C release_assets "chsl"
           
-            rm "release_assets/$OUT_NAME"
+            rm "release_assets/chsl"
           }
-          
+            
           function package_windows {
             SRC_DIR="artifacts/$1"
             OUT_NAME="$2"
           
-            mv "$SRC_DIR"/*.exe "release_assets/$OUT_NAME.exe"
+            mv "$SRC_DIR"/*.exe "release_assets/chsl.exe"
           
-            zip -j "release_assets/$OUT_NAME.zip" "release_assets/$OUT_NAME.exe"
+            zip -j "release_assets/$OUT_NAME.zip" "release_assets/chsl.exe"
           
-            rm "release_assets/$OUT_NAME.exe"
+            rm "release_assets/chsl.exe"
           }
           
           # --- Linux ---

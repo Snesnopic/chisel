@@ -14,8 +14,7 @@
 namespace chisel {
 
 void FlexiGifProcessor::recompress(const std::filesystem::path& input,
-                                   const std::filesystem::path& output,
-                                   bool /*preserve_metadata*/) {
+                                   const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
@@ -54,7 +53,7 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
             settings.minNonGreedyMatch   = 2;
             settings.minImprovement      = 1;
             settings.maxDictionary       = 4096;
-            settings.maxTokens           = 10000;
+            settings.maxTokens           = options.maxTokens;
             settings.splitRuns           = false;
             settings.alignment           = 10;
             settings.readOnlyBest        = false;

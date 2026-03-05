@@ -61,10 +61,10 @@ public:
     /**
      * @brief Rebuilds the FLAC file with optimized cover art.
      * @param content The ExtractedContent struct from prepare_extraction.
-     * @param target_format (Ignored)
+     * @param options Processing options (e.g. metadata preservation).
      * @return Path to the newly finalized FLAC file.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
     /**
      * @brief Recompresses a FLAC file using libFLAC.
      *
@@ -73,11 +73,10 @@ public:
      *
      * @param input Path to the source FLAC file.
      * @param output Path to write the optimized FLAC file.
-     * @param preserve_metadata If true, copies all metadata blocks
-     * (except STREAMINFO) to the new file.
+     * @param options Processing options.
      * @throws std::runtime_error if libFLAC init or processing fails.
      */
-    void recompress(const std::filesystem::path &input, const std::filesystem::path &output, bool preserve_metadata) override;
+    void recompress(const std::filesystem::path &input, const std::filesystem::path &output, const ProcessingOptions &options) override;
 
     // --- integrity check ---
 

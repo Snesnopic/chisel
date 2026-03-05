@@ -38,16 +38,38 @@ enum class EncodeMode {
 struct ChiselObserver {
     virtual ~ChiselObserver() = default;
 
+    /**
+     * @brief Called when processing of a file begins.
+     * @param path Path to the file.
+     */
     virtual void onFileStart(const std::filesystem::path& path) {}
 
+    /**
+     * @brief Called when processing of a file finishes.
+     * @param path Path to the file.
+     * @param size_before Original file size.
+     * @param size_after New file size.
+     * @param replaced True if the file was updated/replaced.
+     */
     virtual void onFileFinish(const std::filesystem::path& path,
                               uintmax_t size_before,
                               uintmax_t size_after,
                               bool replaced) {}
 
+    /**
+     * @brief Called when an error occurs during processing.
+     * @param path Path to the file.
+     * @param error Error message.
+     */
     virtual void onFileError(const std::filesystem::path& path,
                              const std::string& error) {}
 
+    /**
+     * @brief Called to log a message.
+     * @param level Log level.
+     * @param msg Log message.
+     * @param tag Log tag.
+     */
     virtual void onLog(int level, const std::string& msg, const std::string& tag) {}
 };
 
@@ -111,24 +133,34 @@ public:
      * @brief Sets the observer for progress events.
      * The caller retains ownership of the observer.
      */
-    void setObserver(ChiselObserver* observer);
+    void setObserver(ChiselObserver* observer) const;
 
     // --- Execution ---
 
     /**
      * @brief Recompresses a list of files. Blocks until completion.
+     * @param paths List of file paths to process.
      */
-    void recompress(const std::vector<std::filesystem::path>& paths);
+    void recompress(const std::vector<std::filesystem::path>& paths) const;
 
-    void recompress(const std::filesystem::path& path);
-    void recompress(const std::vector<std::string>& paths);
+    /**
+     * @brief Recompresses a single file. Blocks until completion.
+     * @param path Path to the file to process.
+     */
+    void recompress(const std::filesystem::path& path) const;
+
+    /**
+     * @brief Recompresses a list of files. Blocks until completion.
+     * @param paths List of file paths (as strings) to process.
+     */
+    void recompress(const std::vector<std::string>& paths) const;
 
     // --- Control ---
 
     /**
      * @brief Requests cancellation. Thread-safe.
      */
-    void stop();
+    void stop() const;
 
 private:
     struct Impl;

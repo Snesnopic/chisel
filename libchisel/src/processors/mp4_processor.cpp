@@ -15,8 +15,7 @@ namespace chisel {
 namespace fs = std::filesystem;
 
 void Mp4Processor::recompress(const fs::path& input,
-                              const fs::path& output,
-                              bool /*preserve_metadata*/) {
+                              const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
     Logger::log(LogLevel::Warning, "Recompress called on Mp4Processor placeholder.", get_name());
     std::error_code ec;
@@ -51,7 +50,7 @@ std::optional<ExtractedContent> Mp4Processor::prepare_extraction(const fs::path&
     return content;
 }
 
-std::filesystem::path Mp4Processor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path Mp4Processor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

@@ -18,6 +18,7 @@
 #include <chrono>
 #include "zlib_container.h"
 #include "zopfli.h"
+#include "zopfli_compressor.hpp"
 
 namespace {
 
@@ -91,24 +92,6 @@ std::string guess_extension(QPDFObjectHandle const& stream,
         if (data[0] == 0x4F && data[1] == 0x54 && data[2] == 0x54 && data[3] == 0x4F) return ".otf";
     }
     return ".bin";
-}
-
-/**
- * @brief Recompresses a byte vector using Zopfli's Zlib implementation.
- * @param input The raw data to be compressed.
- * @return A vector containing the Zlib-compressed data.
- */
-std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input) {
-    ZopfliOptions opts;
-    ZopfliInitOptions(&opts);
-    opts.numiterations = 15;
-    opts.blocksplitting = 1;
-    unsigned char* out_data = nullptr;
-    size_t out_size = 0;
-    ZopfliZlibCompress(&opts, input.data(), input.size(), &out_data, &out_size);
-    std::vector<unsigned char> result(out_data, out_data + out_size);
-    free(out_data);
-    return result;
 }
 
 /**
@@ -208,7 +191,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     try {
@@ -261,7 +244,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                 }
             }
 
-            std::vector<unsigned char> recompressed = recompress_with_zopfli(decoded);
+            std::vector<unsigned char> recompressed = ZopfliCompressor::compress(decoded, options.iterations, ZopfliFormat::ZLIB);
 
             obj.replaceStreamData(
                 std::string(reinterpret_cast<const char*>(recompressed.data()), recompressed.size()),

@@ -56,12 +56,11 @@ namespace chisel {
          *
          * @param input Path to the source TGA file.
          * @param output Path to write the optimized TGA file.
-         * @param preserve_metadata TGA metadata is not preserved by this processor.
+         * @param options Processing options.
          * @throws std::runtime_error if stb_image fails to load or write.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief TGA is not a container format.
@@ -74,7 +73,7 @@ namespace chisel {
          * @brief TGA is not a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

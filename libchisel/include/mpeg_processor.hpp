@@ -69,8 +69,7 @@ namespace chisel {
          * @throws std::runtime_error On compression failure or IO error.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief Extracts embedded cover art (ID3v2 APIC tags) using AudioMetadataUtil.
@@ -83,9 +82,10 @@ namespace chisel {
         /**
          * @brief Re-inserts optimized cover art into the MP3 file.
          * @param content Content descriptor from prepare_extraction.
+         * @param options Processing options (e.g. metadata preservation).
          * @return Path to the finalized MP3 file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // --- integrity check ---
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }

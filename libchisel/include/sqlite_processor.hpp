@@ -56,13 +56,11 @@ namespace chisel {
          *
          * @param input Path to the source SQLite file.
          * @param output Path to write the optimized SQLite file.
-         * @param preserve_metadata (Ignored) Metadata is inherently
-         * part of the database file.
+         * @param options Processing options.
          * @throws std::runtime_error if sqlite3 fails to open or execute commands.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief SQLite is not treated as a container format.
@@ -75,7 +73,7 @@ namespace chisel {
          * @brief SQLite is not treated as a container format.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 

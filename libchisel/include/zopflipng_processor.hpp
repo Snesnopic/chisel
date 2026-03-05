@@ -56,13 +56,11 @@ namespace chisel {
          *
          * @param input Path to the source PNG file.
          * @param output Path to write the optimized PNG file.
-         * @param preserve_metadata If true, attempts to keep common
-         * text and ancillary chunks.
+         * @param options Processing options.
          * @throws std::runtime_error if optimization fails.
          */
         void recompress(const std::filesystem::path& input,
-                        const std::filesystem::path& output,
-                        bool preserve_metadata) override;
+                        const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
          * @brief This format cannot be extracted.
@@ -75,7 +73,7 @@ namespace chisel {
          * @brief This format cannot be extracted.
          * @return Empty path.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
 
         // --- integrity check ---
 
@@ -97,13 +95,6 @@ namespace chisel {
          * @return true if pixel data and dimensions match, false otherwise.
          */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
-
-        /**
-         * @brief (Static Helper) Recompresses a raw zlib data buffer with Zopfli.
-         * @param input Raw data to compress.
-         * @return A vector containing the Zopfli-compressed zlib stream.
-         */
-        static std::vector<unsigned char> recompress_with_zopfli(const std::vector<unsigned char>& input);
     };
 
 } // namespace chisel

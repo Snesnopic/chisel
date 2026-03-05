@@ -60,8 +60,7 @@ public:
      * @brief Construct a ProcessorExecutor.
      *
      * @param registry Reference to a ProcessorRegistry with available processors.
-     * @param preserve_metadata Whether to preserve metadata during recompression.
-     * @param verify_checksums Whether to verify data integrity after recompression.
+     * @param options Processing options, such as metadata preservation, checksum verification and specific Processor settings.
      * @param mode Encoding mode (PIPE or PARALLEL).
      * @param dry_run If true, do not write or replace files.
      * @param output_dir If set, write optimized files here instead of in-place.
@@ -69,8 +68,7 @@ public:
      * @param threads Number of worker threads to use.
      */
     explicit ProcessorExecutor(ProcessorRegistry& registry,
-                               bool preserve_metadata,
-                               bool verify_checksums,
+                               const ProcessingOptions &options,
                                EncodeMode mode,
                                bool dry_run,
                                std::filesystem::path output_dir,
@@ -145,8 +143,7 @@ private:
                             std::chrono::milliseconds duration) const;
 
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry
-    bool preserve_metadata_;                      ///< Whether to preserve metadata
-    bool verify_checksums_;                       ///< Whether to verify integrity
+    ProcessingOptions m_options;
     bool dry_run_;                                ///< If true, no files are written
     std::filesystem::path output_dir_;            ///< Optional output directory
     bool has_output_dir_;                         ///< Convenience flag for !output_dir_.empty()

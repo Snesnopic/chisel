@@ -74,6 +74,11 @@ set(LIBCHISEL_SOURCES
         src/processors/pnm_processor.cpp
         include/chisel.hpp
         src/utils/chisel.cpp
+        include/xml_processor.hpp
+        src/processors/xml_processor.cpp
+        include/options.hpp
+        include/zopfli_compressor.hpp
+        src/utils/zopfli_compressor.cpp
 )
 corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
@@ -153,6 +158,7 @@ add_dependencies(libchisel tiff)
 add_dependencies(libchisel SQLite::SQLite3)
 add_dependencies(libchisel MAC)
 add_dependencies(libchisel tag)
+add_dependencies(libchisel pugixml)
 
 if(NOT WIN32)
     add_dependencies(libchisel libmagic)

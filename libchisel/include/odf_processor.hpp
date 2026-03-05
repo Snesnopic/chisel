@@ -67,8 +67,7 @@ namespace chisel {
          * @brief (Not Implemented) Direct recompression is not supported.
          */
         void recompress(const std::filesystem::path&,
-                        const std::filesystem::path&,
-                        bool) override {}
+                        const std::filesystem::path&, const ProcessingOptions &options) override {}
 
         /**
          * @brief Extracts all files from the ODF (ZIP) container.
@@ -91,11 +90,11 @@ namespace chisel {
          * All other files (e.g., images) are re-added using standard Deflate.
          *
          * @param content The ExtractedContent struct from `prepare_extraction`.
-         * @param target_format (Ignored) This processor always writes a ZIP.
+         * @param options Processing options (e.g. metadata preservation).
          * @return Path to the newly created temporary ODF file.
          * @throws std::runtime_error if archive creation fails.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // --- integrity check ---
 

@@ -72,8 +72,7 @@ bool copy_apetag(const std::filesystem::path &input,
 namespace chisel {
 
 void ApeProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              bool preserve_metadata) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     if (std::filesystem::exists(output)) {
@@ -172,7 +171,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
     }
     APE_SAFE_DELETE(pCompress)
 
-    if (preserve_metadata) {
+    if (options.preserve_metadata) {
         if (!copy_apetag(input, output)) {
             Logger::log(LogLevel::Debug, "APEv2 metadata copy skipped or failed", get_name());
         }
@@ -207,7 +206,7 @@ std::optional<ExtractedContent> ApeProcessor::prepare_extraction(const std::file
     return content;
 }
 
-std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content) {
+std::filesystem::path ApeProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);

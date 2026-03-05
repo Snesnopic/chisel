@@ -42,8 +42,7 @@ static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::pat
 }
 
 void GifProcessor::recompress(const std::filesystem::path& input,
-                              const std::filesystem::path& output,
-                              const bool preserve_metadata) {
+                              const std::filesystem::path& output, const ProcessingOptions &options) {
 
     std::exception_ptr error_ptr = nullptr;
 
@@ -59,7 +58,7 @@ void GifProcessor::recompress(const std::filesystem::path& input,
 
             if (!gfs) throw std::runtime_error("Failed to read GIF structure");
 
-            if (!preserve_metadata) {
+            if (!options.preserve_metadata) {
                 if (gfs->end_comment) {
                     Gif_DeleteComment(gfs->end_comment);
                     gfs->end_comment = nullptr;

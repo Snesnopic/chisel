@@ -66,8 +66,7 @@ public:
      * extraction and re-assembly.
      */
     void recompress(const std::filesystem::path&,
-                    const std::filesystem::path&,
-                    bool) override {
+                    const std::filesystem::path&, const ProcessingOptions &options) override {
         // intentionally empty: PDF recompression is handled in finalize_extraction
     }
 
@@ -96,11 +95,11 @@ public:
      * Uses `QPDFWriter` to write a new, linearized, and optimized PDF.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
-     * @param target_format (Ignored) This processor always writes a PDF.
+     * @param options Processing options (e.g. metadata preservation).
      * @return Path to the newly created temporary PDF file.
      * @throws std::runtime_error if qpdf fails.
      */
-    std::filesystem::path finalize_extraction(const ExtractedContent &content) override;
+    std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
     /**
      * @brief Compares two PDF files by their raw stream content.
