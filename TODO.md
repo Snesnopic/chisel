@@ -91,6 +91,8 @@
   ↳ <https://github.com/htacg/tidy-html5>
 - [ ] HDR (Radiance RGBE) – add support for HDR file compression using stb_image/stb_image_write.  
   ↳ <https://github.com/nothings/stb>
+- [ ] HALAC (High Availability Lossless Audio Codec) - add support if and when the source code gets updated
+  ↳ <https://github.com/Hakan-Abbas/HALAC-High-Availability-Lossless-Audio-Compression>
 - [ ] OpenEXR – integrate openexr/imath for PIZ/ZIP lossless recompression.
 - [ ] FITS – integrate cfitsio for scientific data compression.
 
