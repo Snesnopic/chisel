@@ -833,7 +833,7 @@ jobs:
             asset_name: "macos-x64"
 
           - id: macos-arm
-            runs_on: macos-26
+            runs_on: macos-15
             asset_name: "macos-arm64"
 
           - id: windows-x64
