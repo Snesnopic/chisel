@@ -130,7 +130,7 @@ namespace chisel {
     bool sanitize_archive_entry_path(const std::string &entry_name, const fs::path &dest_dir, fs::path &out_path) {
         if (entry_name.empty()) return false;
         // Check for null bytes (poisoning)
-        if (entry_name.contains('\0')) return false;
+        if (entry_name.find('\0') != std::string::npos) return false;
 
         std::string s = entry_name;
         // Normalize separators

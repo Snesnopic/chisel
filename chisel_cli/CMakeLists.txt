@@ -39,7 +39,7 @@ elseif(UNIX AND NOT APPLE)
     target_compile_definitions(chisel PRIVATE PLATFORM_LINUX)
 endif()
 
-target_compile_features(chisel PRIVATE cxx_std_23)
+target_compile_features(chisel PRIVATE cxx_std_20)
 
 set_target_properties(chisel PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/$<CONFIG>

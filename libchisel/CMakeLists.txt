@@ -128,7 +128,7 @@ endif()
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
 
-target_compile_features(libchisel PRIVATE cxx_std_23)
+target_compile_features(libchisel PRIVATE cxx_std_20)
 if(WIN32)
     target_compile_definitions(libchisel PUBLIC LIBARCHIVE_STATIC PLATFORM_WINDOWS)
 elseif(APPLE)

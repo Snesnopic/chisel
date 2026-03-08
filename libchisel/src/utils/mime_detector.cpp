@@ -108,28 +108,6 @@ std::string MimeDetector::detect(const std::filesystem::path& path)
 #endif
 }
 
-bool MimeDetector::is_mpeg1_layer3(const std::filesystem::path& path)
-{
-#ifndef _WIN32
-    const magic_t magic = get_magic_desc();
-    if (magic == nullptr) return false;
-
-    const char* desc = magic_file(magic, path.string().c_str());
-    if (desc != nullptr)
-    {
-        std::string s(desc);
-        if (s.contains("MPEG") &&
-            s.contains("layer III") &&
-            (s.contains("v1") || s.contains("version 1")))
-        {
-            return true;
-        }
-    }
-    return false;
-#else
-    return path.extension() == ".mp3";
-#endif
-}
 
 std::filesystem::path MimeDetector::get_magic_file_path()
 {
