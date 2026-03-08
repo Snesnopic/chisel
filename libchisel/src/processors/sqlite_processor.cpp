@@ -4,7 +4,7 @@
 
 #include "../../include/sqlite_processor.hpp"
 #include "../../include/logger.hpp"
-#include <sqlite3.h>
+#include "sqlite3.h"
 #include <stdexcept>
 #include <filesystem>
 #include <sstream>

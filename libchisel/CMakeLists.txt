@@ -115,6 +115,7 @@ target_include_directories(libchisel
         ${taglib_BINARY_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/bmplib
         ${CMAKE_BINARY_DIR}/bmplib
+        ${sqlite3_SOURCE_DIR}
 )
 
 if(NOT WIN32)
