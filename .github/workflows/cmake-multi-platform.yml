@@ -251,7 +251,7 @@ jobs:
       - name: Rename Binary
         shell: bash
         run: |
-          SRC="build/bin/Release/chsl"
+          SRC="bin/Release/chsl"
           DEST="chsl-${{ matrix.asset_name }}-${{ env.VERSION }}"
           echo "Renaming $SRC to $DEST"
           mv "$SRC" "$DEST"
