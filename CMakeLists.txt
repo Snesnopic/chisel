@@ -725,7 +725,7 @@ set(CHISEL_LIBS
         jxl
         jxl_threads
         tiff
-        SQLite::SQLite3
+        SQLite3
         mkclean_lib
         zlibstatic
         tag
