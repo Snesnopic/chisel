@@ -110,6 +110,16 @@ namespace chisel {
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, dest, ec);
+
+                // fallback for cross-device link
+                if (ec == std::errc::cross_device_link) {
+                    ec.clear();
+                    fs::copy(temp_file, dest, fs::copy_options::overwrite_existing, ec);
+                    if (!ec) {
+                        fs::remove(temp_file, ec);
+                    }
+                }
+
                 if (!ec) break;
 
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
@@ -131,6 +141,15 @@ namespace chisel {
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
+
+                // fallback for cross-device link
+                if (ec == std::errc::cross_device_link) {
+                    ec.clear();
+                    fs::copy(temp_file, original_file, fs::copy_options::overwrite_existing, ec);
+                    if (!ec) {
+                        fs::remove(temp_file, ec);
+                    }
+                }
                 if (!ec) break; // success
 
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
