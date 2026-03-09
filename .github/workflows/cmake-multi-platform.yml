@@ -627,6 +627,8 @@ jobs:
           usesh: true
           run: |
             echo "--- Starting FreeBSD Test ---"
+            export LC_ALL=en_US.UTF-8
+            export LANG=en_US.UTF-8
             CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
             echo "Running chisel from: $CHISEL_EXE"
             echo "Processing files in: ${{ env.TEST_DIR }}"
