@@ -531,9 +531,10 @@ jobs:
           - id: freebsd-x64
             arch: amd64
             asset_name: "freebsd-x64"
-          - id: freebsd-arm
-            arch: arm64
-            asset_name: "freebsd-arm64"
+          #  disabled, takes too long
+          # - id: freebsd-arm
+          #   arch: arm64
+          #   asset_name: "freebsd-arm64"
     env:
       TEST_ARCHIVE_NAME: chisel_samples.zip
       TEST_DIR: test-data
