@@ -38,13 +38,13 @@ bool copy_apetag(const std::filesystem::path &input,
 
         for (int i = 0;; ++i) {
             APE::CAPETagField *field = inTag.GetTagField(i);
-            if (!field) break;
+            if (field == nullptr) break;
 
             const APE::str_utfn *name = field->GetFieldName();
             const char *value = field->GetFieldValue();
             const int valueSize = field->GetFieldValueSize();
             const int flags = field->GetFieldFlags();
-            if (!name || valueSize <= 0) continue;
+            if ((name == nullptr) || valueSize <= 0) continue;
 
             const bool isBinary = (flags & TAG_FIELD_FLAG_DATA_TYPE_BINARY) != 0;
 
@@ -55,7 +55,7 @@ bool copy_apetag(const std::filesystem::path &input,
             }
         }
 
-        return outTag.Save();
+        return outTag.Save() != 0;
     } catch (const std::exception& e) {
         // log known exceptions
         Logger::log(LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ApeProcessor");
@@ -86,9 +86,9 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
                              true,
                              true,
                              false);
-    if (!pDecompress || err != ERROR_SUCCESS) {
-        if (pDecompress) delete pDecompress;
-        throw std::runtime_error("ApeProcessor: cannot create APE decompress");
+    if (pDecompress == nullptr || err != ERROR_SUCCESS) {
+        delete pDecompress;
+        throw std::runtime_error("ApeProcessor: cannot create APE decompress (err: " + std::to_string(err) + ")");
     }
 
     const unsigned sample_rate     = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_SAMPLE_RATE));
@@ -113,7 +113,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
                      static_cast<unsigned short>(channels));
 
     APE::IAPECompress *pCompress = CreateIAPECompress();
-    if (!pCompress) {
+    if (pCompress == nullptr) {
         delete pDecompress;
         throw std::runtime_error("ApeProcessor: cannot create APE encoder");
     }
@@ -127,7 +127,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         false,
         maxAudioBytes,
         level,
-        NULL,
+        nullptr,
         0
     );
 
@@ -144,7 +144,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         APE::int64 blocks_retrieved = 0;
         int rc = pDecompress->GetData(block.data(), block_frames_request, &blocks_retrieved);
         if (rc != ERROR_SUCCESS) {
-            pCompress->Finish(NULL, 0, 0);
+            pCompress->Finish(nullptr, 0, 0);
             APE_SAFE_DELETE(pCompress)
             delete pDecompress;
             throw std::runtime_error("ApeProcessor: decoding failed");
@@ -165,7 +165,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     delete pDecompress;
 
-    if (pCompress->Finish(NULL, 0, 0) != 0) {
+    if (pCompress->Finish(nullptr, 0, 0) != 0) {
         APE_SAFE_DELETE(pCompress)
         throw std::runtime_error("ApeProcessor: Finish failed");
     }
@@ -262,9 +262,9 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
                                                     true,  // full header analysis
                                                     true,  // check CRC
                                                     false);
-    if (!dec || err != ERROR_SUCCESS) {
-        if (dec) delete dec;
-        throw std::runtime_error("APE open failed");
+    if ((dec == nullptr) || err != ERROR_SUCCESS) {
+        delete dec;
+        throw std::runtime_error("APE open failed (err: " + std::to_string(err) + ")");
     }
 
     sample_rate = static_cast<unsigned>(dec->GetInfo(APE::IAPEDecompress::APE_INFO_SAMPLE_RATE));
