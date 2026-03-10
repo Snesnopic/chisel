@@ -125,6 +125,9 @@ void signal_handler(int sig) {
 
 inline void init_utf8_locale() {
     std::setlocale(LC_ALL, "");
+    try {
+        std::locale::global(std::locale(""));
+    } catch (...) {}
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
@@ -135,6 +138,10 @@ inline void init_utf8_locale() {
     constexpr const char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
         if (std::setlocale(LC_ALL, fb)) {
+            try {
+                std::locale::global(std::locale(fb));
+            } catch(...) {}
+
             Logger::log(LogLevel::Info, std::string("Locale set to ") + fb, "LocaleInit");
             return;
         }
@@ -144,7 +151,6 @@ inline void init_utf8_locale() {
     Logger::log(LogLevel::Warning, "UTF-8 locale not available; non-ASCII file names may be problematic.",
                 "LocaleInit");
 }
-
 
 int main(int argc, char* argv[]) {
 
