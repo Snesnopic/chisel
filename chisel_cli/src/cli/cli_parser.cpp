@@ -68,11 +68,11 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
 
     // encoding mode option with a map transformer
     app.add_option("--mode", settings.encode_mode, "Encoding mode: 'pipe' (default) or 'parallel'.")
-        ->default_val(EncodeMode::PIPE)
+        ->default_val(chisel::EncodeMode::PIPE)
         ->transform(CLI::CheckedTransformer(
-            std::map<std::string, EncodeMode>{
-                {"pipe", EncodeMode::PIPE},
-                {"parallel", EncodeMode::PARALLEL}
+            std::map<std::string, chisel::EncodeMode>{
+                {"pipe", chisel::EncodeMode::PIPE},
+                {"parallel", chisel::EncodeMode::PARALLEL}
             }, CLI::ignore_case));
 
     app.add_option("--include", settings.include_patterns,

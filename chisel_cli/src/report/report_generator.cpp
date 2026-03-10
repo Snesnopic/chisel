@@ -70,7 +70,7 @@ void print_console_report(const std::vector<Result>& results,
                           const std::vector<ContainerResult>& container_results,
                           const unsigned num_threads,
                           double total_seconds,
-                          EncodeMode mode) {
+                          chisel::EncodeMode mode) {
     const unsigned term_width = get_terminal_width();
     const bool use_colors = is_stdout_a_tty();
 
@@ -174,7 +174,7 @@ void print_console_report(const std::vector<Result>& results,
                   << "\n";
 
         if (!r.codecs_used.empty()) {
-            if (mode == EncodeMode::PIPE) {
+            if (mode == chisel::EncodeMode::PIPE) {
                 std::cerr << "    Pipeline: ";
                 for (size_t i = 0; i < r.codecs_used.size(); ++i) {
                     std::ostringstream ossc;
@@ -239,7 +239,7 @@ void export_csv_report(const std::vector<Result>& results,
                        const std::vector<ContainerResult>& container_results,
                        const std::filesystem::path& output_path,
                        const double total_seconds,
-                       const EncodeMode mode) {
+                       const chisel::EncodeMode mode) {
     std::ofstream out(output_path);
     if (!out) return;
 
@@ -259,7 +259,7 @@ void export_csv_report(const std::vector<Result>& results,
             ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
             codecs_str += r.codecs_used[i].first + ":" + ossc.str() + "%";
             if (i + 1 < r.codecs_used.size()) {
-                if (mode == EncodeMode::PIPE)
+                if (mode == chisel::EncodeMode::PIPE)
                     codecs_str += " -> ";
                 else
                     codecs_str += "; ";
@@ -302,5 +302,5 @@ void export_csv_report(const std::vector<Result>& results,
 
     out << "\n\nTotal amount of time,Encoding mode used\n";
     out << std::fixed << std::setprecision(2) << total_seconds << " seconds,"
-        << (mode == EncodeMode::PIPE ? "PIPE" : "PARALLEL") << "\n";
+        << (mode == chisel::EncodeMode::PIPE ? "PIPE" : "PARALLEL") << "\n";
 }

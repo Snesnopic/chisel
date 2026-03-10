@@ -9,8 +9,7 @@
 #include <string>
 #include <filesystem>
 #include <optional>
-
-enum class EncodeMode;
+#include "processor_executor.hpp"
 
 struct Result {
     std::filesystem::path path;
@@ -38,14 +37,14 @@ void print_console_report(const std::vector<Result>& results,
                           const std::vector<ContainerResult>& container_results,
                           unsigned num_threads,
                           double total_seconds,
-                          EncodeMode mode
+                          chisel::EncodeMode mode
                           );
 
 void export_csv_report(const std::vector<Result>& results,
                        const std::vector<ContainerResult>& container_results,
                        const std::filesystem::path& output_path,
                        double total_seconds,
-                       EncodeMode mode);
+                       chisel::EncodeMode mode);
 
 unsigned get_terminal_width();
 

@@ -26,7 +26,7 @@ struct Settings {
     std::string log_file;
     std::filesystem::path output_path;
     std::filesystem::path report_path;
-    EncodeMode encode_mode = EncodeMode::PIPE;
+    chisel::EncodeMode encode_mode = chisel::EncodeMode::PIPE;
     std::vector<std::string> include_patterns;
     std::vector<std::string> exclude_patterns;
 
