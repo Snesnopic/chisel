@@ -54,11 +54,11 @@ struct Chisel::Impl {
     }
 
     // map public enum to internal global enum
-    ::EncodeMode getInternalMode() const {
+    EncodeMode getInternalMode() const {
         switch (encodeMode) {
-            case EncodeMode::PIPE: return ::EncodeMode::PIPE;
-            case EncodeMode::PARALLEL: return ::EncodeMode::PARALLEL;
-            default: return ::EncodeMode::PIPE;
+            case EncodeMode::PIPE: return EncodeMode::PIPE;
+            case EncodeMode::PARALLEL: return EncodeMode::PARALLEL;
+            default: return EncodeMode::PIPE;
         }
     }
 
