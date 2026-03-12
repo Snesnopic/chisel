@@ -657,6 +657,15 @@ add_library(giflib STATIC
         third_party/gifsicle/src/ungifwrt.c
         third_party/gifsicle/src/xform.c
 )
+target_compile_definitions(giflib PRIVATE
+        HAVE_CONFIG_H=1
+)
+if(NOT WIN32)
+    target_compile_definitions(giflib PRIVATE
+            _popen=popen
+            _pclose=pclose
+    )
+endif()
 if(WIN32)
     target_compile_definitions(giflib PRIVATE
             HAVE_UNISTD_H=0
