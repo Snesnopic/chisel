@@ -211,6 +211,19 @@ set(ZSTD_INCLUDE_DIRS "${ZSTD_INCLUDE_DIR}" CACHE PATH "" FORCE)
 set(ZSTD_LIBRARY libzstd_static CACHE STRING "" FORCE)
 set(ZSTD_LIBRARIES libzstd_static CACHE STRING "" FORCE)
 
+# libdeflate
+set(LIBDEFLATE_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+set(LIBDEFLATE_BUILD_GZIP OFF CACHE BOOL "" FORCE)
+set(LIBDEFLATE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(libdeflate_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libdeflate")
+set(libdeflate_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libdeflate-build")
+add_subdirectory(${libdeflate_SOURCE_DIR} ${libdeflate_BINARY_DIR} EXCLUDE_FROM_ALL)
+
+# force libtiff to use our libdeflate
+set(DEFLATE_FOUND TRUE CACHE BOOL "" FORCE)
+set(DEFLATE_LIBRARY libdeflate_static CACHE STRING "" FORCE)
+set(DEFLATE_INCLUDE_DIR "${libdeflate_SOURCE_DIR}" CACHE PATH "" FORCE)
+
 # libmagic
 if(NOT WIN32)
     ExternalProject_Add(libmagic
@@ -722,6 +735,7 @@ set(CHISEL_LIBS
         jxl
         jxl_threads
         tiff
+        libdeflate_static
         SQLite3
         mkclean_lib
         zlibstatic

@@ -116,6 +116,7 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/bmplib
         ${CMAKE_BINARY_DIR}/bmplib
         ${sqlite3_SOURCE_DIR}
+        ${libdeflate_SOURCE_DIR}
 )
 
 if(NOT WIN32)
@@ -160,6 +161,7 @@ add_dependencies(libchisel SQLite3)
 add_dependencies(libchisel MAC)
 add_dependencies(libchisel tag)
 add_dependencies(libchisel pugixml)
+add_dependencies(libchisel libdeflate_static)
 
 if(NOT WIN32)
     add_dependencies(libchisel libmagic)
