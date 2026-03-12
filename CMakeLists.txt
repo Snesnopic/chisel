@@ -6,6 +6,12 @@ project(chisel VERSION 1.2.0 LANGUAGES C CXX)
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 
+if(NOT CMAKE_OSX_ARCHITECTURES)
+    set(CHISEL_ARCH ${CMAKE_SYSTEM_PROCESSOR})
+else()
+    set(CHISEL_ARCH ${CMAKE_OSX_ARCHITECTURES})
+endif()
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
@@ -30,80 +36,6 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
-option(CHISEL_USE_THINLTO "Prefer -flto=thin when available" ON)
-
-set(CHISEL_LTO_FLAG "")
-if(CHISEL_USE_THINLTO)
-    check_c_compiler_flag("-flto=thin" CHISEL_C_FLTO_THIN)
-    check_cxx_compiler_flag("-flto=thin" CHISEL_CXX_FLTO_THIN)
-    if(CHISEL_C_FLTO_THIN AND CHISEL_CXX_FLTO_THIN)
-        set(CHISEL_LTO_FLAG "-flto=thin")
-    endif()
-endif()
-
-if(CHISEL_LTO_FLAG STREQUAL "")
-    check_c_compiler_flag("-flto" CHISEL_C_FLTO)
-    check_cxx_compiler_flag("-flto" CHISEL_CXX_FLTO)
-    if(CHISEL_C_FLTO AND CHISEL_CXX_FLTO)
-        set(CHISEL_LTO_FLAG "-flto")
-    endif()
-endif()
-
-check_c_compiler_flag("-fuse-linker-plugin" CHISEL_C_FUSE_PLUGIN)
-check_cxx_compiler_flag("-fuse-linker-plugin" CHISEL_CXX_FUSE_PLUGIN)
-if(CHISEL_C_FUSE_PLUGIN AND CHISEL_CXX_FUSE_PLUGIN)
-    if(APPLE AND (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" OR CMAKE_OSX_ARCHITECTURES MATCHES "x86_64"))
-        set(CHISEL_FUSE_LINKER_PLUGIN_FLAG "")
-    else()
-        set(CHISEL_FUSE_LINKER_PLUGIN_FLAG "-fuse-linker-plugin")
-    endif ()
-else()
-    set(CHISEL_FUSE_LINKER_PLUGIN_FLAG "")
-endif()
-
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    if(MSVC)
-        set(CHISEL_COMMON_OPT_FLAGS /Gy /Gw)
-        set(CHISEL_COMMON_LINK_FLAGS "")
-    elseif(MINGW)
-        set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden -fstack-protector-strong -D_FORTIFY_SOURCE=2)
-        set(CHISEL_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -s)
-    elseif(APPLE)
-        set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden -fstack-protector-strong -D_FORTIFY_SOURCE=2)
-        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-            message(STATUS "chisel: Statically linking libgcc and libstdc++ for GCC on macOS")
-            set(CHISEL_COMMON_LINK_FLAGS -Wl,-dead_strip -static-libgcc -static-libstdc++)
-        else()
-            set(CHISEL_COMMON_LINK_FLAGS -Wl,-dead_strip)
-        endif()
-    else()
-        set(CHISEL_COMMON_OPT_FLAGS -ffunction-sections -fdata-sections -fvisibility=hidden -fstack-protector-strong -D_FORTIFY_SOURCE=2)
-        set(CHISEL_COMMON_LINK_FLAGS -Wl,--gc-sections -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -s)
-    endif()
-endif()
-
-if(CHISEL_LTO_FLAG)
-    message(STATUS "chisel: using LTO flag = ${CHISEL_LTO_FLAG}")
-    set(CHISEL_LINK_FLAGS ${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG} ${CHISEL_COMMON_LINK_FLAGS})
-else()
-    message(STATUS "chisel: LTO not available on this compiler")
-    set(CHISEL_LINK_FLAGS ${CHISEL_COMMON_LINK_FLAGS})
-endif()
-
-set(CHISEL_PROPAGATE_C_FLAGS ${CHISEL_COMMON_OPT_FLAGS})
-set(CHISEL_PROPAGATE_CXX_FLAGS ${CHISEL_COMMON_OPT_FLAGS})
-set(CHISEL_PROPAGATE_LINK_FLAGS ${CHISEL_COMMON_LINK_FLAGS})
-
-string(REPLACE ";" " " CHISEL_PROPAGATE_C_FLAGS_STR "${CHISEL_PROPAGATE_C_FLAGS}")
-string(REPLACE ";" " " CHISEL_PROPAGATE_CXX_FLAGS_STR "${CHISEL_PROPAGATE_CXX_FLAGS}")
-string(REPLACE ";" " " CHISEL_PROPAGATE_LINK_FLAGS_STR "${CHISEL_PROPAGATE_LINK_FLAGS}")
-
-message(STATUS "chisel: propagate C flags (no-LTO) = ${CHISEL_PROPAGATE_C_FLAGS_STR}")
-message(STATUS "chisel: propagate link flags (no-LTO) = ${CHISEL_PROPAGATE_LINK_FLAGS_STR}")
-
-set(EXTERNAL_AUTOTOOLS_CFLAGS "${CHISEL_PROPAGATE_C_FLAGS_STR}")
-set(EXTERNAL_AUTOTOOLS_CXXFLAGS "${CHISEL_PROPAGATE_CXX_FLAGS_STR}")
-set(EXTERNAL_AUTOTOOLS_LDFLAGS "${CHISEL_PROPAGATE_LINK_FLAGS_STR}")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if (MSVC)
@@ -231,6 +163,9 @@ if(NOT WIN32)
             URL https://astron.com/pub/file/file-5.45.tar.gz
             URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
             CONFIGURE_COMMAND ./configure --disable-shared --enable-static --prefix=<INSTALL_DIR>
+                "CC=${CMAKE_C_COMPILER} -arch ${CHISEL_ARCH}"
+                "CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS}"
+                "LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}"
             BUILD_COMMAND make
             INSTALL_COMMAND make install
             BUILD_IN_SOURCE 1
@@ -475,6 +410,10 @@ ExternalProject_Add(mozjpeg
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/mozjpeg-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DPNG_SUPPORTED=0
+        -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         UPDATE_DISCONNECTED 1
         BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
@@ -628,7 +567,7 @@ else()
     ExternalProject_Add(libmseed
             SOURCE_DIR ${libmseed_SOURCE_DIR}
             CONFIGURE_COMMAND ""
-            BUILD_COMMAND make
+            BUILD_COMMAND make CFLAGS="-arch ${CMAKE_OSX_ARCHITECTURES} ${EXTERNAL_AUTOTOOLS_CFLAGS}"
             INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
             BUILD_IN_SOURCE 1
             BUILD_BYPRODUCTS ${libmseed_SOURCE_DIR}/libmseed.a
