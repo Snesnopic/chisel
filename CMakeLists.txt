@@ -536,39 +536,27 @@ add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libmseed
 set(libmseed_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmseed")
-if(WIN32)
-    add_library(libmseed STATIC
-            ${libmseed_SOURCE_DIR}/fileutils.c
-            ${libmseed_SOURCE_DIR}/genutils.c
-            ${libmseed_SOURCE_DIR}/msio.c
-            ${libmseed_SOURCE_DIR}/lookup.c
-            ${libmseed_SOURCE_DIR}/yyjson.c
-            ${libmseed_SOURCE_DIR}/msrutils.c
-            ${libmseed_SOURCE_DIR}/extraheaders.c
-            ${libmseed_SOURCE_DIR}/pack.c
-            ${libmseed_SOURCE_DIR}/packdata.c
-            ${libmseed_SOURCE_DIR}/tracelist.c
-            ${libmseed_SOURCE_DIR}/gmtime64.c
-            ${libmseed_SOURCE_DIR}/crc32c.c
-            ${libmseed_SOURCE_DIR}/parseutils.c
-            ${libmseed_SOURCE_DIR}/unpack.c
-            ${libmseed_SOURCE_DIR}/unpackdata.c
-            ${libmseed_SOURCE_DIR}/selection.c
-            ${libmseed_SOURCE_DIR}/logging.c
+add_library(libmseed STATIC
+        ${libmseed_SOURCE_DIR}/fileutils.c
+        ${libmseed_SOURCE_DIR}/genutils.c
+        ${libmseed_SOURCE_DIR}/msio.c
+        ${libmseed_SOURCE_DIR}/lookup.c
+        ${libmseed_SOURCE_DIR}/yyjson.c
+        ${libmseed_SOURCE_DIR}/msrutils.c
+        ${libmseed_SOURCE_DIR}/extraheaders.c
+        ${libmseed_SOURCE_DIR}/pack.c
+        ${libmseed_SOURCE_DIR}/packdata.c
+        ${libmseed_SOURCE_DIR}/tracelist.c
+        ${libmseed_SOURCE_DIR}/gmtime64.c
+        ${libmseed_SOURCE_DIR}/crc32c.c
+        ${libmseed_SOURCE_DIR}/parseutils.c
+        ${libmseed_SOURCE_DIR}/unpack.c
+        ${libmseed_SOURCE_DIR}/unpackdata.c
+        ${libmseed_SOURCE_DIR}/selection.c
+        ${libmseed_SOURCE_DIR}/logging.c
     )
     target_include_directories(libmseed PUBLIC ${libmseed_SOURCE_DIR})
-else()
-    set(libmseed_BINARY_DIR "${CMAKE_BINARY_DIR}/libmseed-build")
-    set(libmseed_INSTALL_DIR "${CMAKE_BINARY_DIR}/libmseed-install")
-    ExternalProject_Add(libmseed
-            SOURCE_DIR ${libmseed_SOURCE_DIR}
-            CONFIGURE_COMMAND ""
-            BUILD_COMMAND make CFLAGS="-arch ${CMAKE_OSX_ARCHITECTURES} ${EXTERNAL_AUTOTOOLS_CFLAGS}"
-            INSTALL_COMMAND make install PREFIX=${libmseed_INSTALL_DIR}
-            BUILD_IN_SOURCE 1
-            BUILD_BYPRODUCTS ${libmseed_SOURCE_DIR}/libmseed.a
-    )
-endif()
+
 
 # gifsicle
 add_library(giflib STATIC
@@ -687,6 +675,7 @@ set(CHISEL_LIBS
         tag
         giflib
         pugixml
+        libmseed
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)
@@ -701,10 +690,6 @@ endif()
 if(UNIX)
     list(APPEND CHISEL_LIBS
             LIBMAGIC
-    )
-elseif(WIN32)
-    list(APPEND CHISEL_LIBS
-            libmseed
     )
 endif()
 if(ENABLE_OPTIVORBIS)
