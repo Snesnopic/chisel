@@ -16,6 +16,17 @@
 #include <memory>
 #include <cstdint>
 #include "processor_executor.hpp"
+#include "../include/processor_registry.hpp"
+#include "../include/processor_executor.hpp"
+#include "../include/event_bus.hpp"
+#include "../include/logger.hpp"
+#include "../include/log_sink.hpp"
+#include "../include/options.hpp"
+#include <mutex>
+#include <thread>
+#include <algorithm>
+#include "events.hpp"
+#include "file_type.hpp"
 
 namespace chisel {
 

@@ -7,18 +7,7 @@
  * @brief Implementation of the public Chisel API.
  */
 
-#include "../include/chisel.hpp"
-#include "../include/processor_registry.hpp"
-#include "../include/processor_executor.hpp"
-#include "../include/event_bus.hpp"
-#include "../include/logger.hpp"
-#include "../include/log_sink.hpp"
-#include "../include/options.hpp"
-#include <mutex>
-#include <thread>
-#include <algorithm>
-#include "events.hpp"
-#include "file_type.hpp"
+#include "chisel.hpp"
 
 namespace chisel {
 
