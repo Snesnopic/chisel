@@ -49,16 +49,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
-        add_compile_options(/O2 /GL /W4)
+        add_compile_options(/O2 /GL /W0)
     else()
-        add_compile_options(-O3 -Wall -Wextra -Wpedantic ${CHISEL_COMMON_OPT_FLAGS})
-        if(CHISEL_LTO_FLAG)
-            add_compile_options(${CHISEL_LTO_FLAG} ${CHISEL_FUSE_LINKER_PLUGIN_FLAG})
-        endif()
+        add_compile_options(-O3 -w ${CHISEL_COMMON_OPT_FLAGS})
         add_link_options(${CHISEL_LINK_FLAGS})
     endif()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/release)
-
 endif()
 
 include(FetchContent)
