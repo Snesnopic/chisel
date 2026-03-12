@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.20)
 project(chisel VERSION 1.2.0 LANGUAGES C CXX)
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
+option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
@@ -762,7 +763,11 @@ elseif(WIN32)
             libmseed
     )
 endif()
-add_subdirectory(third_party/corrosion)
+if(ENABLE_OPTIVORBIS)
+    add_subdirectory(third_party/corrosion)
+    add_compile_definitions(HAVE_OPTIVORBIS=1)
+endif()
+
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 

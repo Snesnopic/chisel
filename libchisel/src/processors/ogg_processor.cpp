@@ -14,11 +14,11 @@
 #include <vector>
 #include <FLAC/all.h>
 #include "file_type.hpp"
-
+#ifdef HAVE_OPTIVORBIS
 extern "C" {
     int chisel_optimize_vorbis(const char* input, const char* output);
 }
-
+#endif
 namespace chisel {
 namespace fs = std::filesystem;
 
@@ -313,6 +313,7 @@ void OggProcessor::recompress(const fs::path& input,
     if (is_vorbis_stream(f_in)) {
         fclose(f_in);
 
+#ifdef HAVE_OPTIVORBIS
         const std::string input_str = input.string();
         const std::string output_str = output.string();
 
@@ -322,6 +323,7 @@ void OggProcessor::recompress(const fs::path& input,
             Logger::log(LogLevel::Error, msg, get_name());
             throw std::runtime_error(msg);
         }
+#endif
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
         return;
     }
@@ -400,7 +402,6 @@ void OggProcessor::recompress(const fs::path& input,
         fs::remove(output, ec);
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
     }
-
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 

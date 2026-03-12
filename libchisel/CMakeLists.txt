@@ -80,7 +80,10 @@ set(LIBCHISEL_SOURCES
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp
 )
-corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
+if(ENABLE_OPTIVORBIS)
+    corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
+endif()
+
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
 target_include_directories(libchisel
@@ -125,6 +128,10 @@ if(NOT WIN32)
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
     )
+endif()
+
+if(ENABLE_OPTIVORBIS)
+    target_link_libraries(libchisel PRIVATE chisel_optivorbis_bridge)
 endif()
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
