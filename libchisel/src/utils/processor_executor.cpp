@@ -83,98 +83,74 @@ namespace chisel {
         finalize_containers();
     }
 
-    void ProcessorExecutor::handle_temp_file(const fs::path& original_file,
-                                             const fs::path& temp_file,
-                                             const uintmax_t original_size,
-                                             const std::chrono::milliseconds duration) const {
+    std::optional<std::pair<fs::path, bool>> ProcessorExecutor::move_to_destination(
+        const fs::path& original_file,
+        const fs::path& temp_file) const {
+
         std::error_code ec;
         const auto new_size = fs::file_size(temp_file, ec);
         if (ec || new_size == 0) {
             Logger::log(LogLevel::Warning, "Temp file is invalid or empty: " + temp_file.string(), "Executor");
             fs::remove(temp_file, ec);
-            event_bus_.publish(FileProcessErrorEvent{original_file, "Failed to create optimized file"});
-            return;
+            return std::nullopt;
         }
 
         bool replaced = false;
+        fs::path dest = original_file;
 
         if (dry_run_) {
             Logger::log(LogLevel::Info, "[DRY-RUN] Would replace: " + original_file.string(), "Executor");
             fs::remove(temp_file, ec);
-
         } else if (has_output_dir_) {
-            const fs::path dest = output_is_directory_
-                                  ? (output_dir_ / original_file.filename())
-                                  : output_dir_;
+            dest = output_is_directory_
+                  ? (output_dir_ / original_file.filename())
+                  : output_dir_;
 
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, dest, ec);
-
-                // fallback for cross-device link
                 if (ec == std::errc::cross_device_link) {
                     ec.clear();
                     fs::copy(temp_file, dest, fs::copy_options::overwrite_existing, ec);
-                    if (!ec) {
-                        fs::remove(temp_file, ec);
-                    }
+                    if (!ec) fs::remove(temp_file, ec);
                 }
-
                 if (!ec) break;
-
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
-                constexpr auto retry_ms = 250;
-                Logger::log(LogLevel::Debug, "Rename (output) failed (sharing violation), retrying in " + std::to_string(retry_ms) + "ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(retry_ms));
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 --retries;
             }
             if (ec) {
-                const std::string rename_error = ec.message();
-                Logger::log(LogLevel::Error, "Rename failed: " + original_file.string() + " -> " + dest.string() + " (" + rename_error + ")", "Executor");
+                Logger::log(LogLevel::Error, "Rename failed: " + dest.string() + " (" + ec.message() + ")", "Executor");
                 fs::remove(temp_file, ec);
-                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + rename_error});
-                return;
+                return std::nullopt;
             }
             replaced = true;
-
         } else { // in-place
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
-
-                // fallback for cross-device link
                 if (ec == std::errc::cross_device_link) {
                     ec.clear();
                     fs::copy(temp_file, original_file, fs::copy_options::overwrite_existing, ec);
-                    if (!ec) {
-                        fs::remove(temp_file, ec);
-                    }
+                    if (!ec) fs::remove(temp_file, ec);
                 }
-                if (!ec) break; // success
-
+                if (!ec) break;
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
-                constexpr auto retry_ms = 500;
-                Logger::log(LogLevel::Debug, "Rename failed (sharing/lock violation), retrying in " + std::to_string(retry_ms) + "ms...", "Executor");
-                std::this_thread::sleep_for(std::chrono::milliseconds(retry_ms));
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
             if (ec) {
-
-                const std::string rename_error = ec.message();
-                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + rename_error + ")", "Executor");
-
-                std::error_code remove_ec;
-                fs::remove(temp_file, remove_ec);
-
-                event_bus_.publish(FileProcessErrorEvent{original_file, "Rename failed: " + rename_error});
-                return;
+                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + ec.message() + ")", "Executor");
+                fs::remove(temp_file, ec);
+                return std::nullopt;
             }
             replaced = true;
         }
 
-        event_bus_.publish(FileProcessCompleteEvent{original_file, original_size, new_size, replaced, duration});
+        return std::make_pair(dest, replaced);
     }
-
 
     void ProcessorExecutor::analyze_path(const fs::path &path) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
@@ -273,6 +249,11 @@ namespace chisel {
                     const auto orig_size = safe_size(file);
                     auto start = std::chrono::steady_clock::now();
                     const std::string job_suffix = RandomUtils::random_suffix();
+
+                    fs::path final_temp_path;
+                    uintmax_t new_size = 0;
+                    bool success = false;
+
                     if (mode_ == EncodeMode::PIPE) {
                         fs::path current = file;
                         fs::path last_tmp;
@@ -300,11 +281,8 @@ namespace chisel {
                             last_tmp = tmp;
                         }
 
-                        auto end = std::chrono::steady_clock::now();
-                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
                         if (pipeline_ok && !last_tmp.empty()) {
-                            auto new_size = safe_size(last_tmp);
+                            new_size = safe_size(last_tmp);
                             // accept the recompressed file only if it is smaller than the original
                             // and, if checksum verification is enabled, the raw checksums match
                             const bool size_improved = (new_size > 0 && new_size < orig_size);
@@ -312,26 +290,21 @@ namespace chisel {
                                 candidates[0]->raw_equal(file, last_tmp);
 
                             if (size_improved && checksum_ok) {
-                                handle_temp_file(file, last_tmp, orig_size, duration);
+                                final_temp_path = last_tmp;
+                                success = true;
                             } else {
+                                std::error_code ec;
+                                fs::remove(last_tmp, ec);
                                 if (!checksum_ok) {
-                                    std::error_code ec;
-                                    fs::remove(last_tmp, ec);
                                     event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected"});
                                 } else {
-                                    std::error_code ec;
-                                    fs::remove(last_tmp, ec);
                                     event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
                                 }
                             }
-                        } else {
+                        } else if (!st.stop_requested()) {
                             auto err = std::error_code{};
                             if (!last_tmp.empty()) fs::remove(last_tmp, err);
-                            if (st.stop_requested()) {
-                                event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
-                            } else {
-                                event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
-                            }
+                            event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
                         }
                     } else {
                         // parallel
@@ -344,7 +317,8 @@ namespace chisel {
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
-                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".cand." + std::to_string(i) + ".tmp");                            Result r{tmp, 0, false};
+                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".cand." + std::to_string(i) + ".tmp");
+                            Result r{tmp, 0, false};
                             try {
                                 candidates[i]->recompress(file, tmp, m_options);
                                 auto sz = safe_size(tmp);
@@ -362,9 +336,6 @@ namespace chisel {
                             results.push_back(r);
                         }
 
-                        auto end = std::chrono::steady_clock::now();
-                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
                         auto best_it = std::min_element(results.begin(), results.end(),
                                                         [](const Result &a, const Result &b) {
                                                             if (a.success != b.success) return a.success && !b.success;
@@ -372,9 +343,11 @@ namespace chisel {
                                                         });
 
                         if (best_it != results.end() && best_it->success && best_it->size < orig_size) {
-                            handle_temp_file(file, best_it->tmp, orig_size, duration);
+                            final_temp_path = best_it->tmp;
+                            new_size = best_it->size;
+                            success = true;
                             for (const auto &r: results) {
-                                if (r.tmp != best_it->tmp) {
+                                if (r.tmp != final_temp_path) {
                                     std::error_code ec2;
                                     fs::remove(r.tmp, ec2);
                                 }
@@ -384,16 +357,34 @@ namespace chisel {
                                 std::error_code ec;
                                 fs::remove(r.tmp, ec);
                             }
-                            if (st.stop_requested()) {
-                                event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
-                            } else {
+                            if (!st.stop_requested()) {
                                 event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
                             }
                         }
                     }
+
+                    auto end = std::chrono::steady_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+                    if (success) {
+                        auto move_result = move_to_destination(file, final_temp_path);
+                        if (move_result) {
+                            event_bus_.publish(FileProcessCompleteEvent{
+                                file,
+                                move_result->first,
+                                orig_size,
+                                new_size,
+                                move_result->second,
+                                duration
+                            });
+                        } else {
+                            event_bus_.publish(FileProcessErrorEvent{file, "Failed to move optimized file"});
+                        }
+                    } else if (st.stop_requested()) {
+                        event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                    }
                 } catch (const std::exception &e) {
-                    Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()),
-                                "Executor");
+                    Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
                     event_bus_.publish(FileProcessErrorEvent{file, e.what()});
                 }
             });
@@ -413,8 +404,7 @@ namespace chisel {
                 procs = registry_.find_by_extension(content.original_path.extension().string());
             }
             if (procs.empty()) {
-                Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(),
-                            "Executor");
+                Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(), "Executor");
                 event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Unsupported format"});
                 continue;
             }
@@ -426,23 +416,35 @@ namespace chisel {
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
                 std::error_code ec;
-
-                if (new_temp_file.empty()) {
-                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
-                    const auto final_size = std::filesystem::file_size(content.original_path, ec);
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, ec ? 0 : final_size});
-                    continue;
-                }
-
                 auto orig_size = std::filesystem::file_size(content.original_path, ec);
                 if (ec) orig_size = 0;
 
-                handle_temp_file(content.original_path, new_temp_file, orig_size, duration);
+                if (new_temp_file.empty()) {
+                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
+                    // publish explicit Phase 3 complete event even if skipped
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, content.original_path, orig_size, orig_size, false, duration});
+                    continue;
+                }
+
+                auto new_size = std::filesystem::file_size(new_temp_file, ec);
+
+                // use the helper and publish the specific Phase 3 event
+                auto move_result = move_to_destination(content.original_path, new_temp_file);
+                if (move_result) {
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{
+                        content.original_path,
+                        move_result->first,
+                        orig_size,
+                        ec ? 0 : new_size,
+                        move_result->second,
+                        duration
+                    });
+                } else {
+                    event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Failed to finalize container file"});
+                }
 
             } catch (const std::exception &e) {
-                Logger::log(LogLevel::Error,
-                            "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()),
-                            "Executor");
+                Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
                 event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, e.what()});
             }
         }

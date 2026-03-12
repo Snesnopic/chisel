@@ -346,8 +346,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-        auto it = std::find_if(results.begin(), results.end(),
-                             [&](const Result& r){ return r.path == e.path; });
+        auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
         if (it != results.end()) {
             it->size_after = e.final_size;
         }
@@ -355,6 +354,7 @@ int main(int argc, char* argv[]) {
         ContainerResult c;
         c.filename = e.path;
         c.success = true;
+        c.size_before = e.original_size;
         c.size_after = e.final_size;
         container_results.push_back(std::move(c));
         on_finish(e.path.filename().string());

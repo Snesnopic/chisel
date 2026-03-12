@@ -81,6 +81,9 @@ public:
      */
     void process(const std::vector<std::filesystem::path>& inputs);
 
+    std::optional<std::pair<std::filesystem::path, bool>> move_to_destination(
+        const std::filesystem::path &original_file, const std::filesystem::path &temp_file) const;
+
     /**
      * @brief Checks if a stop has been requested.
      * @return true if the internal stop flag is set, false otherwise.

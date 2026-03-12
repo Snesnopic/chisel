@@ -76,6 +76,7 @@ struct FileProcessStartEvent {
  */
 struct FileProcessCompleteEvent {
     std::filesystem::path path;             ///< Path of the processed file
+    std::filesystem::path destination;      ///< Final path where the file was saved
     uintmax_t original_size = 0;            ///< Original file size in bytes
     uintmax_t new_size = 0;                 ///< New file size in bytes
     bool replaced = false;                  ///< True if the original file was replaced/written
@@ -111,8 +112,12 @@ struct ContainerFinalizeStartEvent {
  * @brief Emitted when finalization of a container completes successfully.
  */
 struct ContainerFinalizeCompleteEvent {
-    std::filesystem::path path;     ///< Path of the finalized container
-    uintmax_t final_size = 0;       ///< Final size in bytes
+    std::filesystem::path path;             ///< path of the container (input)
+    std::filesystem::path destination;      ///< final path of the container
+    uintmax_t original_size = 0;
+    uintmax_t final_size = 0;
+    bool replaced = false;                  ///< consistency with file events
+    std::chrono::milliseconds duration{0};///< added for reporting
 };
 
 /**
