@@ -185,20 +185,9 @@ jobs:
           path: ${{ env.ARTIFACT_PATH }}
           if-no-files-found: error
 
-  build-freebsd:
-    name: build (${{ matrix.asset_name }})
+  build-freebsd-x64:
+    name: build (freebsd-x64)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - id: freebsd-x64
-            arch: amd64
-            asset_name: "freebsd-x64"
-          - id: freebsd-arm
-            arch: arm64
-            asset_name: "freebsd-arm64"
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -215,7 +204,7 @@ jobs:
       - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          arch: ${{ matrix.arch }}
+          arch: amd64
           release: 14.3
           usesh: true
           prepare: |
@@ -252,7 +241,7 @@ jobs:
         shell: bash
         run: |
           SRC="bin/Release/chsl"
-          DEST="chsl-${{ matrix.asset_name }}-${{ env.VERSION }}"
+          DEST="chsl-freebsd-x64-${{ env.VERSION }}"
           echo "Renaming $SRC to $DEST"
           mv "$SRC" "$DEST"
           echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
@@ -260,7 +249,75 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.asset_name }}
+          name: binary-freebsd-x64
+          path: ${{ env.ARTIFACT_PATH }}
+          if-no-files-found: error
+
+  build-freebsd-arm64:
+    name: build (freebsd-arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Build on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          arch: arm64
+          release: 14.3
+          usesh: true
+          prepare: |
+            pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
+          run: |
+            echo "--- Starting FreeBSD Build ---"
+            export MAKE=gmake
+            mkdir -p $HOME/bin
+            ln -s /usr/local/bin/gmake $HOME/bin/make
+            export PATH=$HOME/bin:$PATH
+            
+            # disable mp3packer as ocaml is not installed
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                  -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -DENABLE_MP3PACKER=OFF \
+                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+            
+            cmake --build build --config Release
+            echo "--- Build Complete ---"
+
+      - name: Determine Version
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "VERSION=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Rename Binary
+        shell: bash
+        run: |
+          SRC="bin/Release/chsl"
+          DEST="chsl-freebsd-arm64-${{ env.VERSION }}"
+          echo "Renaming $SRC to $DEST"
+          mv "$SRC" "$DEST"
+          echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-freebsd-arm64
           path: ${{ env.ARTIFACT_PATH }}
           if-no-files-found: error
 
@@ -522,7 +579,7 @@ jobs:
 
   test-freebsd:
     name: test (${{ matrix.asset_name }})
-    needs: build-freebsd
+    needs: build-freebsd-x64
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -943,7 +1000,7 @@ jobs:
 
   verify-static-linking-freebsd:
     name: verify-static-linking (${{ matrix.asset_name }})
-    needs: build-freebsd
+    needs: [build-freebsd-x64, build-freebsd-arm64]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
