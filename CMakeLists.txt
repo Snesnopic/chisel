@@ -8,6 +8,12 @@ option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
+if(APPLE)
+    set(MAGIC_CC "${CMAKE_C_COMPILER} -arch ${CHISEL_ARCH}")
+else()
+    set(MAGIC_CC "${CMAKE_C_COMPILER}")
+endif()
+
 if(NOT CMAKE_OSX_ARCHITECTURES)
     set(CHISEL_ARCH ${CMAKE_SYSTEM_PROCESSOR})
 else()
@@ -692,9 +698,6 @@ set(CHISEL_LIBS
         pugixml
         libmseed
 )
-if(NOT WIN32)
-    list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)
-endif()
 
 if(ENABLE_MATROSKA)
     list(APPEND CHISEL_LIBS ebml matroska mkclean_lib)
