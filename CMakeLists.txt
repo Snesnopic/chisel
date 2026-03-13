@@ -169,7 +169,7 @@ if(NOT WIN32)
             URL https://astron.com/pub/file/file-5.45.tar.gz
             URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
             CONFIGURE_COMMAND ./configure --disable-shared --enable-static --prefix=<INSTALL_DIR>
-                "CC=${CMAKE_C_COMPILER} -arch ${CHISEL_ARCH}"
+                "CC=${MAGIC_CC}"
                 "CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS}"
                 "LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}"
             BUILD_COMMAND make
