@@ -562,28 +562,13 @@ set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libmseed
-set(libmseed_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmseed")
-add_library(libmseed STATIC
-        ${libmseed_SOURCE_DIR}/fileutils.c
-        ${libmseed_SOURCE_DIR}/genutils.c
-        ${libmseed_SOURCE_DIR}/msio.c
-        ${libmseed_SOURCE_DIR}/lookup.c
-        ${libmseed_SOURCE_DIR}/yyjson.c
-        ${libmseed_SOURCE_DIR}/msrutils.c
-        ${libmseed_SOURCE_DIR}/extraheaders.c
-        ${libmseed_SOURCE_DIR}/pack.c
-        ${libmseed_SOURCE_DIR}/packdata.c
-        ${libmseed_SOURCE_DIR}/tracelist.c
-        ${libmseed_SOURCE_DIR}/gmtime64.c
-        ${libmseed_SOURCE_DIR}/crc32c.c
-        ${libmseed_SOURCE_DIR}/parseutils.c
-        ${libmseed_SOURCE_DIR}/unpack.c
-        ${libmseed_SOURCE_DIR}/unpackdata.c
-        ${libmseed_SOURCE_DIR}/selection.c
-        ${libmseed_SOURCE_DIR}/logging.c
-    )
-    target_include_directories(libmseed PUBLIC ${libmseed_SOURCE_DIR})
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LIBMSEED_URL OFF CACHE BOOL "" FORCE)
 
+add_subdirectory(third_party/libmseed EXCLUDE_FROM_ALL)
 
 # gifsicle
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gifsicle_stubs.c" "
@@ -669,7 +654,7 @@ set(CHISEL_LIBS
         tag
         libgifsicle
         pugixml
-        libmseed
+        mseed_static
 )
 
 if(ENABLE_MATROSKA)
@@ -705,9 +690,8 @@ target_include_directories(libchisel SYSTEM PRIVATE
         "${BMPLIB_DIR}"
         "${BMPLIB_BUILD_DIR}"
 )
+
 target_include_directories(libchisel SYSTEM PRIVATE
-        "${BMPLIB_DIR}"
-        "${BMPLIB_BUILD_DIR}"
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/include"
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/src"
 )
