@@ -5,6 +5,8 @@ project(chisel VERSION 1.2.0 LANGUAGES C CXX)
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
+option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
+option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 if(NOT CMAKE_OSX_ARCHITECTURES)
     set(CHISEL_ARCH ${CMAKE_SYSTEM_PROCESSOR})
@@ -112,7 +114,9 @@ if(EXISTS "${BZIP2_DIR}/bzlib.c")
 endif()
 
 # libmkclean
-add_subdirectory("third_party/libmkclean")
+if(ENABLE_MATROSKA)
+    add_subdirectory("third_party/libmkclean")
+endif()
 
 # liblzma
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -441,25 +445,26 @@ set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
 # libEBML
-set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
-set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
-add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
-list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
-list(APPEND libebml_SOURCE_DIR
-        "${CMAKE_SOURCE_DIR}/third_party/libebml/ebml"
-        "${CMAKE_BINARY_DIR}/third_party/libebml-build"
-)
+if(ENABLE_MATROSKA)
+    set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
+    set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
+    add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
+    list(APPEND libebml_SOURCE_DIR
+            "${CMAKE_SOURCE_DIR}/third_party/libebml/ebml"
+            "${CMAKE_BINARY_DIR}/third_party/libebml-build"
+    )
 # libMatroska
-set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
-set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
-add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
-list(APPEND libmatroska_SOURCE_DIR
-        "${CMAKE_BINARY_DIR}/third_party/libmatroska-build"
-)
-
-target_include_directories(matroska PRIVATE
-        ${libebml_BINARY_DIR}
-)
+    set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
+    set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
+    add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
+    list(APPEND libmatroska_SOURCE_DIR
+            "${CMAKE_BINARY_DIR}/third_party/libmatroska-build"
+    )
+    target_include_directories(matroska PRIVATE
+            ${libebml_BINARY_DIR}
+    )
+endif()
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -637,8 +642,6 @@ target_include_directories(zopflipng PUBLIC
 )
 
 # mp3packer (ocaml)
-option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
-
 if(ENABLE_MP3PACKER)
     include(cmake/mp3packer.cmake)
     add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
@@ -653,8 +656,6 @@ set(CHISEL_LIBS
         png_static
         archive_static
         ogg
-        ebml
-        matroska
         mozjpeg_static
         wavpack
         flexigif
@@ -670,7 +671,6 @@ set(CHISEL_LIBS
         tiff
         libdeflate_static
         SQLite3
-        mkclean_lib
         zlibstatic
         tag
         giflib
@@ -679,6 +679,11 @@ set(CHISEL_LIBS
 )
 if(NOT WIN32)
     list(APPEND CHISEL_LIBS ${libmseed_SOURCE_DIR}/libmseed.a)
+endif()
+
+if(ENABLE_MATROSKA)
+    list(APPEND CHISEL_LIBS ebml matroska mkclean_lib)
+    add_compile_definitions(HAVE_MATROSKA=1)
 endif()
 
 if(ENABLE_MP3PACKER)

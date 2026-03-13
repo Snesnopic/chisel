@@ -101,9 +101,6 @@ target_include_directories(libchisel
         ${libarchive_BINARY_DIR}/libarchive
         ${libogg_SOURCE_DIR}/include
         ${libogg_BINARY_DIR}/include
-        ${libebml_SOURCE_DIR}
-        ${libmatroska_SOURCE_DIR}
-        ${libmatroska_SOURCE_DIR}/src
         ${qpdf_SOURCE_DIR}/include
         ${qpdf_BINARY_DIR}/include
         ${zopfli_SOURCE_DIR}/include
@@ -129,7 +126,11 @@ if(NOT WIN32)
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
     )
 endif()
-
+if(ENABLE_MATROSKA)
+    target_include_directories(libchisel PRIVATE ${libebml_SOURCE_DIR}
+            ${libmatroska_SOURCE_DIR}
+            ${libmatroska_SOURCE_DIR}/src)
+endif()
 if(ENABLE_OPTIVORBIS)
     target_link_libraries(libchisel PRIVATE chisel_optivorbis_bridge)
 endif()
@@ -148,7 +149,6 @@ target_compile_definitions(libchisel PUBLIC TAGLIB_STATIC)
 
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
-add_dependencies(libchisel mkclean_lib)
 add_dependencies(libchisel liblzma)
 add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
@@ -157,8 +157,11 @@ add_dependencies(libchisel FLAC)
 add_dependencies(libchisel flexigif)
 add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
-add_dependencies(libchisel ebml)
-add_dependencies(libchisel matroska)
+if(ENABLE_MATROSKA)
+    add_dependencies(libchisel mkclean_lib)
+    add_dependencies(libchisel ebml)
+    add_dependencies(libchisel matroska)
+endif()
 add_dependencies(libchisel thirdparty_webp thirdparty_webpdecoder thirdparty_webpdemux thirdparty_webpmux)
 add_dependencies(libchisel libqpdf)
 add_dependencies(libchisel libzopfli libzopflipng)
