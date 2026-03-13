@@ -674,7 +674,6 @@ add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 target_sources(libchisel PRIVATE
         ${BMPLIB_SOURCES}
-        "${CMAKE_CURRENT_BINARY_DIR}/gifsicle_stubs.c"
 )
 target_sources(libchisel PRIVATE ${BMPLIB_SOURCES})
 
