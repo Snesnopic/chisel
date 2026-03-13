@@ -586,13 +586,15 @@ add_library(libmseed STATIC
 
 
 # gifsicle
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gifsicle_stubs.c" "const char *gifsicle_prog_name = \"chisel\";\n")
+
 add_library(giflib STATIC
         third_party/gifsicle/src/clp.c
         third_party/gifsicle/src/fmalloc.c
         # third_party/gifsicle/src/gifdiff.c
         third_party/gifsicle/src/giffunc.c
         third_party/gifsicle/src/gifread.c
-        third_party/gifsicle/src/gifsicle.c
+        # third_party/gifsicle/src/gifsicle.c
         third_party/gifsicle/src/giftoc.c
         third_party/gifsicle/src/gifunopt.c
         # third_party/gifsicle/src/gifview.c
@@ -606,9 +608,11 @@ add_library(giflib STATIC
         third_party/gifsicle/src/support.c
         third_party/gifsicle/src/ungifwrt.c
         third_party/gifsicle/src/xform.c
+        "${CMAKE_CURRENT_BINARY_DIR}/gifsicle_stubs.c"
 )
 target_compile_definitions(giflib PRIVATE
         HAVE_CONFIG_H=1
+        program_name=gifsicle_prog_name
 )
 if(NOT WIN32)
     target_compile_definitions(giflib PRIVATE
