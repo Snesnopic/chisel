@@ -571,15 +571,7 @@ set(LIBMSEED_URL OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/libmseed EXCLUDE_FROM_ALL)
 
 # gifsicle
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gifsicle_stubs.c" "
-#ifdef __cplusplus
-thread_local const char *program_name = \"chisel\";
-#elif defined(_MSC_VER)
-__declspec(thread) const char *program_name = \"chisel\";
-#else
-_Thread_local const char *program_name = \"chisel\";
-#endif
-")
+set(BUILD_GIFSICLE_CLI OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFDIFF OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFVIEW OFF CACHE BOOL "" FORCE)
 
