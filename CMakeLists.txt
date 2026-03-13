@@ -342,29 +342,44 @@ if(WIN32)
     file(WRITE "${BMP_HEADER_ORIGINAL}" "${BMP_HEADER_CONTENT}")
 endif()
 
-add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
-target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
-
-if(MSVC)
-    target_compile_options(gen-huffman PRIVATE "/FIstdbool.h")
-else()
-    target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
-endif()
-
-set_target_properties(gen-huffman PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BMPLIB_BUILD_DIR}"
-)
-
 set(HUFFMAN_CODES_H "${BMPLIB_BUILD_DIR}/huffman-codes.h")
+if(CMAKE_CROSSCOMPILING)
+    add_custom_command(
+            OUTPUT "${BMPLIB_BUILD_DIR}/gen-huffman-host"
+            COMMAND env -u CFLAGS -u CXXFLAGS -u LDFLAGS cc "${BMPLIB_DIR}/gen-huffman.c" -I"${BMPLIB_DIR}" -include stdbool.h -o "${BMPLIB_BUILD_DIR}/gen-huffman-host"
+            DEPENDS "${BMPLIB_DIR}/gen-huffman.c"
+            COMMENT "Compiling host gen-huffman for cross-compilation"
+    )
 
-add_custom_command(
-        OUTPUT "${HUFFMAN_CODES_H}"
-        COMMAND $<TARGET_FILE:gen-huffman> "${HUFFMAN_CODES_H}"
-        DEPENDS gen-huffman
-        COMMENT "Generating huffman-codes.h for bmplib"
-)
+    add_custom_command(
+            OUTPUT "${HUFFMAN_CODES_H}"
+            COMMAND "${BMPLIB_BUILD_DIR}/gen-huffman-host" "${HUFFMAN_CODES_H}"
+            DEPENDS "${BMPLIB_BUILD_DIR}/gen-huffman-host"
+            COMMENT "Generating huffman-codes.h for bmplib via host tool"
+    )
+else()
+    add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
+    target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
+
+    if(MSVC)
+        target_compile_options(gen-huffman PRIVATE "/FIstdbool.h")
+    else()
+        target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
+    endif()
+
+    set_target_properties(gen-huffman PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BMPLIB_BUILD_DIR}"
+    )
+
+    add_custom_command(
+            OUTPUT "${HUFFMAN_CODES_H}"
+            COMMAND $<TARGET_FILE:gen-huffman> "${HUFFMAN_CODES_H}"
+            DEPENDS gen-huffman
+            COMMENT "Generating huffman-codes.h for bmplib"
+    )
+endif()
 
 add_custom_target(generate_bmplib_headers DEPENDS "${HUFFMAN_CODES_H}")
 
