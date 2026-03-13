@@ -46,8 +46,8 @@ jobs:
           - id: macos-intel
             runs_on: macos-15-intel
             build_type: Release
-            c_compiler: gcc-12
-            cpp_compiler: g++-12
+            c_compiler: clang
+            cpp_compiler: clang++
             ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
@@ -587,7 +587,7 @@ jobs:
         include:
           - id: freebsd-x64
             arch: amd64
-            release: 14.3
+            release: ${{ matrix.release }}
             asset_name: "freebsd-x64"
           #  disabled, takes too long
           # - id: freebsd-arm
@@ -1036,7 +1036,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: 14.3
+          release: ${{ matrix.release }}
           usesh: true
           run: |
             echo "Checking dependencies for FreeBSD..."
