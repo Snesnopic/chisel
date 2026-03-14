@@ -46,8 +46,8 @@ jobs:
           - id: macos-intel
             runs_on: macos-15-intel
             build_type: Release
-            c_compiler: clang
-            cpp_compiler: clang++
+            c_compiler: /opt/homebrew/opt/llvm/bin/clang
+            cpp_compiler: /opt/homebrew/opt/llvm/bin/clang++
             ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
@@ -121,7 +121,7 @@ jobs:
           brew update
           brew remove --force $(brew list --formula)
           brew remove --cask --force $(brew list)
-          brew install autoconf automake libtool nasm yasm cmake
+          brew install autoconf automake libtool nasm yasm cmake llvm
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -205,7 +205,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: amd64
-          release: 14.3
+          release: "15.0"
           usesh: true
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
@@ -273,7 +273,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: arm64
-          release: 14.3
+          release: "15.0"
           usesh: true
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
@@ -681,7 +681,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: ${{ matrix.release }}
+          release: "15.0"
           usesh: true
           run: |
             echo "--- Starting FreeBSD Test ---"
@@ -1036,7 +1036,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: ${{ matrix.release }}
+          release: "15.0"
           usesh: true
           run: |
             echo "Checking dependencies for FreeBSD..."
