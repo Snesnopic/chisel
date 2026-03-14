@@ -46,8 +46,8 @@ jobs:
           - id: macos-intel
             runs_on: macos-15-intel
             build_type: Release
-            c_compiler: /opt/homebrew/opt/llvm/bin/clang
-            cpp_compiler: /opt/homebrew/opt/llvm/bin/clang++
+            c_compiler: /usr/local/opt/llvm/bin/clang
+            cpp_compiler: /usr/local/opt/llvm/bin/clang++
             ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
