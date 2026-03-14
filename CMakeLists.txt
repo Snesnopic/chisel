@@ -165,45 +165,7 @@ if(NOT WIN32)
     set(MAGIC_BIN "${libmagic_ext_BINARY_DIR}/src")
     file(MAKE_DIRECTORY "${MAGIC_BIN}")
 
-    # generate magic.h
-    if(NOT EXISTS "${MAGIC_BIN}/magic.h")
-        file(READ "${MAGIC_SRC}/magic.h.in" magic_h_in)
-        string(REPLACE "X.YY" "5.45" magic_h_out "${magic_h_in}")
-        file(WRITE "${MAGIC_BIN}/magic.h" "${magic_h_out}")
-    endif()
-
-    # generate minimal posix config.h
-    if(NOT EXISTS "${MAGIC_BIN}/config.h")
-        include(CheckFunctionExists)
-        check_function_exists(strlcpy HAVE_STRLCPY_SYS)
-        check_function_exists(strlcat HAVE_STRLCAT_SYS)
-
-        set(CONFIG_STRL "")
-        if(HAVE_STRLCPY_SYS)
-            set(CONFIG_STRL "${CONFIG_STRL}\n#define HAVE_STRLCPY 1")
-        endif()
-        if(HAVE_STRLCAT_SYS)
-            set(CONFIG_STRL "${CONFIG_STRL}\n#define HAVE_STRLCAT 1")
-        endif()
-
-        file(WRITE "${MAGIC_BIN}/config.h" "
-#define HAVE_STDINT_H 1
-#define HAVE_INTTYPES_H 1
-#define HAVE_SYS_STAT_H 1
-#define HAVE_UNISTD_H 1
-#define HAVE_FCNTL_H 1
-#define HAVE_MMAP 1
-#define HAVE_STRNDUP 1
-#define HAVE_ASPRINTF 1
-#define HAVE_VASPRINTF 1
-#define HAVE_GETLINE 1
-${CONFIG_STRL}
-#define VERSION \"5.45\"
-        ")
-    endif()
-
-    # core sources
-    add_library(LIBMAGIC STATIC
+    set(LIBMAGIC_SOURCES
             "${MAGIC_SRC}/apprentice.c"
             "${MAGIC_SRC}/apptype.c"
             "${MAGIC_SRC}/ascmagic.c"
@@ -224,11 +186,58 @@ ${CONFIG_STRL}
             "${MAGIC_SRC}/readcdf.c"
             "${MAGIC_SRC}/readelf.c"
             "${MAGIC_SRC}/softmagic.c"
-
-            "${MAGIC_SRC}/fmtcheck.c"
-            "${MAGIC_SRC}/strlcpy.c"
-            "${MAGIC_SRC}/strlcat.c"
     )
+
+    if(APPLE)
+        set(MAGIC_CONFIG_H "
+#define HAVE_STDINT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_FCNTL_H 1
+#define HAVE_MMAP 1
+#define HAVE_STRNDUP 1
+#define HAVE_ASPRINTF 1
+#define HAVE_VASPRINTF 1
+#define HAVE_STRLCPY 1
+#define HAVE_STRLCAT 1
+#define HAVE_GETLINE 1
+#define HAVE_FMTCHECK 1
+#define VERSION \"5.45\"
+        ")
+    else()
+        list(APPEND LIBMAGIC_SOURCES
+                "${MAGIC_SRC}/fmtcheck.c"
+                "${MAGIC_SRC}/strlcpy.c"
+                "${MAGIC_SRC}/strlcat.c"
+        )
+        set(MAGIC_CONFIG_H "
+#define HAVE_STDINT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_FCNTL_H 1
+#define HAVE_MMAP 1
+#define HAVE_STRNDUP 1
+#define HAVE_ASPRINTF 1
+#define HAVE_VASPRINTF 1
+#define HAVE_GETLINE 1
+#undef HAVE_STRLCPY
+#undef HAVE_STRLCAT
+#undef HAVE_FMTCHECK
+#define VERSION \"5.45\"
+        ")
+    endif()
+
+    if(NOT EXISTS "${MAGIC_BIN}/magic.h")
+        file(READ "${MAGIC_SRC}/magic.h.in" magic_h_in)
+        string(REPLACE "X.YY" "5.45" magic_h_out "${magic_h_in}")
+        file(WRITE "${MAGIC_BIN}/magic.h" "${magic_h_out}")
+    endif()
+
+    file(WRITE "${MAGIC_BIN}/config.h" "${MAGIC_CONFIG_H}")
+
+    add_library(LIBMAGIC STATIC ${LIBMAGIC_SOURCES})
 
     target_include_directories(LIBMAGIC PUBLIC
             $<BUILD_INTERFACE:${MAGIC_BIN}>
