@@ -174,6 +174,18 @@ if(NOT WIN32)
 
     # generate minimal posix config.h
     if(NOT EXISTS "${MAGIC_BIN}/config.h")
+        include(CheckFunctionExists)
+        check_function_exists(strlcpy HAVE_STRLCPY_SYS)
+        check_function_exists(strlcat HAVE_STRLCAT_SYS)
+
+        set(CONFIG_STRL "")
+        if(HAVE_STRLCPY_SYS)
+            set(CONFIG_STRL "${CONFIG_STRL}\n#define HAVE_STRLCPY 1")
+        endif()
+        if(HAVE_STRLCAT_SYS)
+            set(CONFIG_STRL "${CONFIG_STRL}\n#define HAVE_STRLCAT 1")
+        endif()
+
         file(WRITE "${MAGIC_BIN}/config.h" "
 #define HAVE_STDINT_H 1
 #define HAVE_INTTYPES_H 1
@@ -184,9 +196,8 @@ if(NOT WIN32)
 #define HAVE_STRNDUP 1
 #define HAVE_ASPRINTF 1
 #define HAVE_VASPRINTF 1
-#define HAVE_STRLCPY 1
-#define HAVE_STRLCAT 1
 #define HAVE_GETLINE 1
+${CONFIG_STRL}
 #define VERSION \"5.45\"
         ")
     endif()
@@ -213,6 +224,10 @@ if(NOT WIN32)
             "${MAGIC_SRC}/readcdf.c"
             "${MAGIC_SRC}/readelf.c"
             "${MAGIC_SRC}/softmagic.c"
+
+            "${MAGIC_SRC}/fmtcheck.c"
+            "${MAGIC_SRC}/strlcpy.c"
+            "${MAGIC_SRC}/strlcat.c"
     )
 
     target_include_directories(LIBMAGIC PUBLIC
