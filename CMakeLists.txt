@@ -707,7 +707,7 @@ if(ENABLE_MP3PACKER)
     add_compile_definitions(HAVE_MP3PACKER=1)
 endif()
 
-if(UNIX)
+if(NOT WIN32)
     list(APPEND CHISEL_LIBS
             LIBMAGIC
     )
