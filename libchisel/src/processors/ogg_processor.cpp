@@ -22,10 +22,6 @@ extern "C" {
 namespace chisel {
 namespace fs = std::filesystem;
 
-static const char* processor_tag() {
-    return "OggProcessor";
-}
-
 namespace {
     bool is_vorbis_stream(FILE* f) {
         if (f == nullptr) return false;
@@ -226,7 +222,7 @@ namespace {
                     ctx->encoder,
                     nullptr, write_cb, enc_seek_cb, enc_tell_cb, nullptr,
                     ctx->f_out) != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
-                Logger::log(LogLevel::Error, "Failed to init FLAC Ogg encoder", processor_tag());
+                Logger::log(LogLevel::Error, "Failed to init FLAC Ogg encoder", "OggProcessor");
                 ctx->failed = true;
                 return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
             }
@@ -234,7 +230,7 @@ namespace {
         }
 
         if (FLAC__stream_encoder_process(ctx->encoder, buffer, frame->header.blocksize) == 0) {
-            Logger::log(LogLevel::Error, "Encoding process failed", processor_tag());
+            Logger::log(LogLevel::Error, "Encoding process failed", "OggProcessor");
             ctx->failed = true;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }

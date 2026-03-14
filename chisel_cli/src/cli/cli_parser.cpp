@@ -2,12 +2,14 @@
 // Created by Giuseppe Francione on 20/09/25.
 //
 
-#include "cli_parser.hpp"
-#include "../../libchisel/include/file_type.hpp"
 #include "CLI11.hpp"
+#include "cli_parser.hpp"
 #include <thread>
 #include <algorithm>
 #include <map>
+#ifdef callback
+#undef callback
+#endif
 
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags

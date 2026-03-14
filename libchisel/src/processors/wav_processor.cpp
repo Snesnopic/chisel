@@ -14,13 +14,9 @@
 namespace chisel {
 namespace fs = std::filesystem;
 
-static const char* processor_tag() {
-    return "WavProcessor";
-}
-
 void WavProcessor::recompress(const fs::path& input,
                               const fs::path& output, const ProcessingOptions &options) {
-    Logger::log(LogLevel::Error, "Recompress called on WavProcessor placeholder.", processor_tag());
+    Logger::log(LogLevel::Error, "Recompress called on WavProcessor placeholder.", this->get_name());
 
     std::error_code ec;
     fs::copy_file(input, output, fs::copy_options::overwrite_existing, ec);
@@ -31,7 +27,7 @@ void WavProcessor::recompress(const fs::path& input,
 }
 
 std::optional<ExtractedContent> WavProcessor::prepare_extraction(const fs::path& input_path) {
-    Logger::log(LogLevel::Info, "WAV: Preparing cover art extraction for: " + input_path.string(), processor_tag());
+    Logger::log(LogLevel::Info, "WAV: Preparing cover art extraction for: " + input_path.string(), this->getName());
 
     ExtractedContent content;
     content.original_path = input_path;
@@ -40,8 +36,8 @@ std::optional<ExtractedContent> WavProcessor::prepare_extraction(const fs::path&
     AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
 
     if (state.extracted_covers.empty()) {
-        Logger::log(LogLevel::Debug, "WAV: No embedded cover art found.", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Debug, "WAV: No embedded cover art found.", this->getName());
+        cleanup_temp_dir(content.temp_dir, this->getName());
         return std::nullopt;
     }
 
@@ -55,12 +51,12 @@ std::optional<ExtractedContent> WavProcessor::prepare_extraction(const fs::path&
 }
 
 std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
-    Logger::log(LogLevel::Info, "WAV: Finalizing (re-inserting covers) for: " + content.original_path.string(), processor_tag());
+    Logger::log(LogLevel::Info, "WAV: Finalizing (re-inserting covers) for: " + content.original_path.string(), this->getName());
 
     const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
     if (!state_ptr) {
-        Logger::log(LogLevel::Error, "WAV: Failed to retrieve extraction state.", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "WAV: Failed to retrieve extraction state.", this->getName());
+        cleanup_temp_dir(content.temp_dir, this->getName());
         return {};
     }
 
@@ -70,19 +66,19 @@ std::filesystem::path WavProcessor::finalize_extraction(const ExtractedContent &
     try {
         fs::copy_file(content.original_path, final_temp_path, fs::copy_options::overwrite_existing);
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "WAV: Failed to copy audio file: " + std::string(e.what()), processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "WAV: Failed to copy audio file: " + std::string(e.what()), this->getName());
+        cleanup_temp_dir(content.temp_dir, this->getName());
         return {};
     }
 
     if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
-        Logger::log(LogLevel::Error, "WAV: rebuildCovers failed", processor_tag());
-        cleanup_temp_dir(content.temp_dir, processor_tag());
+        Logger::log(LogLevel::Error, "WAV: rebuildCovers failed", this->getName());
+        cleanup_temp_dir(content.temp_dir, this->getName());
         fs::remove(final_temp_path);
         return {};
     }
 
-    cleanup_temp_dir(content.temp_dir, processor_tag());
+    cleanup_temp_dir(content.temp_dir, this->getName());
     return final_temp_path;
 }
 
