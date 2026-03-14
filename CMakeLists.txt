@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.20)
 
 project(chisel VERSION 1.2.0 LANGUAGES C CXX)
@@ -7,18 +6,6 @@ option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
-
-if(NOT CMAKE_OSX_ARCHITECTURES)
-    set(CHISEL_ARCH ${CMAKE_SYSTEM_PROCESSOR})
-else()
-    set(CHISEL_ARCH ${CMAKE_OSX_ARCHITECTURES})
-endif()
-
-if(APPLE)
-    set(MAGIC_CC "${CMAKE_C_COMPILER} -arch ${CHISEL_ARCH}")
-else()
-    set(MAGIC_CC "${CMAKE_C_COMPILER}")
-endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
@@ -289,6 +276,16 @@ set(wavpack_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/wavpack-build")
 add_subdirectory(${wavpack_SOURCE_DIR} ${wavpack_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libarchive
+# tvOS and watchOS lack support for spawning child processes and external pipes
+if(CMAKE_SYSTEM_NAME MATCHES "^(tvOS|watchOS)$")
+    set(HAVE_POSIX_SPAWN  FALSE CACHE INTERNAL "")
+    set(HAVE_POSIX_SPAWNP FALSE CACHE INTERNAL "")
+    set(HAVE_FORK         FALSE CACHE INTERNAL "")
+    set(HAVE_VFORK        FALSE CACHE INTERNAL "")
+    set(HAVE_PIPE         FALSE CACHE INTERNAL "")
+
+    add_compile_definitions(HAVE_PIPE=0)
+endif()
 set(ENABLE_OPENSSL OFF CACHE BOOL "Disable OpenSSL in libarchive" FORCE)
 set(ENABLE_TAR ON CACHE BOOL "" FORCE)
 set(ENABLE_CPIO ON CACHE BOOL "" FORCE)
@@ -422,6 +419,19 @@ else()
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 endif()
 
+set(MOZJPEG_CROSS_ARGS "")
+
+if(APPLE)
+    list(GET CMAKE_OSX_ARCHITECTURES 0 CURRENT_ARCH)
+
+    list(APPEND MOZJPEG_CROSS_ARGS
+            "-DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
+            "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}"
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+            "-DCMAKE_SYSTEM_PROCESSOR=${CURRENT_ARCH}"
+    )
+endif()
+
 ExternalProject_Add(mozjpeg
         SOURCE_DIR ${CMAKE_SOURCE_DIR}/third_party/mozjpeg
         SOURCE_SUBDIR .
@@ -432,6 +442,7 @@ ExternalProject_Add(mozjpeg
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/mozjpeg-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         -DPNG_SUPPORTED=0
+        ${MOZJPEG_CROSS_ARGS}
         -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
@@ -672,9 +683,7 @@ endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
-target_sources(libchisel PRIVATE
-        ${BMPLIB_SOURCES}
-)
+
 target_sources(libchisel PRIVATE ${BMPLIB_SOURCES})
 
 target_include_directories(libchisel SYSTEM PRIVATE
