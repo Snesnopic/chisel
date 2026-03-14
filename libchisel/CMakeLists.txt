@@ -176,5 +176,5 @@ add_dependencies(libchisel libgifsicle)
 add_dependencies(libchisel mseed_static)
 
 if(NOT WIN32)
-    add_dependencies(libchisel libmagic)
+    add_dependencies(libchisel LIBMAGIC)
 endif()

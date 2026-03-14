@@ -153,42 +153,75 @@ set(DEFLATE_INCLUDE_DIR "${libdeflate_SOURCE_DIR}" CACHE PATH "" FORCE)
 
 # libmagic
 if(NOT WIN32)
-    ExternalProject_Add(libmagic
+    # fetch libmagic source
+    FetchContent_Declare(
+            libmagic_ext
             URL https://astron.com/pub/file/file-5.45.tar.gz
             URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
-            CONFIGURE_COMMAND ./configure --disable-shared --enable-static --prefix=<INSTALL_DIR>
-                "CC=${MAGIC_CC}"
-                "CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS}"
-                "LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}"
-            BUILD_COMMAND make
-            INSTALL_COMMAND make install
-            BUILD_IN_SOURCE 1
-            INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install
-            BUILD_BYPRODUCTS
-                ${CMAKE_BINARY_DIR}/libmagic-install/lib/libmagic.a
-                ${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc
-            CONFIGURE_ENV CFLAGS=${EXTERNAL_AUTOTOOLS_CFLAGS} CXXFLAGS=${EXTERNAL_AUTOTOOLS_CXXFLAGS} LDFLAGS=${EXTERNAL_AUTOTOOLS_LDFLAGS}
+    )
+    FetchContent_MakeAvailable(libmagic_ext)
+
+    set(MAGIC_SRC "${libmagic_ext_SOURCE_DIR}/src")
+    set(MAGIC_BIN "${libmagic_ext_BINARY_DIR}/src")
+    file(MAKE_DIRECTORY "${MAGIC_BIN}")
+
+    # generate magic.h
+    if(NOT EXISTS "${MAGIC_BIN}/magic.h")
+        file(READ "${MAGIC_SRC}/magic.h.in" magic_h_in)
+        string(REPLACE "X.YY" "5.45" magic_h_out "${magic_h_in}")
+        file(WRITE "${MAGIC_BIN}/magic.h" "${magic_h_out}")
+    endif()
+
+    # generate minimal posix config.h
+    if(NOT EXISTS "${MAGIC_BIN}/config.h")
+        file(WRITE "${MAGIC_BIN}/config.h" "
+#define HAVE_STDINT_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_UNISTD_H 1
+#define HAVE_FCNTL_H 1
+#define HAVE_MMAP 1
+#define HAVE_STRNDUP 1
+#define HAVE_ASPRINTF 1
+#define HAVE_VASPRINTF 1
+#define HAVE_STRLCPY 1
+#define HAVE_STRLCAT 1
+#define HAVE_GETLINE 1
+#define VERSION \"5.45\"
+        ")
+    endif()
+
+    # core sources
+    add_library(LIBMAGIC STATIC
+            "${MAGIC_SRC}/apprentice.c"
+            "${MAGIC_SRC}/apptype.c"
+            "${MAGIC_SRC}/ascmagic.c"
+            "${MAGIC_SRC}/buffer.c"
+            "${MAGIC_SRC}/cdf.c"
+            "${MAGIC_SRC}/cdf_time.c"
+            "${MAGIC_SRC}/compress.c"
+            "${MAGIC_SRC}/der.c"
+            "${MAGIC_SRC}/encoding.c"
+            "${MAGIC_SRC}/fsmagic.c"
+            "${MAGIC_SRC}/funcs.c"
+            "${MAGIC_SRC}/is_csv.c"
+            "${MAGIC_SRC}/is_json.c"
+            "${MAGIC_SRC}/is_tar.c"
+            "${MAGIC_SRC}/is_simh.c"
+            "${MAGIC_SRC}/magic.c"
+            "${MAGIC_SRC}/print.c"
+            "${MAGIC_SRC}/readcdf.c"
+            "${MAGIC_SRC}/readelf.c"
+            "${MAGIC_SRC}/softmagic.c"
     )
 
-    set(LIBMAGIC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libmagic-install/include)
-    set(LIBMAGIC_LIB_DIR ${CMAKE_BINARY_DIR}/libmagic-install/lib)
-    set(LIBMAGIC_LIB magic)
+    target_include_directories(LIBMAGIC PUBLIC
+            $<BUILD_INTERFACE:${MAGIC_BIN}>
+            $<BUILD_INTERFACE:${MAGIC_SRC}>
+    )
+    target_compile_definitions(LIBMAGIC PRIVATE HAVE_CONFIG_H)
 
-    # --- Embed compressed magic.mgc as header ---
-    set(MAGIC_SRC "${CMAKE_BINARY_DIR}/libmagic-install/share/misc/magic.mgc")
     set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/libchisel/include/magic.mgc.h")
-    set(MAGIC_COMPRESSED "${CMAKE_BINARY_DIR}/magic.mgc.gz")
-
-    set(LIBMAGIC_INSTALL_DIR ${CMAKE_BINARY_DIR}/libmagic-install)
-    file(MAKE_DIRECTORY ${LIBMAGIC_INSTALL_DIR}/include)
-
-    add_library(LIBMAGIC STATIC IMPORTED GLOBAL)
-    set_target_properties(LIBMAGIC PROPERTIES
-            IMPORTED_LOCATION ${LIBMAGIC_INSTALL_DIR}/lib/libmagic.a
-            INTERFACE_INCLUDE_DIRECTORIES ${LIBMAGIC_INSTALL_DIR}/include
-    )
-
-    add_dependencies(LIBMAGIC libmagic)
 endif()
 
 # zlib
