@@ -10,8 +10,8 @@
 #include <iomanip>
 #include <fstream>
 #include "utils/color.hpp"
-#include "cli/cli_parser.hpp"
 #include "cli/CLI11.hpp"
+#include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
 #include "../../libchisel/include/processor_executor.hpp"
