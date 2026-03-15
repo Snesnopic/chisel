@@ -3,7 +3,11 @@
 //
 
 #include <magic.h>
+#ifdef _WIN32
+#include "magic_mgc_windows.h"
+#else
 #include "magic_mgc.h"
+#endif
 #include "../../include/mime_detector.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/logger.hpp"
