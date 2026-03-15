@@ -579,7 +579,6 @@ set(libwebp_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libwebp")
 set(libwebp_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libwebp-build")
 add_subdirectory(${libwebp_SOURCE_DIR} ${libwebp_BINARY_DIR} EXCLUDE_FROM_ALL)
 add_library(thirdparty_webp ALIAS webp)
-add_library(thirdparty_webpdecoder ALIAS webpdecoder)
 add_library(thirdparty_webpdemux ALIAS webpdemux)
 add_library(thirdparty_webpmux ALIAS libwebpmux)
 
@@ -707,7 +706,6 @@ set(CHISEL_LIBS
         wavpack
         flexigif
         thirdparty_webp
-        thirdparty_webpdecoder
         thirdparty_webpdemux
         thirdparty_webpmux
         libqpdf
