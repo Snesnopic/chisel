@@ -18,12 +18,6 @@ add_executable(chisel ${CHISEL_CLI_SOURCES})
 
 set_target_properties(chisel PROPERTIES OUTPUT_NAME "chsl")
 
-if(APPLE)
-    add_custom_command(TARGET chisel POST_BUILD
-            COMMAND strip -x $<TARGET_FILE:chisel>
-            COMMENT "Stripping symbols from chisel (macOS)")
-endif()
-
 target_link_libraries(chisel PRIVATE libchisel chisel_optivorbis_bridge)
 
 target_include_directories(chisel PRIVATE
