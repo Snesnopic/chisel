@@ -80,14 +80,9 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
     }
 
     int err = 0;
-#ifdef __FreeBSD__
-    APE::IAPEDecompress *pDecompress = CreateIAPEDecompress(
-        reinterpret_cast<const APE::str_utfn*>(input.c_str()),
-        &err, true, true, false);
-#else
+
     APE::IAPEDecompress *pDecompress = CreateIAPEDecompress(
         input.wstring().c_str(), &err, true, true, false);
-#endif
     if (pDecompress == nullptr || err != ERROR_SUCCESS) {
         delete pDecompress;
         throw std::runtime_error("ApeProcessor: cannot create APE decompress (err: " + std::to_string(err) + ")");
