@@ -779,6 +779,7 @@ if(ENABLE_MATROSKA)
     set_target_properties(mkclean_lib PROPERTIES UNITY_BUILD OFF)
     set_target_properties("file_test" PROPERTIES UNITY_BUILD OFF)
     set_target_properties("node_test" PROPERTIES UNITY_BUILD OFF)
+    set_target_properties("ebmltree" PROPERTIES UNITY_BUILD OFF)
 endif()
 
 set_target_properties(liblzma PROPERTIES UNITY_BUILD OFF)
