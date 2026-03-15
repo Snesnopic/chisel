@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.5...4.1.2)
 
 project(chisel VERSION 1.2.0 LANGUAGES C CXX)
 
