@@ -84,7 +84,7 @@ jobs:
         if: runner.os == 'Windows' && (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
         run: git config --global core.autocrlf false
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -179,7 +179,7 @@ jobs:
           echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.ARTIFACT_PATH }}
@@ -190,7 +190,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -247,7 +247,7 @@ jobs:
           echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-freebsd-x64
           path: ${{ env.ARTIFACT_PATH }}
@@ -258,7 +258,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -315,7 +315,7 @@ jobs:
           echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-freebsd-arm64
           path: ${{ env.ARTIFACT_PATH }}
@@ -365,7 +365,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary artifact
         uses: actions/download-artifact@v4
@@ -567,7 +567,7 @@ jobs:
 
       - name: Upload Chisel Log File
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chisel-log-${{ matrix.id }}
           path: |
@@ -598,7 +598,7 @@ jobs:
       BIN_DIR: bin
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download binary artifact
         uses: actions/download-artifact@v4
@@ -709,7 +709,7 @@ jobs:
 
       - name: Upload Chisel Log File
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chisel-log-${{ matrix.asset_name }}
           path: chisel.log
@@ -735,7 +735,7 @@ jobs:
           sort -u combined/chisel-combined.log > combined/chisel-combined-unique.log
 
       - name: Upload combined log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chisel-combined-logs
           path: combined/
@@ -753,7 +753,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all build and log artifacts
         uses: actions/download-artifact@v4
@@ -832,7 +832,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all build and log artifacts
         uses: actions/download-artifact@v4
