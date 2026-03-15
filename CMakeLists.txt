@@ -725,7 +725,7 @@ endif()
 
 if(WIN32)
     list(APPEND CHISEL_LIBS
-            unofficial::libmagic::magic
+            unofficial::libmagic::libmagic
     )
 else()
     list(APPEND CHISEL_LIBS
