@@ -66,7 +66,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: -DENABLE_MP3PACKER=OFF
+            extra_cmake_args: -DENABLE_MP3PACKER=OFF -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
@@ -75,7 +75,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: -DENABLE_MP3PACKER=OFF
+            extra_cmake_args: -DENABLE_MP3PACKER=OFF -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-windows-static
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 

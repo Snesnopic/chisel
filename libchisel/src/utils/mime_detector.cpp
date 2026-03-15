@@ -1,10 +1,9 @@
 //
 // Created by Giuseppe Francione on 11/10/25.
 //
-#ifndef _WIN32
+
 #include <magic.h>
 #include "magic_mgc.h"
-#endif
 #include "../../include/mime_detector.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/logger.hpp"
@@ -61,7 +60,6 @@ namespace {
         return out;
     }
 
-#ifndef _WIN32
     // thread local wrapper to prevent reloading magic db on every call
     struct magic_handle {
         magic_t handle;
@@ -89,29 +87,25 @@ namespace {
         thread_local magic_handle mh(MAGIC_NONE);
         return mh.handle;
     }
-#endif
 } // namespace
 
 std::string MimeDetector::detect(const std::filesystem::path& path)
 {
-#ifndef _WIN32
     const magic_t magic = get_magic_mime();
-    if (magic == nullptr) return {};
+    if (magic == nullptr) return "application/octet-stream";
 
     const char* mime = magic_file(magic, path.string().c_str());
-    return mime != nullptr ? mime : "";
-#else
-    auto ext = path.extension().string();
-    std::ranges::transform(ext, ext.begin(), ::tolower);
-    auto it = ext_to_mime.find(ext);
-    return it != ext_to_mime.end() ? it->second : "application/octet-stream";
-#endif
+    return mime != nullptr ? mime : "application/octet-stream";
 }
 
 
-std::filesystem::path MimeDetector::get_magic_file_path()
+    std::filesystem::path MimeDetector::get_magic_file_path()
 {
-#ifdef __APPLE__
+#ifdef _WIN32
+    const char* appdata = getenv("LOCALAPPDATA");
+    return std::filesystem::path(appdata != nullptr ? appdata : ".") /
+        "chisel/magic.mgc";
+#elif defined(__APPLE__)
     const char* home = getenv("HOME");
     return std::filesystem::path((home != nullptr) ? home : ".") /
         "Library/Application Support/chisel/magic.mgc";
@@ -121,10 +115,8 @@ std::filesystem::path MimeDetector::get_magic_file_path()
         ".local/share/chisel/magic.mgc";
 #endif
 }
-
-void MimeDetector::ensure_magic_installed()
+    void MimeDetector::ensure_magic_installed()
 {
-#ifndef _WIN32
     static std::once_flag init_flag;
     std::call_once(init_flag, []() {
         const auto target = get_magic_file_path();
@@ -139,7 +131,7 @@ void MimeDetector::ensure_magic_installed()
             else {
                 magic_t test_magic = magic_open(MAGIC_NONE);
                 if (test_magic != nullptr) {
-                    if (magic_load(test_magic, target.c_str()) != 0) {
+                    if (magic_load(test_magic, target.string().c_str()) != 0) {
                         need_install = true;
                         Logger::log(LogLevel::Warning, "LOCAL MAGIC DATABASE CORRUPT, REGENERATING...", "MimeDetector");
                     }
@@ -157,10 +149,12 @@ void MimeDetector::ensure_magic_installed()
             std::ofstream ofs(target, std::ios::binary);
             ofs.write(reinterpret_cast<const char*>(decompressed.data()), static_cast<std::streamsize>(decompressed.size()));
         }
-        setenv("MAGIC", target.c_str(), 1);
-    });
+
+#ifdef _WIN32
+        _putenv_s("MAGIC", target.string().c_str());
 #else
-    // _putenv_s("MAGIC", target.string().c_str());
+        setenv("MAGIC", target.c_str(), 1);
 #endif
+    });
 }
 }

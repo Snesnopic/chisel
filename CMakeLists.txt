@@ -144,7 +144,9 @@ set(DEFLATE_LIBRARY libdeflate_static CACHE STRING "" FORCE)
 set(DEFLATE_INCLUDE_DIR "${libdeflate_SOURCE_DIR}" CACHE PATH "" FORCE)
 
 # libmagic
-if(NOT WIN32)
+if(WIN32)
+    find_package(unofficial-libmagic CONFIG REQUIRED)
+else()
     # fetch libmagic source
     FetchContent_Declare(
             libmagic_ext
@@ -721,11 +723,16 @@ if(ENABLE_MP3PACKER)
     add_compile_definitions(HAVE_MP3PACKER=1)
 endif()
 
-if(NOT WIN32)
+if(WIN32)
+    list(APPEND CHISEL_LIBS
+            unofficial::libmagic::magic
+    )
+else()
     list(APPEND CHISEL_LIBS
             LIBMAGIC
     )
 endif()
+
 if(ENABLE_OPTIVORBIS)
     add_subdirectory(third_party/corrosion)
     add_compile_definitions(HAVE_OPTIVORBIS=1)
