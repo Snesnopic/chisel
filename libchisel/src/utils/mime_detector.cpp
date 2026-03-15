@@ -104,15 +104,15 @@ std::string MimeDetector::detect(const std::filesystem::path& path)
 #ifdef _WIN32
     const char* appdata = getenv("LOCALAPPDATA");
     return std::filesystem::path(appdata != nullptr ? appdata : ".") /
-        "chisel/magic.mgc";
+        "chisel"/"magic.mgc";
 #elif defined(__APPLE__)
     const char* home = getenv("HOME");
     return std::filesystem::path((home != nullptr) ? home : ".") /
-        "Library/Application Support/chisel/magic.mgc";
+        "Library" /"Application Support"/"chisel"/"magic.mgc";
 #else
     const char* home = getenv("HOME");
     return std::filesystem::path(home != nullptr ? home : ".") /
-        ".local/share/chisel/magic.mgc";
+        ".local"/"share"/"chisel"/"magic.mgc";
 #endif
 }
     void MimeDetector::ensure_magic_installed()
