@@ -25,7 +25,7 @@ for ($i = 0; $i -lt $len; $i += 16) {
     [void]$sb.Append("    ")
     $limit = [Math]::Min($i + 16, $len)
     for ($j = $i; $j -lt $limit; $j++) {
-        [void]$sb.Append(("0x{0:02x}" -f $compressed[$j]))
+        [void]$sb.Append(("0x{0:x2}" -f $compressed[$j]))
         if ($j -lt $len - 1) {
             [void]$sb.Append(", ")
         }
