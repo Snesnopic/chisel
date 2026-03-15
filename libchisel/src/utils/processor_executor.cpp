@@ -115,7 +115,12 @@ namespace chisel {
                     if (!ec) fs::remove(temp_file, ec);
                 }
                 if (!ec) break;
+#ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
+#else
+                // posix specific retry conditions or generic fallback
+                if (ec.value() != EACCES && ec.value() != ETXTBSY) break;
+#endif
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
                 --retries;
@@ -136,7 +141,12 @@ namespace chisel {
                     if (!ec) fs::remove(temp_file, ec);
                 }
                 if (!ec) break;
+#ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
+#else
+                // posix specific retry conditions or generic fallback
+                if (ec.value() != EACCES && ec.value() != ETXTBSY) break;
+#endif
 
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
@@ -264,8 +274,12 @@ namespace chisel {
                                 pipeline_ok = false;
                                 break;
                             }
-                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
-                            candidates[i]->recompress(current, tmp, m_options);
+                            // resolve target directory to keep temp file on the same mount point
+                            fs::path target_dir = has_output_dir_
+                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
+                                : file.parent_path();
+
+                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");                            candidates[i]->recompress(current, tmp, m_options);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
                                 pipeline_ok = false;
@@ -317,7 +331,12 @@ namespace chisel {
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
-                            fs::path tmp = fs::temp_directory_path() / (file.filename().string() + "_" + job_suffix + ".cand." + std::to_string(i) + ".tmp");
+                            // resolve target directory to keep temp file on the same mount point
+                            fs::path target_dir = has_output_dir_
+                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
+                                : file.parent_path();
+
+                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             Result r{tmp, 0, false};
                             try {
                                 candidates[i]->recompress(file, tmp, m_options);
