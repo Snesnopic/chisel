@@ -368,7 +368,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
@@ -412,7 +412,7 @@ jobs:
 
       - name: Cache test data archive
         id: cache-test-archive
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.TEST_ARCHIVE_NAME }}
           key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
@@ -601,7 +601,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
@@ -624,7 +624,7 @@ jobs:
 
       - name: Cache test data archive
         id: cache-test-archive
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.TEST_ARCHIVE_NAME }}
           key: ${{ runner.os }}-testarchive-v1-${{ secrets.GDRIVE_FILE_ID }}
@@ -685,8 +685,6 @@ jobs:
           usesh: true
           run: |
             echo "--- Starting FreeBSD Test ---"
-            export LC_ALL=en_US.UTF-8
-            export LANG=en_US.UTF-8
             CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
             echo "Running chisel from: $CHISEL_EXE"
             echo "Processing files in: ${{ env.TEST_DIR }}"
@@ -723,7 +721,7 @@ jobs:
     if: always()
     steps:
       - name: Download all log artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: chisel-log-*
           path: logs
@@ -756,7 +754,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download all build and log artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
 
@@ -835,7 +833,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download all build and log artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
 
@@ -930,7 +928,7 @@ jobs:
           arch: ${{ matrix.id == 'windows-arm' && 'arm64' || 'x64' }}
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
