@@ -172,6 +172,25 @@ int main(int argc, char* argv[]) {
         return app.exit(e);
     }
 
+    // set console logger
+    // auto sink = std::make_unique<ConsoleLogSink>();
+    // sink->log_level = Logger::string_to_level(settings.log_level);
+    // Logger::set_sink(std::move(sink));
+
+    // set file logger
+    Logger::clear_sinks();
+    if (!settings.log_file.empty()) {
+        auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
+        fileSink->log_level = Logger::string_to_level(settings.log_level);
+        Logger::add_sink(std::move(fileSink));
+    }
+
+    if (!settings.quiet) {
+        auto consoleSink = std::make_unique<ConsoleLogSink>();
+        consoleSink->log_level = Logger::string_to_level(settings.log_level);
+        Logger::add_sink(std::move(consoleSink));
+    }
+
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     init_utf8_locale();
@@ -192,25 +211,6 @@ int main(int argc, char* argv[]) {
     }
 
 #endif
-
-    // set console logger
-    // auto sink = std::make_unique<ConsoleLogSink>();
-    // sink->log_level = Logger::string_to_level(settings.log_level);
-    // Logger::set_sink(std::move(sink));
-
-    // set file logger
-    Logger::clear_sinks();
-    if (!settings.log_file.empty()) {
-        auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
-        fileSink->log_level = Logger::string_to_level(settings.log_level);
-        Logger::add_sink(std::move(fileSink));
-    }
-
-    if (!settings.quiet) {
-        auto consoleSink = std::make_unique<ConsoleLogSink>();
-        consoleSink->log_level = Logger::string_to_level(settings.log_level);
-        Logger::add_sink(std::move(consoleSink));
-    }
 
     // registry of processors and event bus
     ProcessorRegistry registry;
