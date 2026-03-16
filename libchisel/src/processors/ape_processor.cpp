@@ -81,8 +81,13 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     int err = 0;
 
+    std::string path_str = input.string();
+
+    const std::wstring w_input(path_str.begin(), path_str.end());
+
     APE::IAPEDecompress *pDecompress = CreateIAPEDecompress(
-        input.wstring().c_str(), &err, true, true, false);
+        w_input.c_str(), &err, true, true, false);
+
     if (pDecompress == nullptr || err != ERROR_SUCCESS) {
         delete pDecompress;
         throw std::runtime_error("ApeProcessor: cannot create APE decompress (err: " + std::to_string(err) + ")");
