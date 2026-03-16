@@ -8,6 +8,7 @@
 #include "../../include/file_utils.hpp"
 #include "../../include/random_utils.hpp"
 #include <MACLib.h>
+#include "CharacterHelper.h"
 #include <APETag.h>
 #include <vector>
 #include <stdexcept>
@@ -81,12 +82,10 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     int err = 0;
 
-    std::string path_str = input.string();
-
-    const std::wstring w_input(path_str.begin(), path_str.end());
+    const auto *const pMacString = APE::CAPECharacterHelper::GetUTFNFromANSI(input.string().c_str());
 
     APE::IAPEDecompress *pDecompress = CreateIAPEDecompress(
-        w_input.c_str(), &err, true, true, false);
+        pMacString, &err, true, true, false);
 
     if (pDecompress == nullptr || err != ERROR_SUCCESS) {
         delete pDecompress;
@@ -259,7 +258,10 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
                                     unsigned& channels,
                                     unsigned& bps) {
     int err = 0;
-    APE::IAPEDecompress* dec = CreateIAPEDecompress(file.wstring().c_str(),
+
+    const auto *const pMacString = APE::CAPECharacterHelper::GetUTFNFromANSI(file.string().c_str());
+
+    APE::IAPEDecompress* dec = CreateIAPEDecompress(pMacString,
                                                     &err,
                                                     true,  // full header analysis
                                                     true,  // check CRC
