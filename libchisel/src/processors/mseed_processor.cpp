@@ -78,10 +78,13 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
 
     int ret = ms3_readmsr(&msr, input.string().c_str(), 0, 0);
     if (ret != MS_NOERROR) {
-        if (msr) msr3_free(&msr);
         Logger::log(LogLevel::Warning, "COULD NOT PEEK FIRST RECORD, ATTEMPTING FULL READ.", get_name());
     } else {
         original_version = msr->formatversion;
+    }
+    if (msr != nullptr) {
+        // force libmseed to close the file handle
+        ms3_readmsr(&msr, nullptr, 0, 0);
         msr3_free(&msr);
     }
 
