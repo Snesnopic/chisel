@@ -18,18 +18,7 @@
 #include "random_utils.hpp"
 
 namespace fs = std::filesystem;
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winternl.h>
 
-#ifndef FILE_RENAME_POSIX_SEMANTICS
-#define FILE_RENAME_POSIX_SEMANTICS 0x00000002
-#endif
-#ifndef FILE_RENAME_REPLACE_IF_EXISTS
-#define FILE_RENAME_REPLACE_IF_EXISTS 0x00000001
-#endif
-#endif
 namespace chisel {
     ProcessorExecutor::ProcessorExecutor(ProcessorRegistry &registry,
                                          const ProcessingOptions &options,
@@ -93,36 +82,7 @@ namespace chisel {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         finalize_containers();
     }
-#ifdef _WIN32
-    bool windows_atomic_rename(const fs::path& from, const fs::path& to) {
-        HANDLE hFile = CreateFileW(from.c_str(),
-                                   DELETE | GENERIC_WRITE,
-                                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
-        if (hFile == INVALID_HANDLE_VALUE) return false;
-
-        std::wstring dest_str = to.wstring();
-        size_t info_size = sizeof(FILE_RENAME_INFO) + (dest_str.length() * sizeof(wchar_t));
-        auto* info = static_cast<FILE_RENAME_INFO*>(malloc(info_size));
-
-        if (!info) {
-            CloseHandle(hFile);
-            return false;
-        }
-
-        info->Flags = FILE_RENAME_POSIX_SEMANTICS | FILE_RENAME_REPLACE_IF_EXISTS;
-        info->RootDirectory = NULL;
-        info->FileNameLength = static_cast<DWORD>(dest_str.length() * sizeof(wchar_t));
-        memcpy(info->FileName, dest_str.c_str(), info->FileNameLength);
-
-        bool success = SetFileInformationByHandle(hFile, FileRenameInfoEx, info, (DWORD)info_size);
-
-        free(info);
-        CloseHandle(hFile);
-        return success;
-    }
-#endif
     std::optional<std::pair<fs::path, bool>> ProcessorExecutor::move_to_destination(
         const fs::path& original_file,
         const fs::path& temp_file) const {
@@ -139,49 +99,22 @@ namespace chisel {
         fs::path dest = original_file;
 
         if (dry_run_) {
-            Logger::log(LogLevel::Info, "[DRY-RUN] WOULD REPLACE: " + original_file.string(), "Executor");
+            Logger::log(LogLevel::Info, "[DRY-RUN] Would replace: " + original_file.string(), "Executor");
             fs::remove(temp_file, ec);
-        } else {
-            // resolve destination path
-            if (has_output_dir_) {
-                dest = output_is_directory_
-                      ? (output_dir_ / original_file.filename())
-                      : output_dir_;
-            }
+        } else if (has_output_dir_) {
+            dest = output_is_directory_
+                  ? (output_dir_ / original_file.filename())
+                  : output_dir_;
 
             int retries = 10;
             while (retries > 0) {
-                bool moved = false;
-
-#ifdef _WIN32
-                if (windows_atomic_rename(temp_file, dest)) {
-                    moved = true;
-                    ec.clear();
-                } else {
-                    DWORD err = GetLastError();
-                    if (err == ERROR_NOT_SAME_DEVICE) {
-                        ec = std::make_error_code(std::errc::cross_device_link);
-                    } else {
-                        ec.assign(err, std::system_category());
-                    }
-                }
-#else
                 fs::rename(temp_file, dest, ec);
-                if (!ec) moved = true;
-#endif
-
-                // fallback to copy if cross-device link
-                if (!moved && ec == std::errc::cross_device_link) {
+                if (ec == std::errc::cross_device_link) {
                     ec.clear();
                     fs::copy(temp_file, dest, fs::copy_options::overwrite_existing, ec);
-                    if (!ec) {
-                        fs::remove(temp_file, ec);
-                        moved = true;
-                    }
+                    if (!ec) fs::remove(temp_file, ec);
                 }
-
-                if (moved) break;
-
+                if (!ec) break;
 #ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
 #else
@@ -189,7 +122,33 @@ namespace chisel {
                 if (ec.value() != EACCES && ec.value() != ETXTBSY) break;
 #endif
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(has_output_dir_ ? 250 : 500));
+                std::this_thread::sleep_for(std::chrono::milliseconds(250));
+                --retries;
+            }
+            if (ec) {
+                Logger::log(LogLevel::Error, "Rename failed: " + dest.string() + " (" + ec.message() + ")", "Executor");
+                fs::remove(temp_file, ec);
+                return std::nullopt;
+            }
+            replaced = true;
+        } else { // in-place
+            int retries = 10;
+            while (retries > 0) {
+                fs::rename(temp_file, original_file, ec);
+                if (ec == std::errc::cross_device_link) {
+                    ec.clear();
+                    fs::copy(temp_file, original_file, fs::copy_options::overwrite_existing, ec);
+                    if (!ec) fs::remove(temp_file, ec);
+                }
+                if (!ec) break;
+#ifdef _WIN32
+                if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
+#else
+                // posix specific retry conditions or generic fallback
+                if (ec.value() != EACCES && ec.value() != ETXTBSY) break;
+#endif
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
             if (ec) {
