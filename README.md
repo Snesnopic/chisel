@@ -95,30 +95,20 @@ Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
   git lfs pull
   git submodule update --init --recursive
 ```
-### Configure and build with CMake (Linux / macOS):
-```bash
-mkdir build && cd build
-cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release
-cmake --build . --config Release
-```
 
-### Configure and build with CMake (Windows):
-```powershell
+### Configure and build with CMake:
+```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
+> If you have Ninja, you can add `-G "Ninja"` to the first command.
 
 ### Opting out of specific encoders
 If you do not want to install the OCaml toolchain, you can disable MP3 optimization (mp3packer) by passing `-DENABLE_MP3PACKER=OFF` to CMake during configuration.
 
-## Installing (Optional)
-
-After building the project, you can install the `chsl` executable and its documentation (manpage) onto your system by running:
-
-```bash
-sudo cmake --install . --prefix /usr/local
-```
+You can also opt out of the OptiVorbis integration (which requires Rust) with `-DENABLE_OPTIVORBIS=OFF`.
+You can do the same for MKV optimizations with `-DENABLE_MATROSKA=OFF`.
 
 ## Usage
 
@@ -127,7 +117,7 @@ sudo cmake --install . --prefix /usr/local
 **Arguments:**
 -   `inputs...`
     One or more files or directories to process.
-    Use `-` to read from `stdin` (standard input).
+    Use `-` to read from `stdin`.
 
 **Options:**
 -   `-h, --help`
