@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.2.0 LANGUAGES C CXX)
+project(chisel VERSION 1.3.0 LANGUAGES C CXX)
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
@@ -461,7 +461,6 @@ if(MSVC)
 endif()
 
 # --- mozjpeg via ExternalProject ---
-include(ExternalProject)
 if(MSVC)
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/Release/jpeg-static.lib")
 elseif(MINGW)

@@ -18,12 +18,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Snesnopic"
             VALUE "FileDescription",  "Chisel - Native file optimizer"
-            VALUE "FileVersion",      "1.2.0.0"
+            VALUE "FileVersion",      "1.3.0.0"
             VALUE "InternalName",     "chisel"
             VALUE "LegalCopyright",   "Copyright (C) 2026"
             VALUE "OriginalFilename", "chisel.exe"
             VALUE "ProductName",      "Chisel CLI"
-            VALUE "ProductVersion",   "1.2.0"
+            VALUE "ProductVersion",   "1.3.0"
         END
     END
     BLOCK "VarFileInfo"
