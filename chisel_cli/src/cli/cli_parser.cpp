@@ -2,17 +2,19 @@
 // Created by Giuseppe Francione on 20/09/25.
 //
 
-#include "cli_parser.hpp"
-#include "../../libchisel/include/file_type.hpp"
 #include "CLI11.hpp"
+#include "cli_parser.hpp"
 #include <thread>
 #include <algorithm>
 #include <map>
+#ifdef callback
+#undef callback
+#endif
 
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags
     app.set_help_flag("-h,--help", "Show this help message and exit.");
-    app.set_version_flag("--version", "1.2.0");
+    app.set_version_flag("--version", "1.3.0");
 
     // --- Flags (booleans) ---
     app.add_flag("--no-meta", [&](const int count) {
@@ -68,11 +70,11 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
 
     // encoding mode option with a map transformer
     app.add_option("--mode", settings.encode_mode, "Encoding mode: 'pipe' (default) or 'parallel'.")
-        ->default_val(EncodeMode::PIPE)
+        ->default_val(chisel::EncodeMode::PIPE)
         ->transform(CLI::CheckedTransformer(
-            std::map<std::string, EncodeMode>{
-                {"pipe", EncodeMode::PIPE},
-                {"parallel", EncodeMode::PARALLEL}
+            std::map<std::string, chisel::EncodeMode>{
+                {"pipe", chisel::EncodeMode::PIPE},
+                {"parallel", chisel::EncodeMode::PARALLEL}
             }, CLI::ignore_case));
 
     app.add_option("--include", settings.include_patterns,

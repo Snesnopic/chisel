@@ -9,16 +9,16 @@
 #include <stdexcept>
 #include <system_error>
 #include <filesystem>
-
+#ifdef HAVE_MATROSKA
 // forward declaration of mkclean API
 extern "C" int mkclean_optimize(int argc, char* argv[]);
-
+#endif
 namespace chisel {
 
 void MkvProcessor::recompress(const std::filesystem::path& input,
                               const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
-
+#ifdef HAVE_MATROSKA
     namespace fs = std::filesystem;
     std::error_code ec;
 
@@ -69,7 +69,7 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
         Logger::log(LogLevel::Error, "Mkclean failed with exit code " + std::to_string(return_code), get_name());
         throw std::runtime_error("MkvProcessor: mkclean failed");
     }
-
+#endif
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 

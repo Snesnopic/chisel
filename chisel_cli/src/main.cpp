@@ -10,8 +10,8 @@
 #include <iomanip>
 #include <fstream>
 #include "utils/color.hpp"
-#include "cli/cli_parser.hpp"
 #include "cli/CLI11.hpp"
+#include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
 #include "../../libchisel/include/processor_executor.hpp"
@@ -125,6 +125,9 @@ void signal_handler(int sig) {
 
 inline void init_utf8_locale() {
     std::setlocale(LC_ALL, "");
+    try {
+        std::locale::global(std::locale(""));
+    } catch (...) {}
 
     const char *cur = std::setlocale(LC_CTYPE, nullptr);
     if (cur && std::string(cur).find("UTF-8") != std::string::npos) {
@@ -135,6 +138,10 @@ inline void init_utf8_locale() {
     constexpr const char *fallbacks[] = {"C.UTF-8", "en_US.UTF-8", ".UTF-8" /* Windows */};
     for (const auto fb: fallbacks) {
         if (std::setlocale(LC_ALL, fb)) {
+            try {
+                std::locale::global(std::locale(fb));
+            } catch(...) {}
+
             Logger::log(LogLevel::Info, std::string("Locale set to ") + fb, "LocaleInit");
             return;
         }
@@ -144,7 +151,6 @@ inline void init_utf8_locale() {
     Logger::log(LogLevel::Warning, "UTF-8 locale not available; non-ASCII file names may be problematic.",
                 "LocaleInit");
 }
-
 
 int main(int argc, char* argv[]) {
 
@@ -164,6 +170,25 @@ int main(int argc, char* argv[]) {
     catch (const CLI::ParseError &e) {
         std::cerr << RED << "Parse error: " << e.what() << RESET << std::endl;
         return app.exit(e);
+    }
+
+    // set console logger
+    // auto sink = std::make_unique<ConsoleLogSink>();
+    // sink->log_level = Logger::string_to_level(settings.log_level);
+    // Logger::set_sink(std::move(sink));
+
+    // set file logger
+    Logger::clear_sinks();
+    if (!settings.log_file.empty()) {
+        auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
+        fileSink->log_level = Logger::string_to_level(settings.log_level);
+        Logger::add_sink(std::move(fileSink));
+    }
+
+    if (!settings.quiet) {
+        auto consoleSink = std::make_unique<ConsoleLogSink>();
+        consoleSink->log_level = Logger::string_to_level(settings.log_level);
+        Logger::add_sink(std::move(consoleSink));
     }
 
     std::signal(SIGINT, signal_handler);
@@ -186,25 +211,6 @@ int main(int argc, char* argv[]) {
     }
 
 #endif
-
-    // set console logger
-    // auto sink = std::make_unique<ConsoleLogSink>();
-    // sink->log_level = Logger::string_to_level(settings.log_level);
-    // Logger::set_sink(std::move(sink));
-
-    // set file logger
-    Logger::clear_sinks();
-    if (!settings.log_file.empty()) {
-        auto fileSink = std::make_unique<FileLogSink>(settings.log_file, false);
-        fileSink->log_level = Logger::string_to_level(settings.log_level);
-        Logger::add_sink(std::move(fileSink));
-    }
-
-    if (!settings.quiet) {
-        auto consoleSink = std::make_unique<ConsoleLogSink>();
-        consoleSink->log_level = Logger::string_to_level(settings.log_level);
-        Logger::add_sink(std::move(consoleSink));
-    }
 
     // registry of processors and event bus
     ProcessorRegistry registry;
@@ -340,8 +346,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
-        auto it = std::find_if(results.begin(), results.end(),
-                             [&](const Result& r){ return r.path == e.path; });
+        auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
         if (it != results.end()) {
             it->size_after = e.final_size;
         }
@@ -349,6 +354,7 @@ int main(int argc, char* argv[]) {
         ContainerResult c;
         c.filename = e.path;
         c.success = true;
+        c.size_before = e.original_size;
         c.size_after = e.final_size;
         container_results.push_back(std::move(c));
         on_finish(e.path.filename().string());

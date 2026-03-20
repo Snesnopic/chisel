@@ -15,22 +15,20 @@
 #include <filesystem>
 #include <memory>
 #include <cstdint>
+#include "processor_executor.hpp"
+#include "../include/processor_registry.hpp"
+#include "../include/processor_executor.hpp"
+#include "../include/event_bus.hpp"
+#include "../include/logger.hpp"
+#include "../include/log_sink.hpp"
+#include "../include/options.hpp"
+#include <mutex>
+#include <thread>
+#include <algorithm>
+#include "events.hpp"
+#include "file_type.hpp"
 
 namespace chisel {
-
-/**
- * @brief Defines the strategy for applying multiple processors to a single file.
- */
-enum class EncodeMode {
-    /**
-     * @brief Chain processors: output of one is input to the next.
-     */
-    PIPE,
-    /**
-     * @brief Run all applicable processors on the original file independently.
-     */
-    PARALLEL
-};
 
 /**
  * @brief Interface for receiving progress and status events during execution.

@@ -10,3 +10,6 @@ crate-type = ["staticlib"]
 
 optivorbis = { path = "../../third_party/optivorbis/packages/optivorbis" }
 libc = "0.2"
+
+[profile.release]
+lto = false

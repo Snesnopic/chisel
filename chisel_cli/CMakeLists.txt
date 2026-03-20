@@ -18,12 +18,6 @@ add_executable(chisel ${CHISEL_CLI_SOURCES})
 
 set_target_properties(chisel PROPERTIES OUTPUT_NAME "chsl")
 
-if(APPLE)
-    add_custom_command(TARGET chisel POST_BUILD
-            COMMAND strip -x $<TARGET_FILE:chisel>
-            COMMENT "Stripping symbols from chisel (macOS)")
-endif()
-
 target_link_libraries(chisel PRIVATE libchisel chisel_optivorbis_bridge)
 
 target_include_directories(chisel PRIVATE
@@ -39,7 +33,7 @@ elseif(UNIX AND NOT APPLE)
     target_compile_definitions(chisel PRIVATE PLATFORM_LINUX)
 endif()
 
-target_compile_features(chisel PRIVATE cxx_std_23)
+target_compile_features(chisel PRIVATE cxx_std_20)
 
 set_target_properties(chisel PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/$<CONFIG>

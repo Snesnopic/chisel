@@ -24,23 +24,21 @@
 #include "event_bus.hpp"
 #include "thread_pool.hpp"
 
-/**
- * @brief Defines the strategy for applying multiple processors to a single file.
- */
-enum class EncodeMode {
-    /**
-     * @brief Chain processors: output of one is input to the next.
-     * (e.g., PngProcessor -> ZopfliPngProcessor)
-     */
-    PIPE,
-    /**
-     * @brief Run all processors on the original file and pick the smallest result.
-     */
-    PARALLEL
-};
-
 namespace chisel {
-
+    /**
+     * @brief Defines the strategy for applying multiple processors to a single file.
+     */
+    enum class EncodeMode {
+        /**
+         * @brief Chain processors: output of one is input to the next.
+         * (e.g., PngProcessor -> ZopfliPngProcessor)
+         */
+        PIPE,
+        /**
+         * @brief Run all processors on the original file and pick the smallest result.
+         */
+        PARALLEL
+    };
 /**
  * @brief Orchestrates the analysis, processing, and finalization of files.
  *
@@ -82,6 +80,9 @@ public:
      * @param inputs Vector of filesystem paths to process.
      */
     void process(const std::vector<std::filesystem::path>& inputs);
+
+    std::optional<std::pair<std::filesystem::path, bool>> move_to_destination(
+        const std::filesystem::path &original_file, const std::filesystem::path &temp_file) const;
 
     /**
      * @brief Checks if a stop has been requested.

@@ -27,7 +27,7 @@
 	url = https://github.com/google/zopfli.git
 [submodule "third_party/sqlite3"]
 	path = third_party/sqlite3
-	url = https://github.com/sjinks/sqlite3-cmake.git
+	url = https://github.com/azadkuh/sqlite-amalgamation.git
 [submodule "third_party/libjxl"]
 	path = third_party/libjxl
 	url = https://github.com/libjxl/libjxl.git
@@ -94,3 +94,6 @@
 [submodule "third_party/pugixml"]
 	path = third_party/pugixml
 	url = https://github.com/zeux/pugixml.git
+[submodule "third_party/libdeflate"]
+	path = third_party/libdeflate
+	url = https://github.com/ebiggers/libdeflate.git

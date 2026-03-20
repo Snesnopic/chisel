@@ -21,7 +21,7 @@ extern "C" {
 
 namespace chisel {
 
-static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::path& path) {
+static std::vector<unsigned char> read_file_to_buffer_gif(const std::filesystem::path& path) {
     FILE* f = chisel::open_file(path, "rb");
     if (!f) return {};
     fseek(f, 0, SEEK_END);
@@ -105,8 +105,8 @@ void GifProcessor::recompress(const std::filesystem::path& input,
 }
 
 bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    const auto bufA = read_file_to_buffer(a);
-    const auto bufB = read_file_to_buffer(b);
+    const auto bufA = read_file_to_buffer_gif(a);
+    const auto bufB = read_file_to_buffer_gif(b);
 
     if (bufA.empty() || bufB.empty()) {
         return false;

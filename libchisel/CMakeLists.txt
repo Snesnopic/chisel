@@ -80,7 +80,10 @@ set(LIBCHISEL_SOURCES
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp
 )
-corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
+if(ENABLE_OPTIVORBIS)
+    corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
+endif()
+
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
 target_include_directories(libchisel
@@ -98,9 +101,6 @@ target_include_directories(libchisel
         ${libarchive_BINARY_DIR}/libarchive
         ${libogg_SOURCE_DIR}/include
         ${libogg_BINARY_DIR}/include
-        ${libebml_SOURCE_DIR}
-        ${libmatroska_SOURCE_DIR}
-        ${libmatroska_SOURCE_DIR}/src
         ${qpdf_SOURCE_DIR}/include
         ${qpdf_BINARY_DIR}/include
         ${zopfli_SOURCE_DIR}/include
@@ -115,6 +115,8 @@ target_include_directories(libchisel
         ${taglib_BINARY_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/bmplib
         ${CMAKE_BINARY_DIR}/bmplib
+        ${sqlite3_SOURCE_DIR}
+        ${libdeflate_SOURCE_DIR}
 )
 
 if(NOT WIN32)
@@ -124,10 +126,36 @@ if(NOT WIN32)
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
     )
 endif()
+if(WIN32)
+    set(MAGIC_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated_magic")
+    file(MAKE_DIRECTORY ${MAGIC_GEN_DIR})
+
+    add_custom_command(
+            OUTPUT "${MAGIC_GEN_DIR}/magic_mgc_windows.h"
+            COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_SOURCE_DIR}/scripts/gen_magic.ps1"
+            -InputFile "${unofficial-libmagic_DICTIONARY}"
+            -OutputFile "${MAGIC_GEN_DIR}/magic_mgc_windows.h"
+            DEPENDS "${unofficial-libmagic_DICTIONARY}" "${CMAKE_SOURCE_DIR}/scripts/gen_magic.ps1"
+            COMMENT "generating windows-specific magic_mgc.h via powershell"
+    )
+
+    add_custom_target(generate_windows_magic DEPENDS "${MAGIC_GEN_DIR}/magic_mgc_windows.h")
+    add_dependencies(libchisel generate_windows_magic)
+
+    target_include_directories(libchisel PRIVATE "${MAGIC_GEN_DIR}")
+endif()
+if(ENABLE_MATROSKA)
+    target_include_directories(libchisel PRIVATE ${libebml_SOURCE_DIR}
+            ${libmatroska_SOURCE_DIR}
+            ${libmatroska_SOURCE_DIR}/src)
+endif()
+if(ENABLE_OPTIVORBIS)
+    target_link_libraries(libchisel PRIVATE chisel_optivorbis_bridge)
+endif()
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
 
-target_compile_features(libchisel PRIVATE cxx_std_23)
+target_compile_features(libchisel PRIVATE cxx_std_20)
 if(WIN32)
     target_compile_definitions(libchisel PUBLIC LIBARCHIVE_STATIC PLATFORM_WINDOWS)
 elseif(APPLE)
@@ -139,7 +167,6 @@ target_compile_definitions(libchisel PUBLIC TAGLIB_STATIC)
 
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
-add_dependencies(libchisel mkclean_lib)
 add_dependencies(libchisel liblzma)
 add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
@@ -148,20 +175,24 @@ add_dependencies(libchisel FLAC)
 add_dependencies(libchisel flexigif)
 add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
-add_dependencies(libchisel ebml)
-add_dependencies(libchisel matroska)
-add_dependencies(libchisel thirdparty_webp thirdparty_webpdecoder thirdparty_webpdemux thirdparty_webpmux)
+if(ENABLE_MATROSKA)
+    add_dependencies(libchisel mkclean_lib)
+    add_dependencies(libchisel ebml)
+    add_dependencies(libchisel matroska)
+endif()
+add_dependencies(libchisel thirdparty_webp thirdparty_webpdemux thirdparty_webpmux)
 add_dependencies(libchisel libqpdf)
 add_dependencies(libchisel libzopfli libzopflipng)
 add_dependencies(libchisel jxl jxl_threads)
 add_dependencies(libchisel tiff)
-add_dependencies(libchisel SQLite::SQLite3)
+add_dependencies(libchisel SQLite3)
 add_dependencies(libchisel MAC)
 add_dependencies(libchisel tag)
 add_dependencies(libchisel pugixml)
+add_dependencies(libchisel libdeflate_static)
+add_dependencies(libchisel libgifsicle)
+add_dependencies(libchisel mseed_static)
 
 if(NOT WIN32)
-    add_dependencies(libchisel libmagic)
-    add_dependencies(libchisel libmseed)
-    add_dependencies(libchisel giflib)
+    add_dependencies(libchisel LIBMAGIC)
 endif()

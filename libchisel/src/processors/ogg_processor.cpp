@@ -14,17 +14,13 @@
 #include <vector>
 #include <FLAC/all.h>
 #include "file_type.hpp"
-
+#ifdef HAVE_OPTIVORBIS
 extern "C" {
     int chisel_optimize_vorbis(const char* input, const char* output);
 }
-
+#endif
 namespace chisel {
 namespace fs = std::filesystem;
-
-static const char* processor_tag() {
-    return "OggProcessor";
-}
 
 namespace {
     bool is_vorbis_stream(FILE* f) {
@@ -226,7 +222,7 @@ namespace {
                     ctx->encoder,
                     nullptr, write_cb, enc_seek_cb, enc_tell_cb, nullptr,
                     ctx->f_out) != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
-                Logger::log(LogLevel::Error, "Failed to init FLAC Ogg encoder", processor_tag());
+                Logger::log(LogLevel::Error, "Failed to init FLAC Ogg encoder", "OggProcessor");
                 ctx->failed = true;
                 return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
             }
@@ -234,7 +230,7 @@ namespace {
         }
 
         if (FLAC__stream_encoder_process(ctx->encoder, buffer, frame->header.blocksize) == 0) {
-            Logger::log(LogLevel::Error, "Encoding process failed", processor_tag());
+            Logger::log(LogLevel::Error, "Encoding process failed", "OggProcessor");
             ctx->failed = true;
             return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
         }
@@ -313,6 +309,7 @@ void OggProcessor::recompress(const fs::path& input,
     if (is_vorbis_stream(f_in)) {
         fclose(f_in);
 
+#ifdef HAVE_OPTIVORBIS
         const std::string input_str = input.string();
         const std::string output_str = output.string();
 
@@ -322,6 +319,7 @@ void OggProcessor::recompress(const fs::path& input,
             Logger::log(LogLevel::Error, msg, get_name());
             throw std::runtime_error(msg);
         }
+#endif
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
         return;
     }
@@ -400,7 +398,6 @@ void OggProcessor::recompress(const fs::path& input,
         fs::remove(output, ec);
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
     }
-
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
