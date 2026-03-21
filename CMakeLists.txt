@@ -373,92 +373,8 @@ set(LIBLZMA_LIBRARY liblzma CACHE STRING "" FORCE)
 set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
 
 # bmplib
-set(BMPLIB_DIR "${CMAKE_SOURCE_DIR}/third_party/bmplib")
-set(BMPLIB_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/bmplib")
-
-file(MAKE_DIRECTORY ${BMPLIB_BUILD_DIR})
-
-if(NOT EXISTS "${BMPLIB_DIR}/config.h")
-    file(READ "${BMPLIB_DIR}/config.h.in" BMP_CONFIG_CONTENT)
-    string(REPLACE "@libversion@" "1.8.0" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
-    string(REPLACE "@insanity_limit_mb@" "1024" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
-    file(WRITE "${BMPLIB_DIR}/config.h" "${BMP_CONFIG_CONTENT}")
-endif()
-
-set(BMP_HEADER_ORIGINAL "${BMPLIB_DIR}/bmplib.h")
-set(BMP_HEADER_PATCHED  "${BMPLIB_BUILD_DIR}/bmplib.h")
-
-if(WIN32)
-    file(READ "${BMP_HEADER_ORIGINAL}" BMP_HEADER_CONTENT)
-    string(REPLACE
-            "#if defined (WIN32) || defined (_WIN32)"
-            "#if 0"
-            BMP_HEADER_CONTENT "${BMP_HEADER_CONTENT}")
-    file(WRITE "${BMP_HEADER_ORIGINAL}" "${BMP_HEADER_CONTENT}")
-endif()
-
-set(HUFFMAN_CODES_H "${BMPLIB_BUILD_DIR}/huffman-codes.h")
-if(CMAKE_CROSSCOMPILING)
-    add_custom_command(
-            OUTPUT "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            COMMAND env -u CFLAGS -u CXXFLAGS -u LDFLAGS cc "${BMPLIB_DIR}/gen-huffman.c" -I"${BMPLIB_DIR}" -include stdbool.h -o "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            DEPENDS "${BMPLIB_DIR}/gen-huffman.c"
-            COMMENT "Compiling host gen-huffman for cross-compilation"
-    )
-
-    add_custom_command(
-            OUTPUT "${HUFFMAN_CODES_H}"
-            COMMAND "${BMPLIB_BUILD_DIR}/gen-huffman-host" "${HUFFMAN_CODES_H}"
-            DEPENDS "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            COMMENT "Generating huffman-codes.h for bmplib via host tool"
-    )
-else()
-    add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
-    target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
-
-    if(MSVC)
-        target_compile_options(gen-huffman PRIVATE "/FIstdbool.h")
-    else()
-        target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
-    endif()
-
-    set_target_properties(gen-huffman PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BMPLIB_BUILD_DIR}"
-    )
-
-    add_custom_command(
-            OUTPUT "${HUFFMAN_CODES_H}"
-            COMMAND $<TARGET_FILE:gen-huffman> "${HUFFMAN_CODES_H}"
-            DEPENDS gen-huffman
-            COMMENT "Generating huffman-codes.h for bmplib"
-    )
-endif()
-
-add_custom_target(generate_bmplib_headers DEPENDS "${HUFFMAN_CODES_H}")
-
-file(GLOB BMPLIB_SOURCES "${BMPLIB_DIR}/*.c")
-list(REMOVE_ITEM BMPLIB_SOURCES
-        "${BMPLIB_DIR}/gen-huffman.c"
-        "${BMPLIB_DIR}/test-fileio-pipes.c"
-        "${BMPLIB_DIR}/test-read-conversions.c"
-        "${BMPLIB_DIR}/test-read-io.c"
-        "${BMPLIB_DIR}/test-write-io.c"
-)
-
-if(MSVC)
-    list(FILTER BMPLIB_SOURCES EXCLUDE REGEX "bmp-read-loadimage\\.c$")
-
-    set(BMP_ORIGINAL "${BMPLIB_DIR}/bmp-read-loadimage.c")
-    set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
-
-    file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
-    string(REPLACE "[static " "[" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
-    file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
-
-    list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
-endif()
+set(insanity_limit_mb 1024 CACHE STRING "Insanity limit for bmp in MBs" FORCE)
+add_subdirectory(third_party/bmplib)
 
 # --- mozjpeg via ExternalProject ---
 if(MSVC)
@@ -709,6 +625,7 @@ set(CHISEL_LIBS
         libgifsicle
         pugixml
         mseed_static
+        bmplib
 )
 
 if(ENABLE_MATROSKA)
@@ -740,24 +657,16 @@ endif()
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 
-target_sources(libchisel PRIVATE ${BMPLIB_SOURCES})
-
-target_include_directories(libchisel SYSTEM PRIVATE
-        "${BMPLIB_DIR}"
-        "${BMPLIB_BUILD_DIR}"
-)
-
 target_include_directories(libchisel SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/include"
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/src"
 )
-add_dependencies(libchisel generate_bmplib_headers)
 
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
 
-# we need to edit bmplib and libmkclean before we can do this
+# we need to edit libmkclean before we can do this
 set_target_properties(libchisel PROPERTIES UNITY_BUILD OFF)
 if(CHISEL_BUILD_CLI)
     set_target_properties(chisel PROPERTIES UNITY_BUILD OFF)
