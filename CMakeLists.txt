@@ -446,27 +446,6 @@ set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
-# libEBML
-if(ENABLE_MATROSKA)
-    set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
-    set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
-    add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
-    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
-    list(APPEND libebml_SOURCE_DIR
-            "${CMAKE_SOURCE_DIR}/third_party/libebml/ebml"
-            "${CMAKE_BINARY_DIR}/third_party/libebml-build"
-    )
-# libMatroska
-    set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
-    set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
-    add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
-    list(APPEND libmatroska_SOURCE_DIR
-            "${CMAKE_BINARY_DIR}/third_party/libmatroska-build"
-    )
-    target_include_directories(matroska PRIVATE
-            ${libebml_BINARY_DIR}
-    )
-endif()
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -629,7 +608,7 @@ set(CHISEL_LIBS
 )
 
 if(ENABLE_MATROSKA)
-    list(APPEND CHISEL_LIBS ebml matroska mkclean_lib)
+    list(APPEND CHISEL_LIBS mkclean_lib)
     add_compile_definitions(HAVE_MATROSKA=1)
 endif()
 
@@ -666,8 +645,6 @@ if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
 
-# we need to edit libmkclean before we can do this
-set_target_properties(libchisel PROPERTIES UNITY_BUILD OFF)
 if(CHISEL_BUILD_CLI)
     set_target_properties(chisel PROPERTIES UNITY_BUILD OFF)
 endif()
