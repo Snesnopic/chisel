@@ -614,6 +614,7 @@ endif()
 if(WIN32)
     list(APPEND CHISEL_LIBS
             unofficial::libmagic::libmagic
+            Rpcrt4
     )
 else()
     list(APPEND CHISEL_LIBS
