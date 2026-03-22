@@ -515,6 +515,9 @@ set(libtiff_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libtiff-build")
 add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # sqlite3
+set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
+set(BUILD_SHELL   OFF CACHE BOOL "" FORCE)
+set(ENABLE_STATIC ON  CACHE BOOL "" FORCE)
 set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
 set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -574,7 +577,7 @@ set(CHISEL_LIBS
         jxl_threads
         tiff
         libdeflate_static
-        SQLite3
+        sqlite3-static
         zlibstatic
         tag
         libgifsicle
