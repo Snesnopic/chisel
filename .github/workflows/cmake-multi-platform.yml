@@ -132,9 +132,7 @@ jobs:
           brew install autoconf automake libtool nasm yasm cmake gcc@12
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
-        run: |
-          echo "No Windows-specific build dependencies to install via script."
-        shell: bash
+        run: choco install ninja
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -149,6 +147,7 @@ jobs:
       - name: Configure CMake
         run: >
           cmake -B ${{ steps.strings.outputs.build-output-dir }}
+          -G Ninja
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
