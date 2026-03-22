@@ -129,7 +129,7 @@ jobs:
           brew update
           brew remove --force $(brew list --formula)
           brew remove --cask --force $(brew list)
-          brew install autoconf automake libtool nasm yasm cmake gcc@12
+          brew install autoconf automake libtool nasm yasm cmake gcc@12 ninja
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
         run: choco install ninja
