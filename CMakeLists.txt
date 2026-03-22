@@ -643,38 +643,27 @@ if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
 
-set_target_properties(FLAC PROPERTIES UNITY_BUILD OFF)
-set_target_properties(sharpyuv PROPERTIES UNITY_BUILD OFF)
-set_target_properties(hwy PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libzstd_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(brotlienc PROPERTIES UNITY_BUILD OFF)
+set(NON_UNITY_TARGETS
+        FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
+        jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
+        libdeflate_static zlibstatic tag liblzma
+)
+
 if(NOT WIN32)
-    set_target_properties(LIBMAGIC PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS LIBMAGIC)
 else()
-    set_target_properties(libgifsicle PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS libgifsicle)
 endif()
-set_target_properties(libqpdf_object PROPERTIES UNITY_BUILD OFF)
-set_target_properties(jxl_dec-obj PROPERTIES UNITY_BUILD OFF)
-set_target_properties(jxl_enc-obj PROPERTIES UNITY_BUILD OFF)
-set_target_properties(png_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(archive_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(wavpack PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libdeflate_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(zlibstatic PROPERTIES UNITY_BUILD OFF)
-set_target_properties(tag PROPERTIES UNITY_BUILD OFF)
 
 if(ENABLE_MATROSKA)
-    set_target_properties(matroska2 PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(corec PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(ebml2 PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(mkclean_lib PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("file_test" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("node_test" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("ebmltree" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("mkvtree" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("mkcleanreg" PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS
+            matroska2 corec ebml2 mkclean_lib file_test node_test
+            ebmltree mkvtree mkcleanreg
+    )
 endif()
 
-set_target_properties(liblzma PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libdeflate_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(tag PROPERTIES UNITY_BUILD OFF)
+foreach(tgt IN LISTS NON_UNITY_TARGETS)
+    if(TARGET ${tgt})
+        set_target_properties(${tgt} PROPERTIES UNITY_BUILD OFF)
+    endif()
+endforeach()
