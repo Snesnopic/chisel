@@ -243,12 +243,20 @@ else()
 endif()
 
 # zlib
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build)
+
+if(NOT TARGET zlib)
+    add_library(zlib ALIAS zlibstatic)
+endif()
+
+if(NOT TARGET ZLIB::ZLIB)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+endif()
 
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
 set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
@@ -624,7 +632,6 @@ if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
 
-set_target_properties(zlib PROPERTIES UNITY_BUILD OFF)
 set_target_properties(FLAC PROPERTIES UNITY_BUILD OFF)
 set_target_properties(sharpyuv PROPERTIES UNITY_BUILD OFF)
 set_target_properties(hwy PROPERTIES UNITY_BUILD OFF)
