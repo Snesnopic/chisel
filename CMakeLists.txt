@@ -83,7 +83,7 @@ if(EXISTS "${BZIP2_DIR}/bzlib.c")
             "${CMAKE_CURRENT_BINARY_DIR}/bzip2_inc/bz_version.h"
     )
 
-    add_library(bz2_static STATIC
+    add_library(bz2_static STATIC EXCLUDE_FROM_ALL
             ${BZIP2_DIR}/blocksort.c
             ${BZIP2_DIR}/huffman.c
             ${BZIP2_DIR}/crctable.c
@@ -112,7 +112,7 @@ endif()
 
 # libmkclean
 if(ENABLE_MATROSKA)
-    add_subdirectory("third_party/libmkclean")
+    add_subdirectory("third_party/libmkclean" EXCLUDE_FROM_ALL)
 endif()
 
 # liblzma
@@ -242,7 +242,7 @@ else()
 
     file(WRITE "${MAGIC_BIN}/config.h" "${MAGIC_CONFIG_H}")
 
-    add_library(LIBMAGIC STATIC ${LIBMAGIC_SOURCES})
+    add_library(LIBMAGIC STATIC EXCLUDE_FROM_ALL ${LIBMAGIC_SOURCES})
 
     target_include_directories(LIBMAGIC PUBLIC
             $<BUILD_INTERFACE:${MAGIC_BIN}>
@@ -259,7 +259,8 @@ set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
 set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
 set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
-add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build)
+set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 if(NOT TARGET zlib)
     add_library(zlib ALIAS zlibstatic)
@@ -269,20 +270,12 @@ if(NOT TARGET ZLIB::ZLIB)
     add_library(ZLIB::ZLIB ALIAS zlibstatic)
 endif()
 
-set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir" FORCE)
+set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs" FORCE)
 
-if(MSVC)
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/Release/zlibstatic.lib" CACHE FILEPATH "zlib library")
-else()
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libz.a" CACHE FILEPATH "zlib library")
-endif()
-
-set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
-set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
-
-set(ZLIB_H_PATH "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
+set(ZLIB_LIBRARY zlibstatic CACHE STRING "zlib library" FORCE)
+set(ZLIB_LIBRARIES zlibstatic CACHE STRING "zlib libraries" FORCE)
+set(ZLIB_FOUND TRUE CACHE BOOL "zlib found" FORCE)
 
 set(ENABLE_STATIC_RUNTIME OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -332,7 +325,7 @@ endif()
 set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
 file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
 list(REMOVE_ITEM FLEXIGIF_SOURCES "${FLEXIGIF_DIR}/flexiGIF.cpp")
-add_library(flexigif STATIC ${FLEXIGIF_SOURCES})
+add_library(flexigif STATIC EXCLUDE_FROM_ALL ${FLEXIGIF_SOURCES})
 target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
 target_compile_features(flexigif PUBLIC cxx_std_11)
 
@@ -393,7 +386,8 @@ set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
 
 # bmplib
 set(insanity_limit_mb 1024 CACHE STRING "Insanity limit for bmp in MBs" FORCE)
-add_subdirectory(third_party/bmplib)
+set(BMPLIB_GEN_HUFFMAN OFF)
+add_subdirectory(third_party/bmplib EXCLUDE_FROM_ALL)
 
 # --- mozjpeg via ExternalProject ---
 if(MSVC)
@@ -555,7 +549,7 @@ set(BUILD_GIFSICLE_CLI OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFDIFF OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFVIEW OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(third_party/gifsicle)
+add_subdirectory(third_party/gifsicle EXCLUDE_FROM_ALL)
 
 # Monkey's Audio
 set(BUILD_UTIL OFF CACHE BOOL "" FORCE)
@@ -573,7 +567,7 @@ if(ENABLE_MP3PACKER)
     include(cmake/mp3packer.cmake)
     add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
 
-    add_subdirectory(third_party/vbrfix)
+    add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 endif()
 
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
@@ -627,7 +621,7 @@ else()
 endif()
 
 if(ENABLE_OPTIVORBIS)
-    add_subdirectory(third_party/corrosion)
+    add_subdirectory(third_party/corrosion EXCLUDE_FROM_ALL)
     add_compile_definitions(HAVE_OPTIVORBIS=1)
 endif()
 
