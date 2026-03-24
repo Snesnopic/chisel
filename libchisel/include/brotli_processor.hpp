@@ -6,6 +6,7 @@
 #define CHISEL_BROTLI_PROCESSOR_HPP
 
 #include "processor.hpp"
+#include "file_type.hpp"
 #include <array>
 #include <string_view>
 #include <span>

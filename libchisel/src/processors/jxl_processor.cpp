@@ -30,7 +30,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
 
     // read input file
     std::vector<uint8_t> input_buf;
-    if (!read_file(input, input_buf)) {
+    if (!chisel::read_file(input, input_buf)) {
         Logger::log(LogLevel::Error, "Failed to read input file", get_name());
         throw std::runtime_error("JxlProcessor: cannot read input");
     }
@@ -184,7 +184,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     }
     size_t out_size = next_out - out_buf.data();
     out_buf.resize(out_size);
-    if (!write_file(output, out_buf)) {
+    if (!chisel::write_file(output, out_buf)) {
         JxlEncoderDestroy(enc);
         throw std::runtime_error("JxlProcessor: cannot write output");
     }
@@ -199,7 +199,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
                                  std::vector<uint8_t>& buffer)
 {
     std::vector<uint8_t> input_buf;
-    if (!read_file(path, input_buf)) {
+    if (!chisel::read_file(path, input_buf)) {
         return false;
     }
 
