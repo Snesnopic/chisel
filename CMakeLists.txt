@@ -9,7 +9,7 @@ option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 set(CMAKE_UNITY_BUILD TRUE)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
     if(ipo_supported)
@@ -64,8 +64,20 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
         add_compile_options(/O2 /GL /W0)
+        add_link_options(/OPT:REF /OPT:ICF) # dead code elimination on windows
     else()
         add_compile_options(-O3 -w)
+
+        # place each function and data in its own section to allow linker to strip them
+        add_compile_options(-ffunction-sections -fdata-sections)
+
+        if(APPLE)
+            # macos linker flag to remove unused sections
+            add_link_options("-Wl,-dead_strip")
+        else()
+            # linux/mingw linker flags to remove unused sections and strip symbols
+            add_link_options("-Wl,--gc-sections" "-s")
+        endif()
     endif()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/release)
 endif()
