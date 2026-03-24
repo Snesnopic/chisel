@@ -459,9 +459,9 @@ add_dependencies(mozjpeg_static mozjpeg copy_mozjpeg_jconfig)
 remove_definitions(JCONFIG_INCLUDED)
 add_library(JPEG::JPEG ALIAS mozjpeg_static)
 
-set(JPEG_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/mozjpeg;${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build" CACHE PATH "jpeg include dir" FORCE)
-set(JPEG_INCLUDE "${JPEG_INCLUDE_DIR}" CACHE PATH "jpeg include dir" FORCE)
-set(LIBJPEG_H_PATH "${JPEG_INCLUDE_DIR}" CACHE PATH "jpeg include dir" FORCE)
+set(JPEG_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/mozjpeg" CACHE PATH "jpeg include dir")
+set(JPEG_INCLUDE_DIR "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
+set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
