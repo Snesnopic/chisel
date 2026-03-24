@@ -9,9 +9,9 @@ option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 # disable unity build for on macos intel gcc to prevent cc1plus oom
 if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_UNITY_BUILD TRUE)
-else()
     set(CMAKE_UNITY_BUILD FALSE)
+else()
+    set(CMAKE_UNITY_BUILD TRUE)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
