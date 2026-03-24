@@ -7,7 +7,12 @@ option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
-set(CMAKE_UNITY_BUILD TRUE)
+# disable unity build for on macos intel gcc to prevent cc1plus oom
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_UNITY_BUILD TRUE)
+else()
+    set(CMAKE_UNITY_BUILD FALSE)
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     include(CheckIPOSupported)
@@ -666,13 +671,7 @@ target_include_directories(libchisel SYSTEM PRIVATE
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
-# disable unity build for heavy google libs on macos gcc to prevent cc1plus oom
-if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND NON_UNITY_TARGETS
-            brotlicommon brotlidec brotlienc
-            woff2common woff2dec woff2enc
-    )
-endif()
+
 set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
