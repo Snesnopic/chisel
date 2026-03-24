@@ -2,35 +2,36 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
-#include "../../include/processor_registry.hpp"
-#include "../../include/aiff_processor.hpp"
-#include "../../include/ape_processor.hpp"
-#include "../../include/archive_processor.hpp"
-#include "../../include/bmp_processor.hpp"
-#include "../../include/flac_processor.hpp"
-#include "../../include/flexigif_processor.hpp"
-#include "../../include/gif_processor.hpp"
-#include "../../include/jpeg_processor.hpp"
-#include "../../include/jxl_processor.hpp"
-#include "../../include/mkv_processor.hpp"
-#include "../../include/mp4_processor.hpp"
-#include "../../include/mpeg_processor.hpp"
-#include "../../include/mseed_processor.hpp"
-#include "../../include/odf_processor.hpp"
-#include "../../include/ogg_processor.hpp"
-#include "../../include/ooxml_processor.hpp"
-#include "../../include/pdf_processor.hpp"
-#include "../../include/png_processor.hpp"
-#include "../../include/pnm_processor.hpp"
-#include "../../include/sqlite_processor.hpp"
-#include "../../include/tiff_processor.hpp"
-#include "../../include/tga_processor.hpp"
+#include "processor_registry.hpp"
+#include "aiff_processor.hpp"
+#include "ape_processor.hpp"
+#include "archive_processor.hpp"
+#include "bmp_processor.hpp"
+#include "flac_processor.hpp"
+#include "flexigif_processor.hpp"
+#include "gif_processor.hpp"
+#include "jpeg_processor.hpp"
+#include "jxl_processor.hpp"
+#include "mkv_processor.hpp"
+#include "mp4_processor.hpp"
+#include "mpeg_processor.hpp"
+#include "mseed_processor.hpp"
+#include "odf_processor.hpp"
+#include "ogg_processor.hpp"
+#include "ooxml_processor.hpp"
+#include "pdf_processor.hpp"
+#include "png_processor.hpp"
+#include "pnm_processor.hpp"
+#include "sqlite_processor.hpp"
+#include "tiff_processor.hpp"
+#include "tga_processor.hpp"
 #include "xml_processor.hpp"
-#include "../../include/wav_processor.hpp"
-#include "../../include/wavpack_processor.hpp"
-#include "../../include/webp_processor.hpp"
-#include "../../include/zopflipng_processor.hpp"
+#include "wav_processor.hpp"
+#include "wavpack_processor.hpp"
+#include "webp_processor.hpp"
+#include "zopflipng_processor.hpp"
 #include "woff2_processor.hpp"
+#include "brotli_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -65,6 +66,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<PnmProcessor>());
     processors_.push_back(std::make_unique<XmlProcessor>());
     processors_.push_back(std::make_unique<Woff2Processor>());
+    processors_.push_back(std::make_unique<BrotliProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

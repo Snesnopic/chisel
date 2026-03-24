@@ -81,6 +81,8 @@ set(LIBCHISEL_SOURCES
         src/utils/zopfli_compressor.cpp
         include/woff2_processor.hpp
         src/processors/woff2_processor.cpp
+        include/brotli_processor.hpp
+        src/processors/brotli_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
