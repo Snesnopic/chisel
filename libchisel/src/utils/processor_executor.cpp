@@ -446,7 +446,20 @@ namespace chisel {
                 }
 
                 auto new_size = std::filesystem::file_size(new_temp_file, ec);
-
+                if (!ec && new_size >= orig_size) {
+                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
+                    std::error_code rm_ec;
+                    std::filesystem::remove(new_temp_file, rm_ec);
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{
+                        content.original_path,
+                        content.original_path,
+                        orig_size,
+                        orig_size,
+                        false,
+                        duration
+                    });
+                    continue;
+                }
                 // use the helper and publish the specific Phase 3 event
                 auto move_result = move_to_destination(content.original_path, new_temp_file);
                 if (move_result) {
