@@ -37,6 +37,7 @@
 #include "dsf_processor.hpp"
 #include "mpc_processor.hpp"
 #include "tta_processor.hpp"
+#include "cfbf_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -79,6 +80,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<DsfProcessor>());
     processors_.push_back(std::make_unique<MpcProcessor>());
     processors_.push_back(std::make_unique<TtaProcessor>());
+    processors_.push_back(std::make_unique<CfbfProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

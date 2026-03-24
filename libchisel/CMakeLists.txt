@@ -93,6 +93,8 @@ set(LIBCHISEL_SOURCES
         src/processors/mpc_processor.cpp
         include/tta_processor.hpp
         src/processors/tta_processor.cpp
+        include/cfbf_processor.hpp
+        src/processors/cfbf_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -170,6 +172,10 @@ if(ENABLE_OPTIVORBIS)
 endif()
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
+# for cfbf processor
+if(WIN32)
+    target_link_libraries(libchisel PRIVATE ole32)
+endif()
 
 target_compile_features(libchisel PRIVATE cxx_std_20)
 if(WIN32)
