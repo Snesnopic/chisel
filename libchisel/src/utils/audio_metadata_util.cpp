@@ -28,6 +28,16 @@
 #include "ape/apeitem.h"
 #include "ape/apetag.h"
 #include "wav/wavfile.h"
+#include "matroska/matroskafile.h"
+#include "wavpack/wavpackfile.h"
+#include "mpc/mpcfile.h"
+#include "trueaudio/trueaudiofile.h"
+#include "ogg/flac/oggflacfile.h"
+#include "ogg/speex/speexfile.h"
+#include "asf/asffile.h"
+#include "asf/asfpicture.h"
+#include "dsf/dsffile.h"
+#include "dsdiff/dsdifffile.h"
 
 namespace chisel {
 
@@ -38,29 +48,31 @@ namespace chisel {
 namespace {
 
 // read file into bytevector
-inline TagLib::ByteVector readFileToByteVector(const std::filesystem::path &p) {
+TagLib::ByteVector readFileToByteVector(const std::filesystem::path &p) {
     std::ifstream in(p, std::ios::binary);
     const std::vector<char> buffer((std::istreambuf_iterator<char>(in)), {});
     return TagLib::ByteVector(buffer.data(), static_cast<unsigned int>(buffer.size()));
 }
 
 // decide extension from mime
-inline const char* extFromMime(const std::string &mime) {
+const char* extFromMime(const std::string &mime) {
     if (mime == "image/png") return ".png";
     if (mime == "image/jpeg" || mime == "image/jpg") return ".jpg";
     if (mime == "image/webp") return ".webp";
-    // fallback: prefer jpg for unknowns
-    return ".jpg";
+    if (mime == "application/x-truetype-font" || mime == "font/ttf") return ".ttf";
+    if (mime == "application/vnd.ms-opentype" || mime == "font/otf") return ".otf";
+    if (mime == "text/xml" || mime == "application/xml") return ".xml";
+    return ".bin";
 }
 
 // infer mp4 format from mime
-inline TagLib::MP4::CoverArt::Format inferFormatFromMime(const std::string &mime) {
+TagLib::MP4::CoverArt::Format inferFormatFromMime(const std::string &mime) {
     return (mime == "image/png") ? TagLib::MP4::CoverArt::PNG : TagLib::MP4::CoverArt::JPEG;
 }
 
 // raii wrapper for file pointers
 struct FileCloser {
-    void operator()(FILE *f) const { if (f) std::fclose(f); }
+    void operator()(FILE *f) const { if (f != nullptr) std::fclose(f); }
 };
 using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
@@ -79,15 +91,15 @@ struct PngRead {
     png_infop info = nullptr;
     explicit PngRead() {
         png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-        if (png) {
+        if (png != nullptr) {
             png_set_error_fn(png, nullptr, png_error_fn_quiet, png_warning_fn_quiet);
             info = png_create_info_struct(png);
         }
     }
     ~PngRead() {
-        if (png || info) png_destroy_read_struct(&png, &info, nullptr);
+        if ((png != nullptr) || (info != nullptr)) png_destroy_read_struct(&png, &info, nullptr);
     }
-    bool isValid() const { return png && info; }
+    [[nodiscard]] bool isValid() const { return (png != nullptr) && (info != nullptr); }
 };
 
 // libjpeg error handlers
@@ -95,14 +107,14 @@ struct JpegErrorMgr {
     jpeg_error_mgr pub{};
     jmp_buf setjmp_buffer{};
 };
-void jpeg_error_exit_throw(j_common_ptr cinfo) {
+void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     auto* err = reinterpret_cast<JpegErrorMgr*>(cinfo->err);
     // return control to computeImageProps
     longjmp(err->setjmp_buffer, 1);
 }
 
 // compute image props
-inline void computeImageProps(const std::filesystem::path &imagePath,
+void computeImageProps(const std::filesystem::path &imagePath,
                               const std::string& mime_type,
                               int &width, int &height, int &depth, int &colors) {
     // default to 0
@@ -120,15 +132,17 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
             rewind(fp.get());
 
             PngRead rd;
-            if (!rd.isValid() || setjmp(png_jmpbuf(rd.png))) {
+            if (!rd.isValid() || (setjmp(png_jmpbuf(rd.png)) != 0)) {
                 return; // libpng error
             }
 
             png_init_io(rd.png, fp.get());
             png_read_info(rd.png, rd.info);
 
-            png_uint_32 w, h;
-            int bit_depth, color_type;
+            png_uint_32 w;
+            png_uint_32 h;
+            int bit_depth;
+            int color_type;
             png_get_IHDR(rd.png, rd.info, &w, &h, &bit_depth, &color_type, nullptr, nullptr, nullptr);
 
             width = static_cast<int>(w);
@@ -206,27 +220,15 @@ inline void computeImageProps(const std::filesystem::path &imagePath,
 }
 
 // normalize picture type flac
-inline int normalizePictureTypeFromFlac(const TagLib::FLAC::Picture::Type t) {
-    return static_cast<int>(t);
+int normalizePictureTypeFromFlac(const TagLib::FLAC::Picture::Type t) {
+    return t;
 }
 
 // default front cover type (id3v2/flac standard for frontcover is 3)
-inline int defaultFrontCoverType() {
+int defaultFrontCoverType() {
     return 3;
 }
 
-// helper to map ID3/FLAC image type to APEv2 keys
-TagLib::String getApeCoverKey(int picture_type) {
-    // 3 = Front Cover, 4 = Back Cover. Default a Front.
-    if (picture_type == 4) return "Cover Art (Back)";
-    return "Cover Art (Front)";
-}
-
-// inverse helper
-int getPictureTypeFromApeKey(const TagLib::String &key) {
-    if (key == "Cover Art (Back)") return 4;
-    return 3; // Default Front
-}
 
 // shared helper to extract cover from ID3v2 tag (MP3, WAV, AIFF)
 void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
@@ -281,6 +283,154 @@ bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
     return true;
 }
 
+
+int getPictureTypeFromApeKey(const TagLib::String &key) {
+    if (key == "Cover Art (Back)") return 4;
+    if (key == "Cover Art (Leaflet)") return 5;
+    if (key == "Cover Art (Media)") return 6;
+    if (key == "Cover Art (Lead artist)") return 8;
+    if (key == "Cover Art (Icon)") return 1;
+    return 3; // default front
+}
+
+void extractApeV2Covers(TagLib::APE::Tag* tag,
+                        const std::filesystem::path& temp_dir,
+                        std::vector<AudioCoverInfo>& extracted_covers) {
+    if (tag == nullptr) {
+        return;
+    }
+    const auto &itemListMap = tag->itemListMap();
+    int idx = static_cast<int>(extracted_covers.size());
+
+    // iterate all items dynamically
+    for (const auto & it : itemListMap) {
+        TagLib::String key = it.first;
+
+        if (key.startsWith("Cover Art ") && it.second.type() == TagLib::APE::Item::Binary) {
+            TagLib::ByteVector val = it.second.binaryData();
+            int nullPos = val.find(0);
+            if (nullPos < 0) continue;
+
+            TagLib::ByteVector imgData = val.mid(nullPos + 1);
+            TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
+
+            std::string mime = "image/jpeg";
+            if (imgData.size() >= 8 && !png_sig_cmp((unsigned char*)imgData.data(), 0, 8)) {
+                mime = "image/png";
+            }
+
+            const char *ext = extFromMime(mime);
+            std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+
+            std::ofstream out(outPath, std::ios::binary);
+            out.write(imgData.data(), imgData.size());
+            out.close();
+
+            AudioCoverInfo info;
+            info.temp_file_path = outPath;
+            info.mime_type = mime;
+            info.description = desc.to8Bit(true);
+            info.picture_type = getPictureTypeFromApeKey(key);
+
+            // store original key to rebuild properly
+            info.format_specific = std::make_any<std::string>(key.to8Bit(true));
+
+            extracted_covers.push_back(std::move(info));
+            ++idx;
+        }
+    }
+}
+
+bool rebuildApeV2Covers(TagLib::APE::Tag* tag,
+                        const std::vector<AudioCoverInfo>& covers) {
+    if (tag == nullptr) return false;
+
+    // clean up all existing covers dynamically
+    auto itemList = tag->itemListMap();
+    for (auto & it : itemList) {
+        if (it.first.startsWith("Cover Art ")) {
+            tag->removeItem(it.first);
+        }
+    }
+
+    for (const auto &info : covers) {
+        TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+        if (data.isEmpty()) continue;
+
+        std::string key_str = "Cover Art (Front)"; // fallback
+        if (info.format_specific.has_value() && info.format_specific.type() == typeid(std::string)) {
+            key_str = std::any_cast<std::string>(info.format_specific);
+        }
+        TagLib::String key(key_str, TagLib::String::UTF8);
+
+        TagLib::ByteVector val;
+        val.append(TagLib::ByteVector(info.description.data(), static_cast<unsigned int>(info.description.size())));
+        val.append(0);
+        val.append(data);
+
+        tag->setItem(key, TagLib::APE::Item(key, val, true));
+    }
+    return true;
+}
+
+// shared helper to extract covers from xiph comment (ogg variants)
+void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
+                       const std::filesystem::path& temp_dir,
+                       std::vector<AudioCoverInfo>& extracted_covers) {
+    if (tag == nullptr) return;
+
+    int idx = static_cast<int>(extracted_covers.size());
+    for (auto *pic : tag->pictureList()) {
+        const char *ext = extFromMime(pic->mimeType().to8Bit(true));
+        std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+
+        std::ofstream out(outPath, std::ios::binary);
+        out.write(pic->data().data(), pic->data().size());
+        out.close();
+
+        AudioCoverInfo info;
+        info.temp_file_path = outPath;
+        info.mime_type = pic->mimeType().to8Bit(true);
+        info.description = pic->description().to8Bit(true);
+        info.picture_type = normalizePictureTypeFromFlac(pic->type());
+
+        extracted_covers.push_back(std::move(info));
+        ++idx;
+    }
+}
+
+// shared helper to rebuild xiph comment covers
+bool rebuildXiphCovers(TagLib::Ogg::XiphComment* tag,
+                       const std::vector<AudioCoverInfo>& covers) {
+    if (tag == nullptr) return false;
+
+    tag->removeAllPictures();
+
+    for (const auto &info : covers) {
+        TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+        if (data.isEmpty()) continue;
+
+        auto *pic = new TagLib::FLAC::Picture;
+        pic->setMimeType(info.mime_type);
+        pic->setDescription(info.description);
+        pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
+        pic->setData(data);
+
+        int w=0;
+        int h=0;
+        int d=0;
+        int c=0;
+        computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
+        if (w > 0) pic->setWidth(w);
+        if (h > 0) pic->setHeight(h);
+        if (d > 0) pic->setColorDepth(d);
+        if (c > 0) pic->setNumColors(c);
+
+        tag->addPicture(pic);
+    }
+    return true;
+}
+
 } // namespace
 
 //
@@ -297,14 +447,14 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     TagLib::FileRef ref(input_path.string().c_str());
 #endif
     TagLib::File *file_ref = ref.file();
-    if (!file_ref) {
+    if (file_ref == nullptr) {
         return state;
     }
 
     // flac
     if (auto *flacFile = dynamic_cast<TagLib::FLAC::File*>(file_ref)) {
         int idx = 0;
-        for (auto pic : flacFile->pictureList()) {
+        for (auto *pic : flacFile->pictureList()) {
             const char *ext = extFromMime(pic->mimeType().to8Bit(true));
             std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
 
@@ -345,55 +495,14 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
 
     // ape (Monkey's Audio) - use APEv2
     if (auto *apeFile = dynamic_cast<TagLib::APE::File*>(file_ref)) {
-        if (auto *tag = apeFile->APETag()) {
-            const auto &itemListMap = tag->itemListMap();
-
-            const constexpr char* keys[] = {"Cover Art (Front)", "Cover Art (Back)"};
-
-            int idx = 0;
-            for (const auto* key : keys) {
-                if (itemListMap.contains(key)) {
-                    const auto &item = itemListMap[key];
-                    if (item.type() != TagLib::APE::Item::Binary) continue;
-
-                    TagLib::ByteVector val = item.binaryData();
-
-                    int nullPos = val.find(0);
-                    if (nullPos < 0) continue; // not valid
-
-                    TagLib::ByteVector imgData = val.mid(nullPos + 1);
-                    TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
-
-                    std::string mime = "image/jpeg"; // fallback
-                    if (imgData.size() >= 8 && !png_sig_cmp((unsigned char*)imgData.data(), 0, 8)) {
-                        mime = "image/png";
-                    }
-
-                    const char *ext = extFromMime(mime);
-                    std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
-
-                    std::ofstream out(outPath, std::ios::binary);
-                    out.write(imgData.data(), imgData.size());
-                    out.close();
-
-                    AudioCoverInfo info;
-                    info.temp_file_path = outPath;
-                    info.mime_type = mime;
-                    info.description = desc.to8Bit(true);
-                    info.picture_type = getPictureTypeFromApeKey(key);
-
-                    state.extracted_covers.push_back(std::move(info));
-                    ++idx;
-                }
-            }
-        }
+        extractApeV2Covers(apeFile->APETag(), temp_dir, state.extracted_covers);
         return state;
     }
 
     // mp4
     if (auto *mp4File = dynamic_cast<TagLib::MP4::File*>(file_ref)) {
         auto *tag = mp4File->tag();
-        if (tag) {
+        if (tag != nullptr) {
             auto items = tag->itemMap();
             auto it = items.find("covr");
             if (it != items.end()) {
@@ -426,10 +535,10 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     // ogg vorbis
     if (auto *oggVorbis = dynamic_cast<TagLib::Ogg::Vorbis::File*>(file_ref)) {
         auto *xc = oggVorbis->tag();
-        if (xc) {
+        if (xc != nullptr) {
             int idx = 0;
             auto pics = xc->pictureList();
-            for (auto pic : pics) {
+            for (auto *pic : pics) {
                 const char *ext = extFromMime(pic->mimeType().to8Bit(true));
                 std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
 
@@ -453,10 +562,10 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     // ogg opus
     if (auto *oggOpus = dynamic_cast<TagLib::Ogg::Opus::File*>(file_ref)) {
         auto *xc = oggOpus->tag();
-        if (xc) {
+        if (xc != nullptr) {
             int idx = 0;
             auto pics = xc->pictureList();
-            for (auto pic : pics) {
+            for (auto *pic : pics) {
                 const char *ext = extFromMime(pic->mimeType().to8Bit(true));
                 std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
 
@@ -477,6 +586,121 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
         return state;
     }
 
+    // mkv (matroska / webm)
+    if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
+        int idx = 0;
+        TagLib::List<TagLib::VariantMap> all_attachments = mkvFile->complexProperties("PICTURE");
+
+        // append non-picture attachments (fonts, xml)
+        for (const auto& att : mkvFile->complexProperties("ATTACHMENT")) {
+            all_attachments.append(att);
+        }
+
+        for (const auto &picMap : all_attachments) {
+            if (!picMap.contains("data") || !picMap.contains("mimeType")) continue;
+
+            TagLib::ByteVector data = picMap["data"].toByteVector();
+            std::string mime = picMap["mimeType"].toString().to8Bit(true);
+
+            const char *ext = extFromMime(mime);
+            std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx) + ext);
+
+            std::ofstream out(outPath, std::ios::binary);
+            out.write(data.data(), data.size());
+            out.close();
+
+            AudioCoverInfo info;
+            info.temp_file_path = outPath;
+            info.mime_type = mime;
+            info.picture_type = defaultFrontCoverType();
+
+            if (picMap.contains("description")) {
+                info.description = picMap["description"].toString().to8Bit(true);
+            }
+
+            // store original filename and attachment type (picture or attachment) to rebuild correctly
+            std::string original_fileName = picMap.contains("fileName") ? picMap["fileName"].toString().to8Bit(true) : "";
+            bool is_picture = mime.find("image/") == 0;
+            info.format_specific = std::make_any<std::pair<std::string, bool>>(original_fileName, is_picture);
+
+            state.extracted_covers.push_back(std::move(info));
+            ++idx;
+        }
+        return state;
+    }
+
+    // trueaudio (id3v2 apic)
+    if (auto *ttaFile = dynamic_cast<TagLib::TrueAudio::File*>(file_ref)) {
+        extractId3v2Covers(ttaFile->ID3v2Tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // wavpack (apev2)
+    if (auto *wvFile = dynamic_cast<TagLib::WavPack::File*>(file_ref)) {
+        extractApeV2Covers(wvFile->APETag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // musepack (apev2)
+    if (auto *mpcFile = dynamic_cast<TagLib::MPC::File*>(file_ref)) {
+        extractApeV2Covers(mpcFile->APETag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // ogg flac (xiph)
+    if (auto *oggFlac = dynamic_cast<TagLib::Ogg::FLAC::File*>(file_ref)) {
+        extractXiphCovers(oggFlac->tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // ogg speex (xiph)
+    if (auto *oggSpeex = dynamic_cast<TagLib::Ogg::Speex::File*>(file_ref)) {
+        extractXiphCovers(oggSpeex->tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // asf / wma / wmv
+    if (auto *asfFile = dynamic_cast<TagLib::ASF::File*>(file_ref)) {
+        if (auto *tag = asfFile->tag()) {
+            auto attrList = tag->attributeListMap()["WM/Picture"];
+            int idx = 0;
+            for (const auto &attr : attrList) {
+                TagLib::ASF::Picture pic = attr.toPicture();
+                if (!pic.isValid()) continue;
+
+                std::string mime = pic.mimeType().to8Bit(true);
+                const char *ext = extFromMime(mime);
+                std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+
+                std::ofstream out(outPath, std::ios::binary);
+                out.write(pic.picture().data(), pic.picture().size());
+                out.close();
+
+                AudioCoverInfo info;
+                info.temp_file_path = outPath;
+                info.mime_type = mime;
+                info.description = pic.description().to8Bit(true);
+                info.picture_type = pic.type();
+
+                state.extracted_covers.push_back(std::move(info));
+                ++idx;
+            }
+        }
+        return state;
+    }
+
+    // dsf
+    if (auto *dsfFile = dynamic_cast<TagLib::DSF::File*>(file_ref)) {
+        extractId3v2Covers(dsfFile->tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
+    // dsdiff (id3v2 apic)
+    if (auto *dsdiffFile = dynamic_cast<TagLib::DSDIFF::File*>(file_ref)) {
+        extractId3v2Covers(dsdiffFile->ID3v2Tag(), temp_dir, state.extracted_covers);
+        return state;
+    }
+
     return state;
 }
 
@@ -492,7 +716,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     TagLib::FileRef ref(input_path.string().c_str());
 #endif
     TagLib::File *file_ref = ref.file();
-    if (!file_ref) {
+    if (file_ref == nullptr) {
         return false;
     }
 
@@ -549,26 +773,10 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // ape
     if (auto *apeFile = dynamic_cast<TagLib::APE::File*>(file_ref)) {
-        auto *tag = apeFile->APETag(true);
-        if (!tag) return false;
-
-        tag->removeItem("Cover Art (Front)");
-        tag->removeItem("Cover Art (Back)");
-
-        for (const auto &info : state.extracted_covers) {
-            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
-            if (data.isEmpty()) continue;
-
-            TagLib::String key = getApeCoverKey(info.picture_type);
-
-            TagLib::ByteVector val;
-            val.append(TagLib::ByteVector(info.description.data(), static_cast<unsigned int>(info.description.size())));
-            val.append(0); // null terminator
-            val.append(data);
-
-            tag->setItem(key, TagLib::APE::Item(key, val, true));
+        if (rebuildApeV2Covers(apeFile->APETag(true), state.extracted_covers)) {
+            return apeFile->save();
         }
-        return apeFile->save();
+        return false;
     }
 
     // mp4
@@ -591,7 +799,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
         }
 
         auto *tag = mp4File->tag();
-        if (!tag) return false;
+        if (tag == nullptr) return false;
 
         tag->removeItem("covr");
         tag->setItem("covr", TagLib::MP4::Item(covers)); // create item from list
@@ -602,7 +810,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     // ogg vorbis
     if (auto *oggVorbis = dynamic_cast<TagLib::Ogg::Vorbis::File*>(file_ref)) {
         auto *xc = oggVorbis->tag();
-        if (!xc) return false;
+        if (xc == nullptr) return false;
 
         xc->removeAllPictures();
 
@@ -616,7 +824,10 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
-            int w=0, h=0, d=0, c=0;
+            int w=0;
+            int h=0;
+            int d=0;
+            int c=0;
             computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
             if (w > 0) pic->setWidth(w);
             if (h > 0) pic->setHeight(h);
@@ -631,7 +842,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     // ogg opus
     if (auto *oggOpus = dynamic_cast<TagLib::Ogg::Opus::File*>(file_ref)) {
         auto *xc = oggOpus->tag();
-        if (!xc) return false;
+        if (xc == nullptr) return false;
 
         xc->removeAllPictures();
 
@@ -655,6 +866,120 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             xc->addPicture(pic);
         }
         return oggOpus->save();
+    }
+
+    // mkv (matroska / webm)
+    if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
+        TagLib::List<TagLib::VariantMap> pictures;
+        TagLib::List<TagLib::VariantMap> attachments;
+
+        for (const auto &info : state.extracted_covers) {
+            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+            if (data.isEmpty()) continue;
+
+            TagLib::VariantMap attMap;
+            attMap.insert("data", data);
+            attMap.insert("mimeType", TagLib::String(info.mime_type, TagLib::String::UTF8));
+            attMap.insert("description", TagLib::String(info.description, TagLib::String::UTF8));
+
+            std::string fileName = "attachment" + std::string(extFromMime(info.mime_type));
+            bool is_picture = info.mime_type.find("image/") == 0;
+
+            if (info.format_specific.has_value() && info.format_specific.type() == typeid(std::pair<std::string, bool>)) {
+                auto meta = std::any_cast<std::pair<std::string, bool>>(info.format_specific);
+                if (!meta.first.empty()) fileName = meta.first;
+                is_picture = meta.second;
+            }
+            attMap.insert("fileName", TagLib::String(fileName, TagLib::String::UTF8));
+
+            if (is_picture) {
+                pictures.append(attMap);
+            } else {
+                attachments.append(attMap);
+            }
+        }
+
+        mkvFile->setComplexProperties("PICTURE", pictures);
+        mkvFile->setComplexProperties("ATTACHMENT", attachments);
+        return mkvFile->save();
+    }
+
+    // trueaudio
+    if (auto *ttaFile = dynamic_cast<TagLib::TrueAudio::File*>(file_ref)) {
+        if (rebuildId3v2Covers(ttaFile->ID3v2Tag(true), state.extracted_covers)) {
+            return ttaFile->save();
+        }
+        return false;
+    }
+
+    // wavpack
+    if (auto *wvFile = dynamic_cast<TagLib::WavPack::File*>(file_ref)) {
+        if (rebuildApeV2Covers(wvFile->APETag(true), state.extracted_covers)) {
+            return wvFile->save();
+        }
+        return false;
+    }
+
+    // musepack
+    if (auto *mpcFile = dynamic_cast<TagLib::MPC::File*>(file_ref)) {
+        if (rebuildApeV2Covers(mpcFile->APETag(true), state.extracted_covers)) {
+            return mpcFile->save();
+        }
+        return false;
+    }
+
+    // ogg flac
+    if (auto *oggFlac = dynamic_cast<TagLib::Ogg::FLAC::File*>(file_ref)) {
+        if (rebuildXiphCovers(oggFlac->tag(), state.extracted_covers)) {
+            return oggFlac->save();
+        }
+        return false;
+    }
+
+    // ogg speex
+    if (auto *oggSpeex = dynamic_cast<TagLib::Ogg::Speex::File*>(file_ref)) {
+        if (rebuildXiphCovers(oggSpeex->tag(), state.extracted_covers)) {
+            return oggSpeex->save();
+        }
+        return false;
+    }
+
+    // asf / wma / wmv
+    if (auto *asfFile = dynamic_cast<TagLib::ASF::File*>(file_ref)) {
+        auto *tag = asfFile->tag();
+        if (tag == nullptr) return false;
+
+        tag->removeItem("WM/Picture");
+
+        for (const auto &info : state.extracted_covers) {
+            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+            if (data.isEmpty()) continue;
+
+            TagLib::ASF::Picture pic;
+            pic.setMimeType(info.mime_type);
+            pic.setDescription(info.description);
+            pic.setType(static_cast<TagLib::ASF::Picture::Type>(info.picture_type));
+            pic.setPicture(data);
+
+            tag->addAttribute("WM/Picture", TagLib::ASF::Attribute(pic.render()));
+        }
+        return asfFile->save();
+    }
+
+    // dsf
+    if (auto *dsfFile = dynamic_cast<TagLib::DSF::File*>(file_ref)) {
+        if (rebuildId3v2Covers(dsfFile->tag(), state.extracted_covers)) {
+            return dsfFile->save();
+        }
+        return false;
+    }
+
+    // dsdiff
+    if (auto *dsdiffFile = dynamic_cast<TagLib::DSDIFF::File*>(file_ref)) {
+        if (rebuildId3v2Covers(dsdiffFile->ID3v2Tag(true), state.extracted_covers)) {
+            return dsdiffFile->save();
+        }
+        return false;
     }
 
     return false;

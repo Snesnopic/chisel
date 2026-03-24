@@ -83,6 +83,16 @@ set(LIBCHISEL_SOURCES
         src/processors/woff2_processor.cpp
         include/brotli_processor.hpp
         src/processors/brotli_processor.cpp
+        include/asf_processor.hpp
+        src/processors/asf_processor.cpp
+        include/dsdiff_processor.hpp
+        src/processors/dsdiff_processor.cpp
+        include/dsf_processor.hpp
+        src/processors/dsf_processor.cpp
+        include/mpc_processor.hpp
+        src/processors/mpc_processor.cpp
+        include/tta_processor.hpp
+        src/processors/tta_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")

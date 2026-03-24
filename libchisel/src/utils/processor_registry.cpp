@@ -32,8 +32,15 @@
 #include "zopflipng_processor.hpp"
 #include "woff2_processor.hpp"
 #include "brotli_processor.hpp"
+#include "asf_processor.hpp"
+#include "dsdiff_processor.hpp"
+#include "dsf_processor.hpp"
+#include "mpc_processor.hpp"
+#include "tta_processor.hpp"
 #include <algorithm>
 #include <cctype>
+
+
 
 namespace chisel {
 
@@ -67,6 +74,11 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<XmlProcessor>());
     processors_.push_back(std::make_unique<Woff2Processor>());
     processors_.push_back(std::make_unique<BrotliProcessor>());
+    processors_.push_back(std::make_unique<AsfProcessor>());
+    processors_.push_back(std::make_unique<DsdiffProcessor>());
+    processors_.push_back(std::make_unique<DsfProcessor>());
+    processors_.push_back(std::make_unique<MpcProcessor>());
+    processors_.push_back(std::make_unique<TtaProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
