@@ -12,19 +12,6 @@
 
 namespace chisel {
 
-// read file into memory buffer
-static std::vector<uint8_t> read_file(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) throw std::runtime_error("Cannot open file: " + path.string());
-    const auto size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(size);
-    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-        throw std::runtime_error("Error reading file: " + path.string());
-    }
-    return buffer;
-}
-
 // decode woff2 container to raw ttf payload
 static std::vector<uint8_t> decode_to_ttf(const std::vector<uint8_t>& woff2_data) {
     const size_t ttf_size = woff2::ComputeWOFF2FinalSize(woff2_data.data(), woff2_data.size());

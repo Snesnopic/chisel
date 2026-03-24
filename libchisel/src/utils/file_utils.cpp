@@ -154,5 +154,31 @@ namespace chisel {
         out_path = normalized;
         return true;
     }
+    // helper to write buffer into file
+    bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &buf) {
+        std::ofstream out(path, std::ios::binary);
+        if (!out) return false;
+        out.write(reinterpret_cast<const char*>(buf.data()), buf.size());
+        return true;
+    }
+
+    bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) return false;
+        buf.assign(std::istreambuf_iterator(in), {});
+        return true;
+    }
+
+    std::vector<uint8_t> read_file(const std::filesystem::path& path) {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file) throw std::runtime_error("cannot open file: " + path.string());
+        const auto size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        std::vector<uint8_t> buffer(size);
+        if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+            throw std::runtime_error("error reading file: " + path.string());
+        }
+        return buffer;
+    }
 } // namespace chisel
 

@@ -2,8 +2,8 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
-#include "../../include/jxl_processor.hpp"
-#include "../../include/logger.hpp"
+#include "jxl_processor.hpp"
+#include "logger.hpp"
 #include <jxl/encode.h>
 #include <jxl/decode.h>
 #include <fstream>
@@ -12,22 +12,6 @@
 #include <string>
 
 namespace {
-
-// helper to read file into buffer
-bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return false;
-    buf.assign(std::istreambuf_iterator<char>(in), {});
-    return true;
-}
-
-// helper to write buffer into file
-bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &buf) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
-    out.write(reinterpret_cast<const char*>(buf.data()), buf.size());
-    return true;
-}
 
 size_t get_bytes_per_channel(const JxlDataType data_type) {
     if (data_type == JXL_TYPE_FLOAT) return 4;
