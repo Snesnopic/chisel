@@ -39,15 +39,12 @@ jobs:
 
       - name: Install Rust targets and components
         run: |
-          # install all required rust targets for apple platforms
+          # install only tier 2 targets that have prebuilt std available
           rustup target add \
             x86_64-apple-darwin aarch64-apple-darwin \
-            aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim \
-            aarch64-apple-visionos aarch64-apple-visionos-sim \
-            aarch64-apple-tvos x86_64-apple-tvos aarch64-apple-tvos-sim \
-            arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
+            aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
           
-          # required for build-std on tier 3 targets
+          # required for build-std on tier 3 targets (visionos, tvos, watchos)
           rustup component add rust-src
 
       - name: Build XCFramework
