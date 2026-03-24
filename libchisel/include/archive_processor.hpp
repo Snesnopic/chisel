@@ -40,10 +40,8 @@ public:
             "application/x-tar",
             //"application/gzip", // Handled as filters, not primary formats
             "application/x-bzip2",
-            //"application/x-xz",
             "application/x-iso9660-image",
             "application/x-cpio",
-            // "application/x-lzma",
             "application/vnd.ms-cab-compressed",
             // "application/x-ms-wim", // Write not supported
             "application/java-archive",
@@ -60,10 +58,10 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 18> kExts = {
+        static constexpr std::array<std::string_view, 17> kExts = {
             ".zip", // ".7z",
-            ".tar",  ".bz2", //".gz", ".xz",
-            ".iso", ".cpio", ".lzma", ".cab", // ".wim",
+            ".tar",  ".bz2", //".gz",
+            ".iso", ".cpio", ".cab", // ".wim",
             ".jar", ".xpi", ".apk",
             ".cbz", ".cbt",
             ".epub",

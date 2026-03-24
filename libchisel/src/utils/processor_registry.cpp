@@ -38,10 +38,9 @@
 #include "mpc_processor.hpp"
 #include "tta_processor.hpp"
 #include "cfbf_processor.hpp"
+#include "lzma_processor.hpp"
 #include <algorithm>
 #include <cctype>
-
-
 
 namespace chisel {
 
@@ -81,6 +80,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MpcProcessor>());
     processors_.push_back(std::make_unique<TtaProcessor>());
     processors_.push_back(std::make_unique<CfbfProcessor>());
+    processors_.push_back(std::make_unique<LzmaProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

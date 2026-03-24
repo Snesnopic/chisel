@@ -95,6 +95,8 @@ set(LIBCHISEL_SOURCES
         src/processors/tta_processor.cpp
         include/cfbf_processor.hpp
         src/processors/cfbf_processor.cpp
+        include/lzma_processor.hpp
+        src/processors/lzma_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -135,6 +137,7 @@ target_include_directories(libchisel
         ${libdeflate_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include
         ${CMAKE_SOURCE_DIR}/third_party/woff2/include
+        ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
 )
 
 if(NOT WIN32)
