@@ -6,6 +6,7 @@
 #include "logger.hpp"
 #include <jxl/encode.h>
 #include <jxl/decode.h>
+#include "file_utils.hpp"
 #include <fstream>
 #include <vector>
 #include <iterator>
