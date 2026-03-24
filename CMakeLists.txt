@@ -7,12 +7,7 @@ option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
-# disable unity build for on macos intel gcc to prevent cc1plus oom
-if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_UNITY_BUILD FALSE)
-else()
-    set(CMAKE_UNITY_BUILD TRUE)
-endif()
+set(CMAKE_UNITY_BUILD TRUE)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     include(CheckIPOSupported)
@@ -602,6 +597,9 @@ set(CMAKE_DISABLE_FIND_PACKAGE_BrotliEnc ON CACHE BOOL "" FORCE)
 # woff2
 set(WOFF2_SKIP_TESTS ON CACHE BOOL "" FORCE)
 set(NOISY_LOGGING OFF)
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CANONICAL_PREFIXES ON CACHE BOOL "" FORCE)
+endif ()
 add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
 
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
