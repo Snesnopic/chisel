@@ -666,7 +666,13 @@ target_include_directories(libchisel SYSTEM PRIVATE
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
-
+# disable unity build for heavy google libs on macos gcc to prevent cc1plus oom
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND NON_UNITY_TARGETS
+            brotlicommon brotlidec brotlienc
+            woff2common woff2dec woff2enc
+    )
+endif()
 set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
