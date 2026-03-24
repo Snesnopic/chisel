@@ -79,6 +79,8 @@ set(LIBCHISEL_SOURCES
         include/options.hpp
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp
+        include/woff2_processor.hpp
+        src/processors/woff2_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -117,6 +119,8 @@ target_include_directories(libchisel
         ${CMAKE_BINARY_DIR}/bmplib
         ${sqlite3_SOURCE_DIR}
         ${libdeflate_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include
+        ${CMAKE_SOURCE_DIR}/third_party/woff2/include
 )
 
 if(NOT WIN32)
@@ -190,6 +194,8 @@ add_dependencies(libchisel pugixml)
 add_dependencies(libchisel libdeflate_static)
 add_dependencies(libchisel libgifsicle)
 add_dependencies(libchisel mseed_static)
+add_dependencies(libchisel brotlicommon brotlidec brotlienc)
+add_dependencies(libchisel woff2common woff2dec woff2enc)
 
 if(NOT WIN32)
     add_dependencies(libchisel LIBMAGIC)

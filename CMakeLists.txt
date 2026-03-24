@@ -571,6 +571,28 @@ if(ENABLE_MP3PACKER)
     add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 endif()
 
+# brotli
+set(BROTLIDEC_FOUND TRUE CACHE BOOL "" FORCE)
+set(BROTLIENC_FOUND TRUE CACHE BOOL "" FORCE)
+set(BROTLICOMMON_FOUND TRUE CACHE BOOL "" FORCE)
+
+set(BROTLIDEC_LIBRARIES brotlidec CACHE STRING "" FORCE)
+set(BROTLIENC_LIBRARIES brotlienc CACHE STRING "" FORCE)
+set(BROTLICOMMON_LIBRARIES brotlicommon CACHE STRING "" FORCE)
+
+set(BROTLIDEC_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+set(BROTLIENC_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+set(BROTLICOMMON_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+
+# disable cmake find_package for brotli to prevent homebrew leakage
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec ON CACHE BOOL "" FORCE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliEnc ON CACHE BOOL "" FORCE)
+
+# woff2
+set(WOFF2_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(NOISY_LOGGING OFF)
+add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -598,6 +620,12 @@ set(CHISEL_LIBS
         pugixml
         mseed_static
         bmplib
+        brotlicommon
+        brotlidec
+        brotlienc
+        woff2common
+        woff2dec
+        woff2enc
 )
 
 if(ENABLE_MATROSKA)

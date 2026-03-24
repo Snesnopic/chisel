@@ -30,6 +30,7 @@
 #include "../../include/wavpack_processor.hpp"
 #include "../../include/webp_processor.hpp"
 #include "../../include/zopflipng_processor.hpp"
+#include "woff2_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -63,6 +64,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<BmpProcessor>());
     processors_.push_back(std::make_unique<PnmProcessor>());
     processors_.push_back(std::make_unique<XmlProcessor>());
+    processors_.push_back(std::make_unique<Woff2Processor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
