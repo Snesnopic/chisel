@@ -9,6 +9,7 @@
 #include <array>
 #include <string_view>
 #include <span>
+#include "file_utils.hpp"
 
 namespace chisel {
 

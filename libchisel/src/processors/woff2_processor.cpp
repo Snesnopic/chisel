@@ -32,7 +32,7 @@ void Woff2Processor::recompress(const std::filesystem::path& input,
                                 const ProcessingOptions& /*options*/) {
     Logger::log(LogLevel::Debug, "Starting WOFF2 recompression for " + input.string(), get_name());
 
-    const auto input_data = read_file(input);
+    const auto input_data = chisel::read_file(input);
     const auto ttf_data = decode_to_ttf(input_data);
 
     size_t max_woff2_size = woff2::MaxWOFF2CompressedSize(ttf_data.data(), ttf_data.size());
@@ -61,8 +61,8 @@ std::string Woff2Processor::get_raw_checksum(const std::filesystem::path& /*file
 
 bool Woff2Processor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
     try {
-        const auto data_a = read_file(a);
-        const auto data_b = read_file(b);
+        const auto data_a = chisel::read_file(a);
+        const auto data_b = chisel::read_file(b);
 
         const auto ttf_a = decode_to_ttf(data_a);
         const auto ttf_b = decode_to_ttf(data_b);
