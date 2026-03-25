@@ -97,6 +97,10 @@ set(LIBCHISEL_SOURCES
         src/processors/cfbf_processor.cpp
         include/lzma_processor.hpp
         src/processors/lzma_processor.cpp
+        include/zstd_processor.hpp
+        src/processors/zstd_processor.cpp
+        include/bzip2_processor.hpp
+        src/processors/bzip2_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -138,6 +142,8 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include
         ${CMAKE_SOURCE_DIR}/third_party/woff2/include
         ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
+        ${ZSTD_INCLUDE_DIR}
+        ${BZIP2_DIR}
 )
 
 if(NOT WIN32)
