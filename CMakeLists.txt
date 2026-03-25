@@ -650,6 +650,7 @@ set(CHISEL_LIBS
         woff2common
         woff2dec
         woff2enc
+        liblzma
 )
 
 if(ENABLE_MATROSKA)

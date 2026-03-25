@@ -190,6 +190,8 @@ elseif(UNIX AND NOT APPLE)
 endif()
 target_compile_definitions(libchisel PUBLIC TAGLIB_STATIC)
 
+target_compile_definitions(libchisel PRIVATE LZMA_API_STATIC)
+
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
 add_dependencies(libchisel liblzma)
