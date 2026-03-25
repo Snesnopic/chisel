@@ -277,7 +277,6 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".iso",    "application/x-iso9660-image"},
     {".cpio",   "application/x-cpio"},
     {".lzma",   "application/x-lzma"},
-    {".cab",    "application/vnd.ms-cab-compressed"},
     {".epub",   "application/epub+zip"},
     {".cbz",    "application/vnd.comicbook+zip"},
     {".cbt",    "application/vnd.comicbook+tar"},
