@@ -101,6 +101,8 @@ set(LIBCHISEL_SOURCES
         src/processors/zstd_processor.cpp
         include/bzip2_processor.hpp
         src/processors/bzip2_processor.cpp
+        include/ico_processor.hpp
+        src/processors/ico_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")

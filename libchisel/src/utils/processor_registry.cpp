@@ -41,6 +41,7 @@
 #include "lzma_processor.hpp"
 #include "zstd_processor.hpp"
 #include "bzip2_processor.hpp"
+#include "ico_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -85,6 +86,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<LzmaProcessor>());
     processors_.push_back(std::make_unique<ZstdProcessor>());
     processors_.push_back(std::make_unique<Bzip2Processor>());
+    processors_.push_back(std::make_unique<IcoProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
