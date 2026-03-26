@@ -1,0 +1,152 @@
+//
+// Created by Giuseppe Francione on 26/03/26.
+//
+
+#include "../../include/swf_processor.hpp"
+#include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
+#include <zlib.h>
+#include <fstream>
+#include <vector>
+#include <stdexcept>
+
+namespace chisel {
+
+inline uint32_t read_le32(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+}
+
+inline void write_le32(uint8_t* p, uint32_t v) {
+    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
+}
+
+// inflate zlib payload
+static std::vector<uint8_t> inflate_swf(const uint8_t* src, size_t src_len, size_t expected_len) {
+    std::vector<uint8_t> uncompressed(expected_len);
+    uLongf dest_len = static_cast<uLongf>(expected_len);
+
+    if (uncompress(uncompressed.data(), &dest_len, src, static_cast<uLong>(src_len)) != Z_OK) {
+        throw std::runtime_error("zlib decompression failed");
+    }
+
+    uncompressed.resize(dest_len);
+    return uncompressed;
+}
+
+// deflate with max compression (level 9)
+static std::vector<uint8_t> deflate_swf(const std::vector<uint8_t>& uncompressed) {
+    z_stream strm{};
+    if (deflateInit(&strm, Z_BEST_COMPRESSION) != Z_OK) {
+        throw std::runtime_error("failed to init zlib");
+    }
+
+    std::vector<uint8_t> compressed;
+    constexpr size_t chunk_size = 65536;
+    std::vector<uint8_t> out_buf(chunk_size);
+
+    strm.next_in = const_cast<uint8_t*>(uncompressed.data());
+    strm.avail_in = static_cast<uInt>(uncompressed.size());
+
+    int ret;
+    do {
+        strm.next_out = out_buf.data();
+        strm.avail_out = static_cast<uInt>(out_buf.size());
+
+        ret = deflate(&strm, Z_FINISH);
+        if (ret == Z_STREAM_ERROR) {
+            deflateEnd(&strm);
+            throw std::runtime_error("zlib compression failed");
+        }
+
+        size_t written = out_buf.size() - strm.avail_out;
+        if (written > 0) {
+            compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + written);
+        }
+    } while (strm.avail_out == 0);
+
+    deflateEnd(&strm);
+    return compressed;
+}
+
+void SwfProcessor::recompress(const std::filesystem::path& input_path,
+                              const std::filesystem::path& output_path, const ProcessingOptions&) {
+    Logger::log(LogLevel::Debug, "starting swf recompression for " + input_path.string(), get_name());
+
+    const auto data = read_file(input_path);
+    if (data.size() < 8) return;
+
+    const uint8_t magic[3] = {data[0], data[1], data[2]};
+    const uint8_t version = data[3];
+    const uint32_t uncompressed_file_size = read_le32(data.data() + 4);
+
+    if (magic[1] != 'W' || magic[2] != 'S') {
+        Logger::log(LogLevel::Warning, "invalid swf signature", get_name());
+        return;
+    }
+
+    std::vector<uint8_t> uncompressed_payload;
+
+    try {
+        if (magic[0] == 'F') {
+            uncompressed_payload.assign(data.begin() + 8, data.end());
+        } else if (magic[0] == 'C') {
+            size_t expected_size = uncompressed_file_size > 8 ? uncompressed_file_size - 8 : 0;
+            uncompressed_payload = inflate_swf(data.data() + 8, data.size() - 8, expected_size);
+        } else if (magic[0] == 'Z') {
+            // lzma swf (ZWS) is rare and requires special setup. skip for now to maintain safety.
+            Logger::log(LogLevel::Warning, "lzma swf (ZWS) not supported, skipping", get_name());
+            return;
+        } else {
+            return;
+        }
+
+        auto compressed_payload = deflate_swf(uncompressed_payload);
+
+        std::ofstream out(output_path, std::ios::binary);
+        if (!out) {
+            Logger::log(LogLevel::Error, "cannot open output file: " + output_path.string(), get_name());
+            return;
+        }
+
+        // force standard zlib compression header (CWS)
+        out.write("CWS", 3);
+        out.write(reinterpret_cast<const char*>(&version), 1);
+
+        uint8_t size_bytes[4];
+        write_le32(size_bytes, static_cast<uint32_t>(uncompressed_payload.size() + 8));
+        out.write(reinterpret_cast<const char*>(size_bytes), 4);
+
+        out.write(reinterpret_cast<const char*>(compressed_payload.data()), compressed_payload.size());
+        out.close();
+
+    } catch (...) {
+        Logger::log(LogLevel::Error, "failed to recompress swf payload", get_name());
+    }
+}
+
+// verify bit-identical logic (uncompressed payloads must match)
+bool SwfProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    try {
+        auto get_uncompressed = [](const std::vector<uint8_t>& data) -> std::vector<uint8_t> {
+            if (data.size() < 8) return {};
+            if (data[0] == 'F') return {data.begin() + 8, data.end()};
+            if (data[0] == 'C') {
+                size_t expected = read_le32(data.data() + 4) - 8;
+                return inflate_swf(data.data() + 8, data.size() - 8, expected);
+            }
+            return {};
+        };
+
+        const auto data_a = read_file(a);
+        const auto data_b = read_file(b);
+
+        if (data_a.size() < 8 || data_b.size() < 8) return false;
+        if (data_a[3] != data_b[3]) return false; // versions must match
+
+        return get_uncompressed(data_a) == get_uncompressed(data_b);
+    } catch (...) {
+        return false;
+    }
+}
+
+} // namespace chisel
