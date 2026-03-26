@@ -77,18 +77,15 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
         if (is_png) {
             out_file.write(reinterpret_cast<const char*>(payload), bytes_in_res);
         } else {
-            // Costruiamo un BITMAPFILEHEADER finto di 14 byte
             uint32_t biSize = read_le32(payload);
             uint16_t biBitCount = read_le16(payload + 14);
             uint32_t biClrUsed = read_le32(payload + 32);
 
-            // Calcoliamo la dimensione della palette
             uint32_t palette_colors = 0;
             if (biBitCount <= 8) {
                 palette_colors = (biClrUsed == 0) ? (1 << biBitCount) : biClrUsed;
             }
 
-            // L'offset dei pixel è 14 (header) + dimensione DIB + dimensione palette
             uint32_t pixel_offset = 14 + biSize + (palette_colors * 4);
             uint32_t file_size = 14 + bytes_in_res;
 
@@ -151,14 +148,14 @@ std::filesystem::path IcoProcessor::finalize_extraction(const ExtractedContent& 
         // copy original 16-byte entry to preserve width/height/planes/bpp metadata
         const size_t orig_dir_offset = 6 + i * 16;
         uint8_t entry[16];
-        std::memcpy(entry, orig_data.data() + orig_dir_offset, 16);
+        memcpy(entry, orig_data.data() + orig_dir_offset, 16);
 
         // update size and offset
         write_le32(entry + 8, static_cast<uint32_t>(payload.size()));
         write_le32(entry + 12, current_offset);
 
         // write updated entry back into new_ico directory space
-        std::memcpy(new_ico.data() + dir_start + i * 16, entry, 16);
+        memcpy(new_ico.data() + dir_start + i * 16, entry, 16);
 
         // append payload
         new_ico.insert(new_ico.end(), payload.begin(), payload.end());
