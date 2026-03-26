@@ -105,6 +105,10 @@ set(LIBCHISEL_SOURCES
         src/processors/ico_processor.cpp
         include/swf_processor.hpp
         src/processors/swf_processor.cpp
+        include/gft_processor.hpp
+        src/processors/gft_processor.cpp
+        include/rdb_processor.hpp
+        src/processors/rdb_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
