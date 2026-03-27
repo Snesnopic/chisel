@@ -15,7 +15,7 @@ jobs:
       enable_freebsd: ${{ steps.set_vars.outputs.enable_freebsd }}
     steps:
       - id: set_vars
-        run: echo "enable_freebsd=false" >> "$GITHUB_OUTPUT"
+        run: echo "enable_freebsd=true" >> "$GITHUB_OUTPUT"
   build:
     name: build (${{ matrix.asset_name }})
     runs-on: ${{ matrix.runs_on }}
@@ -893,6 +893,8 @@ jobs:
           package_unix "binary-linux-arm64"     "chsl-linux-arm64"
           package_unix "binary-macos-x64"       "chsl-macos-x64"
           package_unix "binary-macos-arm64"     "chsl-macos-arm64"
+          package_unix "binary-freebsd-x64"     "chsl-freebsd-x64"
+          package_unix "binary-freebsd-arm64"   "chsl-freebsd-arm64"
           package_windows "binary-windows-x64"    "chsl-windows-x64"
           package_windows "binary-windows-arm64"  "chsl-windows-arm64"
           
@@ -1046,7 +1048,7 @@ jobs:
       FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif|tag"
     steps:
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: binary-${{ matrix.asset_name }}
           path: ${{ env.BIN_DIR }}
