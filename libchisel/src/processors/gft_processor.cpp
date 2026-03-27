@@ -10,10 +10,6 @@
 
 namespace chisel {
 
-inline uint32_t read_le32(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
-}
-
 std::optional<ExtractedContent> GftProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "starting gft extraction for " + input_path.string(), get_name());
 
