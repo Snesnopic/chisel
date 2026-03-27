@@ -12,18 +12,6 @@
 
 namespace chisel {
 
-inline uint32_t read_le32(const uint8_t* p) { return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)); }
-inline uint64_t read_le64(const uint8_t* p) {
-    return static_cast<uint64_t>(read_le32(p)) | (static_cast<uint64_t>(read_le32(p + 4)) << 32);
-}
-inline void write_le32(uint8_t* p, uint32_t v) { p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF; }
-inline void write_le64(uint8_t* p, uint64_t v) { write_le32(p, static_cast<uint32_t>(v)); write_le32(p + 4, static_cast<uint32_t>(v >> 32)); }
-
-static std::string format_index(size_t index) {
-    std::ostringstream oss;
-    oss << std::setw(6) << std::setfill('0') << index;
-    return oss.str();
-}
 
 std::optional<ExtractedContent> RdbProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "starting rdb extraction for " + input_path.string(), get_name());

@@ -15,21 +15,6 @@
 
 namespace chisel {
 
-// big-endian helpers for apple powerpc legacy format
-inline uint32_t read_be32(const uint8_t* p) {
-    return static_cast<uint32_t>((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]);
-}
-
-inline void write_be32(uint8_t* p, uint32_t v) {
-    p[0] = (v >> 24) & 0xFF; p[1] = (v >> 16) & 0xFF; p[2] = (v >> 8) & 0xFF; p[3] = v & 0xFF;
-}
-
-static std::string format_index(size_t index) {
-    std::ostringstream oss;
-    oss << std::setw(4) << std::setfill('0') << index;
-    return oss.str();
-}
-
 std::optional<ExtractedContent> IcnsProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "STARTING ICNS EXTRACTION FOR " + input_path.string(), get_name());
 

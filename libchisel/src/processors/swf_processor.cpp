@@ -5,6 +5,7 @@
 #include "../../include/swf_processor.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
+#include "file_utils.hpp"
 #include <zlib.h>
 #include <fstream>
 #include <vector>
@@ -12,13 +13,6 @@
 
 namespace chisel {
 
-inline uint32_t read_le32(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
-}
-
-inline void write_le32(uint8_t* p, uint32_t v) {
-    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
-}
 
 // inflate zlib payload
 static std::vector<uint8_t> inflate_swf(const uint8_t* src, size_t src_len, size_t expected_len) {

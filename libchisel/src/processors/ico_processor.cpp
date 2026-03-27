@@ -6,6 +6,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
 #include "../../include/file_utils.hpp"
+#include <cstring>
 #include <fstream>
 #include <vector>
 #include <stdexcept>
@@ -14,21 +15,6 @@
 #include <algorithm>
 
 namespace chisel {
-
-// little-endian helpers
-inline uint16_t read_le16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
-inline uint32_t read_le32(const uint8_t* p) { return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24)); }
-inline void write_le16(uint8_t* p, uint16_t v) { p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; }
-inline void write_le32(uint8_t* p, uint32_t v) {
-    p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
-}
-
-// format zero-padded index for sorting
-static std::string format_index(size_t index) {
-    std::ostringstream oss;
-    oss << std::setw(4) << std::setfill('0') << index;
-    return oss.str();
-}
 
 std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "STARTING ICO EXTRACTION FOR " + input_path.string(), get_name());
