@@ -38,12 +38,24 @@ namespace chisel {
         write_le32(p, static_cast<uint32_t>(v)); write_le32(p + 4, static_cast<uint32_t>(v >> 32));
     }
 
+    uint16_t read_be16(const uint8_t* p) {
+        return static_cast<uint16_t>((p[0] << 8) | p[1]);
+    }
+
     uint32_t read_be32(const uint8_t* p) {
         return static_cast<uint32_t>((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]);
     }
 
+    void write_be16(uint8_t* p, const uint16_t v) {
+        p[0] = (v >> 8) & 0xFF; p[1] = v & 0xFF;
+    }
+
     void write_be32(uint8_t* p, const uint32_t v) {
         p[0] = (v >> 24) & 0xFF; p[1] = (v >> 16) & 0xFF; p[2] = (v >> 8) & 0xFF; p[3] = v & 0xFF;
+    }
+
+    uint32_t align4(const uint32_t v) {
+        return (v + 3) & ~3;
     }
 
     // format zero-padded index for sorting

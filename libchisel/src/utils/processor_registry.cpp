@@ -46,6 +46,7 @@
 #include "gft_processor.hpp"
 #include "rdb_processor.hpp"
 #include "icns_processor.hpp"
+#include "woff_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -95,6 +96,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<GftProcessor>());
     processors_.push_back(std::make_unique<RdbProcessor>());
     processors_.push_back(std::make_unique<IcnsProcessor>());
+    processors_.push_back(std::make_unique<WoffProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

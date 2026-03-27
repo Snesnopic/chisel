@@ -22,9 +22,14 @@ namespace chisel {
     void write_le32(uint8_t* p, uint32_t v);
     void write_le64(uint8_t* p, uint64_t v);
 
+    uint16_t read_be16(const uint8_t* p);
     uint32_t read_be32(const uint8_t* p);
 
+    void write_be16(uint8_t* p, uint16_t v);
     void write_be32(uint8_t* p, uint32_t v);
+
+    // padding to 4-byte boundaries
+    uint32_t align4(uint32_t v);
 
     // format zero-padded index for sorting
     std::string format_index(size_t index);
