@@ -9,6 +9,10 @@
 #include <array>
 #include <string_view>
 #include <span>
+#include "random_utils.hpp"
+#include "audio_metadata_util.hpp"
+#include "file_type.hpp"
+#include "file_utils.hpp"
 
 namespace chisel {
 

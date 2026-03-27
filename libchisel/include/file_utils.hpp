@@ -9,9 +9,30 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <vector>
+#include <cstdint>
+#include <fstream>
 
 namespace chisel {
+    uint16_t read_le16(const uint8_t* p);
+    uint32_t read_le32(const uint8_t* p);
+    uint64_t read_le64(const uint8_t* p);
 
+    void write_le16(uint8_t* p, uint16_t v);
+    void write_le32(uint8_t* p, uint32_t v);
+    void write_le64(uint8_t* p, uint64_t v);
+
+    uint16_t read_be16(const uint8_t* p);
+    uint32_t read_be32(const uint8_t* p);
+
+    void write_be16(uint8_t* p, uint16_t v);
+    void write_be32(uint8_t* p, uint32_t v);
+
+    // padding to 4-byte boundaries
+    uint32_t align4(uint32_t v);
+
+    // format zero-padded index for sorting
+    std::string format_index(size_t index);
     /**
      * @brief Opens a file using a filesystem path, handling Windows Unicode correctly.
      * @param path The path to the file.
@@ -90,6 +111,38 @@ namespace chisel {
      * @return True if safe, false if malicious or invalid.
      */
     bool sanitize_archive_entry_path(const std::string& entry_name, const std::filesystem::path& dest_dir, std::filesystem::path& out_path);
+
+    /**
+     * @brief Writes a byte buffer to a file.
+     *
+     * Overwrites the file if it already exists. Creates parent directories
+     * if necessary. Returns false on I/O errors or if the file cannot be written.
+     *
+     * @param path The destination file path.
+     * @param buf The buffer containing the bytes to write.
+     * @return True if the file was successfully written, false otherwise.
+     */
+    bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& buf);
+
+    /**
+     * @brief Reads the entire contents of a file into a byte buffer.
+     *
+     * This overload writes the file's raw bytes into the provided output vector.
+     * It returns false on I/O errors or if the file cannot be opened.
+     *
+     * @param path The path to the file to be read.
+     * @param buf [Output] The vector that will receive the file's bytes.
+     * @return True if the file was successfully read, false otherwise.
+     */
+    bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf);
+
+    /**
+     * @brief Reads the entire contents of a file into a byte vector.
+     * @param path The path to the file to be read.
+     * @return A vector containing the file's raw bytes.
+     */
+    std::vector<uint8_t> read_file(const std::filesystem::path& path);
+
 } // namespace chisel
 
 #endif // CHISEL_FILE_UTILS_HPP

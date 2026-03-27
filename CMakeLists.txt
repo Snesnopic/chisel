@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.3.0 LANGUAGES C CXX)
+project(chisel VERSION 1.4.0 LANGUAGES C CXX)
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
@@ -9,7 +9,18 @@ option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 set(CMAKE_UNITY_BUILD TRUE)
 
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+    if(ipo_supported)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    else()
+        message(WARNING "IPO/LTO is not supported: ${ipo_error}")
+    endif()
+else()
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION FALSE)
+endif()
+
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 endif()
@@ -53,8 +64,20 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     if (MSVC)
         add_compile_options(/O2 /GL /W0)
+        add_link_options(/OPT:REF /OPT:ICF) # dead code elimination on windows
     else()
         add_compile_options(-O3 -w)
+
+        # place each function and data in its own section to allow linker to strip them
+        add_compile_options(-ffunction-sections -fdata-sections)
+
+        if(APPLE)
+            # macos linker flag to remove unused sections
+            add_link_options("-Wl,-dead_strip")
+        else()
+            # linux/mingw linker flags to remove unused sections and strip symbols
+            add_link_options("-Wl,--gc-sections" "-s")
+        endif()
     endif()
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/release)
 endif()
@@ -72,7 +95,7 @@ if(EXISTS "${BZIP2_DIR}/bzlib.c")
             "${CMAKE_CURRENT_BINARY_DIR}/bzip2_inc/bz_version.h"
     )
 
-    add_library(bz2_static STATIC
+    add_library(bz2_static STATIC EXCLUDE_FROM_ALL
             ${BZIP2_DIR}/blocksort.c
             ${BZIP2_DIR}/huffman.c
             ${BZIP2_DIR}/crctable.c
@@ -101,7 +124,7 @@ endif()
 
 # libmkclean
 if(ENABLE_MATROSKA)
-    add_subdirectory("third_party/libmkclean")
+    add_subdirectory("third_party/libmkclean" EXCLUDE_FROM_ALL)
 endif()
 
 # liblzma
@@ -231,7 +254,7 @@ else()
 
     file(WRITE "${MAGIC_BIN}/config.h" "${MAGIC_CONFIG_H}")
 
-    add_library(LIBMAGIC STATIC ${LIBMAGIC_SOURCES})
+    add_library(LIBMAGIC STATIC EXCLUDE_FROM_ALL ${LIBMAGIC_SOURCES})
 
     target_include_directories(LIBMAGIC PUBLIC
             $<BUILD_INTERFACE:${MAGIC_BIN}>
@@ -243,27 +266,29 @@ else()
 endif()
 
 # zlib
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
 set(zlib_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zlib")
 set(zlib_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zlib-build")
-set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(${zlib_SOURCE_DIR} ${zlib_BINARY_DIR} EXCLUDE_FROM_ALL)
 
-add_subdirectory(${zlib_SOURCE_DIR} third_party/zlib-build)
-
-set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs")
-
-if(MSVC)
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/Release/zlibstatic.lib" CACHE FILEPATH "zlib library")
-else()
-    set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/libz.a" CACHE FILEPATH "zlib library")
+if(NOT TARGET zlib)
+    add_library(zlib ALIAS zlibstatic)
 endif()
 
-set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}" CACHE STRING "zlib libraries")
-set(ZLIB_FOUND TRUE CACHE BOOL "zlib found")
+if(NOT TARGET ZLIB::ZLIB)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+endif()
+set(ZLIB_H_PATH "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE STRING "" FORCE)
+set(ZLIB_LIB_PATH ZLIB::ZLIB CACHE STRING "" FORCE)
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE PATH "zlib include dir" FORCE)
+set(ZLIB_INCLUDE_DIRS "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dirs" FORCE)
 
-set(ZLIB_H_PATH "${ZLIB_INCLUDE_DIR}" CACHE PATH "zlib include dir")
-set(ZLIB_LIB_PATH "${ZLIB_LIBRARY}" CACHE FILEPATH "zlib library")
+set(ZLIB_LIBRARY zlibstatic CACHE STRING "zlib library" FORCE)
+set(ZLIB_LIBRARIES zlibstatic CACHE STRING "zlib libraries" FORCE)
+set(ZLIB_FOUND TRUE CACHE BOOL "zlib found" FORCE)
 
 set(ENABLE_STATIC_RUNTIME OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -313,7 +338,7 @@ endif()
 set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
 file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
 list(REMOVE_ITEM FLEXIGIF_SOURCES "${FLEXIGIF_DIR}/flexiGIF.cpp")
-add_library(flexigif STATIC ${FLEXIGIF_SOURCES})
+add_library(flexigif STATIC EXCLUDE_FROM_ALL ${FLEXIGIF_SOURCES})
 target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
 target_compile_features(flexigif PUBLIC cxx_std_11)
 
@@ -373,92 +398,9 @@ set(LIBLZMA_LIBRARY liblzma CACHE STRING "" FORCE)
 set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
 
 # bmplib
-set(BMPLIB_DIR "${CMAKE_SOURCE_DIR}/third_party/bmplib")
-set(BMPLIB_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/bmplib")
-
-file(MAKE_DIRECTORY ${BMPLIB_BUILD_DIR})
-
-if(NOT EXISTS "${BMPLIB_DIR}/config.h")
-    file(READ "${BMPLIB_DIR}/config.h.in" BMP_CONFIG_CONTENT)
-    string(REPLACE "@libversion@" "1.8.0" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
-    string(REPLACE "@insanity_limit_mb@" "1024" BMP_CONFIG_CONTENT "${BMP_CONFIG_CONTENT}")
-    file(WRITE "${BMPLIB_DIR}/config.h" "${BMP_CONFIG_CONTENT}")
-endif()
-
-set(BMP_HEADER_ORIGINAL "${BMPLIB_DIR}/bmplib.h")
-set(BMP_HEADER_PATCHED  "${BMPLIB_BUILD_DIR}/bmplib.h")
-
-if(WIN32)
-    file(READ "${BMP_HEADER_ORIGINAL}" BMP_HEADER_CONTENT)
-    string(REPLACE
-            "#if defined (WIN32) || defined (_WIN32)"
-            "#if 0"
-            BMP_HEADER_CONTENT "${BMP_HEADER_CONTENT}")
-    file(WRITE "${BMP_HEADER_ORIGINAL}" "${BMP_HEADER_CONTENT}")
-endif()
-
-set(HUFFMAN_CODES_H "${BMPLIB_BUILD_DIR}/huffman-codes.h")
-if(CMAKE_CROSSCOMPILING)
-    add_custom_command(
-            OUTPUT "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            COMMAND env -u CFLAGS -u CXXFLAGS -u LDFLAGS cc "${BMPLIB_DIR}/gen-huffman.c" -I"${BMPLIB_DIR}" -include stdbool.h -o "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            DEPENDS "${BMPLIB_DIR}/gen-huffman.c"
-            COMMENT "Compiling host gen-huffman for cross-compilation"
-    )
-
-    add_custom_command(
-            OUTPUT "${HUFFMAN_CODES_H}"
-            COMMAND "${BMPLIB_BUILD_DIR}/gen-huffman-host" "${HUFFMAN_CODES_H}"
-            DEPENDS "${BMPLIB_BUILD_DIR}/gen-huffman-host"
-            COMMENT "Generating huffman-codes.h for bmplib via host tool"
-    )
-else()
-    add_executable(gen-huffman "${BMPLIB_DIR}/gen-huffman.c")
-    target_include_directories(gen-huffman PRIVATE "${BMPLIB_DIR}")
-
-    if(MSVC)
-        target_compile_options(gen-huffman PRIVATE "/FIstdbool.h")
-    else()
-        target_compile_options(gen-huffman PRIVATE "-include" "stdbool.h")
-    endif()
-
-    set_target_properties(gen-huffman PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${BMPLIB_BUILD_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${BMPLIB_BUILD_DIR}"
-            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${BMPLIB_BUILD_DIR}"
-    )
-
-    add_custom_command(
-            OUTPUT "${HUFFMAN_CODES_H}"
-            COMMAND $<TARGET_FILE:gen-huffman> "${HUFFMAN_CODES_H}"
-            DEPENDS gen-huffman
-            COMMENT "Generating huffman-codes.h for bmplib"
-    )
-endif()
-
-add_custom_target(generate_bmplib_headers DEPENDS "${HUFFMAN_CODES_H}")
-
-file(GLOB BMPLIB_SOURCES "${BMPLIB_DIR}/*.c")
-list(REMOVE_ITEM BMPLIB_SOURCES
-        "${BMPLIB_DIR}/gen-huffman.c"
-        "${BMPLIB_DIR}/test-fileio-pipes.c"
-        "${BMPLIB_DIR}/test-read-conversions.c"
-        "${BMPLIB_DIR}/test-read-io.c"
-        "${BMPLIB_DIR}/test-write-io.c"
-)
-
-if(MSVC)
-    list(FILTER BMPLIB_SOURCES EXCLUDE REGEX "bmp-read-loadimage\\.c$")
-
-    set(BMP_ORIGINAL "${BMPLIB_DIR}/bmp-read-loadimage.c")
-    set(BMP_PATCHED  "${BMPLIB_BUILD_DIR}/bmp-read-loadimage.c")
-
-    file(READ "${BMP_ORIGINAL}" BMP_SRC_CONTENT)
-    string(REPLACE "[static " "[" BMP_SRC_CONTENT "${BMP_SRC_CONTENT}")
-    file(WRITE "${BMP_PATCHED}" "${BMP_SRC_CONTENT}")
-
-    list(APPEND BMPLIB_SOURCES "${BMP_PATCHED}")
-endif()
+set(insanity_limit_mb 1024 CACHE STRING "Insanity limit for bmp in MBs" FORCE)
+set(BMPLIB_GEN_HUFFMAN OFF)
+add_subdirectory(third_party/bmplib EXCLUDE_FROM_ALL)
 
 # --- mozjpeg via ExternalProject ---
 if(MSVC)
@@ -530,27 +472,6 @@ set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
-# libEBML
-if(ENABLE_MATROSKA)
-    set(libebml_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libebml")
-    set(libebml_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libebml-build")
-    add_subdirectory(${libebml_SOURCE_DIR} ${libebml_BINARY_DIR} EXCLUDE_FROM_ALL)
-    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/cmake")
-    list(APPEND libebml_SOURCE_DIR
-            "${CMAKE_SOURCE_DIR}/third_party/libebml/ebml"
-            "${CMAKE_BINARY_DIR}/third_party/libebml-build"
-    )
-# libMatroska
-    set(libmatroska_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libmatroska")
-    set(libmatroska_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libmatroska-build")
-    add_subdirectory(${libmatroska_SOURCE_DIR} ${libmatroska_BINARY_DIR} EXCLUDE_FROM_ALL)
-    list(APPEND libmatroska_SOURCE_DIR
-            "${CMAKE_BINARY_DIR}/third_party/libmatroska-build"
-    )
-    target_include_directories(matroska PRIVATE
-            ${libebml_BINARY_DIR}
-    )
-endif()
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -591,6 +512,12 @@ set(USE_IMPLICIT_CRYPTO OFF CACHE BOOL "" FORCE)
 set(INSTALL_CMAKE_PACKAGE OFF CACHE BOOL "Disable qpdf CMake package export" FORCE)
 set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export" FORCE)
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR} EXCLUDE_FROM_ALL)
+if(TARGET libqpdf_object)
+    add_dependencies(libqpdf_object copy_mozjpeg_jconfig)
+endif()
+if(TARGET libqpdf)
+    add_dependencies(libqpdf copy_mozjpeg_jconfig)
+endif()
 
 # zopfli
 set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
@@ -620,6 +547,12 @@ set(libtiff_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libtiff-build")
 add_subdirectory(${libtiff_SOURCE_DIR} ${libtiff_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # sqlite3
+set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)
+set(BUILD_SHELL   OFF CACHE BOOL "" FORCE)
+set(ENABLE_STATIC ON  CACHE BOOL "" FORCE)
+if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|watchOS|visionOS)$")
+    set(IOS TRUE CACHE INTERNAL "Disable gethostuuid in sqlite3")
+endif()
 set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
 set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -638,36 +571,12 @@ set(BUILD_GIFSICLE_CLI OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFDIFF OFF CACHE BOOL "" FORCE)
 set(BUILD_GIFVIEW OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(third_party/gifsicle)
+add_subdirectory(third_party/gifsicle EXCLUDE_FROM_ALL)
 
 # Monkey's Audio
-set(MACLIB_HEADER "${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared/MACLib.h")
-if(EXISTS "${MACLIB_HEADER}")
-    file(READ "${MACLIB_HEADER}" MACLIB_CONTENTS)
-    string(FIND "${MACLIB_CONTENTS}" "#include \"All.h\"" _found)
-    if(_found EQUAL -1)
-        message(STATUS "Patching MACLib.h to include All.h")
-        file(WRITE "${MACLIB_HEADER}.patched${CMAKE_BUILD_TYPE}" "#include \"All.h\"\n${MACLIB_CONTENTS}")
-        file(RENAME "${MACLIB_HEADER}.patched${CMAKE_BUILD_TYPE}" "${MACLIB_HEADER}")
-    else()
-        message(STATUS "MACLib.h already includes All.h")
-    endif()
-endif()
-set(BUILD_UTIL FALSE CACHE BOOL "" FORCE)
-set(BUILD_SHARED FALSE CACHE BOOL "" FORCE)
+set(BUILD_UTIL OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/MACLib EXCLUDE_FROM_ALL)
-target_include_directories(MAC PUBLIC third_party/MACLib/Shared)
-if(WIN32)
-    target_compile_definitions(MAC PRIVATE NO_MFC)
-    set(MACLIB_STDAFX "${CMAKE_SOURCE_DIR}/third_party/MACLib/Source/MacDll/stdafx.h")
-    if(EXISTS "${MACLIB_STDAFX}")
-        file(READ "${MACLIB_STDAFX}" _contents)
-        string(REPLACE "#include <afxwin.h>"  "//#include <afxwin.h>"  _contents "${_contents}")
-        string(REPLACE "#include <afxext.h>"  "//#include <afxext.h>"  _contents "${_contents}")
-        string(REPLACE "#include \"MFCGlobals.h\"" "//#include \"MFCGlobals.h\"" _contents "${_contents}")
-        file(WRITE "${MACLIB_STDAFX}" "${_contents}")
-    endif()
-endif()
 
 # zopfli include hint for targets (safe to keep)
 target_include_directories(zopflipng PUBLIC
@@ -680,8 +589,33 @@ if(ENABLE_MP3PACKER)
     include(cmake/mp3packer.cmake)
     add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
 
-    add_subdirectory(third_party/vbrfix)
+    add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 endif()
+
+# brotli
+set(BROTLIDEC_FOUND TRUE CACHE BOOL "" FORCE)
+set(BROTLIENC_FOUND TRUE CACHE BOOL "" FORCE)
+set(BROTLICOMMON_FOUND TRUE CACHE BOOL "" FORCE)
+
+set(BROTLIDEC_LIBRARIES brotlidec CACHE STRING "" FORCE)
+set(BROTLIENC_LIBRARIES brotlienc CACHE STRING "" FORCE)
+set(BROTLICOMMON_LIBRARIES brotlicommon CACHE STRING "" FORCE)
+
+set(BROTLIDEC_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+set(BROTLIENC_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+set(BROTLICOMMON_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include" CACHE PATH "" FORCE)
+
+# disable cmake find_package for brotli to prevent homebrew leakage
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliDec ON CACHE BOOL "" FORCE)
+set(CMAKE_DISABLE_FIND_PACKAGE_BrotliEnc ON CACHE BOOL "" FORCE)
+
+# woff2
+set(WOFF2_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(NOISY_LOGGING OFF)
+if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CANONICAL_PREFIXES ON CACHE BOOL "" FORCE)
+endif ()
+add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
 
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
@@ -703,16 +637,24 @@ set(CHISEL_LIBS
         jxl_threads
         tiff
         libdeflate_static
-        SQLite3
+        sqlite3-static
         zlibstatic
         tag
         libgifsicle
         pugixml
         mseed_static
+        bmplib
+        brotlicommon
+        brotlidec
+        brotlienc
+        woff2common
+        woff2dec
+        woff2enc
+        liblzma
 )
 
 if(ENABLE_MATROSKA)
-    list(APPEND CHISEL_LIBS ebml matroska mkclean_lib)
+    list(APPEND CHISEL_LIBS mkclean_lib)
     add_compile_definitions(HAVE_MATROSKA=1)
 endif()
 
@@ -725,6 +667,7 @@ endif()
 if(WIN32)
     list(APPEND CHISEL_LIBS
             unofficial::libmagic::libmagic
+            Rpcrt4
     )
 else()
     list(APPEND CHISEL_LIBS
@@ -733,68 +676,43 @@ else()
 endif()
 
 if(ENABLE_OPTIVORBIS)
-    add_subdirectory(third_party/corrosion)
+    add_subdirectory(third_party/corrosion EXCLUDE_FROM_ALL)
     add_compile_definitions(HAVE_OPTIVORBIS=1)
 endif()
 
 add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 
-target_sources(libchisel PRIVATE ${BMPLIB_SOURCES})
-
-target_include_directories(libchisel SYSTEM PRIVATE
-        "${BMPLIB_DIR}"
-        "${BMPLIB_BUILD_DIR}"
-)
-
 target_include_directories(libchisel SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/include"
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/src"
 )
-add_dependencies(libchisel generate_bmplib_headers)
 
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
 endif()
 
-# we need to edit bmplib and libmkclean before we can do this
-set_target_properties(libchisel PROPERTIES UNITY_BUILD OFF)
-if(CHISEL_BUILD_CLI)
-    set_target_properties(chisel PROPERTIES UNITY_BUILD OFF)
-endif()
-set_target_properties(zlib PROPERTIES UNITY_BUILD OFF)
-set_target_properties(FLAC PROPERTIES UNITY_BUILD OFF)
-set_target_properties(sharpyuv PROPERTIES UNITY_BUILD OFF)
-set_target_properties(hwy PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libzstd_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(brotlienc PROPERTIES UNITY_BUILD OFF)
+set(NON_UNITY_TARGETS
+        FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
+        jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
+        libdeflate_static zlibstatic tag liblzma
+)
+
 if(NOT WIN32)
-    set_target_properties(LIBMAGIC PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS LIBMAGIC)
 else()
-    set_target_properties(libgifsicle PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS libgifsicle)
 endif()
-set_target_properties(libqpdf_object PROPERTIES UNITY_BUILD OFF)
-set_target_properties(jxl_dec-obj PROPERTIES UNITY_BUILD OFF)
-set_target_properties(jxl_enc-obj PROPERTIES UNITY_BUILD OFF)
-set_target_properties(png_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(archive_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(wavpack PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libdeflate_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(zlibstatic PROPERTIES UNITY_BUILD OFF)
-set_target_properties(tag PROPERTIES UNITY_BUILD OFF)
 
 if(ENABLE_MATROSKA)
-    set_target_properties(matroska2 PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(corec PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(ebml2 PROPERTIES UNITY_BUILD OFF)
-    set_target_properties(mkclean_lib PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("file_test" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("node_test" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("ebmltree" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("mkvtree" PROPERTIES UNITY_BUILD OFF)
-    set_target_properties("mkcleanreg" PROPERTIES UNITY_BUILD OFF)
+    list(APPEND NON_UNITY_TARGETS
+            matroska2 corec ebml2 mkclean_lib file_test node_test
+            ebmltree mkvtree mkcleanreg
+    )
 endif()
 
-set_target_properties(liblzma PROPERTIES UNITY_BUILD OFF)
-set_target_properties(libdeflate_static PROPERTIES UNITY_BUILD OFF)
-set_target_properties(tag PROPERTIES UNITY_BUILD OFF)
+foreach(tgt IN LISTS NON_UNITY_TARGETS)
+    if(TARGET ${tgt})
+        set_target_properties(${tgt} PROPERTIES UNITY_BUILD OFF)
+    endif()
+endforeach()

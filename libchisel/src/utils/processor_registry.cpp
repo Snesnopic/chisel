@@ -2,34 +2,51 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
-#include "../../include/processor_registry.hpp"
-#include "../../include/aiff_processor.hpp"
-#include "../../include/ape_processor.hpp"
-#include "../../include/archive_processor.hpp"
-#include "../../include/bmp_processor.hpp"
-#include "../../include/flac_processor.hpp"
-#include "../../include/flexigif_processor.hpp"
-#include "../../include/gif_processor.hpp"
-#include "../../include/jpeg_processor.hpp"
-#include "../../include/jxl_processor.hpp"
-#include "../../include/mkv_processor.hpp"
-#include "../../include/mp4_processor.hpp"
-#include "../../include/mpeg_processor.hpp"
-#include "../../include/mseed_processor.hpp"
-#include "../../include/odf_processor.hpp"
-#include "../../include/ogg_processor.hpp"
-#include "../../include/ooxml_processor.hpp"
-#include "../../include/pdf_processor.hpp"
-#include "../../include/png_processor.hpp"
-#include "../../include/pnm_processor.hpp"
-#include "../../include/sqlite_processor.hpp"
-#include "../../include/tiff_processor.hpp"
-#include "../../include/tga_processor.hpp"
+#include "processor_registry.hpp"
+#include "aiff_processor.hpp"
+#include "ape_processor.hpp"
+#include "archive_processor.hpp"
+#include "bmp_processor.hpp"
+#include "flac_processor.hpp"
+#include "flexigif_processor.hpp"
+#include "gif_processor.hpp"
+#include "jpeg_processor.hpp"
+#include "jxl_processor.hpp"
+#include "mkv_processor.hpp"
+#include "mp4_processor.hpp"
+#include "mpeg_processor.hpp"
+#include "mseed_processor.hpp"
+#include "odf_processor.hpp"
+#include "ogg_processor.hpp"
+#include "ooxml_processor.hpp"
+#include "pdf_processor.hpp"
+#include "png_processor.hpp"
+#include "pnm_processor.hpp"
+#include "sqlite_processor.hpp"
+#include "tiff_processor.hpp"
+#include "tga_processor.hpp"
 #include "xml_processor.hpp"
-#include "../../include/wav_processor.hpp"
-#include "../../include/wavpack_processor.hpp"
-#include "../../include/webp_processor.hpp"
-#include "../../include/zopflipng_processor.hpp"
+#include "wav_processor.hpp"
+#include "wavpack_processor.hpp"
+#include "webp_processor.hpp"
+#include "zopflipng_processor.hpp"
+#include "woff2_processor.hpp"
+#include "brotli_processor.hpp"
+#include "asf_processor.hpp"
+#include "dsdiff_processor.hpp"
+#include "dsf_processor.hpp"
+#include "mpc_processor.hpp"
+#include "tta_processor.hpp"
+#include "cfbf_processor.hpp"
+#include "lzma_processor.hpp"
+#include "zstd_processor.hpp"
+#include "bzip2_processor.hpp"
+#include "ico_processor.hpp"
+#include "swf_processor.hpp"
+#include "gft_processor.hpp"
+#include "rdb_processor.hpp"
+#include "icns_processor.hpp"
+#include "woff_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -63,6 +80,23 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<BmpProcessor>());
     processors_.push_back(std::make_unique<PnmProcessor>());
     processors_.push_back(std::make_unique<XmlProcessor>());
+    processors_.push_back(std::make_unique<Woff2Processor>());
+    processors_.push_back(std::make_unique<BrotliProcessor>());
+    processors_.push_back(std::make_unique<AsfProcessor>());
+    processors_.push_back(std::make_unique<DsdiffProcessor>());
+    processors_.push_back(std::make_unique<DsfProcessor>());
+    processors_.push_back(std::make_unique<MpcProcessor>());
+    processors_.push_back(std::make_unique<TtaProcessor>());
+    processors_.push_back(std::make_unique<CfbfProcessor>());
+    processors_.push_back(std::make_unique<LzmaProcessor>());
+    processors_.push_back(std::make_unique<ZstdProcessor>());
+    processors_.push_back(std::make_unique<Bzip2Processor>());
+    processors_.push_back(std::make_unique<IcoProcessor>());
+    processors_.push_back(std::make_unique<SwfProcessor>());
+    processors_.push_back(std::make_unique<GftProcessor>());
+    processors_.push_back(std::make_unique<RdbProcessor>());
+    processors_.push_back(std::make_unique<IcnsProcessor>());
+    processors_.push_back(std::make_unique<WoffProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

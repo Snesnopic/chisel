@@ -346,6 +346,28 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
+        if (!settings.quiet) {
+            std::string status_msg;
+            if (!e.replaced) {
+                status_msg = settings.dry_run ? " [DRY-RUN]" : " [kept]";
+            } else {
+                status_msg = settings.dry_run ? " [DRY-RUN]" :
+                             (settings.output_path.empty() ? " [replaced]" : " [OK]");
+            }
+
+            {
+                std::scoped_lock lock(g_console_mtx);
+                clear_line_internal();
+
+                std::cerr
+                    << (e.replaced ? GREEN : YELLOW)
+                    << "[DONE] " << e.path.filename().string()
+                    << " (" << e.original_size << " -> " << e.final_size << " bytes)"
+                    << status_msg
+                    << RESET << std::endl;
+            }
+        }
+
         auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
         if (it != results.end()) {
             it->size_after = e.final_size;

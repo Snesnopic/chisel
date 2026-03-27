@@ -79,6 +79,40 @@ set(LIBCHISEL_SOURCES
         include/options.hpp
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp
+        include/woff2_processor.hpp
+        src/processors/woff2_processor.cpp
+        include/brotli_processor.hpp
+        src/processors/brotli_processor.cpp
+        include/asf_processor.hpp
+        src/processors/asf_processor.cpp
+        include/dsdiff_processor.hpp
+        src/processors/dsdiff_processor.cpp
+        include/dsf_processor.hpp
+        src/processors/dsf_processor.cpp
+        include/mpc_processor.hpp
+        src/processors/mpc_processor.cpp
+        include/tta_processor.hpp
+        src/processors/tta_processor.cpp
+        include/cfbf_processor.hpp
+        src/processors/cfbf_processor.cpp
+        include/lzma_processor.hpp
+        src/processors/lzma_processor.cpp
+        include/zstd_processor.hpp
+        src/processors/zstd_processor.cpp
+        include/bzip2_processor.hpp
+        src/processors/bzip2_processor.cpp
+        include/ico_processor.hpp
+        src/processors/ico_processor.cpp
+        include/swf_processor.hpp
+        src/processors/swf_processor.cpp
+        include/gft_processor.hpp
+        src/processors/gft_processor.cpp
+        include/rdb_processor.hpp
+        src/processors/rdb_processor.cpp
+        include/icns_processor.hpp
+        src/processors/icns_processor.cpp
+        include/woff_processor.hpp
+        src/processors/woff_processor.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -117,6 +151,11 @@ target_include_directories(libchisel
         ${CMAKE_BINARY_DIR}/bmplib
         ${sqlite3_SOURCE_DIR}
         ${libdeflate_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/third_party/libjxl/third_party/brotli/c/include
+        ${CMAKE_SOURCE_DIR}/third_party/woff2/include
+        ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
+        ${ZSTD_INCLUDE_DIR}
+        ${BZIP2_DIR}
 )
 
 if(NOT WIN32)
@@ -154,6 +193,10 @@ if(ENABLE_OPTIVORBIS)
 endif()
 
 target_link_libraries(libchisel PUBLIC ${CHISEL_LIBS})
+# for cfbf processor
+if(WIN32)
+    target_link_libraries(libchisel PRIVATE ole32)
+endif()
 
 target_compile_features(libchisel PRIVATE cxx_std_20)
 if(WIN32)
@@ -164,6 +207,8 @@ elseif(UNIX AND NOT APPLE)
     target_compile_definitions(libchisel PUBLIC PLATFORM_LINUX)
 endif()
 target_compile_definitions(libchisel PUBLIC TAGLIB_STATIC)
+
+target_compile_definitions(libchisel PRIVATE LZMA_API_STATIC)
 
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
@@ -177,21 +222,21 @@ add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
 if(ENABLE_MATROSKA)
     add_dependencies(libchisel mkclean_lib)
-    add_dependencies(libchisel ebml)
-    add_dependencies(libchisel matroska)
 endif()
 add_dependencies(libchisel thirdparty_webp thirdparty_webpdemux thirdparty_webpmux)
 add_dependencies(libchisel libqpdf)
 add_dependencies(libchisel libzopfli libzopflipng)
 add_dependencies(libchisel jxl jxl_threads)
 add_dependencies(libchisel tiff)
-add_dependencies(libchisel SQLite3)
+add_dependencies(libchisel sqlite3-static)
 add_dependencies(libchisel MAC)
 add_dependencies(libchisel tag)
 add_dependencies(libchisel pugixml)
 add_dependencies(libchisel libdeflate_static)
 add_dependencies(libchisel libgifsicle)
 add_dependencies(libchisel mseed_static)
+add_dependencies(libchisel brotlicommon brotlidec brotlienc)
+add_dependencies(libchisel woff2common woff2dec woff2enc)
 
 if(NOT WIN32)
     add_dependencies(libchisel LIBMAGIC)

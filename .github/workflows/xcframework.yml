@@ -1,0 +1,301 @@
+name: Apple XCFramework Build
+
+on:
+  push:
+    branches: [ "main", "development" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-xcframework:
+    name: Build XCFramework (macos-26)
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew remove --force $(brew list --formula)
+          brew remove --cask --force $(brew list)
+          brew install autoconf automake libtool nasm yasm cmake gcc@12 ninja
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install Rust targets and components
+        run: |
+          # install only tier 2 targets that have prebuilt std available
+          rustup target add \
+            x86_64-apple-darwin aarch64-apple-darwin \
+            aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+          
+          # required for build-std on tier 3 targets (visionos, tvos, watchos)
+          rustup component add rust-src
+
+      - name: Build XCFramework
+        shell: bash
+        run: |
+          set -e
+
+          # add required binaries to path
+          export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/opt/homebrew/opt/ocaml/bin:/usr/local/bin:${PATH}"
+
+          ROOT_DIR="$(pwd)"
+          WORK_DIR="${ROOT_DIR}/build_xcframework"
+          OUT_XCFRAMEWORK="${WORK_DIR}/Chisel.xcframework"
+
+          echo "===================================================="
+          echo "CLEANING UP OLD CACHES TO PREVENT POISONING..."
+          echo "===================================================="
+          rm -f "${ROOT_DIR}/CMakeCache.txt"
+          rm -rf "${ROOT_DIR}/CMakeFiles"
+          rm -rf "${WORK_DIR}"
+          mkdir -p "${WORK_DIR}"
+
+          OCAML_LIB_DIR="${HOME}/.opam/4.14.0/lib/ocaml"
+
+          # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
+          TARGETS=(
+            # macos
+            "macos|macosx|x86_64|OFF|OFF|OFF"
+            "macos|macosx|arm64|OFF|OFF|OFF"
+          
+            # ios / ipados
+            "ios|iphoneos|arm64|OFF|OFF|OFF"
+            "ios_simulator|iphonesimulator|x86_64|OFF|OFF|OFF"
+            "ios_simulator|iphonesimulator|arm64|OFF|OFF|OFF"
+          
+            # visionos
+            "visionos|xros|arm64|OFF|OFF|OFF"
+            "visionos_simulator|xrsimulator|arm64|OFF|OFF|OFF"
+          
+            # tvos
+            "tvos|appletvos|arm64|OFF|OFF|OFF"
+            "tvos_simulator|appletvsimulator|x86_64|OFF|OFF|OFF"
+            "tvos_simulator|appletvsimulator|arm64|OFF|OFF|OFF"
+          
+            # watchos
+            "watchos|watchos|arm64_32|OFF|OFF|OFF"
+            "watchos_simulator|watchsimulator|x86_64|OFF|OFF|OFF"
+            "watchos_simulator|watchsimulator|arm64|OFF|OFF|OFF"
+          )
+
+          # 1. build each architecture separately
+          for TARGET_INFO in "${TARGETS[@]}"; do
+            IFS='|' read -r PLATFORM SDK ARCH MP3_ENABLED OPTIVORBIS_ENABLED MATROSKA_ENABLED <<< "${TARGET_INFO}"    
+          
+            echo "===================================================="
+            echo "BUILDING FOR ${PLATFORM} - ${ARCH} (MP3: ${MP3_ENABLED} OPTIVORBIS: ${OPTIVORBIS_ENABLED} MATROSKA: ${MATROSKA_ENABLED})"
+            echo "===================================================="
+          
+            BUILD_DIR="${WORK_DIR}/build_${PLATFORM}_${ARCH}"
+            mkdir -p "${BUILD_DIR}"
+            cd "${BUILD_DIR}"
+          
+            if [ "${PLATFORM}" == "macos" ]; then
+              SYS_NAME="Darwin"
+              DEPLOY_TARGET="14.0"
+              if [ "${ARCH}" == "x86_64" ]; then RUST_TARGET="x86_64-apple-darwin"; fi
+              if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-darwin"; fi
+            elif [[ "${PLATFORM}" == ios* ]]; then
+              SYS_NAME="iOS"
+              DEPLOY_TARGET="16.0"
+              if [ "${PLATFORM}" == "ios" ]; then
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-ios"; fi
+              elif [ "${PLATFORM}" == "ios_simulator" ]; then
+                if [ "${ARCH}" == "x86_64" ]; then RUST_TARGET="x86_64-apple-ios"; fi
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-ios-sim"; fi
+              fi
+            elif [[ "${PLATFORM}" == visionos* ]]; then
+              SYS_NAME="visionOS"
+              DEPLOY_TARGET="1.0"
+              if [ "${PLATFORM}" == "visionos" ]; then
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-visionos"; fi
+              elif [ "${PLATFORM}" == "visionos_simulator" ]; then
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-visionos-sim"; fi
+              fi
+            elif [[ "${PLATFORM}" == tvos* ]]; then
+              SYS_NAME="tvOS"
+              DEPLOY_TARGET="16.0"
+              if [ "${PLATFORM}" == "tvos" ]; then
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-tvos"; fi
+              elif [ "${PLATFORM}" == "tvos_simulator" ]; then
+                if [ "${ARCH}" == "x86_64" ]; then RUST_TARGET="x86_64-apple-tvos"; fi
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-tvos-sim"; fi
+              fi
+            elif [[ "${PLATFORM}" == watchos* ]]; then
+              SYS_NAME="watchOS"
+              DEPLOY_TARGET="9.0"
+              if [ "${PLATFORM}" == "watchos" ]; then
+                if [ "${ARCH}" == "arm64_32" ]; then RUST_TARGET="arm64_32-apple-watchos"; fi
+              elif [ "${PLATFORM}" == "watchos_simulator" ]; then
+                if [ "${ARCH}" == "x86_64" ]; then RUST_TARGET="x86_64-apple-watchos-sim"; fi
+                if [ "${ARCH}" == "arm64" ]; then RUST_TARGET="aarch64-apple-watchos-sim"; fi
+              fi
+            fi
+          
+            export CARGO_BUILD_TARGET="${RUST_TARGET}"
+            # strictly disable llvm bitcode generation for rust targets
+            export RUSTFLAGS="-C embed-bitcode=no"
+          
+            # enable build-std for tier 3 rust targets
+            if [[ "${PLATFORM}" =~ (visionos|tvos|watchos) ]]; then
+              export RUSTC_BOOTSTRAP=1
+              export CARGO_UNSTABLE_BUILD_STD="std,panic_abort"
+            else
+              unset RUSTC_BOOTSTRAP
+              unset CARGO_UNSTABLE_BUILD_STD
+            fi
+          
+            cmake -DCMAKE_BUILD_TYPE="Release" \
+                  -DCHISEL_BUILD_CLI=OFF \
+                  -DENABLE_MP3PACKER="${MP3_ENABLED}" \
+                  -DENABLE_OPTIVORBIS="${OPTIVORBIS_ENABLED}" \
+                  -DENABLE_MATROSKA="${MATROSKA_ENABLED}" \
+                  -DCMAKE_SYSTEM_NAME="${SYS_NAME}" \
+                  -DCMAKE_OSX_SYSROOT="$(xcrun --sdk ${SDK} --show-sdk-path)" \
+                  -DCMAKE_OSX_ARCHITECTURES="${ARCH}" \
+                  -DCMAKE_OSX_DEPLOYMENT_TARGET="${DEPLOY_TARGET}" \
+                  -DRust_CARGO_TARGET="${RUST_TARGET}" \
+                  -DCHISEL_USE_THINLTO=OFF \
+                  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+                  -DCMAKE_SKIP_INSTALL_RULES=ON \
+                  -DCMAKE_MACOSX_BUNDLE=OFF \
+                  "${ROOT_DIR}"
+          
+            cmake --build . --parallel $(sysctl -n hw.ncpu)
+          
+            # filter static libraries by architecture to avoid mixing host build artifacts
+            rm -f "${BUILD_DIR}/static_libs.txt"
+            find "${BUILD_DIR}" -type f -name "*.a" | while read -r lib_path; do
+              if lipo -info "${lib_path}" | grep -qw "${ARCH}"; then
+                echo "${lib_path}" >> "${BUILD_DIR}/static_libs.txt"
+              else
+                echo "SKIPPING ${lib_path} (ARCH MISMATCH)"
+              fi
+            done
+          
+            if [ "${MP3_ENABLED}" == "ON" ]; then
+              echo "APPENDING OCAML STATIC LIBRARIES..."
+              echo "${OCAML_LIB_DIR}/libasmrun.a" >> "${BUILD_DIR}/static_libs.txt"
+              echo "${OCAML_LIB_DIR}/libthreadsnat.a" >> "${BUILD_DIR}/static_libs.txt"
+              echo "${OCAML_LIB_DIR}/libcamlstr.a" >> "${BUILD_DIR}/static_libs.txt"
+              echo "${OCAML_LIB_DIR}/libunix.a" >> "${BUILD_DIR}/static_libs.txt"
+            fi
+          
+            LIB_OUT="${WORK_DIR}/libchisel_${PLATFORM}_${ARCH}.a"
+            libtool -static -o "${LIB_OUT}" -filelist "${BUILD_DIR}/static_libs.txt"
+          done
+
+          # 2. merge architectures into fat binaries per platform
+          echo "===================================================="
+          echo "CREATING FAT BINARIES..."
+          echo "===================================================="
+
+          mkdir -p "${WORK_DIR}/fat_libs"
+
+          # macos (x86_64 + arm64)
+          lipo -create -output "${WORK_DIR}/fat_libs/libchisel_macos.a" \
+            "${WORK_DIR}/libchisel_macos_x86_64.a" \
+            "${WORK_DIR}/libchisel_macos_arm64.a"
+
+          # ios (arm64)
+          cp "${WORK_DIR}/libchisel_ios_arm64.a" "${WORK_DIR}/fat_libs/libchisel_ios.a"
+
+          # ios simulator (x86_64 + arm64)
+          lipo -create -output "${WORK_DIR}/fat_libs/libchisel_ios_simulator.a" \
+            "${WORK_DIR}/libchisel_ios_simulator_x86_64.a" \
+            "${WORK_DIR}/libchisel_ios_simulator_arm64.a"
+
+          # visionos (arm64)
+          cp "${WORK_DIR}/libchisel_visionos_arm64.a" "${WORK_DIR}/fat_libs/libchisel_visionos.a"
+
+          # visionos simulator (arm64)
+          cp "${WORK_DIR}/libchisel_visionos_simulator_arm64.a" "${WORK_DIR}/fat_libs/libchisel_visionos_simulator.a"
+
+          # tvos (arm64)
+          cp "${WORK_DIR}/libchisel_tvos_arm64.a" "${WORK_DIR}/fat_libs/libchisel_tvos.a"
+
+          # tvos simulator (x86_64 + arm64)
+          lipo -create -output "${WORK_DIR}/fat_libs/libchisel_tvos_simulator.a" \
+            "${WORK_DIR}/libchisel_tvos_simulator_x86_64.a" \
+            "${WORK_DIR}/libchisel_tvos_simulator_arm64.a"
+
+          # watchos (arm64_32)
+          cp "${WORK_DIR}/libchisel_watchos_arm64_32.a" "${WORK_DIR}/fat_libs/libchisel_watchos.a"
+
+          # watchos simulator (x86_64 + arm64)
+          lipo -create -output "${WORK_DIR}/fat_libs/libchisel_watchos_simulator.a" \
+            "${WORK_DIR}/libchisel_watchos_simulator_x86_64.a" \
+            "${WORK_DIR}/libchisel_watchos_simulator_arm64.a"
+
+          # 3. create public headers directory & modulemap for swift interop
+          echo "===================================================="
+          echo "PREPARING PUBLIC HEADERS..."
+          echo "===================================================="
+
+          HEADERS_DIR="${WORK_DIR}/Headers"
+          mkdir -p "${HEADERS_DIR}"
+
+          # copy headers from libchisel directory
+          if [ -d "${ROOT_DIR}/libchisel/include" ]; then
+            cp -r "${ROOT_DIR}/libchisel/include/"* "${HEADERS_DIR}/"
+          else
+            echo "ERROR: HEADERS DIRECTORY NOT FOUND AT ${ROOT_DIR}/libchisel/include"
+            exit 1
+          fi
+
+          # generate modulemap for swift
+          cat <<EOF > "${HEADERS_DIR}/module.modulemap"
+          module Chisel {
+            header "chisel.hpp"
+            export *
+          }
+          EOF
+
+          # 4. generate the final xcframework
+          echo "===================================================="
+          echo "GENERATING XCFRAMEWORK..."
+          echo "===================================================="
+
+          xcodebuild -create-xcframework \
+            -library "${WORK_DIR}/fat_libs/libchisel_macos.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_ios.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_ios_simulator.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_visionos.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_visionos_simulator.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_tvos.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_tvos_simulator.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_watchos.a" -headers "${HEADERS_DIR}" \
+            -library "${WORK_DIR}/fat_libs/libchisel_watchos_simulator.a" -headers "${HEADERS_DIR}" \
+            -output "${OUT_XCFRAMEWORK}"
+
+          echo "DONE! XCFRAMEWORK IS READY AT: ${OUT_XCFRAMEWORK}"
+
+      - name: Compress XCFramework
+        shell: bash
+        run: |
+          cd build_xcframework
+          zip -r Chisel.xcframework.zip Chisel.xcframework
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: chisel-xcframework
+          path: build_xcframework/Chisel.xcframework.zip
+          if-no-files-found: error

@@ -4,12 +4,66 @@
 
 #include <filesystem>
 #include "../../include/file_utils.hpp"
+
+#include <sstream>
+
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
 #include <system_error>
 
 namespace chisel {
     namespace fs = std::filesystem;
+
+    uint16_t read_le16(const uint8_t* p) {
+        return static_cast<uint16_t>(p[0] | (p[1] << 8));
+    }
+
+    uint32_t read_le32(const uint8_t* p) {
+        return static_cast<uint32_t>(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+    }
+
+    uint64_t read_le64(const uint8_t* p) {
+        return static_cast<uint64_t>(read_le32(p)) | (static_cast<uint64_t>(read_le32(p + 4)) << 32);
+    }
+
+    void write_le16(uint8_t* p, const uint16_t v) {
+        p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF;
+    }
+
+    void write_le32(uint8_t* p, const uint32_t v) {
+        p[0] = v & 0xFF; p[1] = (v >> 8) & 0xFF; p[2] = (v >> 16) & 0xFF; p[3] = (v >> 24) & 0xFF;
+    }
+
+    void write_le64(uint8_t* p, const uint64_t v) {
+        write_le32(p, static_cast<uint32_t>(v)); write_le32(p + 4, static_cast<uint32_t>(v >> 32));
+    }
+
+    uint16_t read_be16(const uint8_t* p) {
+        return static_cast<uint16_t>((p[0] << 8) | p[1]);
+    }
+
+    uint32_t read_be32(const uint8_t* p) {
+        return static_cast<uint32_t>((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]);
+    }
+
+    void write_be16(uint8_t* p, const uint16_t v) {
+        p[0] = (v >> 8) & 0xFF; p[1] = v & 0xFF;
+    }
+
+    void write_be32(uint8_t* p, const uint32_t v) {
+        p[0] = (v >> 24) & 0xFF; p[1] = (v >> 16) & 0xFF; p[2] = (v >> 8) & 0xFF; p[3] = v & 0xFF;
+    }
+
+    uint32_t align4(const uint32_t v) {
+        return (v + 3) & ~3;
+    }
+
+    // format zero-padded index for sorting
+    std::string format_index(const size_t index) {
+        std::ostringstream oss;
+        oss << std::setw(4) << std::setfill('0') << index;
+        return oss.str();
+    }
 
     FILE *open_file(const std::filesystem::path &path, const char *mode) {
 #ifdef _WIN32
@@ -153,6 +207,32 @@ namespace chisel {
 
         out_path = normalized;
         return true;
+    }
+    // helper to write buffer into file
+    bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &buf) {
+        std::ofstream out(path, std::ios::binary);
+        if (!out) return false;
+        out.write(reinterpret_cast<const char*>(buf.data()), buf.size());
+        return true;
+    }
+
+    bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) return false;
+        buf.assign(std::istreambuf_iterator(in), {});
+        return true;
+    }
+
+    std::vector<uint8_t> read_file(const std::filesystem::path& path) {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file) throw std::runtime_error("cannot open file: " + path.string());
+        const auto size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        std::vector<uint8_t> buffer(size);
+        if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+            throw std::runtime_error("error reading file: " + path.string());
+        }
+        return buffer;
     }
 } // namespace chisel
 

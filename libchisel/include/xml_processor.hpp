@@ -44,7 +44,7 @@ public:
 
     [[nodiscard]] std::span<const std::string_view, std::dynamic_extent>
     get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 10> mimes = {
+        static constexpr std::array<std::string_view, 11> mimes = {
             "application/xml",
             "text/xml",
             "application/xhtml+xml",
@@ -54,14 +54,15 @@ public:
             "model/vnd.collada+xml",
             "application/rss+xml",
             "application/atom+xml",
-            "application/rdf+xml"
+            "application/rdf+xml",
+            "application/x-fictionbook+xml"
         };
         return {mimes};
     }
 
     [[nodiscard]] std::span<const std::string_view, std::dynamic_extent>
     get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 9> exts = {
+        static constexpr std::array<std::string_view, 10> exts = {
             ".xml",
             ".xhtml",
             ".svg",
@@ -70,7 +71,8 @@ public:
             ".dae",
             ".rss",
             ".atom",
-            ".xmp"
+            ".xmp",
+            ".fb2"
         };
         return {exts};
     }

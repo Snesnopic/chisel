@@ -50,9 +50,9 @@ static ContainerFormat detect_format(const fs::path& path) {
             return *parsed;
         }
         const auto fname = to_lower_copy(path.filename().string());
-        if (fname.ends_with(".tar.gz"))  return ContainerFormat::Tar;
-        if (fname.ends_with(".tar.bz2")) return ContainerFormat::Tar;
-        if (fname.ends_with(".tar.xz"))  return ContainerFormat::Tar;
+        if (fname.ends_with(".tar.gz"))  return ContainerFormat::GZip;
+        if (fname.ends_with(".tar.bz2")) return ContainerFormat::BZip2;
+        if (fname.ends_with(".tar.xz"))  return ContainerFormat::Xz;
         if (fname.ends_with(".tar.zst") || fname.ends_with(".tzst")) return ContainerFormat::Zstd;
     }
     return ContainerFormat::Unknown;

@@ -2,32 +2,17 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
-#include "../../include/jxl_processor.hpp"
-#include "../../include/logger.hpp"
+#include "jxl_processor.hpp"
+#include "logger.hpp"
 #include <jxl/encode.h>
 #include <jxl/decode.h>
+#include "file_utils.hpp"
 #include <fstream>
 #include <vector>
 #include <iterator>
 #include <string>
 
 namespace {
-
-// helper to read file into buffer
-bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return false;
-    buf.assign(std::istreambuf_iterator<char>(in), {});
-    return true;
-}
-
-// helper to write buffer into file
-bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &buf) {
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return false;
-    out.write(reinterpret_cast<const char*>(buf.data()), buf.size());
-    return true;
-}
 
 size_t get_bytes_per_channel(const JxlDataType data_type) {
     if (data_type == JXL_TYPE_FLOAT) return 4;
@@ -45,7 +30,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
 
     // read input file
     std::vector<uint8_t> input_buf;
-    if (!read_file(input, input_buf)) {
+    if (!chisel::read_file(input, input_buf)) {
         Logger::log(LogLevel::Error, "Failed to read input file", get_name());
         throw std::runtime_error("JxlProcessor: cannot read input");
     }
@@ -199,7 +184,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     }
     size_t out_size = next_out - out_buf.data();
     out_buf.resize(out_size);
-    if (!write_file(output, out_buf)) {
+    if (!chisel::write_file(output, out_buf)) {
         JxlEncoderDestroy(enc);
         throw std::runtime_error("JxlProcessor: cannot write output");
     }
@@ -214,7 +199,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
                                  std::vector<uint8_t>& buffer)
 {
     std::vector<uint8_t> input_buf;
-    if (!read_file(path, input_buf)) {
+    if (!chisel::read_file(path, input_buf)) {
         return false;
     }
 
