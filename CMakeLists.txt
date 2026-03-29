@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.4.0 LANGUAGES C CXX)
+project(chisel VERSION 1.4.0 LANGUAGES CXX C)
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
-set(CMAKE_UNITY_BUILD TRUE)
-
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+    set(CMAKE_UNITY_BUILD TRUE)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
     if(ipo_supported)
@@ -31,10 +30,6 @@ cmake_policy(SET CMP0069 NEW)
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 endif()
-
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
