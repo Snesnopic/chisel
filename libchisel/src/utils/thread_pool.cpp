@@ -10,21 +10,27 @@ ThreadPool::ThreadPool(unsigned threads) {
     if (threads == 0) threads = 1;
     workers_.reserve(threads);
     for (unsigned i = 0; i < threads; ++i) {
-        workers_.emplace_back([this](const std::stop_token& st) {
+        workers_.emplace_back([this]() {
+            const stop_token st(&stop_flag_);
             for (;;) {
-                std::function<void(std::stop_token)> task;
+                std::function<void(stop_token)> task;
                 {
                     std::unique_lock lock(queue_mutex_);
-                    condition_.wait(lock, st, [this] {
-                        return stop_ || !tasks_.empty();
+                    condition_.wait(lock, [this] {
+                        return stop_flag_.load(std::memory_order_acquire) || !tasks_.empty();
                     });
-                    if ((stop_ && tasks_.empty()) || st.stop_requested())
+
+                    if (stop_flag_.load(std::memory_order_acquire) && tasks_.empty()) {
                         return;
-                    if (tasks_.empty())
+                    }
+                    if (tasks_.empty()) {
                         continue;
+                    }
+
                     task = std::move(tasks_.front());
                     tasks_.pop();
                 }
+
                 struct PendingGuard {
                     size_t &pending;
                     std::mutex &mtx;
@@ -35,6 +41,7 @@ ThreadPool::ThreadPool(unsigned threads) {
                         cv.notify_all();
                     }
                 } guard{pending_, queue_mutex_, idle_cv_};
+
                 try {
                     task(st);
                 } catch (const std::exception& e) {
@@ -48,7 +55,7 @@ ThreadPool::ThreadPool(unsigned threads) {
 void ThreadPool::request_stop() {
     {
         std::unique_lock lock(queue_mutex_);
-        stop_ = true;
+        stop_flag_.store(true, std::memory_order_release);
         while (!tasks_.empty()) {
             tasks_.pop();
             if (pending_ > 0) {
@@ -57,9 +64,6 @@ void ThreadPool::request_stop() {
         }
     }
     condition_.notify_all();
-    for (auto& worker : workers_) {
-        worker.request_stop();
-    }
 }
 
 void ThreadPool::wait_idle() {
@@ -72,7 +76,13 @@ void ThreadPool::wait_idle() {
 ThreadPool::~ThreadPool() {
     {
         std::unique_lock lock(queue_mutex_);
-        stop_ = true;
+        stop_flag_.store(true, std::memory_order_release);
     }
     condition_.notify_all();
+
+    for (auto& worker : workers_) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
 }

@@ -39,13 +39,6 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
-if(APPLE)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_link_options("-static-libgcc")
-        add_link_options("-static-libstdc++")
-    endif()
-endif()
-
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     if (MSVC)
         add_compile_options(/Od /Zi /W0)

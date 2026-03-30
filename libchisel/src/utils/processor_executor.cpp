@@ -231,7 +231,7 @@ namespace chisel {
     void ProcessorExecutor::process_work_list() {
         for (const auto &file: work_list_) {
             if (stop_flag_.load(std::memory_order_relaxed)) return;
-            pool_.enqueue([this, file](const std::stop_token &st) {
+            pool_.enqueue([this, file](stop_token st) {
                 if (st.stop_requested()) {
                     event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
                     return;

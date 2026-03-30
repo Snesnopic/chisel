@@ -19,16 +19,27 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
-#include <stop_token> // Used by the implementation (std::jthread)
 #include <thread>
+#include <atomic>
+
+// custom stop token to replace std::stop_token
+class stop_token {
+    const std::atomic<bool>* stop_flag_{nullptr};
+public:
+    stop_token() = default;
+    explicit stop_token(const std::atomic<bool>* flag) : stop_flag_(flag) {}
+
+    [[nodiscard]] bool stop_requested() const noexcept {
+        return stop_flag_ && stop_flag_->load(std::memory_order_acquire);
+    }
+};
 
 /**
  * @brief A simple fixed-size thread pool for executing tasks concurrently.
  *
- * @details This pool uses std::jthread (C++20) internally, which automatically
- * handles joining on destruction and supports cooperative cancellation
- * via std::stop_token. Tasks enqueued should accept a
- * `std::stop_token` as their argument.
+ * @details This pool uses std::thread internally. It handles joining on
+ * destruction and supports cooperative cancellation via a custom stop_token.
+ * Tasks enqueued should accept a `stop_token` as their argument.
  */
 class ThreadPool {
 public:
@@ -48,7 +59,7 @@ public:
     /**
      * @brief Enqueues a task to be executed by a worker thread.
      *
-     * The task must be a callable that accepts a `std::stop_token`.
+     * The task must be a callable that accepts a `stop_token`.
      *
      * @tparam F The type of the callable task.
      * @param f The task to execute.
@@ -56,16 +67,18 @@ public:
      * @throws std::runtime_error if enqueue is called on a stopped pool.
      */
     template<class F>
-    auto enqueue(F&& f) -> std::future<std::invoke_result_t<F, std::stop_token>> {
-        using return_type = std::invoke_result_t<F, std::stop_token>;
-        auto task = std::make_shared<std::packaged_task<return_type(std::stop_token)>>(
+    auto enqueue(F&& f) -> std::future<std::invoke_result_t<F, stop_token>> {
+        using return_type = std::invoke_result_t<F, stop_token>;
+        auto task = std::make_shared<std::packaged_task<return_type(stop_token)>>(
             std::forward<F>(f)
         );
         {
             std::unique_lock lock(queue_mutex_);
-            if (stop_) throw std::runtime_error("enqueue on stopped ThreadPool");
+            if (stop_flag_.load(std::memory_order_acquire)) {
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            }
             ++pending_;
-            tasks_.emplace([task](std::stop_token st) { (*task)(st); });
+            tasks_.emplace([task](stop_token st) { (*task)(st); });
         }
         condition_.notify_one();
         return task->get_future();
@@ -85,13 +98,13 @@ public:
     void request_stop();
 
 private:
-    std::mutex queue_mutex_;                ///< Protects tasks_, stop_, and pending_
-    std::condition_variable_any condition_; ///< Notifies workers of new tasks or stop requests
+    std::mutex queue_mutex_;                ///< Protects tasks_ and pending_
+    std::condition_variable condition_;     ///< Notifies workers of new tasks or stop requests
     std::condition_variable idle_cv_;       ///< Notifies wait_idle() when pending_ is zero
-    std::queue<std::function<void(std::stop_token)>> tasks_; ///< The queue of tasks
-    bool stop_{false};                      ///< Flag to signal workers to stop
+    std::queue<std::function<void(stop_token)>> tasks_; ///< The queue of tasks
+    std::atomic<bool> stop_flag_{false};    ///< Flag to signal workers to stop
     size_t pending_{0};                     ///< Number of tasks enqueued or running
-    std::vector<std::jthread> workers_;     ///< The worker threads
+    std::vector<std::thread> workers_;      ///< The worker threads
 };
 
 #endif // CHISEL_THREAD_POOL_HPP
