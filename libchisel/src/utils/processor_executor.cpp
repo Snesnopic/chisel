@@ -15,6 +15,7 @@
 #include <stack>
 #include <string>
 #include <chrono>
+#include <fstream>
 #include "random_utils.hpp"
 
 namespace fs = std::filesystem;
@@ -131,15 +132,43 @@ namespace chisel {
                 return std::nullopt;
             }
             replaced = true;
-        } else { // in-place
+        } else {
+            // in-place
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
+
+#ifdef __APPLE__
+                // fallback to stream copy for sandboxed environments
+                if (ec) {
+                    ec.clear();
+                    std::ifstream src(temp_file, std::ios::binary);
+                    std::ofstream dst(original_file, std::ios::binary | std::ios::trunc);
+
+                    if (src && dst) {
+                        dst << src.rdbuf();
+                        dst.flush();
+
+                        if (dst.good()) {
+                            Logger::log(LogLevel::Info, "STREAM OVERWRITE SUCCESSFUL", "Executor");
+                            fs::remove(temp_file, ec);
+                            ec.clear();
+                        } else {
+                            Logger::log(LogLevel::Error, "FAILED TO FLUSH STREAM", "Executor");
+                            ec = std::make_error_code(std::errc::io_error);
+                        }
+                    } else {
+                        ec = std::make_error_code(std::errc::permission_denied);
+                    }
+                }
+#else
                 if (ec == std::errc::cross_device_link) {
                     ec.clear();
                     fs::copy(temp_file, original_file, fs::copy_options::overwrite_existing, ec);
                     if (!ec) fs::remove(temp_file, ec);
                 }
+#endif
+
                 if (!ec) break;
 #ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
@@ -151,12 +180,6 @@ namespace chisel {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
-            if (ec) {
-                Logger::log(LogLevel::Error, "Rename failed (in-place): " + original_file.string() + " (" + ec.message() + ")", "Executor");
-                fs::remove(temp_file, ec);
-                return std::nullopt;
-            }
-            replaced = true;
         }
 
         return std::make_pair(dest, replaced);
@@ -274,10 +297,16 @@ namespace chisel {
                                 pipeline_ok = false;
                                 break;
                             }
+#ifdef __APPLE__
+                            fs::path target_dir = has_output_dir_
+                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
+                                : fs::temp_directory_path(); // use system temp to bypass sandbox restrictions
+#else
                             // resolve target directory to keep temp file on the same mount point
                             fs::path target_dir = has_output_dir_
                                 ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
                                 : file.parent_path();
+#endif
 
                             fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");                            candidates[i]->recompress(current, tmp, m_options);
                             auto sz = safe_size(tmp);
@@ -331,10 +360,16 @@ namespace chisel {
 
                         for (size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
+#ifdef __APPLE__
+                            fs::path target_dir = has_output_dir_
+                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
+                                : fs::temp_directory_path(); // use system temp to bypass sandbox restrictions
+#else
                             // resolve target directory to keep temp file on the same mount point
                             fs::path target_dir = has_output_dir_
                                 ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
                                 : file.parent_path();
+#endif
 
                             fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             Result r{tmp, 0, false};
