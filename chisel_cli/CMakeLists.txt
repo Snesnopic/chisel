@@ -17,9 +17,7 @@ endif()
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
 # for .rc file
-if(NOT DEFINED PROJECT_VERSION_TWEAK)
-    set(PROJECT_VERSION_TWEAK 0)
-endif()
+set(PROJECT_VERSION_TWEAK 0)
 target_compile_definitions(chisel PRIVATE
         FILEVER_MAJOR=${PROJECT_VERSION_MAJOR}
         FILEVER_MINOR=${PROJECT_VERSION_MINOR}
@@ -34,7 +32,7 @@ target_compile_definitions(chisel PRIVATE
 
 set_target_properties(chisel PROPERTIES OUTPUT_NAME "chsl")
 
-target_link_libraries(chisel PRIVATE libchisel chisel_optivorbis_bridge)
+target_link_libraries(chisel PRIVATE libchisel)
 
 target_include_directories(chisel PRIVATE
         $<TARGET_PROPERTY:libchisel,INTERFACE_INCLUDE_DIRECTORIES>
