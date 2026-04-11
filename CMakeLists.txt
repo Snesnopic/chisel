@@ -393,8 +393,6 @@ add_subdirectory(third_party/bmplib EXCLUDE_FROM_ALL)
 # --- mozjpeg via ExternalProject ---
 if(MSVC)
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/Release/jpeg-static.lib")
-elseif(MINGW)
-    set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 else()
     set(_mozjpeg_lib "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build/libjpeg.a")
 endif()
