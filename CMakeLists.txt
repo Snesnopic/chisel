@@ -161,7 +161,7 @@ else()
     # fetch libmagic source
     FetchContent_Declare(
             libmagic_ext
-            URL https://astron.com/pub/file/file-5.45.tar.gz
+            URL https://mirror.koddos.net/lfs/lfs-packages/12.0/file-5.45.tar.gz
             URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
     )
     FetchContent_MakeAvailable(libmagic_ext)
