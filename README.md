@@ -35,7 +35,7 @@ The project builds all its dependencies automatically via Git submodules.
   -   `pkg-config`
   -   `autoconf`, `automake`, `libtool`, `nasm`, `yasm` (required by some submodules)
 -   **Windows:**
-  -   Visual Studio 2022 (with MSVC C++23 toolchain)
+  -   Visual Studio 2022 (with MSVC C++23 toolchain), `vcpkg`
 
 ---
 
@@ -68,7 +68,7 @@ opam install dune dune-configurator -y
 ```
 
 ### Windows
-Ensure you have installed Visual Studio 2022 (with the "Desktop development with C++" workload) and Git.
+Ensure you have installed Visual Studio 2022 (with the "Desktop development with C++" workload), Git and vcpkg configured.
 ```powershell
 # Download Visual Studio 2022 Community bootstrapper
 Invoke-WebRequest "https://aka.ms/vs/17/release/vs_community.exe" -OutFile vs.exe
