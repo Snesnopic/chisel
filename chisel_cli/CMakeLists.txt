@@ -25,7 +25,7 @@ target_compile_definitions(chisel PRIVATE
         FILEVER_MINOR=${PROJECT_VERSION_MINOR}
         FILEVER_PATCH=${PROJECT_VERSION_PATCH}
         FILEVER_TWEAK=${PROJECT_VERSION_TWEAK}
-        FILEVER_STR=${PROJECT_VERSION}
+        FILEVER_STR="\"${PROJECT_VERSION}\""
 )
 
 target_compile_definitions(chisel PRIVATE
