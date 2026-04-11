@@ -16,6 +16,22 @@ if(WIN32)
 endif()
 add_executable(chisel ${CHISEL_CLI_SOURCES})
 
+# for .rc file
+if(NOT DEFINED PROJECT_VERSION_TWEAK)
+    set(PROJECT_VERSION_TWEAK 0)
+endif()
+target_compile_definitions(chisel PRIVATE
+        FILEVER_MAJOR=${PROJECT_VERSION_MAJOR}
+        FILEVER_MINOR=${PROJECT_VERSION_MINOR}
+        FILEVER_PATCH=${PROJECT_VERSION_PATCH}
+        FILEVER_TWEAK=${PROJECT_VERSION_TWEAK}
+        FILEVER_STR=${PROJECT_VERSION}
+)
+
+target_compile_definitions(chisel PRIVATE
+        CHISEL_VERSION="${PROJECT_VERSION}"
+)
+
 set_target_properties(chisel PROPERTIES OUTPUT_NAME "chsl")
 
 target_link_libraries(chisel PRIVATE libchisel chisel_optivorbis_bridge)

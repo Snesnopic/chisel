@@ -120,6 +120,10 @@ endif()
 
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
+target_compile_definitions(libchisel PRIVATE
+        CHISEL_VERSION="${PROJECT_VERSION}"
+)
+
 target_include_directories(libchisel
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

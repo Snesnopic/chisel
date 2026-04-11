@@ -1,7 +1,8 @@
 #include <windows.h>
+
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,1,0
-PRODUCTVERSION  1,0,1,0
+FILEVERSION     FILEVER_MAJOR,FILEVER_MINOR,FILEVER_PATCH,FILEVER_TWEAK
+PRODUCTVERSION  FILEVER_MAJOR,FILEVER_MINOR,FILEVER_PATCH,FILEVER_TWEAK
 FILEFLAGSMASK   0x3fL
 #ifdef _DEBUG
 FILEFLAGS       VS_FF_DEBUG
@@ -11,6 +12,7 @@ FILEFLAGS       0x0L
 FILEOS          VOS_NT_WINDOWS32
 FILETYPE        VFT_APP
 FILESUBTYPE     VFT2_UNKNOWN
+
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
@@ -18,12 +20,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Snesnopic"
             VALUE "FileDescription",  "Chisel - Native file optimizer"
-            VALUE "FileVersion",      "1.4.0.0"
+            VALUE "FileVersion",      FILEVER_STR
             VALUE "InternalName",     "chisel"
             VALUE "LegalCopyright",   "Copyright (C) 2026"
             VALUE "OriginalFilename", "chisel.exe"
             VALUE "ProductName",      "Chisel CLI"
-            VALUE "ProductVersion",   "1.4.0"
+            VALUE "ProductVersion",   FILEVER_STR
         END
     END
     BLOCK "VarFileInfo"
