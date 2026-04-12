@@ -728,13 +728,12 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            auto *pic = new TagLib::FLAC::Picture;
+            auto pic = std::make_unique<TagLib::FLAC::Picture>();
             pic->setMimeType(info.mime_type);
             pic->setDescription(info.description);
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
-            // compute technical fields from the *optimized* image data
             int w=0, h=0, d=0, c=0;
             computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
             if (w > 0) pic->setWidth(w);
@@ -742,7 +741,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (d > 0) pic->setColorDepth(d);
             if (c > 0) pic->setNumColors(c);
 
-            flacFile->addPicture(pic);
+            flacFile->addPicture(pic.get());
         }
         return flacFile->save();
     }
@@ -818,7 +817,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            auto *pic = new TagLib::FLAC::Picture;
+            auto pic = std::make_unique<TagLib::FLAC::Picture>();
             pic->setMimeType(info.mime_type);
             pic->setDescription(info.description);
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
@@ -834,7 +833,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (d > 0) pic->setColorDepth(d);
             if (c > 0) pic->setNumColors(c);
 
-            xc->addPicture(pic);
+            xc->addPicture(pic.get());
         }
         return oggVorbis->save();
     }
@@ -850,7 +849,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
-            auto *pic = new TagLib::FLAC::Picture;
+            auto pic = std::make_unique<TagLib::FLAC::Picture>();
             pic->setMimeType(info.mime_type);
             pic->setDescription(info.description);
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
@@ -863,7 +862,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (d > 0) pic->setColorDepth(d);
             if (c > 0) pic->setNumColors(c);
 
-            xc->addPicture(pic);
+            xc->addPicture(pic.get());
         }
         return oggOpus->save();
     }
