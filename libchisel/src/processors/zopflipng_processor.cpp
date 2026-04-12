@@ -20,18 +20,7 @@
 
 namespace fs = std::filesystem;
 
-namespace { // anonymous namespace for helpers
-
-    // --- helpers for raw_equal (from png_processor) ---
-
-    void png_error_fn(png_structp, const png_const_charp msg) {
-        Logger::log(LogLevel::Error, std::string("libpng: ") + msg, "libpng");
-        throw std::runtime_error(msg);
-    }
-
-    void png_warning_fn(png_structp, const png_const_charp msg) {
-        Logger::log(LogLevel::Warning, std::string("libpng: ") + msg, "libpng");
-    }
+namespace {
 
     struct FileCloser {
         void operator()(FILE *f) const { if (f) std::fclose(f); }
@@ -129,17 +118,13 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
             opts.keepchunks.clear();
         }
 
-        // read input file
-        std::ifstream ifs(input, std::ios::binary);
-        if (!ifs) {
-            Logger::log(LogLevel::Error, "Failed to open input file", get_name());
+        std::vector<unsigned char> origpng;
+        try {
+            origpng = chisel::read_file(input);
+        } catch (const std::exception& e) {
+            Logger::log(LogLevel::Error, std::string("Failed to open input file: ") + e.what(), get_name());
             throw std::runtime_error("ZopflipngProcessor: cannot open input");
         }
-        auto size = fs::file_size(input);
-        std::vector<unsigned char> origpng;
-        origpng.reserve(size);
-        origpng.assign((std::istreambuf_iterator<char>(ifs)),
-                       std::istreambuf_iterator<char>());
 
         // optimize
         std::vector<unsigned char> resultpng;
