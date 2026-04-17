@@ -11,6 +11,9 @@ jobs:
   build-xcframework:
     name: Build XCFramework (macos-26)
     runs-on: macos-26
+    strategy:
+      matrix:
+        ocaml_version: [ 4.14.0 ]
 
     steps:
       - name: Checkout repository
