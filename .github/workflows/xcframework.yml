@@ -86,7 +86,7 @@ jobs:
           # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
           TARGETS=(
             # macos
-            "macos|macosx|x86_64|ON|ON|ON"
+            "macos|macosx|x86_64|OFF|ON|ON"
             "macos|macosx|arm64|ON|ON|ON"
           
             # ios / ipados
