@@ -91,22 +91,22 @@ jobs:
           
             # ios / ipados
             "ios|iphoneos|arm64|OFF|ON|ON"
-            "ios_simulator|iphonesimulator|x86_64|OFF|ON|ON"
-            "ios_simulator|iphonesimulator|arm64|OFF|ON|ON"
+            "ios_simulator|iphonesimulator|x86_64|OFF|ON|OFF"
+            "ios_simulator|iphonesimulator|arm64|OFF|ON|OFF"
           
             # visionos
             "visionos|xros|arm64|OFF|ON|ON"
-            "visionos_simulator|xrsimulator|arm64|OFF|ON|ON"
+            "visionos_simulator|xrsimulator|arm64|OFF|ON|OFF"
           
             # tvos
             "tvos|appletvos|arm64|OFF|ON|ON"
-            "tvos_simulator|appletvsimulator|x86_64|OFF|ON|ON"
-            "tvos_simulator|appletvsimulator|arm64|OFF|ON|ON"
+            "tvos_simulator|appletvsimulator|x86_64|OFF|ON|OFF"
+            "tvos_simulator|appletvsimulator|arm64|OFF|ON|OFF"
           
             # watchos
             "watchos|watchos|arm64_32|OFF|OFF|OFF"
-            "watchos_simulator|watchsimulator|x86_64|OFF|ON|ON"
-            "watchos_simulator|watchsimulator|arm64|OFF|ON|ON"
+            "watchos_simulator|watchsimulator|x86_64|OFF|ON|OFF"
+            "watchos_simulator|watchsimulator|arm64|OFF|ON|OFF"
           )
 
           # 1. build each architecture separately
