@@ -274,7 +274,7 @@ namespace chisel {
                 }
                 if (candidates.empty()) {
                     Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessSkippedEvent{file, "Unsupported format"});
+                    event_bus_.publish(FileAnalyzeSkippedEvent{file, "Unsupported format"});
                     return;
                 }
 
