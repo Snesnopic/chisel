@@ -81,7 +81,7 @@ jobs:
           rm -rf "${WORK_DIR}"
           mkdir -p "${WORK_DIR}"
 
-          OCAML_LIB_DIR="${HOME}/.opam/4.14.0/lib/ocaml"
+          OCAML_LIB_DIR=$(opam exec -- ocamlc -where)
 
           # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
           TARGETS=(
