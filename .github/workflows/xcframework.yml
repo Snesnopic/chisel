@@ -47,18 +47,16 @@ jobs:
           # required for build-std on tier 3 targets (visionos, tvos, watchos)
           rustup component add rust-src
 
-      - name: Install OCaml Dependencies
-        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
-        run: |
-          opam install dune dune-configurator --yes
-          opam exec -- ocamlopt -version
-
       - name: Set up OCaml
-        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
         uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml_version }}
           dune-cache: true
+
+      - name: Install OCaml Dependencies
+        run: |
+          opam install dune dune-configurator --yes
+          opam exec -- ocamlopt -version
 
       - name: Build XCFramework
         shell: bash
