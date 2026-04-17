@@ -90,16 +90,16 @@ jobs:
             "macos|macosx|arm64|ON|ON|ON"
           
             # ios / ipados
-            "ios|iphoneos|arm64|OFF|ON|ON"
+            "ios|iphoneos|arm64|OFF|ON|OFF"
             "ios_simulator|iphonesimulator|x86_64|OFF|ON|OFF"
             "ios_simulator|iphonesimulator|arm64|OFF|ON|OFF"
           
             # visionos
-            "visionos|xros|arm64|OFF|ON|ON"
+            "visionos|xros|arm64|OFF|ON|OFF"
             "visionos_simulator|xrsimulator|arm64|OFF|ON|OFF"
           
             # tvos
-            "tvos|appletvos|arm64|OFF|ON|ON"
+            "tvos|appletvos|arm64|OFF|ON|OFF"
             "tvos_simulator|appletvsimulator|x86_64|OFF|ON|OFF"
             "tvos_simulator|appletvsimulator|arm64|OFF|ON|OFF"
           
