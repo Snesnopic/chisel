@@ -73,20 +73,6 @@ jobs:
           WORK_DIR="${ROOT_DIR}/build_xcframework"
           OUT_XCFRAMEWORK="${WORK_DIR}/Chisel.xcframework"
 
-          echo "CREATING RUSTUP INTERCEPTOR FOR TIER 3 TARGETS..."
-          mkdir -p "${WORK_DIR}/fake_bin"
-          cat << 'EOF' > "${WORK_DIR}/fake_bin/rustup"
-          #!/bin/bash
-            if [[ "$1" == "target" && "$2" == "list" ]]; then
-            echo "${CARGO_BUILD_TARGET} (installed)"
-            exit 0
-            fi
-            exec "${HOME}/.cargo/bin/rustup" "$@"
-            EOF
-          chmod +x "${WORK_DIR}/fake_bin/rustup"
-
-          export PATH="${WORK_DIR}/fake_bin:${PATH}"
-
           echo "===================================================="
           echo "CLEANING UP OLD CACHES TO PREVENT POISONING..."
           echo "===================================================="
@@ -109,18 +95,18 @@ jobs:
             "ios_simulator|iphonesimulator|arm64|OFF|ON|OFF"
           
             # visionos
-            "visionos|xros|arm64|OFF|ON|OFF"
-            "visionos_simulator|xrsimulator|arm64|OFF|ON|OFF"
+            "visionos|xros|arm64|OFF|OFF|OFF"
+            "visionos_simulator|xrsimulator|arm64|OFF|OFF|OFF"
           
             # tvos
             "tvos|appletvos|arm64|OFF|ON|OFF"
-            "tvos_simulator|appletvsimulator|x86_64|OFF|ON|OFF"
-            "tvos_simulator|appletvsimulator|arm64|OFF|ON|OFF"
+            "tvos_simulator|appletvsimulator|x86_64|OFF|OFF|OFF"
+            "tvos_simulator|appletvsimulator|arm64|OFF|OFF|OFF"
           
             # watchos
             "watchos|watchos|arm64_32|OFF|OFF|OFF"
-            "watchos_simulator|watchsimulator|x86_64|OFF|ON|OFF"
-            "watchos_simulator|watchsimulator|arm64|OFF|ON|OFF"
+            "watchos_simulator|watchsimulator|x86_64|OFF|OFF|OFF"
+            "watchos_simulator|watchsimulator|arm64|OFF|OFF|OFF"
           )
 
           # 1. build each architecture separately
