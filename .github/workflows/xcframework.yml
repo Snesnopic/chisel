@@ -99,7 +99,7 @@ jobs:
             "visionos_simulator|xrsimulator|arm64|OFF|OFF|OFF"
           
             # tvos
-            "tvos|appletvos|arm64|OFF|ON|OFF"
+            "tvos|appletvos|arm64|OFF|OFF|OFF"
             "tvos_simulator|appletvsimulator|x86_64|OFF|OFF|OFF"
             "tvos_simulator|appletvsimulator|arm64|OFF|OFF|OFF"
           
