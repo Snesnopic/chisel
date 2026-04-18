@@ -196,7 +196,11 @@ jobs:
           
             # filter static libraries by architecture to avoid mixing host build artifacts
             rm -f "${BUILD_DIR}/static_libs.txt"
-            find "${BUILD_DIR}" -type f -name "*.a" | while read -r lib_path; do
+            
+            find "${BUILD_DIR}" -type f -name "*.a" \
+              ! -path "*/target/*/deps/*" \
+              ! -path "*/target/*/build/*" | while read -r lib_path; do
+            
               if lipo -info "${lib_path}" | grep -qw "${ARCH}"; then
                 echo "${lib_path}" >> "${BUILD_DIR}/static_libs.txt"
               else
