@@ -146,21 +146,15 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
             continue;
         }
 
-        FILE* out = chisel::open_file(out_path, "wb");
-        if (!out) {
-            Logger::log(LogLevel::Error, "Can't open file in write mode: " + out_path.string(), "ArchiveProcessor");
-            archive_read_data_skip(a);
-            continue;
-        }
+        // override the pathname to match the sanitized path
+        archive_entry_set_pathname(entry, out_path.string().c_str());
 
-        la_ssize_t size_read = 0;
-        while ((size_read = archive_read_data(a, buffer.data(), buffer.size())) > 0) {
-            fwrite(buffer.data(), 1, static_cast<size_t>(size_read), out);
-        }
-        fclose(out);
+        // extract directly with libarchive preserving time and permissions
+        constexpr int extract_flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
+        int ext_r = archive_read_extract(a, entry, extract_flags);
 
-        if (size_read < 0) {
-            Logger::log(LogLevel::Error, "Error reading data: " + std::string(archive_error_string(a)), "ArchiveProcessor");
+        if (ext_r != ARCHIVE_OK) {
+            Logger::log(LogLevel::Error, "extraction failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
             archive_read_free(a);
             return false;
         }
@@ -386,22 +380,39 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             archive_entry_set_perm(entry, 0755);
         } else if (is_reg) {
             archive_entry_set_filetype(entry, AE_IFREG);
-            archive_entry_set_perm(entry, 0644);
             std::uintmax_t fsize = fs::file_size(p, ec);
             if (ec) fsize = 0;
             archive_entry_set_size(entry, static_cast<la_int64_t>(fsize));
 
 #ifndef _WIN32
+            // posix: read real stats for permissions and modified time
             struct stat st{};
-            if (stat(p.c_str(), &st) == 0 && st.st_nlink > 1) {
-                auto key = std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
-                auto it_hl = hardlink_map.find(key);
-                if (it_hl != hardlink_map.end()) {
-                    archive_entry_set_hardlink(entry, it_hl->second.c_str());
-                    archive_entry_set_size(entry, 0);
-                } else {
-                    hardlink_map[key] = rel;
+            if (stat(p.c_str(), &st) == 0) {
+                archive_entry_set_perm(entry, st.st_mode);
+                archive_entry_set_mtime(entry, st.st_mtime, 0);
+
+                if (st.st_nlink > 1) {
+                    auto key = std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
+                    auto it_hl = hardlink_map.find(key);
+                    if (it_hl != hardlink_map.end()) {
+                        archive_entry_set_hardlink(entry, it_hl->second.c_str());
+                        archive_entry_set_size(entry, 0);
+                    } else {
+                        hardlink_map[key] = rel;
+                    }
                 }
+            } else {
+                archive_entry_set_perm(entry, 0644);
+            }
+#else
+            // windows fallback
+            archive_entry_set_perm(entry, 0644);
+            auto ftime = fs::last_write_time(p, ec);
+            if (!ec) {
+                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                    ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+                std::time_t tt = std::chrono::system_clock::to_time_t(sctp);
+                archive_entry_set_mtime(entry, tt, 0);
             }
 #endif
         } else if (is_symlink) {
