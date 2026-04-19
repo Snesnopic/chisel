@@ -21,7 +21,22 @@
 #include "zopfli_compressor.hpp"
 
 namespace {
+    // provides raw, pre-compressed data to qpdf, bypassing internal zlib/encoders
+    class raw_stream_provider : public QPDFObjectHandle::StreamDataProvider {
+        std::vector<unsigned char> data_;
+    public:
+        explicit raw_stream_provider(std::vector<unsigned char> data) : data_(std::move(data)) {}
 
+        void provideStreamData(int /*objid*/, int /*gen*/, Pipeline* pipeline) override {
+            pipeline->write(data_.data(), data_.size());
+            pipeline->finish();
+        }
+
+        // forces qpdf to write the stream exactly as provided
+        bool supportsCompression() {
+            return false;
+        }
+    };
 /**
  * @brief A custom std::stringbuf that redirects its content to the chisel Logger.
  * This is used to capture warnings and errors from QPDF.
@@ -149,13 +164,14 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
 
     auto objects = pdf.getAllObjects();
     PdfState st;
-    st.streams.resize(objects.size());
     st.temp_dir = content.temp_dir;
 
-    for (size_t i = 0; i < objects.size(); ++i) {
-        auto& obj = objects[i];
+    for (auto& obj : objects) {
         if (!obj.isStream()) continue;
-        auto& info = st.streams[i];
+
+        int obj_id = obj.getObjGen().getObj();
+        auto& info = st.streams[obj_id];
+
         QPDFObjectHandle dict = obj.getDict();
         info.has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
 
@@ -166,7 +182,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
             data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
             info.decodable = true;
         } catch (QPDFExc& e) {
-            Logger::log(LogLevel::Debug,"Stream " + std::to_string(i) + " is not decodable, falling back to raw: " + e.what(),
+            Logger::log(LogLevel::Debug,"Stream " + std::to_string(obj_id) + " is not decodable, falling back to raw: " + e.what(),
                                     get_name());
             buf = obj.getRawStreamData();
             data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
@@ -174,13 +190,14 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
         }
 
         std::string ext = guess_extension(obj, data);
-        std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(i) + ext);
+        std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ext);
 
         std::ofstream ofs(out_file, std::ios::binary);
         ofs.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
         ofs.close();
 
         info.file = out_file;
+        info.original_size = data.size();
         content.extracted_files.push_back(out_file);
     }
 
@@ -212,45 +229,57 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         pdf.processFile(content.original_path.string().c_str());
 
         auto objects = pdf.getAllObjects();
-        if (st.streams.size() < objects.size()) {
-            st.streams.resize(objects.size());
-        }
 
-        for (size_t i = 0; i < objects.size(); ++i) {
-            auto& obj = objects[i];
+        for (auto& obj : objects) {
             if (!obj.isStream()) continue;
 
-            auto& info = st.streams[i];
-            if (!info.decodable) continue;
+            int obj_id = obj.getObjGen().getObj();
+            if (st.streams.find(obj_id) == st.streams.end()) continue;
+            auto& info = st.streams[obj_id];
 
             const QPDFObjectHandle dict = obj.getDict();
-            if (dict.isDictionary() && dict.hasKey("/DecodeParms")) continue;
-            if (!stream_is_single_flate(obj)) continue;
+            bool is_flate = stream_is_single_flate(obj);
+            bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
 
-            std::vector<unsigned char> decoded;
-            if (!info.file.empty() && std::filesystem::exists(info.file)) {
-                std::ifstream ifs(info.file, std::ios::binary);
-                decoded.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
-                ifs.close();
-            } else {
+            std::error_code ec;
+            uintmax_t disk_size = info.file.empty() ? 0 : std::filesystem::file_size(info.file, ec);
+
+            bool file_was_optimized = (!ec && disk_size > 0 && disk_size < info.original_size);
+            std::vector<unsigned char> raw_data_to_inject;
+
+            bool replace_stream = false;
+
+            // read externally optimized file if it exists (e.g. jpg optimized by Phase 2)
+            if (file_was_optimized) {
+                std::ifstream ifs(info.file, std::ios::binary | std::ios::ate);
+                if (ifs) {
+                    auto sz = ifs.tellg(); ifs.seekg(0);
+                    raw_data_to_inject.resize(sz);
+                    ifs.read(reinterpret_cast<char*>(raw_data_to_inject.data()), sz);
+                    replace_stream = true;
+                }
+            }
+            // if no external file, but it's an internal flate stream, optimize with zopfli
+            else if (is_flate && !has_decode_parms && info.decodable) {
                 try {
                     const std::shared_ptr<Buffer> buf = obj.getStreamData(qpdf_dl_specialized);
-                    decoded.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
-                } catch (QPDFExc& e) {
-                    Logger::log(LogLevel::Debug,
-                                "Skipping stream " + std::to_string(i) + " (not decodable now): " + std::string(e.what()),
-                                get_name());
-                    continue;
+                    std::vector<unsigned char> decoded(buf->getBuffer(), buf->getBuffer() + buf->getSize());
+                    auto recompressed = ZopfliCompressor::compress(decoded, options.iterations, ZopfliFormat::ZLIB);
+
+                    if (recompressed.size() < obj.getRawStreamData()->getSize()) {
+                        raw_data_to_inject = std::move(recompressed);
+                        replace_stream = true;
+                    }
+                } catch (const std::exception& e) {
+                    Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
                 }
             }
 
-            std::vector<unsigned char> recompressed = ZopfliCompressor::compress(decoded, options.iterations, ZopfliFormat::ZLIB);
-
-            obj.replaceStreamData(
-                std::string(reinterpret_cast<const char*>(recompressed.data()), recompressed.size()),
-                QPDFObjectHandle::newName("/FlateDecode"),
-                QPDFObjectHandle::newNull()
-            );
+            // inject the raw data keeping the original dictionary filters intact
+            if (replace_stream) {
+                auto provider = std::make_shared<raw_stream_provider>(std::move(raw_data_to_inject));
+                obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+            }
         }
 
         // Always write to a new temporary file
@@ -261,6 +290,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         writer.setLinearization(true);
         writer.setStaticID(true);
         writer.setDeterministicID(true);
+        writer.setObjectStreamMode(qpdf_o_generate);
+        writer.setStreamDataMode(qpdf_s_compress);
         writer.write();
 
         cleanup_temp_dir(st.temp_dir);
