@@ -115,7 +115,10 @@ namespace chisel {
                     fs::copy(temp_file, dest, fs::copy_options::overwrite_existing, ec);
                     if (!ec) fs::remove(temp_file, ec);
                 }
-                if (!ec) break;
+                if (!ec) {
+                    replaced = true;
+                    break;
+                }
 #ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
 #else
@@ -169,7 +172,10 @@ namespace chisel {
                 }
 #endif
 
-                if (!ec) break;
+                if (!ec) {
+                    replaced = true;
+                    break;
+                }
 #ifdef _WIN32
                 if (ec.value() != 32 && ec.value() != 5 && ec.value() != 2) break;
 #else
@@ -268,7 +274,7 @@ namespace chisel {
                 }
                 if (candidates.empty()) {
                     Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessSkippedEvent{file, "Unsupported format"});
+                    event_bus_.publish(FileAnalyzeSkippedEvent{file, "Unsupported format"});
                     return;
                 }
 
@@ -474,27 +480,13 @@ namespace chisel {
                 if (ec) orig_size = 0;
 
                 if (new_temp_file.empty()) {
-                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
+                    Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
                     // publish explicit Phase 3 complete event even if skipped
                     event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, content.original_path, orig_size, orig_size, false, duration});
                     continue;
                 }
 
                 auto new_size = std::filesystem::file_size(new_temp_file, ec);
-                if (!ec && new_size >= orig_size) {
-                    Logger::log(LogLevel::Debug, "Container finalize skipped (no improvement): " + content.original_path.string(), "Executor");
-                    std::error_code rm_ec;
-                    std::filesystem::remove(new_temp_file, rm_ec);
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{
-                        content.original_path,
-                        content.original_path,
-                        orig_size,
-                        orig_size,
-                        false,
-                        duration
-                    });
-                    continue;
-                }
                 // use the helper and publish the specific Phase 3 event
                 auto move_result = move_to_destination(content.original_path, new_temp_file);
                 if (move_result) {

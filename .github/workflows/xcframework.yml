@@ -11,6 +11,9 @@ jobs:
   build-xcframework:
     name: Build XCFramework (macos-26)
     runs-on: macos-26
+    strategy:
+      matrix:
+        ocaml_version: [ 4.14.0 ]
 
     steps:
       - name: Checkout repository
@@ -47,6 +50,17 @@ jobs:
           # required for build-std on tier 3 targets (visionos, tvos, watchos)
           rustup component add rust-src
 
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml_version }}
+          dune-cache: true
+
+      - name: Install OCaml Dependencies
+        run: |
+          opam install dune dune-configurator --yes
+          opam exec -- ocamlopt -version
+
       - name: Build XCFramework
         shell: bash
         run: |
@@ -67,18 +81,18 @@ jobs:
           rm -rf "${WORK_DIR}"
           mkdir -p "${WORK_DIR}"
 
-          OCAML_LIB_DIR="${HOME}/.opam/4.14.0/lib/ocaml"
+          OCAML_LIB_DIR=$(opam exec -- ocamlc -where)
 
           # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
           TARGETS=(
             # macos
-            "macos|macosx|x86_64|OFF|OFF|OFF"
-            "macos|macosx|arm64|OFF|OFF|OFF"
+            "macos|macosx|x86_64|OFF|ON|ON"
+            "macos|macosx|arm64|ON|ON|ON"
           
             # ios / ipados
-            "ios|iphoneos|arm64|OFF|OFF|OFF"
-            "ios_simulator|iphonesimulator|x86_64|OFF|OFF|OFF"
-            "ios_simulator|iphonesimulator|arm64|OFF|OFF|OFF"
+            "ios|iphoneos|arm64|OFF|ON|OFF"
+            "ios_simulator|iphonesimulator|x86_64|OFF|ON|OFF"
+            "ios_simulator|iphonesimulator|arm64|OFF|ON|OFF"
           
             # visionos
             "visionos|xros|arm64|OFF|OFF|OFF"
@@ -182,7 +196,16 @@ jobs:
           
             # filter static libraries by architecture to avoid mixing host build artifacts
             rm -f "${BUILD_DIR}/static_libs.txt"
-            find "${BUILD_DIR}" -type f -name "*.a" | while read -r lib_path; do
+            
+            find "${BUILD_DIR}" -type f -name "*.a" \
+              ! -path "*/target/*/deps/*" \
+              ! -path "*/target/*/build/*" | while read -r lib_path; do
+            
+              if [[ "${lib_path}" == *"/target/"* && "${lib_path}" != *"/target/${RUST_TARGET}/"* ]]; then
+                echo "SKIPPING ${lib_path} (WRONG PLATFORM TARGET)"
+                continue
+              fi
+  
               if lipo -info "${lib_path}" | grep -qw "${ARCH}"; then
                 echo "${lib_path}" >> "${BUILD_DIR}/static_libs.txt"
               else

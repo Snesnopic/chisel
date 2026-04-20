@@ -130,13 +130,14 @@ private:
         bool decodable = false;       ///< True if qpdf could decode the stream
         bool has_decode_parms = false;///< True if stream has /DecodeParms
         std::filesystem::path file;   ///< Path to the extracted raw stream data
+        uintmax_t original_size = 0;  ///< Tracking for injection criteria
     };
 
     /**
      * @brief Holds the state of a PDF extraction process.
      */
     struct PdfState {
-        std::vector<StreamInfo> streams; ///< Info for each object index
+        std::unordered_map<int, StreamInfo> streams; ///< Info for each object index
         std::filesystem::path temp_dir;  ///< The temp dir holding extracted streams
     };
 
