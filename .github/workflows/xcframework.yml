@@ -216,11 +216,19 @@ jobs:
             if [ "${MP3_ENABLED}" == "ON" ]; then
               echo "APPENDING OCAML STATIC LIBRARIES..."
               echo "${OCAML_LIB_DIR}/libasmrun.a" >> "${BUILD_DIR}/static_libs.txt"
+              echo "${OCAML_LIB_DIR}/stdlib.a" >> "${BUILD_DIR}/static_libs.txt"
               echo "${OCAML_LIB_DIR}/libthreadsnat.a" >> "${BUILD_DIR}/static_libs.txt"
               echo "${OCAML_LIB_DIR}/libcamlstr.a" >> "${BUILD_DIR}/static_libs.txt"
               echo "${OCAML_LIB_DIR}/libunix.a" >> "${BUILD_DIR}/static_libs.txt"
+              find "${ROOT_DIR}" -type f \( -name "mp3packer.a" -o -name "libmp3packer_stubs.a" -o -name "glue.o" \) | while read -r ocaml_lib; do
+                if lipo -info "${ocaml_lib}" | grep -qw "${ARCH}"; then
+                  echo "FOUND OCAML COMPILED LIB: ${ocaml_lib}"
+                  echo "${ocaml_lib}" >> "${BUILD_DIR}/static_libs.txt"
+                else
+                  echo "SKIPPING OCAML LIB ${ocaml_lib} (ARCH MISMATCH)"
+                fi
+              done
             fi
-          
             LIB_OUT="${WORK_DIR}/libchisel_${PLATFORM}_${ARCH}.a"
             libtool -static -o "${LIB_OUT}" -filelist "${BUILD_DIR}/static_libs.txt"
           done
