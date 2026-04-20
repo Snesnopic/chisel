@@ -53,6 +53,24 @@ extern "C" {
 
 
 namespace {
+    static std::once_flag g_ocaml_init_flag;
+    thread_local bool is_ocaml_thread_registered = false;
+    void ensure_ocaml_initialized() {
+        std::call_once(g_ocaml_init_flag, []() {
+            Logger::log(LogLevel::Debug, "Initializing OCaml runtime from library...", "MpegProcessor");
+            char* caml_argv[2] = { const_cast<char*>("chisel_lib"), nullptr };
+
+            try {
+                caml_startup(caml_argv);
+                caml_release_runtime_system();
+
+                is_ocaml_thread_registered = true;
+            } catch (...) {
+                Logger::log(LogLevel::Error, "Fatal error during OCaml initialization", "MpegProcessor");
+            }
+        });
+    }
+
     class ScopedOutputSilencer {
         int original_stdout;
         int original_stderr;
@@ -102,13 +120,14 @@ namespace {
     };
 
     int run_ocaml_mp3packer(const std::string& input, const std::string& output) {
+        ensure_ocaml_initialized();
+
         // register thread once per lifecycle
-        thread_local bool is_registered = false;
-        if (!is_registered) {
+        if (!is_ocaml_thread_registered) {
             if (caml_c_thread_register() == 0) {
                 return -999;
             }
-            is_registered = true;
+            is_ocaml_thread_registered = true;
         }
 
         scoped_ocaml_lock lock;
