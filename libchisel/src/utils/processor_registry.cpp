@@ -112,11 +112,11 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime
 }
 
 bool ProcessorRegistry::supports_mime(const std::string& mime) const {
-    return std::any_of(processors_.begin(), processors_.end(),
-        [&mime](const IProcessor* proc_ptr) {
-        const auto& mimes = proc_ptr->get_supported_mime_types();
-            // check if the mime is supported by this processor
-            return std::find(mimes.begin(), mimes.end(), mime) != mimes.end();
+    const std::string_view mime_view = mime;
+
+    return std::ranges::any_of(processors_, [mime_view](const auto& proc) {
+        const auto mimes = proc->get_supported_mime_types();
+        return std::ranges::find(mimes, mime_view) != mimes.end();
     });
 }
 
