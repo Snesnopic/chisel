@@ -47,6 +47,13 @@ public:
     [[nodiscard]] std::vector<IProcessor*> find_by_mime(const std::string& mime) const;
 
     /**
+     * @brief Checks whether the given MIME type is supported by at least one Processor.
+     * @param mime MIME type to check
+     * @return true if this MIME type is supported by at least one Processor, false otherwise
+     */
+    [[nodiscard]] bool supports_mime(const std::string& mime) const;
+
+    /**
      * @brief Find all processors that support a given file extension.
      *
      * Comparison is case-insensitive.
