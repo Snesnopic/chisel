@@ -37,7 +37,7 @@ namespace chisel {
             return true;
         }
 
-        void recompress(const fs::path& /*input_path*/, const fs::path& /*output_path*/, const ProcessingOptions& /*options*/) override {
+        void recompress(const std::filesystem::path& /*input_path*/, const std::filesystem::path& /*output_path*/, const ProcessingOptions& /*options*/) override {
             throw std::logic_error("KanziProcessor does not support direct recompression.");
         }
 

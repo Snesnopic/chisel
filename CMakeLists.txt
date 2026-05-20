@@ -635,6 +635,7 @@ add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
 
 # kanzicpp
 set(CONCURRENCY_DISABLED ON CACHE BOOL "Disable multithreading in Kanzi" FORCE)
+set(KANZI_ENABLE_NATIVE_OPTIMIZATIONS OFF CACHE BOOL "Disable native optimizations for portability" FORCE)
 add_subdirectory(third_party/kanzi-cpp EXCLUDE_FROM_ALL)
 
 # common libraries for all platforms (exposed to libchisel/chisel_cli)

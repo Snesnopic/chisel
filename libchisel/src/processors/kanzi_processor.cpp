@@ -13,11 +13,9 @@
 #include "app/BlockDecompressor.hpp"
 
 namespace chisel {
+    
 
-namespace fs = std::filesystem;
-
-
-std::optional<ExtractedContent> KanziProcessor::prepare_extraction(const fs::path& input_path) {
+std::optional<ExtractedContent> KanziProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "Starting kanzi decompression", get_name());
 
     ExtractedContent content;
@@ -26,7 +24,7 @@ std::optional<ExtractedContent> KanziProcessor::prepare_extraction(const fs::pat
 
     content.format = ContainerFormat::Kanzi;
 
-    fs::path raw_bin = content.temp_dir / "stream.raw";
+    std::filesystem::path raw_bin = content.temp_dir / "stream.raw";
 
     try {
         kanzi::Context ctx;
@@ -53,7 +51,7 @@ std::optional<ExtractedContent> KanziProcessor::prepare_extraction(const fs::pat
     return content;
 }
 
-fs::path KanziProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions& /*options*/) {
+std::filesystem::path KanziProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions& /*options*/) {
     if (content.extracted_files.empty()) {
         Logger::log(LogLevel::Error, "No raw stream found for kanzi repacking", get_name());
         throw std::runtime_error("KanziProcessor: empty extracted files");
@@ -61,8 +59,8 @@ fs::path KanziProcessor::finalize_extraction(const ExtractedContent& content, co
 
     Logger::log(LogLevel::Debug, "Repacking kanzi", get_name());
 
-    const fs::path& processed_bin = content.extracted_files.front();
-    fs::path out_knz = fs::temp_directory_path() /
+    const std::filesystem::path& processed_bin = content.extracted_files.front();
+    std::filesystem::path out_knz = std::filesystem::temp_directory_path() /
         (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + ".knz");
 
     try {
@@ -82,12 +80,12 @@ fs::path KanziProcessor::finalize_extraction(const ExtractedContent& content, co
 
         if (bc.compress(written) != 0) {
             Logger::log(LogLevel::Error, "Kanzi compression returned non-zero status", get_name());
-            fs::remove(out_knz);
+            std::filesystem::remove(out_knz);
             throw std::runtime_error("KanziProcessor: compression failed");
         }
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Error, std::string("Kanzi exception: ") + e.what(), get_name());
-        fs::remove(out_knz);
+        std::filesystem::remove(out_knz);
         throw;
     }
 
@@ -95,7 +93,7 @@ fs::path KanziProcessor::finalize_extraction(const ExtractedContent& content, co
     return out_knz;
 }
 
-std::string KanziProcessor::get_raw_checksum(const fs::path& /*file_path*/) const {
+std::string KanziProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {
     return "";
 }
 
