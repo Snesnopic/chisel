@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.5...4.1.2)
 
 project(chisel VERSION 1.4.2 LANGUAGES CXX C)
 
+# prevents redefinition of 'uninstall' target
+macro(add_custom_target target_name)
+    if("${target_name}" STREQUAL "uninstall")
+        if(NOT TARGET uninstall)
+            _add_custom_target(${ARGV})
+        endif()
+    else()
+        _add_custom_target(${ARGV})
+    endif()
+endmacro()
+
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
@@ -622,6 +633,10 @@ if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif ()
 add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
 
+# kanzicpp
+set(CONCURRENCY_DISABLED ON CACHE BOOL "Disable multithreading in Kanzi" FORCE)
+add_subdirectory(third_party/kanzi-cpp EXCLUDE_FROM_ALL)
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -656,6 +671,7 @@ set(CHISEL_LIBS
         woff2dec
         woff2enc
         liblzma
+        libkanzi
 )
 
 if(ENABLE_MATROSKA)
