@@ -716,7 +716,7 @@ endif()
 set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
-        libdeflate_static zlibstatic tag liblzma
+        libdeflate_static zlibstatic tag liblzma libkanzi
 )
 
 if(NOT WIN32)
