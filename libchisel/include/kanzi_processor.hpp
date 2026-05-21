@@ -6,6 +6,9 @@
 #define CHISEL_KANZI_PROCESSOR_HPP
 
 #include "processor.hpp"
+#include <array>
+#include <string_view>
+#include <span>
 
 namespace chisel {
 
