@@ -3,18 +3,6 @@
 ## Testing
 
 - [ ] Test edge cases: corrupted files, unsupported formats, empty files, mismatched extensions.
-- [ ] Improve resiliency of mime detection, maybe enforce magic db regeneration on first use.
-
-## Refactoring / Architecture
-
-- [ ] Normalize MIME detection and extension mapping.
-- [ ] Implement a UriProcessor to detect and process embedded data URIs (e.g. data:image/*;base64) in HTML, CSS, JS, XML, SVG. Extract, decode, optimize via existing processors, and reinsert re-encoded content.
-- [ ] Review and clean up unused or redundant CMake variables.
-- [ ] Complete refactoring of third-party library integrations (libFLAC, libwavpack) to use `FILE*` or callback-based APIs instead of filenames, ensuring full Unicode support on Windows.
-
-## WavPack
-
-- [ ] Implement brute-force recompression across compression modes and select the smallest output.
 
 ## JPEG
 
@@ -35,41 +23,30 @@
 ## Archives
 
 - [ ] Add support for 7Z recompression using 7zip SDK.
-- [ ] Investigate integration of BestCFBF (<https://papas-best.com/downloads/bestcfbf/stable/bestcfbf.cpp>) for optimizing MSI, DOC, PPT, XLS:
-  - On Windows: adapt and integrate directly with COM Structured Storage APIs.
-  - On Linux/macOS: research alternative libraries (e.g. libgsf, olefile) to replicate functionality.
-- [ ] Explore Leanify-style handling of container formats that are essentially ZIP/LZMA/Deflate (APK, XPS, XPInstall, EPUB, DOCX, ODT, etc.) and integrate similar recursive optimization.
 - [ ] Investigate **advmng** for MNG recompression (delta compression, ancillary chunk removal)  
   ↳ <https://www.advancemame.it/doc-advmng>
 - [ ] Rewrite hardlink handling in archive_processor with a cross-platform approach, since current implementation is not available on Windows.
 
 ## MKV / Matroska
 
-- [ ] Preserve chapters, tags, and attachments (e.g. fonts, cover art).
-- [ ] Finish Matroska container support (currently unfinished).
+- [ ] Finish Matroska container support (currently not all files supported).
 
 ## New MIME types / Codecs
 
 - [ ] ALAC – investigate integration via libavcodec or standalone decoder.
 - [ ] TAK – closed source, not feasible (note).
 - [ ] LA (Lossless Audio) – abandoned, not feasible (note).
-- [ ] TTA (The True Audio) – integrate open source library.  
-  ↳ <https://github.com/stseelig/libttaR>
 - [ ] MPEG‑4 ALS – investigate reference implementation.  
   ↳ <https://www.iso.org/standard/43345.html>
   ↳ <https://github.com/OptiVorbis/OptiVorbis>
 - [ ] Lepton (Rust JPEG recompressor) – consider FFI integration.  
   ↳ <https://github.com/dropbox/lepton> (original C++), <https://github.com/microsoft/lepton_jpeg_rust>
-- [ ] WOFF/WOFF2 – recompression via zlib/Brotli.  
-  ↳ <https://www.w3.org/TR/WOFF2/>
 - [ ] SWF – recompress embedded zlib/LZMA streams (legacy, low priority).  
   ↳ <https://en.wikipedia.org/wiki/SWF>
 - [ ] STL – ASCII recompression, binary deduplication of triangles.  
   ↳ <https://en.wikipedia.org/wiki/STL_(file_format)>
 - [ ] PCX – palette optimization and RLE recompression.  
   ↳ <https://en.wikipedia.org/wiki/PCX>
-- [ ] ICO – optimize embedded PNG/BMP.  
-  ↳ <https://en.wikipedia.org/wiki/ICO_(file_format)>
 - [ ] SVG/XML/HTML/CSS/JS – minification and metadata stripping.  
   ↳ <https://www.w3.org/Graphics/SVG/>
 - [ ] FB2 – FictionBook container optimization.  
@@ -78,19 +55,14 @@
   ↳ <https://encode.su/threads/1111-Ocarina-s-MPEG1-and-MPEG2-video-compressor>
 - [ ] H.264 – investigate lossless recompression (Pied Piper / losslessh264).  
   ↳ <https://encode.su/threads/2285-H264-Lossless-recompression-Pied-Piper-(losslessh264)>
-- [ ] Sound Slimmer – investigate MP3/AAC archival recompression concepts.  
-  ↳ <https://audiophilesoft.com/load/junk/sound_slimmer_v1_04_001/9-1-0-61>
 - [ ] Executables (PE/EXE/DLL) – optional Leanify-style recompression.  
   ↳ <https://en.wikipedia.org/wiki/Portable_Executable>
 - [ ] Lua bytecode – optional Leanify-style recompression.  
   ↳ <https://www.lua.org/manual/5.4/manual.html#6.4>
-- [ ] RDB, GFT – niche formats, investigate feasibility.
 - [ ] WebAssembly – integrate wasm-opt (Binaryen).  
   ↳ <https://github.com/WebAssembly/binaryen>
 - [ ] HTML/XML – integrate tidy-html5 for cleanup/minification.  
   ↳ <https://github.com/htacg/tidy-html5>
-- [ ] HDR (Radiance RGBE) – add support for HDR file compression using stb_image/stb_image_write.  
-  ↳ <https://github.com/nothings/stb>
 - [ ] HALAC (High Availability Lossless Audio Codec) - add support if and when the source code gets updated
   ↳ <https://github.com/Hakan-Abbas/HALAC-High-Availability-Lossless-Audio-Compression>
 - [ ] OpenEXR – integrate openexr/imath for PIZ/ZIP lossless recompression.

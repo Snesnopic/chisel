@@ -1,12 +1,13 @@
 # chisel
 
-**chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform monolithic binary.  
+**chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform binary.  
 It focuses on lossless recompression of various file formats by integrating multiple specialized encoders.
 
 ---
 ## Installation
 
 ### Quick Install (macOS / Linux)
+
 The easiest way to install `chisel` is via [Homebrew](https://brew.sh). This method automatically handles updates and dependencies.
 
 ```bash
@@ -15,6 +16,7 @@ brew tap snesnopic/chsl
 brew install chsl
 ```
 ### Building from Source
+
 If you prefer to compile chisel manually, or if you are using Windows, please follow the build instructions below.
 
 ## Requirements
@@ -42,7 +44,9 @@ The project builds all its dependencies automatically via Git submodules.
 ## Installing dependencies
 
 ### Linux (Debian/Ubuntu)
+
 This command installs only the build tools. All libraries are submodules.
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build help2man pkg-config git \
@@ -51,6 +55,7 @@ curl https://sh.rustup.rs -sSf | sh
 ```
 
 ### macOS (Homebrew)
+
 ```bash
 brew update
 brew install cmake ninja pkg-config git autoconf help2man automake libtool nasm yasm
@@ -59,6 +64,7 @@ curl https://sh.rustup.rs -sSf | sh
 
 ### Windows
 Ensure you have installed Visual Studio 2022 (with the "Desktop development with C++" workload), Git and vcpkg configured.
+
 ```powershell
 # Download Visual Studio 2022 Community bootstrapper
 Invoke-WebRequest "https://aka.ms/vs/17/release/vs_community.exe" -OutFile vs.exe
@@ -73,6 +79,7 @@ Invoke-WebRequest "https://aka.ms/vs/17/release/vs_community.exe" -OutFile vs.ex
 Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
 .\rustup-init.exe -y
 ```
+
 ---
 
 ## Building chisel
@@ -205,19 +212,17 @@ Extending `chisel` with a new encoder or format requires just a few operations:
 
 1. **Define the Processor:**
    Create a new header in `libchisel/include/processors/`, inheriting from `IProcessor`. You must meaningfully implement the required metadata methods:
-* `get_name()`
-* `get_supported_mime_types()`
-* `get_supported_extensions()`
-* `can_recompress()`
-* `can_extract_contents()`
-
+   * `get_name()`
+   * `get_supported_mime_types()`
+   * `get_supported_extensions()`
+   * `can_recompress()`
+   * `can_extract_contents()`
 
 2. **Implement the core logic:**
    Write the implementation in `libchisel/src/processors/`.
-* Implement `recompress()`, making sure to respect the `options.preserve_metadata` flag if applicable for your format.
-* If your processor is a container, you must override `prepare_extraction()` and `finalize_extraction()`, ensuring the exact structure of the container is restored during finalization.
-* *Note:* Implementing the `raw_equal()` method (used to verify that the meaningful content is bit-identical before and after compression) isn't strictly required to run the tool, but all tests run on the GitHub CI workers will execute with the `--verify-checksums` flag enabled, so it is highly recommended.
-
+   * Implement `recompress()`, making sure to respect the `options.preserve_metadata` flag if applicable for your format.
+   * If your processor is a container, you must override `prepare_extraction()` and `finalize_extraction()`, ensuring the exact structure of the container is restored during finalization.
+   * *Note:* Implementing the `raw_equal()` method (used to verify that the meaningful content is bit-identical before and after compression) isn't strictly required to run the tool, but all tests run on the GitHub CI workers will execute with the `--verify-checksums` flag enabled, so it is highly recommended.
 
 3. **Register the Processor:**
    The final step is to instantiate and register your new class inside the constructor of `ProcessorRegistry` in `libchisel/src/processor_registry.cpp`.
