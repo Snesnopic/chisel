@@ -15,7 +15,6 @@ endmacro()
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
-option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
@@ -600,13 +599,10 @@ target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopfli
 )
 
-# mp3packer (ocaml)
-if(ENABLE_MP3PACKER)
-    include(cmake/mp3packer.cmake)
-    add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
-
-    add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
-endif()
+# mp3packercpp
+set(USE_OPENMP OFF CACHE BOOL "Enable OpenMP for mp3packercpp" FORCE)
+add_subdirectory(third_party/mp3packercpp EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 
 # brotli
 set(BROTLIDEC_FOUND TRUE CACHE BOOL "" FORCE)
@@ -673,17 +669,13 @@ set(CHISEL_LIBS
         woff2enc
         liblzma
         libkanzi
+        mp3packercpp_core
+        vbrfix_lib
 )
 
 if(ENABLE_MATROSKA)
     list(APPEND CHISEL_LIBS mkclean_lib)
     add_compile_definitions(HAVE_MATROSKA=1)
-endif()
-
-if(ENABLE_MP3PACKER)
-    list(APPEND CHISEL_LIBS mp3packer_static)
-    list(APPEND CHISEL_LIBS vbrfix_lib)
-    add_compile_definitions(HAVE_MP3PACKER=1)
 endif()
 
 if(WIN32)

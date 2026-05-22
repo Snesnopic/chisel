@@ -26,14 +26,8 @@
 
 static std::vector<std::string> g_active_files;
 
-#ifdef HAVE_MP3PACKER
-// Global mutex to synchronize console output from multiple threads
-extern std::mutex g_console_mtx;
-#undef flush // otherwise we can't use std::flush later
-#else
 // Global mutex to synchronize console output from multiple threads
 std::mutex g_console_mtx;
-#endif
 
 // Helper to clear the current line
 inline void clear_line_internal() {

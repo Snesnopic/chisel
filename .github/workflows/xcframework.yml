@@ -11,9 +11,6 @@ jobs:
   build-xcframework:
     name: Build XCFramework (macos-26)
     runs-on: macos-26
-    strategy:
-      matrix:
-        ocaml_version: [ 4.14.0 ]
 
     steps:
       - name: Checkout repository
@@ -50,16 +47,7 @@ jobs:
           # required for build-std on tier 3 targets (visionos, tvos, watchos)
           rustup component add rust-src
 
-      - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml_version }}
-          dune-cache: true
 
-      - name: Install OCaml Dependencies
-        run: |
-          opam install dune dune-configurator --yes
-          opam exec -- ocamlopt -version
 
       - name: Build XCFramework
         shell: bash
@@ -67,7 +55,7 @@ jobs:
           set -e
 
           # add required binaries to path
-          export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/opt/homebrew/opt/ocaml/bin:/usr/local/bin:${PATH}"
+          export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 
           ROOT_DIR="$(pwd)"
           WORK_DIR="${ROOT_DIR}/build_xcframework"
@@ -81,7 +69,6 @@ jobs:
           rm -rf "${WORK_DIR}"
           mkdir -p "${WORK_DIR}"
 
-          OCAML_LIB_DIR=$(opam exec -- ocamlc -where)
 
           # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
           TARGETS=(
@@ -178,7 +165,6 @@ jobs:
           
             cmake -DCMAKE_BUILD_TYPE="Release" \
                   -DCHISEL_BUILD_CLI=OFF \
-                  -DENABLE_MP3PACKER="${MP3_ENABLED}" \
                   -DENABLE_OPTIVORBIS="${OPTIVORBIS_ENABLED}" \
                   -DENABLE_MATROSKA="${MATROSKA_ENABLED}" \
                   -DCMAKE_SYSTEM_NAME="${SYS_NAME}" \
@@ -213,22 +199,6 @@ jobs:
               fi
             done
           
-            if [ "${MP3_ENABLED}" == "ON" ]; then
-              echo "APPENDING OCAML STATIC LIBRARIES..."
-              echo "${OCAML_LIB_DIR}/libasmrun.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/stdlib.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libthreadsnat.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libcamlstr.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libunix.a" >> "${BUILD_DIR}/static_libs.txt"
-              find "${ROOT_DIR}" -type f \( -name "mp3packer.a" -o -name "libmp3packer_stubs.a" -o -name "glue.o" \) | while read -r ocaml_lib; do
-                if lipo -info "${ocaml_lib}" | grep -qw "${ARCH}"; then
-                  echo "FOUND OCAML COMPILED LIB: ${ocaml_lib}"
-                  echo "${ocaml_lib}" >> "${BUILD_DIR}/static_libs.txt"
-                else
-                  echo "SKIPPING OCAML LIB ${ocaml_lib} (ARCH MISMATCH)"
-                fi
-              done
-            fi
             LIB_OUT="${WORK_DIR}/libchisel_${PLATFORM}_${ARCH}.a"
             libtool -static -o "${LIB_OUT}" -filelist "${BUILD_DIR}/static_libs.txt"
           done

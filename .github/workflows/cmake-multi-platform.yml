@@ -29,7 +29,6 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-x64-gcc"
 
@@ -38,7 +37,6 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-x64-clang"
 
@@ -47,7 +45,6 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "linux-arm64"
 
@@ -56,7 +53,6 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
 
@@ -65,7 +61,6 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
-            ocaml_version: "4.14.2"
             binary_path: bin/Release/chsl
             asset_name: "macos-arm64"
 
@@ -74,7 +69,7 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: -DENABLE_MP3PACKER=OFF -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+            extra_cmake_args: -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x64"
 
@@ -83,13 +78,13 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: -DENABLE_MP3PACKER=OFF -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-windows-static
+            extra_cmake_args: -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=arm64-windows-static
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 
     steps:
       - name: Disable Git AutoCRLF
-        if: runner.os == 'Windows' && (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
+        if: runner.os == 'Windows'
         run: git config --global core.autocrlf false
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -103,18 +98,7 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Set up OCaml
-        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml_version }}
-          dune-cache: true
 
-      - name: Install OCaml Dependencies
-        if: (!contains(matrix.extra_cmake_args, 'ENABLE_MP3PACKER=OFF'))
-        run: |
-          opam install dune dune-configurator --yes
-          opam exec -- ocamlopt -version
 
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
@@ -231,13 +215,11 @@ jobs:
             ln -s /usr/local/bin/gmake $HOME/bin/make
             export PATH=$HOME/bin:$PATH
             
-            # disable mp3packer as ocaml is not installed
             cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
                   -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
                   -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
                   -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
                   -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -DENABLE_MP3PACKER=OFF \
                   -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             
             cmake --build build --config Release
@@ -301,13 +283,11 @@ jobs:
             ln -s /usr/local/bin/gmake $HOME/bin/make
             export PATH=$HOME/bin:$PATH
             
-            # disable mp3packer as ocaml is not installed
             cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
                   -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
                   -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
                   -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
                   -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -DENABLE_MP3PACKER=OFF \
                   -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
             
             cmake --build build --config Release

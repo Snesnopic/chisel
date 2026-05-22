@@ -9,148 +9,9 @@
 #include "../../include/random_utils.hpp"
 #include <stdexcept>
 #include <filesystem>
-#include <mutex>
-#include <cstdio>
-#include <fcntl.h>
 #include <fstream>
 #include "../../../third_party/vbrfix/include/vbrfix/vbrfix.hpp"
-
-// main's print mutex, since we redirect stdout and stderr to null while compressing with mp3
-// TODO: edit cloned mp3packer's branch to remove all prints
-
-#ifdef HAVE_MP3PACKER
-std::mutex g_console_mtx;
-static std::mutex g_mp3packer_mutex;
-extern "C" {
-#include <caml/mlvalues.h>
-#include <caml/callback.h>
-#include <caml/alloc.h>
-#include <caml/memory.h>
-#include <caml/threads.h>
-}
-
-#ifdef _WIN32
-    #include <io.h>
-    #define DUP _dup
-    #define DUP2 _dup2
-    #define FILENO _fileno
-    #define CLOSE _close
-    #define NULL_DEVICE "NUL"
-    #ifndef STDOUT_FILENO
-        #define STDOUT_FILENO 1
-    #endif
-    #ifndef STDERR_FILENO
-        #define STDERR_FILENO 2
-    #endif
-#else
-    #include <unistd.h>
-    #define DUP dup
-    #define DUP2 dup2
-    #define FILENO fileno
-    #define CLOSE close
-    #define NULL_DEVICE "/dev/null"
-#endif
-
-
-namespace {
-    static std::once_flag g_ocaml_init_flag;
-    thread_local bool is_ocaml_thread_registered = false;
-    void ensure_ocaml_initialized() {
-        std::call_once(g_ocaml_init_flag, []() {
-            Logger::log(LogLevel::Debug, "Initializing OCaml runtime from library...", "MpegProcessor");
-            char* caml_argv[2] = { const_cast<char*>("chisel_lib"), nullptr };
-
-            try {
-                caml_startup(caml_argv);
-                caml_release_runtime_system();
-
-                is_ocaml_thread_registered = true;
-            } catch (...) {
-                Logger::log(LogLevel::Error, "Fatal error during OCaml initialization", "MpegProcessor");
-            }
-        });
-    }
-
-    class ScopedOutputSilencer {
-        int original_stdout;
-        int original_stderr;
-        int null_fd;
-        bool active;
-
-    public:
-        explicit ScopedOutputSilencer(bool silence = true) : active(silence) {
-            if (!active) return;
-
-            fflush(stdout);
-            fflush(stderr);
-
-            original_stdout = DUP(STDOUT_FILENO);
-            original_stderr = DUP(STDERR_FILENO);
-
-            null_fd = open(NULL_DEVICE, O_WRONLY);
-
-            if (null_fd >= 0) {
-                DUP2(null_fd, STDOUT_FILENO);
-                DUP2(null_fd, STDERR_FILENO);
-            }
-        }
-
-        ~ScopedOutputSilencer() {
-            if (!active) return;
-
-            fflush(stdout);
-            fflush(stderr);
-
-            DUP2(original_stdout, STDOUT_FILENO);
-            DUP2(original_stderr, STDERR_FILENO);
-
-            CLOSE(original_stdout);
-            CLOSE(original_stderr);
-            if (null_fd >= 0) CLOSE(null_fd);
-        }
-    };
-
-    struct scoped_ocaml_lock {
-        scoped_ocaml_lock() {
-            caml_acquire_runtime_system();
-        }
-        ~scoped_ocaml_lock() {
-            caml_release_runtime_system();
-        }
-    };
-
-    int run_ocaml_mp3packer(const std::string& input, const std::string& output) {
-        ensure_ocaml_initialized();
-
-        // register thread once per lifecycle
-        if (!is_ocaml_thread_registered) {
-            if (caml_c_thread_register() == 0) {
-                return -999;
-            }
-            is_ocaml_thread_registered = true;
-        }
-
-        scoped_ocaml_lock lock;
-
-        CAMLparam0();
-        CAMLlocal3(v_input, v_output, v_res);
-
-        int result = -1;
-        const value* func = caml_named_value("caml_pack_mp3");
-
-        if (func != nullptr) {
-            v_input = caml_copy_string(input.c_str());
-            v_output = caml_copy_string(output.c_str());
-            v_res = caml_callback2(*func, v_input, v_output);
-            result = Int_val(v_res);
-        }
-
-        CAMLreturnT(int, result);
-    }
-}
-
-#endif // HAVE_MP3PACKER
-
+#include "packer.hpp"
 #include "file_type.hpp"
 
 namespace chisel {
@@ -159,40 +20,23 @@ namespace fs = std::filesystem;
 void MpegProcessor::recompress(const fs::path& input,
                                const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
-
-#ifdef HAVE_MP3PACKER
-    std::scoped_lock lock(g_mp3packer_mutex, g_console_mtx);
-
-    Logger::log(LogLevel::Info, "Starting compression via ocaml: " + input.string(), get_name());
+    Logger::log(LogLevel::Info, "Starting compression via mp3packercpp: " + input.string(), get_name());
 
     if (fs::exists(output)) {
         fs::remove(output);
     }
 
-    int result_code = 1;
-
     try {
-        ScopedOutputSilencer hush(true);
-        result_code = run_ocaml_mp3packer(input.string(), output.string());
-
+        mp3packer::Packer packer;
+        packer.recompress_huffman = true;
+        packer.process(input.string(), output.string());
     } catch (const std::exception& e) {
-        throw std::runtime_error("Exception during OCaml execution wrapper: " + std::string(e.what()));
-    }
-
-    if (result_code == -999) {
-        throw std::runtime_error("Failed to register worker thread with OCaml runtime.");
-    }
-    if (result_code == -1) {
-        throw std::runtime_error("OCaml function 'caml_pack_mp3' not found. Runtime not initialized?");
-    }
-    if (result_code != 0) {
-        throw std::runtime_error("MP3Packer failed with exit code: " + std::to_string(result_code));
+        throw std::runtime_error("Exception during mp3packercpp execution: " + std::string(e.what()));
     }
 
     Logger::log(LogLevel::Debug, "Compression successful.", get_name());
+    /*
     try {
-        ScopedOutputSilencer hush_vbr(true);
-
         vbrfix::FixParams params;
         params.always_skip = false;
 
@@ -211,18 +55,7 @@ void MpegProcessor::recompress(const fs::path& input,
     }
 
     Logger::log(LogLevel::Debug, "Compression and vbr fix successful.", get_name());
-#else
-
-    Logger::log(LogLevel::Warning, "Mp3packer disabled inside build", get_name());
-
-    std::error_code ec;
-    fs::copy_file(input, output, fs::copy_options::overwrite_existing, ec);
-
-    if (ec) {
-        throw std::runtime_error("Copy failed: " + ec.message());
-    }
-
-#endif // HAVE_MP3PACKER
+    */
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
