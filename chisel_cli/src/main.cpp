@@ -100,7 +100,7 @@ static std::atomic<chisel::ProcessorExecutor*> g_executor{nullptr};
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         // Protect interrupt message so it doesn't mix with progress bar
-        std::lock_guard<std::mutex> lock(g_console_mtx);
+        std::scoped_lock lock(g_console_mtx);
         std::cerr << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
@@ -305,7 +305,7 @@ int main(int argc, char* argv[]) {
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
         {
-            std::lock_guard<std::mutex> lock(g_console_mtx);
+            std::scoped_lock lock(g_console_mtx);
             clear_line_internal();
             Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
         }
