@@ -7,9 +7,6 @@
 #include <thread>
 #include <algorithm>
 #include <map>
-#ifdef callback
-#undef callback
-#endif
 
 void setup_cli_parser(CLI::App& app, Settings& settings) {
     // setup standard help and version flags
