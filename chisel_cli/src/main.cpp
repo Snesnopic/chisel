@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
     auto inputs = collect_input_files(settings.inputs, settings, settings.is_pipe);
     if (inputs.empty()) {
         Logger::log(LogLevel::Error, "No valid input files.", "main");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     // progress tracking
@@ -448,5 +448,5 @@ int main(int argc, char* argv[]) {
     if (executor.is_stopped()) {
         return 130; // standard exit code for SIGINT
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

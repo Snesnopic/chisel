@@ -8,8 +8,7 @@
 #include <vector>
 #include <filesystem>
 
-// Aggiunto
-struct Settings; // Forward declaration
+struct Settings;
 
 std::vector<std::filesystem::path>
 collect_input_files(const std::vector<std::filesystem::path>& inputs,
