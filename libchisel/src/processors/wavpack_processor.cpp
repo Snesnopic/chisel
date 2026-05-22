@@ -11,6 +11,7 @@
 #include <filesystem>
 #include "file_utils.hpp"
 
+
 namespace chisel {
 
 void WavPackProcessor::recompress(const std::filesystem::path& input,

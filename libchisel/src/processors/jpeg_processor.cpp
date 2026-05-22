@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <memory>
 #include "file_utils.hpp"
+namespace chisel {
 
 namespace {
 
@@ -94,8 +95,6 @@ void copy_saved_markers(const j_decompress_ptr srcinfo,
 }
 
 } // namespace
-
-namespace chisel {
 
 void JpegProcessor::recompress(const std::filesystem::path& input,
                                const std::filesystem::path& output, const ProcessingOptions &options) {

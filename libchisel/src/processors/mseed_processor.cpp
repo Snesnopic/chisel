@@ -13,6 +13,7 @@
 #include "file_utils.hpp"
 #include "logger.hpp"
 #include "log_sink.hpp"
+
 #ifdef _WIN32
 #undef min
 #undef max

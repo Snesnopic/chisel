@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 11/10/25.
 //
 
+/**
+ * @file mime_detector.hpp
+ * @brief Utility definitions for MIME_DETECTOR.
+ */
+
 #ifndef CHISEL_MIME_DETECTOR_HPP
 #define CHISEL_MIME_DETECTOR_HPP
 

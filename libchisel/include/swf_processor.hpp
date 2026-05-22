@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 26/03/26.
 //
 
+/**
+ * @file swf_processor.hpp
+ * @brief Processor for SWF files.
+ */
+
 #ifndef CHISEL_SWF_PROCESSOR_HPP
 #define CHISEL_SWF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Swf files.
+     */
     class SwfProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

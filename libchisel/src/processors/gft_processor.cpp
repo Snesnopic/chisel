@@ -8,6 +8,7 @@
 #include "../../include/file_utils.hpp"
 #include <fstream>
 
+
 namespace chisel {
 
 std::optional<ExtractedContent> GftProcessor::prepare_extraction(const std::filesystem::path& input_path) {

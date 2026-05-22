@@ -11,6 +11,7 @@
 #include <vector>
 #include <fstream>
 
+
 namespace chisel {
 
 void WebpProcessor::recompress(const std::filesystem::path& input,

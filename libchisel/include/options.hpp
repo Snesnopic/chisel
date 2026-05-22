@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/02/26.
 //
 
+/**
+ * @file options.hpp
+ * @brief Utility definitions for OPTIONS.
+ */
+
 #ifndef CHISEL_OPTIONS_HPP
 #define CHISEL_OPTIONS_HPP
 

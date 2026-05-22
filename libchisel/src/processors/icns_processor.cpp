@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstring>
 
+
 namespace chisel {
 
 std::optional<ExtractedContent> IcnsProcessor::prepare_extraction(const std::filesystem::path& input_path) {

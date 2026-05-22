@@ -11,6 +11,7 @@
 #include <fstream>
 #include <cstring> // for memcmp
 
+
 namespace chisel {
 
 void PnmProcessor::recompress(const std::filesystem::path& input,

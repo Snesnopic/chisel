@@ -18,6 +18,7 @@
 #include <any>
 #include "file_type.hpp"
 
+
 namespace {
 
 /**
@@ -59,11 +60,11 @@ bool copy_apetag(const std::filesystem::path &input,
         return outTag.Save() != 0;
     } catch (const std::exception& e) {
         // log known exceptions
-        Logger::log(LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ApeProcessor");
+        chisel::Logger::log(chisel::LogLevel::Warning, "Failed to copy APE tag: " + std::string(e.what()), "ApeProcessor");
         return false;
     } catch (...) {
         // log unknown exceptions
-        Logger::log(LogLevel::Warning, "Failed to copy APE tag: Unknown exception caught", "ApeProcessor");
+        chisel::Logger::log(chisel::LogLevel::Warning, "Failed to copy APE tag: Unknown exception caught", "ApeProcessor");
         return false;
     }
 }

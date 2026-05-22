@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 25/03/26.
 //
 
+/**
+ * @file bzip2_processor.hpp
+ * @brief Processor for BZIP2 files.
+ */
+
 #ifndef CHISEL_BZIP2_PROCESSOR_HPP
 #define CHISEL_BZIP2_PROCESSOR_HPP
 
@@ -13,6 +18,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Bzip2 files.
+     */
     class Bzip2Processor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

@@ -11,6 +11,7 @@
 #include <vector>
 #include <stdexcept>
 
+
 namespace chisel {
 
 static std::vector<uint8_t> decode_lzma(const std::vector<uint8_t>& compressed) {

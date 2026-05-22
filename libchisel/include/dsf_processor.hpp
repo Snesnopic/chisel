@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file dsf_processor.hpp
+ * @brief Processor for DSF files.
+ */
+
 #ifndef CHISEL_DSF_PROCESSOR_HPP
 #define CHISEL_DSF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Dsf files.
+     */
     class DsfProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

@@ -5,6 +5,10 @@
 #include "../../include/logger.hpp"
 #include <vector>
 
+
+namespace chisel {
+
+
 std::vector<std::unique_ptr<ILogSink>> Logger::sinks_;
 std::mutex Logger::mtx_;
 
@@ -30,3 +34,5 @@ void Logger::log(const LogLevel level,
         }
     }
 }
+
+} // namespace chisel

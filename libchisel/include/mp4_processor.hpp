@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 18/11/25.
 //
 
+/**
+ * @file mp4_processor.hpp
+ * @brief Processor for MP4 files.
+ */
+
 #ifndef CHISEL_MP4_PROCESSOR_HPP
 #define CHISEL_MP4_PROCESSOR_HPP
 

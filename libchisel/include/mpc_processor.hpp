@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file mpc_processor.hpp
+ * @brief Processor for MPC files.
+ */
+
 #ifndef CHISEL_MPC_PROCESSOR_HPP
 #define CHISEL_MPC_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Mpc files.
+     */
     class MpcProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

@@ -11,6 +11,7 @@
 #include "file_utils.hpp"
 #include "stb_image.h"
 #include <cstring>
+
 namespace chisel {
 
 void FlexiGifProcessor::recompress(const std::filesystem::path& input,

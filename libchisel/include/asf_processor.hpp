@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file asf_processor.hpp
+ * @brief Processor for ASF files.
+ */
+
 #ifndef CHISEL_ASF_PROCESSOR_HPP
 #define CHISEL_ASF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Asf files.
+     */
     class AsfProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

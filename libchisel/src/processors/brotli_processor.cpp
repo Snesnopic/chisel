@@ -12,6 +12,7 @@
 #include <vector>
 #include <stdexcept>
 
+
 namespace chisel {
 
 static std::vector<uint8_t> decode_brotli(const std::vector<uint8_t>& compressed) {

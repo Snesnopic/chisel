@@ -16,6 +16,7 @@
 #include <map>
 #include "file_utils.hpp"
 
+
 namespace chisel {
     /**
      * @brief libpng error handler that throws a C++ exception.

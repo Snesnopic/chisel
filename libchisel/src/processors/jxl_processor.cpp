@@ -12,6 +12,7 @@
 #include <iterator>
 #include <string>
 
+
 namespace {
 
 size_t get_bytes_per_channel(const JxlDataType data_type) {

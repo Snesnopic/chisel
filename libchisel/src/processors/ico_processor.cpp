@@ -14,6 +14,7 @@
 #include <sstream>
 #include <algorithm>
 
+
 namespace chisel {
 
 std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::filesystem::path& input_path) {

@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 20/05/2026.
 //
 
+/**
+ * @file kanzi_processor.hpp
+ * @brief Processor for KANZI files.
+ */
+
 #ifndef CHISEL_KANZI_PROCESSOR_HPP
 #define CHISEL_KANZI_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Kanzi files.
+     */
     class KanziProcessor : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

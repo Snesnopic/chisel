@@ -189,6 +189,9 @@ public:
     void stop() const;
 
 private:
+    /**
+     * @brief Represents Impl.
+     */
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

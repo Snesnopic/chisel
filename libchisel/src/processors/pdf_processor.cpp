@@ -20,6 +20,8 @@
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
 
+namespace chisel {
+
 namespace {
     // provides raw, pre-compressed data to qpdf, bypassing internal zlib/encoders
     class raw_stream_provider : public QPDFObjectHandle::StreamDataProvider {
@@ -144,8 +146,6 @@ void strip_metadata(QPDF& pdf) {
 }
 
 } // namespace
-
-namespace chisel {
 
 std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());

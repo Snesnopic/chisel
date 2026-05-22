@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file tta_processor.hpp
+ * @brief Processor for TTA files.
+ */
+
 #ifndef CHISEL_TTA_PROCESSOR_HPP
 #define CHISEL_TTA_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Tta files.
+     */
     class TtaProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

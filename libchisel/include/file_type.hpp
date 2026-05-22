@@ -20,6 +20,8 @@
 #include <optional>
 #include <algorithm>
 
+namespace chisel {
+
 /**
  * @brief Enumerates all known container types chisel can process.
  *
@@ -352,6 +354,6 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".mseed",  "application/vnd.fdsn.mseed"}
 };
 
-
+} // namespace chisel
 
 #endif //CHISEL_FILE_TYPE_HPP

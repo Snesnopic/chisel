@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <cstring>
 
+
 namespace chisel {
 
 static std::vector<uint8_t> inflate_zlib(const uint8_t* src, size_t src_len, size_t expected_len) {

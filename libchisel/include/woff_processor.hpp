@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 26/03/26.
 //
 
+/**
+ * @file woff_processor.hpp
+ * @brief Processor for WOFF files.
+ */
+
 #ifndef CHISEL_WOFF_PROCESSOR_HPP
 #define CHISEL_WOFF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Woff files.
+     */
     class WoffProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

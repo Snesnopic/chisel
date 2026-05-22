@@ -14,6 +14,7 @@
 #include <vector>
 #include <FLAC/all.h>
 #include "file_type.hpp"
+
 #ifdef HAVE_OPTIVORBIS
 extern "C" {
     int chisel_optimize_vorbis(const char* input, const char* output);

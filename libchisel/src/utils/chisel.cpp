@@ -9,6 +9,7 @@
 
 #include "chisel.hpp"
 
+
 namespace chisel {
 
 // bridge sink to redirect static logs to the instance observer

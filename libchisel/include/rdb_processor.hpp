@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 26/03/26.
 //
 
+/**
+ * @file rdb_processor.hpp
+ * @brief Processor for RDB files.
+ */
+
 #ifndef CHISEL_RDB_PROCESSOR_HPP
 #define CHISEL_RDB_PROCESSOR_HPP
 
@@ -13,6 +18,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Rdb files.
+     */
     class RdbProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

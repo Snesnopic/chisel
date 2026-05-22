@@ -9,6 +9,7 @@
 #include "gzip_container.h"
 #include "zlib_container.h"
 
+
 namespace chisel {
 
     std::vector<unsigned char> ZopfliCompressor::compress(const std::span<const unsigned char> input,

@@ -18,6 +18,7 @@
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
 
+
 namespace chisel {
 
 namespace fs = std::filesystem;
