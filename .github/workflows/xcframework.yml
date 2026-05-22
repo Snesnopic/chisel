@@ -70,38 +70,38 @@ jobs:
           mkdir -p "${WORK_DIR}"
 
 
-          # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
+          # matrix of targets to build: platform|sdk|arch|enableoptivorbis|enablematroska
           TARGETS=(
             # macos
-            "macos|macosx|x86_64|OFF|ON|ON"
-            "macos|macosx|arm64|ON|ON|ON"
+            "macos|macosx|x86_64|ON|ON"
+            "macos|macosx|arm64|ON|ON"
           
             # ios / ipados
-            "ios|iphoneos|arm64|OFF|ON|ON"
-            "ios_simulator|iphonesimulator|x86_64|OFF|ON|ON"
-            "ios_simulator|iphonesimulator|arm64|OFF|ON|ON"
+            "ios|iphoneos|arm64|ON|ON"
+            "ios_simulator|iphonesimulator|x86_64|ON|ON"
+            "ios_simulator|iphonesimulator|arm64|ON|ON"
           
             # visionos
-            "visionos|xros|arm64|OFF|OFF|ON"
-            "visionos_simulator|xrsimulator|arm64|OFF|OFF|ON"
+            "visionos|xros|arm64|OFF|ON"
+            "visionos_simulator|xrsimulator|arm64|OFF|ON"
           
             # tvos
-            "tvos|appletvos|arm64|OFF|OFF|ON"
-            "tvos_simulator|appletvsimulator|x86_64|OFF|OFF|ON"
-            "tvos_simulator|appletvsimulator|arm64|OFF|OFF|ON"
+            "tvos|appletvos|arm64|OFF|ON"
+            "tvos_simulator|appletvsimulator|x86_64|OFF|ON"
+            "tvos_simulator|appletvsimulator|arm64|OFF|ON"
           
             # watchos
-            "watchos|watchos|arm64_32|OFF|OFF|ON"
-            "watchos_simulator|watchsimulator|x86_64|OFF|OFF|ON"
-            "watchos_simulator|watchsimulator|arm64|OFF|OFF|ON"
+            "watchos|watchos|arm64_32|OFF|ON"
+            "watchos_simulator|watchsimulator|x86_64|OFF|ON"
+            "watchos_simulator|watchsimulator|arm64|OFF|ON"
           )
 
           # 1. build each architecture separately
           for TARGET_INFO in "${TARGETS[@]}"; do
-            IFS='|' read -r PLATFORM SDK ARCH MP3_ENABLED OPTIVORBIS_ENABLED MATROSKA_ENABLED <<< "${TARGET_INFO}"    
+            IFS='|' read -r PLATFORM SDK ARCH OPTIVORBIS_ENABLED MATROSKA_ENABLED <<< "${TARGET_INFO}"    
           
             echo "===================================================="
-            echo "BUILDING FOR ${PLATFORM} - ${ARCH} (MP3: ${MP3_ENABLED} OPTIVORBIS: ${OPTIVORBIS_ENABLED} MATROSKA: ${MATROSKA_ENABLED})"
+            echo "BUILDING FOR ${PLATFORM} - ${ARCH} (OPTIVORBIS: ${OPTIVORBIS_ENABLED} MATROSKA: ${MATROSKA_ENABLED})"
             echo "===================================================="
           
             BUILD_DIR="${WORK_DIR}/build_${PLATFORM}_${ARCH}"
