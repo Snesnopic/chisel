@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-xcframework:
-    name: Build XCFramework (macos-26)
+    name: Build XCFramework
     runs-on: macos-14
 
     steps:
