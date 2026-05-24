@@ -333,12 +333,7 @@ if(TARGET man)
 endif()
 
 # flexiGIF
-set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
-file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
-list(REMOVE_ITEM FLEXIGIF_SOURCES "${FLEXIGIF_DIR}/flexiGIF.cpp")
-add_library(flexigif STATIC EXCLUDE_FROM_ALL ${FLEXIGIF_SOURCES})
-target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
-target_compile_features(flexigif PUBLIC cxx_std_11)
+add_subdirectory(third_party/flexigif EXCLUDE_FROM_ALL)
 
 # wavpack
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
@@ -643,7 +638,7 @@ set(CHISEL_LIBS
         ogg
         mozjpeg_static
         wavpack
-        flexigif
+        flexigif_core
         thirdparty_webp
         thirdparty_webpdemux
         thirdparty_webpmux

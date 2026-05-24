@@ -4,8 +4,8 @@
 
 #include "../../include/flexigif_processor.hpp"
 #include "../../include/logger.hpp"
-#include "GifImage.h"
-#include "LzwEncoder.h"
+#include "GifImage.hpp"
+#include "LzwEncoder.hpp"
 #include <stdexcept>
 #include <vector>
 #include "file_utils.hpp"
@@ -19,7 +19,7 @@ void FlexiGifProcessor::recompress(const std::filesystem::path& input,
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
-        GifImage gif(input.string());
+        GifImage gif(input.string(), false);
 
         const unsigned int numFrames = gif.getNumFrames();
         if (numFrames == 0) {

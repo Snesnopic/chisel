@@ -154,7 +154,7 @@ target_include_directories(libchisel
         ${zopfli_SOURCE_DIR}/src/zopfli
         ${libmseed_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
-        ${CMAKE_SOURCE_DIR}/third_party/flexigif
+        ${CMAKE_SOURCE_DIR}/third_party/flexigif/core
         ${CMAKE_SOURCE_DIR}/third_party/stb
         ${taglib_SOURCE_DIR}
         ${taglib_BINARY_DIR}
@@ -229,7 +229,7 @@ add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
 add_dependencies(libchisel ogg)
 add_dependencies(libchisel FLAC)
-add_dependencies(libchisel flexigif)
+add_dependencies(libchisel flexigif_core)
 add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
 if(ENABLE_MATROSKA)
