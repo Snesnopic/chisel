@@ -1,7 +1,7 @@
 # chisel
 
 **chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform binary.  
-It focuses on lossless recompression of various file formats by integrating multiple specialized encoders.
+It focuses on lossless recompression of **60+ file formats** by integrating multiple specialized encoders.
 
 ---
 ## Installation
@@ -298,3 +298,34 @@ Extending `chisel` with a new encoder or format requires just a few operations:
 | Fonts         | WOFF2                      | font/woff2                                                                                                                                                                                                                                                                 | .woff2                                            | woff2                                 |
 | Scientific    | MSEED                      | application/vnd.fdsn.mseed                                                                                                                                                                                                                                                 | .mseed                                            | libmseed                              |
 | Databases     | SQLite                     | application/vnd.sqlite3, application/x-sqlite3                                                                                                                                                                                                                             | .sqlite, .db                                      | sqlite3                               |
+
+## Third-party libraries
+
+Chisel works because it makes use of so many libraries. Here is a list of the incredible open-source projects that power its processors:
+
+- **[TagLib](https://github.com/taglib/taglib)**: Audio metadata and cover art extraction.
+- **[libarchive](https://github.com/libarchive/libarchive)**: Multi-format archive reading and writing (ZIP, Tar, GZip, etc.).
+- **[mozjpeg](https://github.com/mozilla/mozjpeg)**: High-performance JPEG recompression.
+- **[libwebp](https://github.com/webmproject/libwebp)**: WebP image encoding and decoding.
+- **[libpng](http://www.libpng.org/pub/png/libpng.html)**: PNG image handling.
+- **[zopfli](https://github.com/google/zopfli)**: Deflate/PNG optimization.
+- **[libflac](https://github.com/xiph/flac)**: Free Lossless Audio Codec handling.
+- **[libogg](https://github.com/xiph/ogg)**: Ogg container support.
+- **[libjxl](https://github.com/libjxl/libjxl)**: JPEG XL support.
+- **[wavpack](https://github.com/dbry/WavPack)**: WavPack lossless audio compressor.
+- **[libebml](https://github.com/Matroska-Org/libebml)** & **[libmatroska](https://github.com/Matroska-Org/libmatroska)**: EBML and Matroska container handling.
+- **[mkclean](https://github.com/Matroska-Org/libmkclean)**: Matroska/WebM optimization tool.
+- **[qpdf](https://github.com/qpdf/qpdf)**: PDF transformation and optimization.
+- **[zstd](https://github.com/facebook/zstd)**: ZSTD compression.
+- **[xz](https://tukaani.org/xz/)**: LZMA compression.
+- **[brotli](https://github.com/google/brotli)**: Generic-purpose lossless compression.
+- **[sqlite3](https://www.sqlite.org/)**: SQLite database engine.
+- **[OptiVorbis](https://github.com/OptiVorbis/OptiVorbis)**: Ogg Vorbis recompression (Rust-based).
+- **[gifsicle](https://github.com/kohler/gifsicle)** & **[flexigif](https://create.stephan-brumme.com/flexigif-lossless-gif-lzw-optimization/)**: GIF optimization.
+- **[libmseed](https://github.com/EarthScope/libmseed)**: miniSEED data format library.
+- **[pugixml](https://github.com/zeux/pugixml)**: Light-weight, simple and fast XML parser.
+- **[libtiff](http://www.simplesystems.org/libtiff/)**: TIFF image support.
+- **[stb](https://github.com/nothings/stb)**: Single-file public domain libraries for images.
+- **[kanzi-cpp](https://github.com/flanglet/kanzi-cpp)**: Lossless data compressor port.
+- **[mp3packercpp](https://github.com/Snesnopic/mp3packercpp)**: mp3packer port.
+- **[corrosion](https://github.com/corrosion-rs/corrosion)**: CMake integration for Rust.
