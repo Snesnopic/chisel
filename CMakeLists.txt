@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.4.2 LANGUAGES CXX C)
+project(chisel VERSION 1.5.0 LANGUAGES CXX C)
 
 # prevents redefinition of 'uninstall' target
 macro(add_custom_target target_name)
