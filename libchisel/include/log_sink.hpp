@@ -16,6 +16,8 @@
 
 #include <string_view>
 
+namespace chisel {
+
 /**
  * @brief Severity levels for log messages.
  *
@@ -55,5 +57,7 @@ struct ILogSink {
                      std::string_view message,
                      std::string_view tag) = 0;
 };
+
+} // namespace chisel
 
 #endif // CHISEL_LOG_SINK_HPP

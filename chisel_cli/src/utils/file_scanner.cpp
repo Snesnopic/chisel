@@ -32,7 +32,7 @@ bool is_filtered(const fs::path& path, const Settings& settings) {
                     return true;
                 }
             } catch (const std::regex_error& e) {
-                Logger::log(LogLevel::Warning, "Invalid exclude regex: " + pattern + " (" + e.what() + ")", "scanner");
+                chisel::Logger::log(chisel::LogLevel::Warning, "Invalid exclude regex: " + pattern + " (" + e.what() + ")", "scanner");
             }
         }
     }
@@ -44,7 +44,7 @@ bool is_filtered(const fs::path& path, const Settings& settings) {
                     return false;
                 }
             } catch (const std::regex_error& e) {
-                Logger::log(LogLevel::Warning, "Invalid include regex: " + pattern + " (" + e.what() + ")", "scanner");
+                chisel::Logger::log(chisel::LogLevel::Warning, "Invalid include regex: " + pattern + " (" + e.what() + ")", "scanner");
             }
         }
         return true;
@@ -73,17 +73,17 @@ collect_input_files(const std::vector<fs::path>& inputs,
             continue;
         }
         if (!fs::exists(in)) {
-            Logger::log(LogLevel::Error, "Input not found: " + in.string(), "scanner");
+            chisel::Logger::log(chisel::LogLevel::Error, "Input not found: " + in.string(), "scanner");
             continue;
         }
         if (fs::is_directory(in)) {
             if (recursive) {
-                for (auto& e : fs::recursive_directory_iterator(in)) {
+                for (const auto& e : fs::recursive_directory_iterator(in)) {
                     if (fs::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), settings))
                         result.push_back(e.path());
                 }
             } else {
-                for (auto& e : fs::directory_iterator(in)) {
+                for (const auto& e : fs::directory_iterator(in)) {
                     if (fs::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), settings))
                         result.push_back(e.path());
                 }
@@ -93,7 +93,7 @@ collect_input_files(const std::vector<fs::path>& inputs,
         }
     }
 
-    Logger::log(LogLevel::Info,
+    chisel::Logger::log(chisel::LogLevel::Info,
                 "Scanner collected " + std::to_string(result.size()) + " files",
                 "scanner");
     return result;

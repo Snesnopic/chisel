@@ -15,6 +15,9 @@
 #include <string_view>
 #include <span>
 
+/**
+ * @brief Represents MS3Record.
+ */
 struct MS3Record; // forward declaration
 
 namespace chisel {

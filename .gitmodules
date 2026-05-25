@@ -83,10 +83,6 @@
 [submodule "third_party/corrosion"]
 	path = third_party/corrosion
 	url = https://github.com/corrosion-rs/corrosion.git
-[submodule "third_party/mp3packer"]
-	path = third_party/mp3packer
-	url = https://github.com/Snesnopic/mp3packer
-	branch = lib
 [submodule "third_party/vbrfix"]
 	path = third_party/vbrfix
 	url = https://github.com/Snesnopic/vbrfix
@@ -100,3 +96,9 @@
 [submodule "third_party/woff2"]
 	path = third_party/woff2
 	url = https://github.com/google/woff2.git
+[submodule "third_party/kanzi-cpp"]
+	path = third_party/kanzi-cpp
+	url = https://github.com/Snesnopic/kanzi-cpp
+[submodule "third_party/mp3packercpp"]
+	path = third_party/mp3packercpp
+	url = https://github.com/Snesnopic/mp3packercpp.git

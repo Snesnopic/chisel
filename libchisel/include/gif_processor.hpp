@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file gif_processor.hpp
+ * @brief Processor for GIF files.
+ */
+
 #ifndef CHISEL_GIF_PROCESSOR_HPP
 #define CHISEL_GIF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Gif files.
+     */
     class GifProcessor final : public IProcessor {
     public:
         // --- self-description ---

@@ -2,11 +2,18 @@
 // Created by Giuseppe Francione on 07/10/25.
 //
 
+/**
+ * @file random_utils.hpp
+ * @brief Utility definitions for RANDOM_UTILS.
+ */
+
 #ifndef CHISEL_RANDOM_UTILS_H
 #define CHISEL_RANDOM_UTILS_H
 
 #include <random>
 #include <string>
+
+namespace chisel {
 
 /**
  * @brief Provides simple, thread-local random number utilities.
@@ -32,6 +39,8 @@ namespace RandomUtils {
      */
     std::string random_suffix();
 
-} // namespace
+} // namespace RandomUtils
+
+} // namespace chisel
 
 #endif //CHISEL_RANDOM_UTILS_H

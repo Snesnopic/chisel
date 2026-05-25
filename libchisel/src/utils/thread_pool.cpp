@@ -6,6 +6,9 @@
 #include "logger.hpp"
 #include "log_sink.hpp"
 
+
+namespace chisel {
+
 ThreadPool::ThreadPool(unsigned threads) {
     if (threads == 0) threads = 1;
     workers_.reserve(threads);
@@ -86,3 +89,5 @@ ThreadPool::~ThreadPool() {
         }
     }
 }
+
+} // namespace chisel

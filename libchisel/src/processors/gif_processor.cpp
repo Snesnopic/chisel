@@ -17,6 +17,7 @@
 extern "C" {
 #include <lcdfgif/gif.h>
 #include "gifsicle.h"
+
 }
 
 namespace chisel {

@@ -9,6 +9,7 @@
 
 #include "chisel.hpp"
 
+
 namespace chisel {
 
 // bridge sink to redirect static logs to the instance observer
@@ -107,7 +108,52 @@ Chisel& Chisel::threads(const unsigned val) {
     return *this;
 }
 
-Chisel& Chisel::mode(EncodeMode m) {
+bool Chisel::isCompatible(const std::filesystem::path& path) const {
+    std::error_code ec;
+
+    if (!std::filesystem::is_regular_file(path, ec) || ec) {
+        return false;
+    }
+
+    try {
+        return impl_->registry.supports_mime(MimeDetector::detect(path));
+    } catch (const std::exception&) {
+        // fallback for unreadable files or detection failures
+        return false;
+    }
+}
+
+std::set<std::string_view> Chisel::supportedExtensions() const {
+    const auto& procs = impl_->registry.all();
+    std::set<std::string_view> extensions;
+
+    for (const auto& proc : procs) {
+        const auto& exts = proc->get_supported_extensions();
+
+        extensions.insert(exts.begin(), exts.end());
+    }
+
+    return extensions;
+}
+
+std::set<std::string_view> Chisel::supportedMimeTypes() const {
+    const auto& procs = impl_->registry.all();
+    std::set<std::string_view> mimes;
+
+    for (const auto& proc : procs) {
+        const auto& exts = proc->get_supported_mime_types();
+
+        mimes.insert(exts.begin(), exts.end());
+    }
+
+    return mimes;
+}
+
+std::string_view Chisel::version() {
+    return CHISEL_VERSION;
+}
+
+Chisel& Chisel::mode(const EncodeMode m) {
     impl_->encodeMode = m;
     return *this;
 }

@@ -26,20 +26,8 @@
 
 static std::vector<std::string> g_active_files;
 
-#ifdef HAVE_MP3PACKER
-// Global mutex to synchronize console output from multiple threads
-extern std::mutex g_console_mtx;
-extern "C" {
-#include <caml/mlvalues.h>
-#include <caml/callback.h>
-#include <caml/alloc.h>
-#include <caml/threads.h>
-}
-#undef flush // otherwise we can't use std::flush later
-#else
 // Global mutex to synchronize console output from multiple threads
 std::mutex g_console_mtx;
-#endif
 
 // Helper to clear the current line
 inline void clear_line_internal() {
@@ -112,7 +100,7 @@ static std::atomic<chisel::ProcessorExecutor*> g_executor{nullptr};
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         // Protect interrupt message so it doesn't mix with progress bar
-        std::lock_guard<std::mutex> lock(g_console_mtx);
+        std::scoped_lock lock(g_console_mtx);
         std::cerr << CYAN
                   << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
                   << RESET << std::endl;
@@ -202,15 +190,6 @@ int main(int argc, char* argv[]) {
         Logger::log(LogLevel::Error, "Failed to initialize magic file: " + std::string(e.what()), "main");
         // this is often non-fatal, so we continue
     }
-#ifdef HAVE_MP3PACKER
-    try {
-        caml_startup((char_os**)argv);
-        caml_release_runtime_system();
-    } catch (...) {
-        Logger::log(LogLevel::Error, "Failed to initialize OCaml runtime", "main");
-    }
-
-#endif
 
     // registry of processors and event bus
     ProcessorRegistry registry;
@@ -224,7 +203,7 @@ int main(int argc, char* argv[]) {
     auto inputs = collect_input_files(settings.inputs, settings, settings.is_pipe);
     if (inputs.empty()) {
         Logger::log(LogLevel::Error, "No valid input files.", "main");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     // progress tracking
@@ -326,7 +305,7 @@ int main(int argc, char* argv[]) {
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
         {
-            std::lock_guard<std::mutex> lock(g_console_mtx);
+            std::scoped_lock lock(g_console_mtx);
             clear_line_internal();
             Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
         }
@@ -469,5 +448,5 @@ int main(int argc, char* argv[]) {
     if (executor.is_stopped()) {
         return 130; // standard exit code for SIGINT
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

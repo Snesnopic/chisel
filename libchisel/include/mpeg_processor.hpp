@@ -43,16 +43,11 @@ namespace chisel {
 
         // --- capabilities ---
         /**
-        * @brief Recompression support depends on whether the project was compiled with
-        * MP3Packer integration enabled (HAVE_MP3PACKER).
-        * @return true if MP3Packer integration is available, false otherwise.
-        */
+         * @brief This processor can recompress with mp3packercpp.
+         * @return true
+         */
         [[nodiscard]] bool can_recompress() const noexcept override {
-#ifdef HAVE_MP3PACKER
             return true;
-#else
-            return false;
-#endif
         }
 
         /**
@@ -64,8 +59,7 @@ namespace chisel {
         // --- operations ---
 
         /**
-         * @brief Performs lossless MP3 recompression via MP3Packer (if enabled).
-         * Falls back to a standard copy if HAVE_MP3PACKER is undefined.
+         * @brief Performs lossless MP3 recompression via mp3ackercpp.
          * @throws std::runtime_error On compression failure or IO error.
          */
         void recompress(const std::filesystem::path& input,

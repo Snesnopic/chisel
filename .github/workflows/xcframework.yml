@@ -9,11 +9,8 @@ on:
 
 jobs:
   build-xcframework:
-    name: Build XCFramework (macos-26)
-    runs-on: macos-26
-    strategy:
-      matrix:
-        ocaml_version: [ 4.14.0 ]
+    name: Build XCFramework
+    runs-on: macos-14
 
     steps:
       - name: Checkout repository
@@ -50,16 +47,7 @@ jobs:
           # required for build-std on tier 3 targets (visionos, tvos, watchos)
           rustup component add rust-src
 
-      - name: Set up OCaml
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml_version }}
-          dune-cache: true
 
-      - name: Install OCaml Dependencies
-        run: |
-          opam install dune dune-configurator --yes
-          opam exec -- ocamlopt -version
 
       - name: Build XCFramework
         shell: bash
@@ -67,7 +55,7 @@ jobs:
           set -e
 
           # add required binaries to path
-          export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/opt/homebrew/opt/ocaml/bin:/usr/local/bin:${PATH}"
+          export PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
 
           ROOT_DIR="$(pwd)"
           WORK_DIR="${ROOT_DIR}/build_xcframework"
@@ -81,40 +69,39 @@ jobs:
           rm -rf "${WORK_DIR}"
           mkdir -p "${WORK_DIR}"
 
-          OCAML_LIB_DIR=$(opam exec -- ocamlc -where)
 
-          # matrix of targets to build: platform|sdk|arch|enablemp3|enableoptivorbis|enablematroska
+          # matrix of targets to build: platform|sdk|arch|enableoptivorbis|enablematroska
           TARGETS=(
             # macos
-            "macos|macosx|x86_64|OFF|ON|ON"
-            "macos|macosx|arm64|ON|ON|ON"
+            "macos|macosx|x86_64|ON|ON"
+            "macos|macosx|arm64|ON|ON"
           
             # ios / ipados
-            "ios|iphoneos|arm64|OFF|ON|OFF"
-            "ios_simulator|iphonesimulator|x86_64|OFF|ON|OFF"
-            "ios_simulator|iphonesimulator|arm64|OFF|ON|OFF"
+            "ios|iphoneos|arm64|ON|ON"
+            "ios_simulator|iphonesimulator|x86_64|ON|ON"
+            "ios_simulator|iphonesimulator|arm64|ON|ON"
           
             # visionos
-            "visionos|xros|arm64|OFF|OFF|OFF"
-            "visionos_simulator|xrsimulator|arm64|OFF|OFF|OFF"
+            "visionos|xros|arm64|OFF|ON"
+            "visionos_simulator|xrsimulator|arm64|OFF|ON"
           
             # tvos
-            "tvos|appletvos|arm64|OFF|OFF|OFF"
-            "tvos_simulator|appletvsimulator|x86_64|OFF|OFF|OFF"
-            "tvos_simulator|appletvsimulator|arm64|OFF|OFF|OFF"
+            "tvos|appletvos|arm64|OFF|ON"
+            "tvos_simulator|appletvsimulator|x86_64|OFF|ON"
+            "tvos_simulator|appletvsimulator|arm64|OFF|ON"
           
             # watchos
-            "watchos|watchos|arm64_32|OFF|OFF|OFF"
-            "watchos_simulator|watchsimulator|x86_64|OFF|OFF|OFF"
-            "watchos_simulator|watchsimulator|arm64|OFF|OFF|OFF"
+            "watchos|watchos|arm64_32|OFF|ON"
+            "watchos_simulator|watchsimulator|x86_64|OFF|ON"
+            "watchos_simulator|watchsimulator|arm64|OFF|ON"
           )
 
           # 1. build each architecture separately
           for TARGET_INFO in "${TARGETS[@]}"; do
-            IFS='|' read -r PLATFORM SDK ARCH MP3_ENABLED OPTIVORBIS_ENABLED MATROSKA_ENABLED <<< "${TARGET_INFO}"    
+            IFS='|' read -r PLATFORM SDK ARCH OPTIVORBIS_ENABLED MATROSKA_ENABLED <<< "${TARGET_INFO}"    
           
             echo "===================================================="
-            echo "BUILDING FOR ${PLATFORM} - ${ARCH} (MP3: ${MP3_ENABLED} OPTIVORBIS: ${OPTIVORBIS_ENABLED} MATROSKA: ${MATROSKA_ENABLED})"
+            echo "BUILDING FOR ${PLATFORM} - ${ARCH} (OPTIVORBIS: ${OPTIVORBIS_ENABLED} MATROSKA: ${MATROSKA_ENABLED})"
             echo "===================================================="
           
             BUILD_DIR="${WORK_DIR}/build_${PLATFORM}_${ARCH}"
@@ -178,7 +165,6 @@ jobs:
           
             cmake -DCMAKE_BUILD_TYPE="Release" \
                   -DCHISEL_BUILD_CLI=OFF \
-                  -DENABLE_MP3PACKER="${MP3_ENABLED}" \
                   -DENABLE_OPTIVORBIS="${OPTIVORBIS_ENABLED}" \
                   -DENABLE_MATROSKA="${MATROSKA_ENABLED}" \
                   -DCMAKE_SYSTEM_NAME="${SYS_NAME}" \
@@ -212,14 +198,6 @@ jobs:
                 echo "SKIPPING ${lib_path} (ARCH MISMATCH)"
               fi
             done
-          
-            if [ "${MP3_ENABLED}" == "ON" ]; then
-              echo "APPENDING OCAML STATIC LIBRARIES..."
-              echo "${OCAML_LIB_DIR}/libasmrun.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libthreadsnat.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libcamlstr.a" >> "${BUILD_DIR}/static_libs.txt"
-              echo "${OCAML_LIB_DIR}/libunix.a" >> "${BUILD_DIR}/static_libs.txt"
-            fi
           
             LIB_OUT="${WORK_DIR}/libchisel_${PLATFORM}_${ARCH}.a"
             libtool -static -o "${LIB_OUT}" -filelist "${BUILD_DIR}/static_libs.txt"

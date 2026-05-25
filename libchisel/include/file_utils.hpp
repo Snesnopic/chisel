@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 13/11/25.
 //
 
+/**
+ * @file file_utils.hpp
+ * @brief Utility definitions for FILE_UTILS.
+ */
+
 #ifndef CHISEL_FILE_UTILS_HPP
 #define CHISEL_FILE_UTILS_HPP
 

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include "processor_executor.hpp"
 #include "processor_registry.hpp"
+#include "mime_detector.hpp"
 #include "processor_executor.hpp"
 #include "event_bus.hpp"
 #include "logger.hpp"
@@ -25,6 +26,7 @@
 #include <mutex>
 #include <thread>
 #include <algorithm>
+#include <set>
 #include "events.hpp"
 #include "file_type.hpp"
 
@@ -114,6 +116,32 @@ public:
     Chisel& threads(unsigned val);
 
     /**
+     * @brief Checks whether the input file is processable by any of the currently registered Processors.
+     * @param path File to check
+     * @return True if the file is compatible with any of the processors, false otherwise
+     */
+    [[nodiscard]] bool isCompatible(const std::filesystem::path &path) const;
+
+    /**
+     * @brief Returns an std::set of string_views, containing all file extensions that have at least
+     * one Processor that support it.
+     * @return A set of string views with all supported extensions.
+     */
+    [[nodiscard]] std::set<std::string_view> supportedExtensions() const;
+
+    /**
+     * @brief Returns an std::set of string_views, containing all mime types that have at least
+     * one Processor that support it.
+     * @return A set of string views with all supported mime types.
+     */
+    [[nodiscard]] std::set<std::string_view> supportedMimeTypes() const;
+
+    /**
+     * @brief Returns the current version of the library as a string_view.
+     * @return The current version of libchisel.
+     */
+    [[nodiscard]] static std::string_view version();
+    /**
      * @brief Set the encoding strategy.
      * Default: PIPE.
      */
@@ -161,6 +189,9 @@ public:
     void stop() const;
 
 private:
+    /**
+     * @brief Represents Impl.
+     */
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

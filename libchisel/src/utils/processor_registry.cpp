@@ -47,8 +47,10 @@
 #include "rdb_processor.hpp"
 #include "icns_processor.hpp"
 #include "woff_processor.hpp"
+#include "kanzi_processor.hpp"
 #include <algorithm>
 #include <cctype>
+
 
 namespace chisel {
 
@@ -97,6 +99,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<RdbProcessor>());
     processors_.push_back(std::make_unique<IcnsProcessor>());
     processors_.push_back(std::make_unique<WoffProcessor>());
+    processors_.push_back(std::make_unique<KanziProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
@@ -109,6 +112,15 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime
         }
     }
     return result;
+}
+
+bool ProcessorRegistry::supports_mime(const std::string& mime) const {
+    const std::string_view mime_view = mime;
+
+    return std::ranges::any_of(processors_, [mime_view](const auto& proc) {
+        const auto mimes = proc->get_supported_mime_types();
+        return std::ranges::find(mimes, mime_view) != mimes.end();
+    });
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_extension(const std::string& ext) const {

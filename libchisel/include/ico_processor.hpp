@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 26/03/26.
 //
 
+/**
+ * @file ico_processor.hpp
+ * @brief Processor for ICO files.
+ */
+
 #ifndef CHISEL_ICO_PROCESSOR_HPP
 #define CHISEL_ICO_PROCESSOR_HPP
 
@@ -13,6 +18,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Ico files.
+     */
     class IcoProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

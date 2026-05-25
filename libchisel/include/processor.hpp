@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file processor.hpp
+ * @brief Processor for PROCESSOR files.
+ */
+
 #ifndef CHISEL_PROCESSOR_HPP
 #define CHISEL_PROCESSOR_HPP
 
@@ -14,8 +19,6 @@
 #include <string_view>
 #include <stdexcept>
 #include "options.hpp"
-
-enum class ContainerFormat;
 
 /**
  * @namespace chisel
@@ -30,6 +33,11 @@ enum class ContainerFormat;
  * to prevent symbol collisions.
  */
 namespace chisel {
+
+/**
+ * @brief Enumeration for ContainerFormat.
+ */
+enum class ContainerFormat;
 
 /**
  * @brief Holds information about content extracted by a processor.

@@ -11,6 +11,7 @@
 #include <vector>
 #include <stdexcept>
 
+
 namespace chisel {
 
 // extract pure payload from bzip2 stream

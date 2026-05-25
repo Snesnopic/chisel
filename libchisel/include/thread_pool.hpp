@@ -22,7 +22,12 @@
 #include <thread>
 #include <atomic>
 
+namespace chisel {
+
 // custom stop token to replace std::stop_token
+/**
+ * @brief Represents stop_token.
+ */
 class stop_token {
     const std::atomic<bool>* stop_flag_{nullptr};
 public:
@@ -106,5 +111,7 @@ private:
     size_t pending_{0};                     ///< Number of tasks enqueued or running
     std::vector<std::thread> workers_;      ///< The worker threads
 };
+
+} // namespace chisel
 
 #endif // CHISEL_THREAD_POOL_HPP

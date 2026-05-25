@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file brotli_processor.hpp
+ * @brief Processor for BROTLI files.
+ */
+
 #ifndef CHISEL_BROTLI_PROCESSOR_HPP
 #define CHISEL_BROTLI_PROCESSOR_HPP
 
@@ -13,6 +18,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Brotli files.
+     */
     class BrotliProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

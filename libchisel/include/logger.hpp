@@ -20,6 +20,9 @@
 #include <string>
 #include <vector>
 
+namespace chisel {
+
+
 /**
  * @brief Static logging facade for chisel.
  *
@@ -95,5 +98,7 @@ private:
     ///< Protects access to the sinks_ vector.
     static std::mutex mtx_;
 };
+
+} // namespace chisel
 
 #endif //CHISEL_LOGGER_HPP

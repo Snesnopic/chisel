@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/02/26.
 //
 
+/**
+ * @file zopfli_compressor.hpp
+ * @brief Compression utility for ZOPFLI_COMPRESSOR.
+ */
+
 #ifndef CHISEL_ZOPFLI_COMPRESSOR_HPP
 #define CHISEL_ZOPFLI_COMPRESSOR_HPP
 

@@ -20,6 +20,8 @@
 #include <optional>
 #include <algorithm>
 
+namespace chisel {
+
 /**
  * @brief Enumerates all known container types chisel can process.
  *
@@ -58,6 +60,7 @@ enum class ContainerFormat {
     Cpio,
     Ar,
     Zstd,
+    Kanzi,
     Unknown
 };
 
@@ -108,6 +111,7 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/zip",                        ContainerFormat::Zip },
     { "application/java-archive",               ContainerFormat::Zip },
     { "application/vnd.android.package-archive", ContainerFormat::Apk },
+    { "application/x-kanzi",                    ContainerFormat::Kanzi }
 };
 
 /**
@@ -148,6 +152,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Cpio:     return "cpio";
         case ContainerFormat::Ar:       return "a";
         case ContainerFormat::Zstd:     return "zst";
+        case ContainerFormat::Kanzi:    return "knz";
         default:                        return "unknown";
     }
 }
@@ -203,6 +208,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "nupkg") return ContainerFormat::Zip;
     if (s == "war" || s == "ear") return ContainerFormat::Jar;
     if (s == "aab")   return ContainerFormat::Apk;
+    if (s == "knz") return ContainerFormat::Kanzi;
     return std::nullopt;
 }
 
@@ -255,6 +261,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Cpio:
         case ContainerFormat::Ar:
         case ContainerFormat::Zstd:
+        case ContainerFormat::Kanzi:
             return true;
         default:
             return false;
@@ -295,6 +302,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".war",    "application/java-archive"},
     {".ear",    "application/java-archive"},
     {".aab",    "application/vnd.android.package-archive"},
+    {".knz",    "application/x-kanzi"},
 
     // images
     {".jpg",    "image/jpeg"},
@@ -346,6 +354,6 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".mseed",  "application/vnd.fdsn.mseed"}
 };
 
-
+} // namespace chisel
 
 #endif //CHISEL_FILE_TYPE_HPP

@@ -10,9 +10,11 @@
 #include <cmath>
 #include <memory>
 #include <algorithm>
+#include <mutex>
 #include "file_utils.hpp"
 #include "logger.hpp"
 #include "log_sink.hpp"
+
 #ifdef _WIN32
 #undef min
 #undef max
@@ -71,20 +73,27 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "ENTERING RECOMPRESS FOR " + input.string(), get_name());
 
-    ms_rloginit(nullptr, nullptr, [](const char*){}, nullptr, 0);
+    static std::once_flag flag;
+    std::call_once(flag, []() {
+        ms_rloginit(nullptr, nullptr, [](const char*){}, nullptr, 0);
+    });
+
     MS3Record *msr = nullptr;
     uint8_t original_version = 3;
     uint32_t pack_flags = MSF_FLUSHDATA;
 
-    int ret = ms3_readmsr(&msr, input.string().c_str(), 0, 0);
+    MS3FileParam *msfp = nullptr;
+    int ret = ms3_readmsr_r(&msfp, &msr, input.string().c_str(), 0, 0);
     if (ret != MS_NOERROR) {
         Logger::log(LogLevel::Warning, "COULD NOT PEEK FIRST RECORD, ATTEMPTING FULL READ.", get_name());
     } else {
         original_version = msr->formatversion;
     }
+    if (msfp != nullptr) {
+        // force libmseed to close the file handle and free the local msfp
+        ms3_readmsr_r(&msfp, &msr, nullptr, 0, 0);
+    }
     if (msr != nullptr) {
-        // force libmseed to close the file handle
-        ms3_readmsr(&msr, nullptr, 0, 0);
         msr3_free(&msr);
     }
 
@@ -92,7 +101,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
 
     MS3TraceList *raw_mstl = nullptr;
     ret = ms3_readtracelist(&raw_mstl, input.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
-    MstlPtr mstl(raw_mstl);
+    const MstlPtr mstl(raw_mstl);
 
     if (ret != MS_NOERROR) {
         throw std::runtime_error("failed to read trace list. libmseed code: " + std::to_string(ret));

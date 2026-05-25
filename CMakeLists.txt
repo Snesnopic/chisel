@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.4.2 LANGUAGES CXX C)
+project(chisel VERSION 1.5.0 LANGUAGES CXX C)
+
+# prevents redefinition of 'uninstall' target
+macro(add_custom_target target_name)
+    if("${target_name}" STREQUAL "uninstall")
+        if(NOT TARGET uninstall)
+            _add_custom_target(${ARGV})
+        endif()
+    else()
+        _add_custom_target(${ARGV})
+    endif()
+endmacro()
 
 option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
-option(ENABLE_MP3PACKER "Enable OCaml mp3packer integration" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
@@ -323,12 +333,7 @@ if(TARGET man)
 endif()
 
 # flexiGIF
-set(FLEXIGIF_DIR ${CMAKE_SOURCE_DIR}/third_party/flexigif)
-file(GLOB FLEXIGIF_SOURCES ${FLEXIGIF_DIR}/*.cpp)
-list(REMOVE_ITEM FLEXIGIF_SOURCES "${FLEXIGIF_DIR}/flexiGIF.cpp")
-add_library(flexigif STATIC EXCLUDE_FROM_ALL ${FLEXIGIF_SOURCES})
-target_include_directories(flexigif PUBLIC ${FLEXIGIF_DIR})
-target_compile_features(flexigif PUBLIC cxx_std_11)
+add_subdirectory(third_party/flexigif EXCLUDE_FROM_ALL)
 
 # wavpack
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
@@ -589,13 +594,10 @@ target_include_directories(zopflipng PUBLIC
         ${zopfli_SOURCE_DIR}/src/zopfli
 )
 
-# mp3packer (ocaml)
-if(ENABLE_MP3PACKER)
-    include(cmake/mp3packer.cmake)
-    add_mp3packer_library(mp3packer_static "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mp3packer")
-
-    add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
-endif()
+# mp3packercpp
+set(USE_OPENMP OFF CACHE BOOL "Enable OpenMP for mp3packercpp" FORCE)
+add_subdirectory(third_party/mp3packercpp EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 
 # brotli
 set(BROTLIDEC_FOUND TRUE CACHE BOOL "" FORCE)
@@ -622,6 +624,11 @@ if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif ()
 add_subdirectory(third_party/woff2 EXCLUDE_FROM_ALL)
 
+# kanzicpp
+set(CONCURRENCY_DISABLED ON CACHE BOOL "Disable multithreading in Kanzi" FORCE)
+set(KANZI_ENABLE_NATIVE_OPTIMIZATIONS OFF CACHE BOOL "Disable native optimizations for portability" FORCE)
+add_subdirectory(third_party/kanzi-cpp EXCLUDE_FROM_ALL)
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -631,7 +638,7 @@ set(CHISEL_LIBS
         ogg
         mozjpeg_static
         wavpack
-        flexigif
+        flexigif_core
         thirdparty_webp
         thirdparty_webpdemux
         thirdparty_webpmux
@@ -656,17 +663,14 @@ set(CHISEL_LIBS
         woff2dec
         woff2enc
         liblzma
+        libkanzi
+        mp3packercpp_core
+        vbrfix_lib
 )
 
 if(ENABLE_MATROSKA)
     list(APPEND CHISEL_LIBS mkclean_lib)
     add_compile_definitions(HAVE_MATROSKA=1)
-endif()
-
-if(ENABLE_MP3PACKER)
-    list(APPEND CHISEL_LIBS mp3packer_static)
-    list(APPEND CHISEL_LIBS vbrfix_lib)
-    add_compile_definitions(HAVE_MP3PACKER=1)
 endif()
 
 if(WIN32)
@@ -700,7 +704,7 @@ endif()
 set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
-        libdeflate_static zlibstatic tag liblzma
+        libdeflate_static zlibstatic tag liblzma libkanzi
 )
 
 if(NOT WIN32)

@@ -13,6 +13,7 @@
 #include <shlwapi.h>
 #include <vector>
 
+
 #pragma comment(lib, "Ole32.lib")
 
 namespace {

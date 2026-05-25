@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file dsdiff_processor.hpp
+ * @brief Processor for DSDIFF files.
+ */
+
 #ifndef CHISEL_DSDIFF_PROCESSOR_HPP
 #define CHISEL_DSDIFF_PROCESSOR_HPP
 
@@ -12,6 +17,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Dsdiff files.
+     */
     class DsdiffProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

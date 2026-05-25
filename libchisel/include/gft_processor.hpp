@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 26/03/26.
 //
 
+/**
+ * @file gft_processor.hpp
+ * @brief Processor for GFT files.
+ */
+
 #ifndef CHISEL_GFT_PROCESSOR_HPP
 #define CHISEL_GFT_PROCESSOR_HPP
 
@@ -13,6 +18,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Gft files.
+     */
     class GftProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

@@ -1,3 +1,8 @@
+/**
+ * @file lzma_processor.hpp
+ * @brief Processor for LZMA files.
+ */
+
 #ifndef CHISEL_LZMA_PROCESSOR_HPP
 #define CHISEL_LZMA_PROCESSOR_HPP
 
@@ -9,6 +14,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Lzma files.
+     */
     class LzmaProcessor final : public IProcessor {
     public:
         [[nodiscard]] std::string_view get_name() const noexcept override {

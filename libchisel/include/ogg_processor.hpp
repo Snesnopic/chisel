@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 18/11/25.
 //
 
+/**
+ * @file ogg_processor.hpp
+ * @brief Processor for OGG files.
+ */
+
 #ifndef CHISEL_OGG_PROCESSOR_HPP
 #define CHISEL_OGG_PROCESSOR_HPP
 

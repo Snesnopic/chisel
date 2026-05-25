@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 24/03/26.
 //
 
+/**
+ * @file cfbf_processor.hpp
+ * @brief Processor for CFBF files.
+ */
+
 #ifndef CHISEL_CFBF_PROCESSOR_HPP
 #define CHISEL_CFBF_PROCESSOR_HPP
 

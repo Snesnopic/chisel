@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 17/11/25.
 //
 
+/**
+ * @file audio_metadata_util.hpp
+ * @brief Utility definitions for AUDIO_METADATA_UTIL.
+ */
+
 #ifndef CHISEL_AUDIO_METADATA_UTIL_HPP
 #define CHISEL_AUDIO_METADATA_UTIL_HPP
 

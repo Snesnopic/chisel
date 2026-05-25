@@ -9,6 +9,7 @@ set(LIBCHISEL_SOURCES
         include/gif_processor.hpp
         include/jpeg_processor.hpp
         include/jxl_processor.hpp
+        include/kanzi_processor.hpp
         include/log_sink.hpp
         include/logger.hpp
         include/mime_detector.hpp
@@ -35,6 +36,7 @@ set(LIBCHISEL_SOURCES
         src/processors/gif_processor.cpp
         src/processors/jpeg_processor.cpp
         src/processors/jxl_processor.cpp
+        src/processors/kanzi_processor.cpp
         src/processors/mkv_processor.cpp
         src/processors/mseed_processor.cpp
         src/processors/odf_processor.cpp
@@ -113,6 +115,10 @@ set(LIBCHISEL_SOURCES
         src/processors/icns_processor.cpp
         include/woff_processor.hpp
         src/processors/woff_processor.cpp
+
+        ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src/app/BlockCompressor.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src/app/BlockDecompressor.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src/app/InfoPrinter.cpp
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
@@ -122,6 +128,7 @@ add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
 
 target_compile_definitions(libchisel PRIVATE
         CHISEL_VERSION="${PROJECT_VERSION}"
+        CONCURRENCY_DISABLED
 )
 
 target_include_directories(libchisel
@@ -147,7 +154,7 @@ target_include_directories(libchisel
         ${zopfli_SOURCE_DIR}/src/zopfli
         ${libmseed_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
-        ${CMAKE_SOURCE_DIR}/third_party/flexigif
+        ${CMAKE_SOURCE_DIR}/third_party/flexigif/core
         ${CMAKE_SOURCE_DIR}/third_party/stb
         ${taglib_SOURCE_DIR}
         ${taglib_BINARY_DIR}
@@ -160,6 +167,7 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
         ${ZSTD_INCLUDE_DIR}
         ${BZIP2_DIR}
+        ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src
 )
 
 if(NOT WIN32)
@@ -221,7 +229,7 @@ add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
 add_dependencies(libchisel ogg)
 add_dependencies(libchisel FLAC)
-add_dependencies(libchisel flexigif)
+add_dependencies(libchisel flexigif_core)
 add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
 if(ENABLE_MATROSKA)
@@ -241,6 +249,7 @@ add_dependencies(libchisel libgifsicle)
 add_dependencies(libchisel mseed_static)
 add_dependencies(libchisel brotlicommon brotlidec brotlienc)
 add_dependencies(libchisel woff2common woff2dec woff2enc)
+add_dependencies(libchisel libkanzi)
 
 if(NOT WIN32)
     add_dependencies(libchisel LIBMAGIC)

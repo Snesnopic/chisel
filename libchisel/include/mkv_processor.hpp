@@ -2,6 +2,11 @@
 // Created by Giuseppe Francione on 19/10/25.
 //
 
+/**
+ * @file mkv_processor.hpp
+ * @brief Processor for MKV files.
+ */
+
 #ifndef CHISEL_MKV_PROCESSOR_HPP
 #define CHISEL_MKV_PROCESSOR_HPP
 
@@ -16,6 +21,9 @@
 
 namespace chisel {
 
+    /**
+     * @brief Processor implementation for Mkv files.
+     */
     class MkvProcessor final : public IProcessor {
     public:
         // --- self-description ---
