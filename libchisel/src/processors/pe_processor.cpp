@@ -106,7 +106,7 @@ std::optional<ExtractedContent> PeProcessor::prepare_extraction(const std::files
     ExtractedContent content;
     content.original_path = input_path;
     content.temp_dir = make_temp_dir_for(input_path, "pe");
-    content.format = ContainerFormat::Unknown;
+    content.format = ContainerFormat::Pe;
 
     for (size_t i = 0; i < rsrc_entries.size(); ++i) {
         const auto& entry = rsrc_entries[i];
