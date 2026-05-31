@@ -48,10 +48,6 @@ enum class ContainerFormat;
  * be reassembled by finalize_extraction().
  */
 struct ExtractedContent {
-    std::filesystem::path original_path;                ///< Path to the original container file
-    std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
-    std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
-    ContainerFormat format;                             ///< Format of the container
     /**
      * @brief Type-erased storage for processor-specific state.
      *
@@ -60,6 +56,10 @@ struct ExtractedContent {
      * (e.g., FlacState, PdfState).
      */
     std::any extras;
+    std::filesystem::path original_path;                ///< Path to the original container file
+    std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
+    std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
+    ContainerFormat format;                             ///< Format of the container
 };
 
 /**
