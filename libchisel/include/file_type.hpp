@@ -62,6 +62,7 @@ enum class ContainerFormat {
     Zstd,
     Kanzi,
     Vcf,
+    Pe,
     Unknown
 };
 
@@ -159,6 +160,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Zstd:     return "zst";
         case ContainerFormat::Kanzi:    return "knz";
         case ContainerFormat::Vcf:      return "vcf";
+        case ContainerFormat::Pe:       return "pe";
         default:                        return "unknown";
     }
 }
@@ -216,6 +218,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "aab")   return ContainerFormat::Apk;
     if (s == "knz") return ContainerFormat::Kanzi;
     if (s == "vcf") return ContainerFormat::Vcf;
+    if (s == "exe" || s == "dll" || s == "ocx" || s == "scr" || s == "cpl") return ContainerFormat::Pe;
     return std::nullopt;
 }
 
@@ -270,6 +273,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Zstd:
         case ContainerFormat::Kanzi:
         case ContainerFormat::Vcf:
+        case ContainerFormat::Pe:
             return true;
         default:
             return false;
@@ -312,6 +316,11 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".aab",    "application/vnd.android.package-archive"},
     {".knz",    "application/x-kanzi"},
     {".vcf",    "text/vcard"},
+    {".exe",    "application/x-msdownload"},
+    {".dll",    "application/x-msdownload"},
+    {".ocx",    "application/x-msdownload"},
+    {".scr",    "application/x-msdownload"},
+    {".cpl",    "application/x-msdownload"},
 
     // images
     {".jpg",    "image/jpeg"},

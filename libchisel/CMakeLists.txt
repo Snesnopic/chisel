@@ -8,6 +8,7 @@ set(LIBCHISEL_SOURCES
         include/flexigif_processor.hpp
         include/gif_processor.hpp
         include/jpeg_processor.hpp
+        include/pe_processor.hpp
         include/jxl_processor.hpp
         include/kanzi_processor.hpp
         include/vcf_processor.hpp
@@ -43,6 +44,7 @@ set(LIBCHISEL_SOURCES
         src/processors/odf_processor.cpp
         src/processors/ooxml_processor.cpp
         src/processors/pdf_processor.cpp
+        src/processors/pe_processor.cpp
         src/processors/png_processor.cpp
         src/processors/sqlite_processor.cpp
         src/processors/tiff_processor.cpp
