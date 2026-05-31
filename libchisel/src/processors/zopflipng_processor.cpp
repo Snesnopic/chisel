@@ -113,10 +113,11 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.num_iterations_large = options.iterations_large;
 
         if (options.preserve_metadata) {
-            // keep common metadata chunks
-            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs"};
+            // keep common metadata and specialized chunks (APNG, 9Patch)
+            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs", "acTL", "fcTL", "fdAT", "npTc"};
         } else {
-            opts.keepchunks.clear();
+            // even if not preserving metadata, we MUST keep animation/scaling chunks to avoid breaking the file functionality
+            opts.keepchunks = {"acTL", "fcTL", "fdAT", "npTc"};
         }
 
         std::vector<unsigned char> origpng;
