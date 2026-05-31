@@ -61,6 +61,7 @@ enum class ContainerFormat {
     Ar,
     Zstd,
     Kanzi,
+    Vcf,
     Unknown
 };
 
@@ -111,7 +112,11 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/zip",                        ContainerFormat::Zip },
     { "application/java-archive",               ContainerFormat::Zip },
     { "application/vnd.android.package-archive", ContainerFormat::Apk },
-    { "application/x-kanzi",                    ContainerFormat::Kanzi }
+    { "application/x-kanzi",                    ContainerFormat::Kanzi },
+    { "text/vcard",                             ContainerFormat::Vcf },
+    { "text/x-vcard",                           ContainerFormat::Vcf },
+    { "application/x-msdownload",               ContainerFormat::Pe },
+    { "application/vnd.microsoft.portable-executable", ContainerFormat::Pe }
 };
 
 /**
@@ -153,6 +158,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Ar:       return "a";
         case ContainerFormat::Zstd:     return "zst";
         case ContainerFormat::Kanzi:    return "knz";
+        case ContainerFormat::Vcf:      return "vcf";
         default:                        return "unknown";
     }
 }
@@ -209,6 +215,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "war" || s == "ear") return ContainerFormat::Jar;
     if (s == "aab")   return ContainerFormat::Apk;
     if (s == "knz") return ContainerFormat::Kanzi;
+    if (s == "vcf") return ContainerFormat::Vcf;
     return std::nullopt;
 }
 
@@ -262,6 +269,7 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Ar:
         case ContainerFormat::Zstd:
         case ContainerFormat::Kanzi:
+        case ContainerFormat::Vcf:
             return true;
         default:
             return false;
@@ -303,6 +311,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".ear",    "application/java-archive"},
     {".aab",    "application/vnd.android.package-archive"},
     {".knz",    "application/x-kanzi"},
+    {".vcf",    "text/vcard"},
 
     // images
     {".jpg",    "image/jpeg"},
