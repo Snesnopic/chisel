@@ -62,7 +62,7 @@ public:
 
     [[nodiscard]] std::span<const std::string_view, std::dynamic_extent>
     get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 10> exts = {
+        static constexpr std::array<std::string_view, 12> exts = {
             ".xml",
             ".xhtml",
             ".svg",
@@ -72,7 +72,9 @@ public:
             ".rss",
             ".atom",
             ".xmp",
-            ".fb2"
+            ".fb2",
+            ".xsl",
+            ".xslt"
         };
         return {exts};
     }

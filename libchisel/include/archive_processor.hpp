@@ -54,9 +54,9 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 13> kExts = {
+        static constexpr std::array<std::string_view, 14> kExts = {
             ".zip", // ".7z",
-            ".tar", //".gz",
+            ".tar", ".tgz", //".gz",
             ".iso", ".cpio", // ".wim",
             ".jar", ".xpi", ".apk",
             ".cbz", ".cbt",

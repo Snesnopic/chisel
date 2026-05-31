@@ -288,6 +288,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".cb7",    "application/x-7z-compressed"},
     {".tar",    "application/x-tar"},
     {".gz",     "application/gzip"},
+    {".tgz",    "application/gzip"},
     {".bz2",    "application/x-bzip2"},
     {".xz",     "application/x-xz"},
     {".wim",    "application/x-ms-wim"},
@@ -331,6 +332,7 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".jfi",    "image/jpeg"},
     {".thm",    "image/jpeg"},
     {".png",    "image/png"},
+    {".apng",   "image/png"},
     {".jxl",    "image/jxl"},
     {".tif",    "image/tiff"},
     {".tiff",   "image/tiff"},
@@ -354,7 +356,13 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".odp",    "application/vnd.oasis.opendocument.presentation"},
     {".odg",    "application/vnd.oasis.opendocument.graphics"},
     {".odf",    "application/vnd.oasis.opendocument.formula"},
+    {".odb",    "application/vnd.oasis.opendocument.database"},
     {".pdf",    "application/pdf"},
+
+    // xml variants
+    {".xml",    "application/xml"},
+    {".xsl",    "application/xml"},
+    {".xslt",   "application/xml"},
 
     // databases
     {".sqlite", "application/vnd.sqlite3"},
