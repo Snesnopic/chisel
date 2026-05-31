@@ -6,6 +6,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
 #include "../../include/random_utils.hpp"
+#include "../../include/file_type.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cstring>
