@@ -307,6 +307,11 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     // images
     {".jpg",    "image/jpeg"},
     {".jpeg",   "image/jpeg"},
+    {".jpe",    "image/jpeg"},
+    {".jif",    "image/jpeg"},
+    {".jfif",   "image/jpeg"},
+    {".jfi",    "image/jpeg"},
+    {".thm",    "image/jpeg"},
     {".png",    "image/png"},
     {".jxl",    "image/jxl"},
     {".tif",    "image/tiff"},

@@ -37,7 +37,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kExts = { ".jpg", ".jpeg", ".jpe" };
+            static constexpr std::array<std::string_view, 7> kExts = { ".jpg", ".jpeg", ".jpe", ".jif", ".jfif", ".jfi", ".thm" };
             return {kExts.data(), kExts.size()};
         }
 
