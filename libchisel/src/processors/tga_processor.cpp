@@ -6,16 +6,14 @@
 #include "../../include/logger.hpp"
 #include <stdexcept>
 #include <memory>
+#include <vector>
+#include <mutex>
 
-// --- STB Implementation ---
-// define implementations in this single .cpp file
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "file_utils.hpp"
 #include "../../third_party/stb/stb_image_write.h"
-
-// --------------------------
 
 namespace {
     struct FileCloser {
@@ -60,6 +58,9 @@ namespace chisel {
         }
 
         // enable rle compression
+        // TODO: fork?
+        static std::mutex stb_tga_mtx;
+        std::scoped_lock lock(stb_tga_mtx);
         stbi_write_tga_with_rle = 1;
 
         const int success = stbi_write_tga_to_func(
