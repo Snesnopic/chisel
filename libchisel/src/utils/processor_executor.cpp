@@ -323,14 +323,25 @@ namespace chisel {
                                 : file.parent_path();
 #endif
 
-                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");                            candidates[i]->recompress(current, tmp, m_options);
+                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            struct TempFileGuard {
+                                fs::path path;
+                                bool release = false;
+                                ~TempFileGuard() {
+                                    if (!release && !path.empty()) {
+                                        std::error_code ec;
+                                        fs::remove(path, ec);
+                                    }
+                                }
+                            } tmp_guard{tmp, false};
+
+                            candidates[i]->recompress(current, tmp, m_options);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
                                 pipeline_ok = false;
-                                std::error_code ec;
-                                fs::remove(tmp, ec);
                                 break;
                             }
+                            tmp_guard.release = true; // file is good, don't delete yet
                             if (current != file) {
                                 std::error_code ec;
                                 fs::remove(current, ec);
@@ -455,6 +466,9 @@ namespace chisel {
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
                     event_bus_.publish(FileProcessErrorEvent{file, e.what()});
+                } catch (...) {
+                    Logger::log(LogLevel::Error, "Unknown error on " + file.string(), "Executor");
+                    event_bus_.publish(FileProcessErrorEvent{file, "Unknown non-standard exception"});
                 }
             });
         }
