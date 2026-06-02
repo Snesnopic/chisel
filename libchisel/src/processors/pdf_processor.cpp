@@ -154,10 +154,13 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     content.original_path = input_path;
     content.temp_dir = make_temp_dir_for(input_path);
 
+    LoggerStreamBuf warn_buf(LogLevel::Warning, "PdfProcessor");
+    std::ostream warn_os(&warn_buf);
+    LoggerStreamBuf err_buf(LogLevel::Error, "PdfProcessor");
+    std::ostream err_os(&err_buf);
+
     QPDF pdf;
     auto qlogger = QPDFLogger::create();
-    std::ostream warn_os(nullptr);
-    std::ostream err_os(nullptr);
     qlogger->setOutputStreams(&warn_os, &err_os);
     pdf.setLogger(qlogger);
     pdf.processFile(input_path.string().c_str());
@@ -201,7 +204,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
         content.extracted_files.push_back(out_file);
     }
 
-    state_[content.original_path] = std::move(st);
+    content.extras = std::make_any<PdfState>(std::move(st));
     content.format = ContainerFormat::Pdf;
 
     Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
@@ -213,16 +216,19 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
 
     try {
         PdfState st;
-        if (auto it = state_.find(content.original_path); it != state_.end()) {
-            st = it->second;
+        if (content.extras.has_value() && content.extras.type() == typeid(PdfState)) {
+            st = std::any_cast<PdfState>(content.extras);
         } else {
             st.temp_dir = content.temp_dir;
         }
 
+        LoggerStreamBuf warn_buf(LogLevel::Warning, "PdfProcessor");
+        std::ostream warn_os(&warn_buf);
+        LoggerStreamBuf err_buf(LogLevel::Error, "PdfProcessor");
+        std::ostream err_os(&err_buf);
+
         QPDF pdf;
         auto qlogger = QPDFLogger::create();
-        std::ostream warn_os(nullptr);
-        std::ostream err_os(nullptr);
         qlogger->setOutputStreams(&warn_os, &err_os);
         pdf.setLogger(qlogger);
 
@@ -295,7 +301,6 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         writer.write();
 
         cleanup_temp_dir(st.temp_dir);
-        state_.erase(content.original_path);
 
         Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
 
