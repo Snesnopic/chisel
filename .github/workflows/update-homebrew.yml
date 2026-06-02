@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Homebrew Tap
         uses: actions/checkout@v6
         with:
-          repository: Snesnopic/homebrew-chsl
+          repository: Snesnopic/homebrew-tools
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
           path: homebrew-tap
 
@@ -35,7 +35,8 @@ jobs:
           SHA_LINUX_INTEL=$(sha256sum chsl-linux-x64-gcc.tar.gz | awk '{print $1}')
           SHA_LINUX_ARM=$(sha256sum chsl-linux-arm64.tar.gz | awk '{print $1}')
           
-          cat > homebrew-tap/chsl.rb <<EOF
+          mkdir -p homebrew-tap/Formula
+          cat > homebrew-tap/Formula/chsl.rb <<EOF
           class Chsl < Formula
             desc "Experimental project aiming to recreate the functionality of FileOptimizer"
             homepage "https://github.com/Snesnopic/chisel"
@@ -84,7 +85,7 @@ jobs:
           git config user.email "actions@github.com"
           
           if [[ -n $(git status -s) ]]; then
-            git add chsl.rb
+            git add Formula/chsl.rb
             git commit -m "Update chisel formula to ${TAG_NAME}"
             git push
           else

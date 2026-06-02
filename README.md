@@ -12,7 +12,7 @@ The easiest way to install `chisel` is via [Homebrew](https://brew.sh). This met
 
 ```bash
 brew update
-brew tap snesnopic/chsl
+brew tap snesnopic/tools
 brew install chsl
 ```
 ### Building from Source
