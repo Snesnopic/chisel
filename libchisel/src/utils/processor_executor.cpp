@@ -245,8 +245,8 @@ namespace chisel {
                     Logger::log(LogLevel::Warning, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeSkippedEvent{path, "Extraction resulted in no elements"});
                 } else {
-                    Logger::log(LogLevel::Error, "Prepare_extraction failed for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
+                    Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
+                    event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed or skipped"});
                 }
             }
         }
