@@ -78,9 +78,9 @@ struct FileCloser {
 using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
 // libpng error handlers (quiet)
-void png_error_fn_quiet(png_structp, png_const_charp msg) {
+void png_error_fn_quiet(png_structp png, png_const_charp msg) {
     Logger::log(LogLevel::Debug, std::string("Libpng (header read): ") + msg, "AudioMetadataUtil");
-    throw std::runtime_error(msg);
+    longjmp(png_jmpbuf(png), 1);
 }
 void png_warning_fn_quiet(png_structp, png_const_charp msg) {
     Logger::log(LogLevel::Debug, std::string("Libpng (header read warn): ") + msg, "AudioMetadataUtil");
