@@ -82,8 +82,8 @@ std::string dump_sqlite_db(const std::filesystem::path &file) {
     std::stringstream dump_stream;
     char *err_msg = nullptr;
 
-    // dump schema and data
-    rc = sqlite3_exec(db, ".dump", sqlite_dump_callback, &dump_stream, &err_msg);
+    // dump schema and verify integrity instead of using CLI .dump
+    rc = sqlite3_exec(db, "PRAGMA integrity_check; SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name;", sqlite_dump_callback, &dump_stream, &err_msg);
 
     if (rc != SQLITE_OK) {
         Logger::log(LogLevel::Warning, "Raw_equal: Failed to dump database: " + std::string(err_msg),
