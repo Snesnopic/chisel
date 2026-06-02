@@ -668,13 +668,6 @@ jobs:
           "
         shell: bash
 
-      - name: Extract Test Data
-        run: |
-          echo "Extracting test data..."
-          mkdir ${{ env.TEST_DIR }}
-          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
-        shell: bash
-
       - name: Run Chisel Tests (in FreeBSD VM)
         uses: vmactions/freebsd-vm@v1
         with:
@@ -683,6 +676,9 @@ jobs:
           usesh: true
           run: |
             echo "--- Starting FreeBSD Test ---"
+            echo "Extracting test data inside VM..."
+            mkdir -p ${{ env.TEST_DIR }}
+            unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
             CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
             echo "Running chisel from: $CHISEL_EXE"
             echo "Processing files in: ${{ env.TEST_DIR }}"
