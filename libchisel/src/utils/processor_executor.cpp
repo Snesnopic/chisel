@@ -225,7 +225,15 @@ namespace chisel {
         bool scheduled_for_recompression = false;
         std::optional<ExtractedContent> content;
         if (processor->can_extract_contents()) {
-             content = processor->prepare_extraction(current_path);
+            try {
+                content = processor->prepare_extraction(current_path);
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Error, "Exception during prepare_extraction for " + path.string() + ": " + e.what(), "Executor");
+                content = std::nullopt;
+            } catch (...) {
+                Logger::log(LogLevel::Error, "Unknown exception during prepare_extraction for " + path.string(), "Executor");
+                content = std::nullopt;
+            }
             if (content) {
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
