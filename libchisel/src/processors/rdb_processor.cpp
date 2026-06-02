@@ -53,7 +53,7 @@ std::optional<ExtractedContent> RdbProcessor::prepare_extraction(const std::file
         uint64_t file_offset = read_le64(data.data() + p_index); // Absolute offset in file
         uint64_t file_size = read_le64(data.data() + p_index + 8);
 
-        if (file_size > 0 && file_offset + file_size <= data.size()) {
+        if (file_size > 0 && file_offset <= data.size() && file_size <= data.size() - file_offset) {
             std::filesystem::path inner_path = content.temp_dir / (format_index(i) + ".bin");
             std::ofstream out_file(inner_path, std::ios::binary);
             out_file.write(reinterpret_cast<const char*>(data.data() + file_offset), file_size);
