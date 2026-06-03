@@ -1,27 +1,38 @@
 # chisel
 
-**chisel** is an experimental project aiming to recreate the functionality of [FileOptimizer](https://nikkhokkho.sourceforge.io/static.php?page=FileOptimizer) and its encoders in a single, cross‑platform binary.  
-It focuses on lossless recompression of **60+ file formats** by integrating multiple specialized encoders.
+**chisel** is a CLI tool and library that losslessly optimizes files.
+
+It recursively explores folders, files inside ZIPs or **cover arts inside music files** (IDv3, APE tags etc.), and supports **60+ file formats** by integrating many specialized encoders.
+It does NOT change the format of files (even when it would be beneficial to do so), supports checksum verification to verify that the raw data of files hasn't been altered, and doesn't discard metadata by default.
 
 ---
 ## Installation
 
-### Quick Install (macOS / Linux)
+### Quick install
 
-The easiest way to install `chisel` is via [Homebrew](https://brew.sh). This method automatically handles updates and dependencies.
-
+The easiest way to install `chisel` is via your package manager.
+Chisel is available on [homebrew](https://brew.sh):
 ```bash
 brew update
 brew tap snesnopic/tools
 brew install chsl
 ```
-### Building from Source
 
-If you prefer to compile chisel manually, or if you are using Windows, please follow the build instructions below.
+It is also available on [winget](https://github.com/microsoft/winget-cli):
+```powershell
+winget update
+winget install Snesnopic/Chisel
+```
+
+> The executable name is 'chsl' because 'chisel' already exists in brew.
+
+### Building from source
+
+If you prefer to compile chisel manually, please follow the build instructions below.
 
 ## Requirements
 
-The project builds all its dependencies automatically via Git submodules.
+The project fetches all its dependencies automatically via Git submodules.
 
 -   **All Platforms:**
   -   `git` (with LFS support: run `git lfs install` once)
@@ -43,7 +54,7 @@ The project builds all its dependencies automatically via Git submodules.
 
 ## Installing dependencies
 
-### Linux (Debian/Ubuntu)
+### Linux
 
 This command installs only the build tools. All libraries are submodules.
 
@@ -104,7 +115,7 @@ cmake --build . --config Release
 ### Opting out of specific encoders
 
 You can also opt out of the OptiVorbis integration (which requires Rust) with `-DENABLE_OPTIVORBIS=OFF`.
-You can do the same for MKV optimizations with `-DENABLE_MATROSKA=OFF`.
+You can do the same for MKV optimizations (libmkclean specifically) with `-DENABLE_MATROSKA=OFF`.
 
 ## Usage
 
@@ -331,3 +342,17 @@ Chisel works because it makes use of so many libraries. Here is a list of the in
 - **[kanzi-cpp](https://github.com/flanglet/kanzi-cpp)**: Lossless data compressor port.
 - **[mp3packercpp](https://github.com/Snesnopic/mp3packercpp)**: mp3packer port.
 - **[corrosion](https://github.com/corrosion-rs/corrosion)**: CMake integration for Rust.
+
+## Why?
+
+Chisel exists because I've been inspired by larger and more mature projects that have had something missing.
+Specifically, I've always needed a cross-platform utility, that was contained in its size, that didn't require an interpreter or a terminal script to use it, and that could automatically handle IDv3 tags inside music files.
+These are the tools that I have used, both personally and for research for this project.
+
+- https://nikkhokkho.sourceforge.io/?page=FileOptimizer
+- https://github.com/JayXon/Leanify
+- https://github.com/T-3B/rhefo
+- https://github.com/MartinEesmaa/awesome-compopt
+- https://github.com/ajslater/picopt
+- https://github.com/Wdavery/minuimus.pl
+- https://papas-best.com/optimizer_en
