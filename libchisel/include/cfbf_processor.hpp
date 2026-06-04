@@ -29,19 +29,24 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 5> kMimes = {
+            static constexpr std::array<std::string_view, 6> kMimes = {
                 "application/x-ole-storage",
                 "application/msword",
                 "application/vnd.ms-excel",
                 "application/vnd.ms-powerpoint",
-                "application/x-msi"
+                "application/x-msi",
+                "application/x-ms-spool"
             };
             return {kMimes.data(), kMimes.size()};
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 4> kExts = {
-                ".doc", ".xls", ".ppt", ".msi"
+            static constexpr std::array<std::string_view, 33> kExts = {
+                ".doc", ".xls", ".ppt", ".msi", ".msp", ".mst", ".pub", ".vsd",
+                ".vss", ".vst", ".adp", ".mdb", ".mdt", ".mpd", ".mpp", ".mpt",
+                ".rvt", ".sldasm", ".slddrw", ".sldprt", ".snt", ".thumbs.db",
+                ".spl", ".dot", ".xlt", ".pps", ".chm", ".fla", ".one", ".ost",
+                ".rfa", ".rte", ".wps"
             };
             return {kExts.data(), kExts.size()};
         }

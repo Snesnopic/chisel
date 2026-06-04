@@ -34,9 +34,10 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 11> kMimes = {
+        static constexpr std::array<std::string_view, 12> kMimes = {
             "application/zip",
             // "application/x-7z-compressed", // 7z write support is limited/complex
+            "application/x-zip-compressed",
             "application/x-tar",
             //"application/gzip", // Handled as filters, not primary formats
             "application/x-iso9660-image",
@@ -54,14 +55,15 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 14> kExts = {
-            ".zip", // ".7z",
-            ".tar", ".tgz", //".gz",
-            ".iso", ".cpio", // ".wim",
-            ".jar", ".xpi", ".apk",
-            ".cbz", ".cbt",
-            ".epub",
-            ".a", ".ar", ".lib",
+        static constexpr std::array<std::string_view, 58> kExts = {
+            ".zip", ".tar", ".tgz", ".iso", ".cpio", ".jar", ".xpi", ".apk",
+            ".cbz", ".cbt", ".epub", ".a", ".ar", ".lib",
+            ".air", ".bsz", ".cdr", ".csl", ".gallery", ".gallerycollection",
+            ".galleryitem", ".grs", ".ipa", ".ipsw", ".ita", ".itz", ".nbk",
+            ".notebook", ".oex", ".osk", ".pk3", ".puz", ".stz", ".vlt",
+            ".wal", ".wba", ".wmz", ".wsz", ".xap", ".xl", ".xlam", ".xmz",
+            ".xsn", ".kmz", ".vsix", ".nupkg", ".appx", ".bar", ".dwf", ".easm",
+            ".rmskin", ".sldx", ".zipx", ".gz", ".deb", ".ipk", ".svgz"
         };
         return {kExts.data(), kExts.size()};
     }
