@@ -282,7 +282,6 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Kanzi:
         case ContainerFormat::Vcf:
         case ContainerFormat::Pe:
-        case ContainerFormat::Cfbf:
         case ContainerFormat::Json:
         case ContainerFormat::Xml:
             return true;
@@ -383,6 +382,9 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".thm",    "image/jpeg"},
     {".png",    "image/png"},
     {".apng",   "image/png"},
+    {".jp2",    "image/jp2"},
+    {".j2k",    "image/jp2"},
+    {".j2c",    "image/jp2"},
     {".jxl",    "image/jxl"},
     {".tif",    "image/tiff"},
     {".tiff",   "image/tiff"},

@@ -13,6 +13,7 @@ set(LIBCHISEL_SOURCES
         include/kanzi_processor.hpp
         include/vcf_processor.hpp
         include/json_processor.hpp
+        include/jp2_processor.hpp
         include/log_sink.hpp
         include/logger.hpp
         include/mime_detector.hpp
@@ -51,6 +52,7 @@ set(LIBCHISEL_SOURCES
         src/processors/tiff_processor.cpp
         src/processors/vcf_processor.cpp
         src/processors/json_processor.cpp
+        src/processors/jp2_processor.cpp
         src/processors/wavpack_processor.cpp
         src/processors/webp_processor.cpp
         src/processors/zopflipng_processor.cpp
@@ -174,6 +176,8 @@ target_include_directories(libchisel
         ${ZSTD_INCLUDE_DIR}
         ${BZIP2_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src
+        ${CMAKE_SOURCE_DIR}/third_party/openjpeg/src/lib/openjp2
+        ${CMAKE_BINARY_DIR}/third_party/openjpeg/src/lib/openjp2
 )
 
 if(NOT WIN32)
@@ -256,6 +260,7 @@ add_dependencies(libchisel mseed_static)
 add_dependencies(libchisel brotlicommon brotlidec brotlienc)
 add_dependencies(libchisel woff2common woff2dec woff2enc)
 add_dependencies(libchisel libkanzi)
+add_dependencies(libchisel openjp2)
 
 if(NOT WIN32)
     add_dependencies(libchisel LIBMAGIC)

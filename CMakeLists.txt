@@ -629,6 +629,13 @@ set(CONCURRENCY_DISABLED ON CACHE BOOL "Disable multithreading in Kanzi" FORCE)
 set(KANZI_ENABLE_NATIVE_OPTIMIZATIONS OFF CACHE BOOL "Disable native optimizations for portability" FORCE)
 add_subdirectory(third_party/kanzi-cpp EXCLUDE_FROM_ALL)
 
+# openjpeg
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_STATIC_LIBS ON  CACHE BOOL "" FORCE)
+set(BUILD_CODEC OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/openjpeg EXCLUDE_FROM_ALL)
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -666,6 +673,7 @@ set(CHISEL_LIBS
         libkanzi
         mp3packercpp_core
         vbrfix_lib
+        openjp2
 )
 
 if(ENABLE_MATROSKA)
