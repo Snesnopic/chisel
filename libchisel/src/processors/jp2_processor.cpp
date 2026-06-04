@@ -129,8 +129,61 @@ std::filesystem::path Jp2Processor::finalize_extraction(const ExtractedContent& 
     return {};
 }
 
+static std::vector<uint8_t> decode_jp2_rgba(const std::filesystem::path& path, int& w, int& h) {
+    OPJ_CODEC_FORMAT format = OPJ_CODEC_JP2;
+    std::string ext = path.extension().string();
+    std::ranges::transform(ext, ext.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+    if (ext == ".j2k" || ext == ".j2c") format = OPJ_CODEC_J2K;
+
+    opj_dparameters_t dparam;
+    opj_set_default_decoder_parameters(&dparam);
+    opj_stream_t* stream = opj_stream_create_default_file_stream(path.string().c_str(), OPJ_TRUE);
+    if (!stream) return {};
+
+    opj_codec_t* decoder = opj_create_decompress(format);
+    if (!opj_setup_decoder(decoder, &dparam)) {
+        opj_stream_destroy(stream);
+        opj_destroy_codec(decoder);
+        return {};
+    }
+
+    opj_image_t* image = nullptr;
+    if (!opj_read_header(stream, decoder, &image) || !opj_decode(decoder, stream, image)) {
+        if (image) opj_image_destroy(image);
+        opj_stream_destroy(stream);
+        opj_destroy_codec(decoder);
+        return {};
+    }
+
+    w = static_cast<int>(image->x1 - image->x0);
+    h = static_cast<int>(image->y1 - image->y0);
+    size_t size = static_cast<size_t>(w) * h * image->numcomps;
+    std::vector<uint8_t> pixels(size * sizeof(int));
+
+    for (uint32_t i = 0; i < image->numcomps; ++i) {
+        if (image->comps[i].data) {
+            std::memcpy(pixels.data() + (i * w * h * sizeof(int)), image->comps[i].data, static_cast<size_t>(w) * h * sizeof(int));
+        }
+    }
+
+    opj_image_destroy(image);
+    opj_stream_destroy(stream);
+    opj_destroy_codec(decoder);
+    return pixels;
+}
+
 std::string Jp2Processor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {
     return "";
+}
+
+bool Jp2Processor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    int wa, ha, wb, hb;
+    auto pixA = decode_jp2_rgba(a, wa, ha);
+    auto pixB = decode_jp2_rgba(b, wb, hb);
+
+    if (pixA.empty() || pixB.empty()) return false;
+    if (wa != wb || ha != hb) return false;
+    return pixA == pixB;
 }
 
 } // namespace chisel
