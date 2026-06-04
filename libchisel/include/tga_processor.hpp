@@ -37,7 +37,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 2> kExts = { ".tga", ".targa" };
+            static constexpr std::array<std::string_view, 5> kExts = { ".tga", ".targa", ".icb", ".vda", ".vst" };
             return {kExts.data(), kExts.size()};
         }
 

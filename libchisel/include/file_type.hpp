@@ -66,6 +66,7 @@ enum class ContainerFormat {
     Cfbf,
     Json,
     Xml,
+    Mp4,
     Unknown
 };
 
@@ -120,7 +121,12 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "text/vcard",                             ContainerFormat::Vcf },
     { "text/x-vcard",                           ContainerFormat::Vcf },
     { "application/x-msdownload",               ContainerFormat::Pe },
-    { "application/vnd.microsoft.portable-executable", ContainerFormat::Pe }
+    { "application/vnd.microsoft.portable-executable", ContainerFormat::Pe },
+    { "video/mp4",                      ContainerFormat::Mp4 },
+    { "audio/mp4",                      ContainerFormat::Mp4 },
+    { "video/quicktime",                ContainerFormat::Mp4 },
+    { "video/3gpp",                     ContainerFormat::Mp4 },
+    { "video/3gpp2",                    ContainerFormat::Mp4 }
 };
 
 /**
@@ -167,6 +173,7 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Cfbf:     return "cfbf";
         case ContainerFormat::Json:     return "json";
         case ContainerFormat::Xml:      return "xml";
+        case ContainerFormat::Mp4:      return "mp4";
         default:                        return "unknown";
     }
 }
@@ -221,9 +228,10 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "aab")   return ContainerFormat::Apk;
     if (s == "knz") return ContainerFormat::Kanzi;
     if (s == "vcf" || s == "vcard") return ContainerFormat::Vcf;
+    if (s == "3gp" || s == "3g2" || s == "m4v" || s == "flv" || s == "mov" || s == "qt") return ContainerFormat::Mp4;
     if (s == "json") return ContainerFormat::Json;
     if (s == "xml" || s == "fb2" || s == "fxg" || s == "kml" || s == "xsl" || s == "xslt" || s == "xhtml") return ContainerFormat::Xml;
-    if (s == "exe" || s == "dll" || s == "ocx" || s == "scr" || s == "cpl") return ContainerFormat::Pe;
+    if (s == "exe" || s == "dll" || s == "ocx" || s == "scr" || s == "cpl" || s == "sys" || s == "drv" || s == "bpl" || s == "icl" || s == "rll" || s == "vbx") return ContainerFormat::Pe;
     if (s == "doc" || s == "xls" || s == "ppt" || s == "msi" || s == "msp" || s == "mst" || s == "pub" || s == "vsd" || s == "vss" || s == "vst" || s == "adp" || s == "mdb" || s == "mdt" || s == "mpd" || s == "mpp" || s == "mpt" || s == "rvt" || s == "sldasm" || s == "slddrw" || s == "sldprt" || s == "snt" || s == "thumbs.db" || s == "chm" || s == "fla" || s == "one" || s == "ost" || s == "rfa" || s == "rte" || s == "wps") return ContainerFormat::Cfbf;
     if (s == "gz" || s == "tgz" || s == "deb" || s == "ipk" || s == "svgz") return ContainerFormat::GZip;
 
