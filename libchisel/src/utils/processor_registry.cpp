@@ -49,6 +49,7 @@
 #include "woff_processor.hpp"
 #include "kanzi_processor.hpp"
 #include "vcf_processor.hpp"
+#include "json_processor.hpp"
 #include "pe_processor.hpp"
 #include <algorithm>
 #include <cctype>
@@ -104,6 +105,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<KanziProcessor>());
     processors_.push_back(std::make_unique<VcfProcessor>());
     processors_.push_back(std::make_unique<PeProcessor>());
+    processors_.push_back(std::make_unique<JsonProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {

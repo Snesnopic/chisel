@@ -12,6 +12,7 @@ set(LIBCHISEL_SOURCES
         include/jxl_processor.hpp
         include/kanzi_processor.hpp
         include/vcf_processor.hpp
+        include/json_processor.hpp
         include/log_sink.hpp
         include/logger.hpp
         include/mime_detector.hpp
@@ -49,6 +50,7 @@ set(LIBCHISEL_SOURCES
         src/processors/sqlite_processor.cpp
         src/processors/tiff_processor.cpp
         src/processors/vcf_processor.cpp
+        src/processors/json_processor.cpp
         src/processors/wavpack_processor.cpp
         src/processors/webp_processor.cpp
         src/processors/zopflipng_processor.cpp
