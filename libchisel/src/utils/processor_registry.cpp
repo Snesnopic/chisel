@@ -51,6 +51,7 @@
 #include "vcf_processor.hpp"
 #include "json_processor.hpp"
 #include "mng_processor.hpp"
+#include "pcx_processor.hpp"
 #include "jp2_processor.hpp"
 #include "pe_processor.hpp"
 #include <algorithm>
@@ -110,6 +111,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<JsonProcessor>());
     processors_.push_back(std::make_unique<Jp2Processor>());
     processors_.push_back(std::make_unique<MngProcessor>());
+    processors_.push_back(std::make_unique<PcxProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
