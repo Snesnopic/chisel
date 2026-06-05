@@ -201,10 +201,14 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
         for (uint32_t off : offsets) {
             new_offsets.push_back(static_cast<uint32_t>(os.tellp()));
             is.seekg(off);
-            PcxHeader h;
+            PcxHeader h_page;
             std::vector<uint8_t> pal;
-            auto pix = decode_pcx(is, h, pal);
-            write_pcx_internal(os, h, pix, pal, options.preserve_metadata);
+            try {
+                auto pix = decode_pcx(is, h_page, pal);
+                write_pcx_internal(os, h_page, pix, pal, options.preserve_metadata);
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Error, "DCX page decode failed: " + std::string(e.what()), get_name());
+            }
         }
 
         os.seekp(4);
