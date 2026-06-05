@@ -15,7 +15,6 @@
 #include <iostream>
 #include <cstring>
 #include <memory>
-#include <arpa/inet.h> // for ntohl/htonl
 
 namespace chisel {
 
@@ -29,14 +28,15 @@ struct Chunk {
 };
 
 uint32_t read_u32(std::istream& is) {
-    uint32_t val;
-    is.read(reinterpret_cast<char*>(&val), 4);
-    return ntohl(val);
+    uint8_t buf[4];
+    is.read(reinterpret_cast<char*>(buf), 4);
+    return read_be32(buf);
 }
 
 void write_u32(std::ostream& os, uint32_t val) {
-    uint32_t nval = htonl(val);
-    os.write(reinterpret_cast<const char*>(&nval), 4);
+    uint8_t buf[4];
+    write_be32(buf, val);
+    os.write(reinterpret_cast<const char*>(buf), 4);
 }
 
 void update_crc(Chunk& chunk) {
