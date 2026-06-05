@@ -19,15 +19,11 @@
 #include "file_utils.hpp"
 
 
+namespace chisel {
+
 namespace fs = std::filesystem;
 
 namespace {
-
-    struct FileCloser {
-        void operator()(FILE *f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
     // wrapper for libpng structures (destroys in case of exceptions)
     struct PngRead {
@@ -96,8 +92,6 @@ namespace {
     }
 
 } // namespace
-
-namespace chisel {
 
 void ZopfliPngProcessor::recompress(const fs::path& input,
                                     const fs::path& output, const ProcessingOptions &options) {

@@ -36,15 +36,6 @@ namespace chisel {
     }
 
     /**
-     * @brief RAII wrapper for FILE pointers to ensure they are closed.
-     */
-    struct FileCloser {
-        void operator()(FILE *f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
-
-    /**
      * @brief RAII wrapper for libpng read structs (png_structp, png_infop).
      * Ensures png_destroy_read_struct is called even if exceptions occur.
      */

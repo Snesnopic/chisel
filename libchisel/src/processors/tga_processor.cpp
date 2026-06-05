@@ -15,21 +15,15 @@
 #include "file_utils.hpp"
 #include "../../third_party/stb/stb_image_write.h"
 
+namespace chisel {
+
 namespace {
-    struct FileCloser {
-        void operator()(FILE* f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
-
     void stbi_write_callback(void *context, void *data, int size) {
         if (size <= 0) return;
         FILE* f = static_cast<FILE *>(context);
         std::fwrite(data, 1, static_cast<size_t>(size), f);
     }
 } // namespace
-
-namespace chisel {
 
     void TgaProcessor::recompress(const std::filesystem::path& input,
                                   const std::filesystem::path& output, const ProcessingOptions &options) {
