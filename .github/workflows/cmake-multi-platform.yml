@@ -412,7 +412,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.TEST_ARCHIVE_NAME }}
-          key: ${{ runner.os }}-testarchive-v7-${{ secrets.GDRIVE_FILE_ID }}
+          key: ${{ runner.os }}-testarchive-v8-${{ secrets.GDRIVE_FILE_ID }}
 
       - name: Authenticate and Download Test Data from Google Drive
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
@@ -625,7 +625,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.TEST_ARCHIVE_NAME }}
-          key: ${{ runner.os }}-testarchive-v7-${{ secrets.GDRIVE_FILE_ID }}
+          key: ${{ runner.os }}-testarchive-v8-${{ secrets.GDRIVE_FILE_ID }}
 
       - name: Authenticate and Download Test Data from Google Drive
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
