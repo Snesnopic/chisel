@@ -167,7 +167,7 @@ namespace {
 
     void optimizeCFBF(const std::wstring& sourcePath, const std::wstring& destPath, bool largeSectors) {
         IStorage* source;
-        if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &source))) {
+        if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_NONE, nullptr, 0, &source))) {
             throw std::runtime_error("cfbf: cannot open source stream");
         }
 
@@ -246,11 +246,11 @@ namespace {
 
         // 5. verify identical
         IStorage* l;
-        if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &l))) {
+        if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_NONE, nullptr, 0, &l))) {
             throw std::runtime_error("cfbf: cannot re-open source stream for verification");
         }
         IStorage* r;
-        if (FAILED(StgOpenStorage(destPath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &r))) {
+        if (FAILED(StgOpenStorage(destPath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_NONE, nullptr, 0, &r))) {
             l->Release();
             throw std::runtime_error("cfbf: cannot re-open target stream for verification");
         }
