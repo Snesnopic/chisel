@@ -77,9 +77,7 @@ std::vector<uint8_t> optimize_jpeg(const std::vector<uint8_t>& input) {
 
     jpeg_write_coefficients(&dstinfo, coef_arrays);
     jpeg_finish_compress(&dstinfo);
-    
-    // According to libjpeg docs, do NOT call jpeg_finish_decompress() 
-    // if you are using jpeg_read_coefficients().
+    jpeg_finish_decompress(&srcinfo);
 
     std::vector<uint8_t> result(out_buf, out_buf + out_size);
 
