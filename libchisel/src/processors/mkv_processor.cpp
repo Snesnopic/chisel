@@ -61,13 +61,15 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
         // mkclean works fine reading from input and writing to output directly
         return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
     } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "mkclean_optimize exception: " + std::string(e.what()), get_name());
-        throw;
+        Logger::log(LogLevel::Warning, "mkclean_optimize exception (likely corrupt): " + std::string(e.what()), get_name());
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
     }
 
     if (return_code != 0) {
-        Logger::log(LogLevel::Error, "mkclean failed with exit code " + std::to_string(return_code), get_name());
-        throw std::runtime_error("MkvProcessor: mkclean failed");
+        Logger::log(LogLevel::Warning, "mkclean failed (likely corrupt file) with exit code " + std::to_string(return_code), get_name());
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
     }
 #endif
     Logger::log(LogLevel::Debug, "exiting recompress for " + output.string(), get_name());

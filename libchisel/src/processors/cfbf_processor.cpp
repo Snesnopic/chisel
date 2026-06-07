@@ -298,8 +298,9 @@ void CfbfProcessor::recompress(const std::filesystem::path& input,
         optimizeCFBF(input, output, false);
     } catch (const std::exception& e) {
         if (coInit) CoUninitialize();
-        Logger::log(LogLevel::Error, std::string("cfbf optimization failed: ") + e.what(), get_name());
-        throw;
+        Logger::log(LogLevel::Warning, std::string("cfbf optimization failed (likely corrupt): ") + e.what(), get_name());
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
     }
 
     if (coInit) CoUninitialize();
