@@ -207,7 +207,9 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
                 auto pix = decode_pcx(is, h_page, pal);
                 write_pcx_internal(os, h_page, pix, pal, options.preserve_metadata);
             } catch (const std::exception& e) {
-                Logger::log(LogLevel::Error, "DCX page decode failed: " + std::string(e.what()), get_name());
+                Logger::log(LogLevel::Error, "DCX page decode failed at offset " + std::to_string(off) + ": " + std::string(e.what()), get_name());
+                // In case of failure, we must maintain the DCX structure integrity or abort
+                throw; 
             }
         }
 
