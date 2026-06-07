@@ -36,8 +36,19 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     }
 
     args.emplace_back("--quiet");
+    
+#ifdef _WIN32
+    // On Windows, use wide strings for paths if the API supports it, 
+    // or at least ensure we use the absolute path string.
+    std::error_code ec;
+    auto abs_input = std::filesystem::absolute(input, ec).string();
+    auto abs_output = std::filesystem::absolute(output, ec).string();
+    args.push_back(abs_input);
+    args.push_back(abs_output);
+#else
     args.push_back(input.string());
     args.push_back(output.string());
+#endif
 
     std::vector<char*> argv;
     argv.reserve(args.size());

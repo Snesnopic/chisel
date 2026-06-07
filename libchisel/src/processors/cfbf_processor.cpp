@@ -165,11 +165,23 @@ namespace {
         return true;
     }
 
-    void optimizeCFBF(const std::wstring& sourcePath, const std::wstring& destPath, bool largeSectors) {
+    // helper to get a long-path compatible wstring for Windows
+    std::wstring getLongPath(const std::filesystem::path& p) {
+        std::error_code ec;
+        auto abs_path = std::filesystem::absolute(p, ec);
+        if (ec) return p.wstring();
+        return L"\\\\?\\" + abs_path.wstring();
+    }
+
+    void optimizeCFBF(const std::filesystem::path& source_path, const std::filesystem::path& dest_path, bool largeSectors) {
+        std::wstring sourcePath = getLongPath(source_path);
+        std::wstring destPath = getLongPath(dest_path);
+
         IStorage* source;
         if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &source))) {
             throw std::runtime_error("cfbf: cannot open source stream");
         }
+
 
         STGOPTIONS opt = { 1, 0, 4096 };
         IStorage* destination;
@@ -255,6 +267,7 @@ namespace {
             throw std::runtime_error("cfbf: cannot re-open target stream for verification");
         }
 
+
         bool isIdentical = verifyIdentical(*l, *r);
         l->Release();
         r->Release();
@@ -282,7 +295,7 @@ void CfbfProcessor::recompress(const std::filesystem::path& input,
     try {
         // usually v4 (4096B sectors) is best used only on very large files,
         // we default to false (512B) to preserve maximum compatibility
-        optimizeCFBF(input.wstring(), output.wstring(), false);
+        optimizeCFBF(input, output, false);
     } catch (const std::exception& e) {
         if (coInit) CoUninitialize();
         Logger::log(LogLevel::Error, std::string("cfbf optimization failed: ") + e.what(), get_name());
