@@ -21,7 +21,7 @@ brew install chsl
 It is also available on [winget](https://github.com/microsoft/winget-cli):
 ```powershell
 winget update
-winget install Snesnopic/Chisel
+winget install Snesnopic.Chisel
 ```
 
 > The executable name is 'chsl' because 'chisel' already exists in brew.
