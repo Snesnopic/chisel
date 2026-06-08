@@ -33,14 +33,6 @@ void jpeg_error_exit_throw(const j_common_ptr cinfo) {
 }
 
 /**
- * @brief RAII wrapper for FILE pointers to ensure they are closed.
- */
-struct FileCloser {
-    void operator()(FILE *f) const { if (f) std::fclose(f); }
-};
-using unique_FILE = std::unique_ptr<FILE, FileCloser>;
-
-/**
  * @brief Configures libjpeg to save all metadata markers for later copying.
  * @param srcinfo The libjpeg decompression struct.
  * @param preserve_metadata If true, markers will be saved.

@@ -33,16 +33,23 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 3> kMimes = {
+        static constexpr std::array<std::string_view, 6> kMimes = {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.presentationml.template"
         };
         return {kMimes.data(), kMimes.size()};
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 3> kExts = { ".docx", ".xlsx", ".pptx" };
+        static constexpr std::array<std::string_view, 14> kExts = {
+            ".docx", ".docm", ".dotm", ".dotx",
+            ".xlsx", ".xlsm", ".xltm", ".xltx",
+            ".pptx", ".pptm", ".potm", ".potx", ".ppsm", ".ppsx"
+        };
         return {kExts.data(), kExts.size()};
     }
 

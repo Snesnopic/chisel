@@ -181,8 +181,7 @@ std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::file
     doc->traverse(walker);
 
     if (content.extracted_files.empty()) {
-        chisel::cleanup_temp_dir(content.temp_dir, get_name());
-        return std::nullopt;
+        Logger::log(LogLevel::Debug, "No base64 assets found, will just minify XML", get_name());
     }
 
     Logger::log(LogLevel::Info, "Extracted " + std::to_string(content.extracted_files.size()) + " base64 assets from XML", get_name());

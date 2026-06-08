@@ -8,8 +8,14 @@ set(LIBCHISEL_SOURCES
         include/flexigif_processor.hpp
         include/gif_processor.hpp
         include/jpeg_processor.hpp
+        include/pe_processor.hpp
         include/jxl_processor.hpp
         include/kanzi_processor.hpp
+        include/vcf_processor.hpp
+        include/json_processor.hpp
+        include/mng_processor.hpp
+        include/pcx_processor.hpp
+        include/jp2_processor.hpp
         include/log_sink.hpp
         include/logger.hpp
         include/mime_detector.hpp
@@ -42,9 +48,15 @@ set(LIBCHISEL_SOURCES
         src/processors/odf_processor.cpp
         src/processors/ooxml_processor.cpp
         src/processors/pdf_processor.cpp
+        src/processors/pe_processor.cpp
         src/processors/png_processor.cpp
         src/processors/sqlite_processor.cpp
         src/processors/tiff_processor.cpp
+        src/processors/vcf_processor.cpp
+        src/processors/json_processor.cpp
+        src/processors/mng_processor.cpp
+        src/processors/pcx_processor.cpp
+        src/processors/jp2_processor.cpp
         src/processors/wavpack_processor.cpp
         src/processors/webp_processor.cpp
         src/processors/zopflipng_processor.cpp
@@ -168,6 +180,8 @@ target_include_directories(libchisel
         ${ZSTD_INCLUDE_DIR}
         ${BZIP2_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src
+        ${CMAKE_SOURCE_DIR}/third_party/openjpeg/src/lib/openjp2
+        ${CMAKE_BINARY_DIR}/third_party/openjpeg/src/lib/openjp2
 )
 
 if(NOT WIN32)
@@ -250,6 +264,7 @@ add_dependencies(libchisel mseed_static)
 add_dependencies(libchisel brotlicommon brotlidec brotlienc)
 add_dependencies(libchisel woff2common woff2dec woff2enc)
 add_dependencies(libchisel libkanzi)
+add_dependencies(libchisel openjp2)
 
 if(NOT WIN32)
     add_dependencies(libchisel LIBMAGIC)

@@ -6,32 +6,24 @@
 #include "../../include/logger.hpp"
 #include <stdexcept>
 #include <memory>
+#include <vector>
+#include <mutex>
 
-// --- STB Implementation ---
-// define implementations in this single .cpp file
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "file_utils.hpp"
 #include "../../third_party/stb/stb_image_write.h"
 
-// --------------------------
+namespace chisel {
 
 namespace {
-    struct FileCloser {
-        void operator()(FILE* f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
-
     void stbi_write_callback(void *context, void *data, int size) {
         if (size <= 0) return;
         FILE* f = static_cast<FILE *>(context);
         std::fwrite(data, 1, static_cast<size_t>(size), f);
     }
 } // namespace
-
-namespace chisel {
 
     void TgaProcessor::recompress(const std::filesystem::path& input,
                                   const std::filesystem::path& output, const ProcessingOptions &options) {
@@ -60,6 +52,9 @@ namespace chisel {
         }
 
         // enable rle compression
+        // TODO: fork?
+        static std::mutex stb_tga_mtx;
+        std::scoped_lock lock(stb_tga_mtx);
         stbi_write_tga_with_rle = 1;
 
         const int success = stbi_write_tga_to_func(

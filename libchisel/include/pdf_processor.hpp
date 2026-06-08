@@ -141,10 +141,6 @@ private:
         std::filesystem::path temp_dir;  ///< The temp dir holding extracted streams
     };
 
-    ///< Maps an original PDF path to its extraction state,
-    ///< allowing finalize_extraction() to find its data.
-    std::unordered_map<std::filesystem::path, PdfState> state_;
-
     /**
      * @brief Creates a unique temporary directory for PDF extraction.
      */

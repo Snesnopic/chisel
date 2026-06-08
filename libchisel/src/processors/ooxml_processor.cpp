@@ -48,7 +48,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
         Logger::log(LogLevel::Error, "Failed to open ooxml for reading: " + std::string(archive_error_string(in)), get_name());
         archive_read_free(in);
         cleanup_temp_dir(temp_dir);
-        return content;
+        return std::nullopt;
     }
     if (open_r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), get_name());
@@ -191,24 +191,8 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
             }
             const std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
 
-            std::vector<unsigned char> final_data;
-            const auto ext = rel.extension().string();
-
-            // recompress only PNG/JPG images, leave XML and others untouched
-            if (ext == ".png" || ext == ".jpg" || ext == ".jpeg") {
-                final_data = ZopfliCompressor::compress(
-                    buf,
-                    options.iterations,
-                    ZopfliFormat::DEFLATE
-                );
-                Logger::log(LogLevel::Debug,
-                            "Recompressed image: " + rel.string() + " (" +
-                            std::to_string(buf.size()) + " -> " +
-                            std::to_string(final_data.size()) + " bytes)", get_name());
-            } else {
-                final_data = buf;
-                Logger::log(LogLevel::Debug, "Copied entry unchanged: " + rel.string(), get_name());
-            }
+            std::vector<unsigned char> final_data = buf;
+            Logger::log(LogLevel::Debug, "Copied entry to OOXML: " + rel.string(), get_name());
 
             archive_entry* entry = archive_entry_new();
             if (!entry) {

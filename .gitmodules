@@ -102,3 +102,6 @@
 [submodule "third_party/mp3packercpp"]
 	path = third_party/mp3packercpp
 	url = https://github.com/Snesnopic/mp3packercpp.git
+[submodule "third_party/openjpeg"]
+	path = third_party/openjpeg
+	url = https://github.com/uclouvain/openjpeg.git

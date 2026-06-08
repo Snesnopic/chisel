@@ -64,6 +64,10 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
         if (is_png) {
             out_file.write(reinterpret_cast<const char*>(payload), bytes_in_res);
         } else {
+            if (bytes_in_res < 40) {
+                Logger::log(LogLevel::Warning, "Invalid BMP payload in ICO (too small)", get_name());
+                continue;
+            }
             uint32_t biSize = read_le32(payload);
             uint16_t biBitCount = read_le16(payload + 14);
             uint32_t biClrUsed = read_le32(payload + 32);

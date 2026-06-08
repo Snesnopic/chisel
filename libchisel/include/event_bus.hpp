@@ -56,12 +56,16 @@ namespace chisel {
          */
         template <typename Event>
         void publish(const Event& event) {
-            std::lock_guard lock(mtx_);
-            auto it = subscribers_.find(std::type_index(typeid(Event)));
-            if (it != subscribers_.end()) {
-                for (auto& fn : it->second) {
-                    fn(&event);
+            std::vector<Callback> callbacks;
+            {
+                std::scoped_lock lock(mtx_);
+                auto it = subscribers_.find(std::type_index(typeid(Event)));
+                if (it != subscribers_.end()) {
+                    callbacks = it->second;
                 }
+            }
+            for (auto& fn : callbacks) {
+                fn(&event);
             }
         }
 

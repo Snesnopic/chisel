@@ -61,6 +61,12 @@ enum class ContainerFormat {
     Ar,
     Zstd,
     Kanzi,
+    Vcf,
+    Pe,
+    Cfbf,
+    Json,
+    Xml,
+    Mp4,
     Unknown
 };
 
@@ -111,7 +117,16 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/zip",                        ContainerFormat::Zip },
     { "application/java-archive",               ContainerFormat::Zip },
     { "application/vnd.android.package-archive", ContainerFormat::Apk },
-    { "application/x-kanzi",                    ContainerFormat::Kanzi }
+    { "application/x-kanzi",                    ContainerFormat::Kanzi },
+    { "text/vcard",                             ContainerFormat::Vcf },
+    { "text/x-vcard",                           ContainerFormat::Vcf },
+    { "application/x-msdownload",               ContainerFormat::Pe },
+    { "application/vnd.microsoft.portable-executable", ContainerFormat::Pe },
+    { "video/mp4",                      ContainerFormat::Mp4 },
+    { "audio/mp4",                      ContainerFormat::Mp4 },
+    { "video/quicktime",                ContainerFormat::Mp4 },
+    { "video/3gpp",                     ContainerFormat::Mp4 },
+    { "video/3gpp2",                    ContainerFormat::Mp4 }
 };
 
 /**
@@ -153,6 +168,12 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Ar:       return "a";
         case ContainerFormat::Zstd:     return "zst";
         case ContainerFormat::Kanzi:    return "knz";
+        case ContainerFormat::Vcf:      return "vcf";
+        case ContainerFormat::Pe:       return "pe";
+        case ContainerFormat::Cfbf:     return "cfbf";
+        case ContainerFormat::Json:     return "json";
+        case ContainerFormat::Xml:      return "xml";
+        case ContainerFormat::Mp4:      return "mp4";
         default:                        return "unknown";
     }
 }
@@ -180,9 +201,9 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "wim")   return ContainerFormat::Wim;
     if (s == "rar")   return ContainerFormat::Rar;
     if (s == "mkv")   return ContainerFormat::Mkv;
-    if (s == "docx")  return ContainerFormat::Docx;
-    if (s == "xlsx")  return ContainerFormat::Xlsx;
-    if (s == "pptx")  return ContainerFormat::Pptx;
+    if (s == "docx" || s == "docm" || s == "dotm" || s == "dotx")  return ContainerFormat::Docx;
+    if (s == "xlsx" || s == "xlsm" || s == "xltm" || s == "xltx" || s == "xl")  return ContainerFormat::Xlsx;
+    if (s == "pptx" || s == "pptm" || s == "potm" || s == "potx" || s == "ppsm" || s == "ppsx")  return ContainerFormat::Pptx;
     if (s == "ods")   return ContainerFormat::Ods;
     if (s == "odt")   return ContainerFormat::Odt;
     if (s == "odp")   return ContainerFormat::Odp;
@@ -197,18 +218,23 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "dwfx")  return ContainerFormat::Dwfx;
     if (s == "pdf")   return ContainerFormat::Pdf;
     if (s == "xps" || s == "oxps") return ContainerFormat::Xps;
-    if (s == "apk") return ContainerFormat::Apk;
+    if (s == "apk" || s == "ipa" || s == "ipsw") return ContainerFormat::Apk;
     if (s == "iso")  return ContainerFormat::Iso;
     if (s == "cpio") return ContainerFormat::Cpio;
     if (s == "a" || s == "ar" || s == "lib") return ContainerFormat::Ar;
     if (s == "zst" || s == "zstd" || s == "tzst") return ContainerFormat::Zstd;
-    if (s == "3mf")   return ContainerFormat::Zip;
-    if (s == "kmz")   return ContainerFormat::Zip;
-    if (s == "vsix")  return ContainerFormat::Zip;
-    if (s == "nupkg") return ContainerFormat::Zip;
+    if (s == "3mf" || s == "kmz" || s == "vsix" || s == "nupkg" || s == "air" || s == "bsz" || s == "cdr" || s == "csl" || s == "grs" || s == "ita" || s == "itz" || s == "nbk" || s == "notebook" || s == "oex" || s == "osk" || s == "pk3" || s == "puz" || s == "stz" || s == "vlt" || s == "wal" || s == "wba" || s == "wmz" || s == "wsz" || s == "xap" || s == "xmz" || s == "xsn" || s == "gallery" || s == "gallerycollection" || s == "galleryitem" || s == "appx" || s == "bar" || s == "dwf" || s == "easm" || s == "rmskin" || s == "sldx" || s == "zipx") return ContainerFormat::Zip;
     if (s == "war" || s == "ear") return ContainerFormat::Jar;
     if (s == "aab")   return ContainerFormat::Apk;
     if (s == "knz") return ContainerFormat::Kanzi;
+    if (s == "vcf" || s == "vcard") return ContainerFormat::Vcf;
+    if (s == "3gp" || s == "3g2" || s == "m4v" || s == "flv" || s == "mov" || s == "qt") return ContainerFormat::Mp4;
+    if (s == "json") return ContainerFormat::Json;
+    if (s == "xml" || s == "fb2" || s == "fxg" || s == "kml" || s == "xsl" || s == "xslt" || s == "xhtml") return ContainerFormat::Xml;
+    if (s == "exe" || s == "dll" || s == "ocx" || s == "scr" || s == "cpl" || s == "sys" || s == "drv" || s == "bpl" || s == "icl" || s == "rll" || s == "vbx") return ContainerFormat::Pe;
+    if (s == "doc" || s == "xls" || s == "ppt" || s == "msi" || s == "msp" || s == "mst" || s == "pub" || s == "vsd" || s == "vss" || s == "vst" || s == "adp" || s == "mdb" || s == "mdt" || s == "mpd" || s == "mpp" || s == "mpt" || s == "rvt" || s == "sldasm" || s == "slddrw" || s == "sldprt" || s == "snt" || s == "thumbs.db" || s == "chm" || s == "fla" || s == "one" || s == "ost" || s == "rfa" || s == "rte" || s == "wps") return ContainerFormat::Cfbf;
+    if (s == "gz" || s == "tgz" || s == "deb" || s == "ipk" || s == "svgz") return ContainerFormat::GZip;
+
     return std::nullopt;
 }
 
@@ -262,6 +288,10 @@ inline bool can_write_format(const ContainerFormat fmt) {
         case ContainerFormat::Ar:
         case ContainerFormat::Zstd:
         case ContainerFormat::Kanzi:
+        case ContainerFormat::Vcf:
+        case ContainerFormat::Pe:
+        case ContainerFormat::Json:
+        case ContainerFormat::Xml:
             return true;
         default:
             return false;
@@ -272,10 +302,49 @@ inline bool can_write_format(const ContainerFormat fmt) {
 static const std::unordered_map<std::string, std::string> ext_to_mime = {
     // archives
     {".zip",    "application/zip"},
+    {".air",    "application/zip"},
+    {".appx",   "application/zip"},
+    {".bar",    "application/zip"},
+    {".bsz",    "application/zip"},
+    {".cdr",    "application/zip"},
+    {".csl",    "application/zip"},
+    {".dwf",    "application/zip"},
+    {".easm",   "application/zip"},
+    {".gallery", "application/zip"},
+    {".gallerycollection", "application/zip"},
+    {".galleryitem", "application/zip"},
+    {".grs",    "application/zip"},
+    {".ipa",    "application/zip"},
+    {".ipsw",   "application/zip"},
+    {".ita",    "application/zip"},
+    {".itz",    "application/zip"},
+    {".nbk",    "application/zip"},
+    {".notebook", "application/zip"},
+    {".oex",    "application/zip"},
+    {".osk",    "application/zip"},
+    {".pk3",    "application/zip"},
+    {".puz",    "application/zip"},
+    {".rmskin", "application/zip"},
+    {".sldx",   "application/zip"},
+    {".stz",    "application/zip"},
+    {".vlt",    "application/zip"},
+    {".wal",    "application/zip"},
+    {".wba",    "application/zip"},
+    {".wmz",    "application/zip"},
+    {".wsz",    "application/zip"},
+    {".xap",    "application/zip"},
+    {".xl",     "application/zip"},
+    {".xmz",    "application/zip"},
+    {".xsn",    "application/zip"},
+    {".zipx",   "application/zip"},
     {".7z",     "application/x-7z-compressed"},
     {".cb7",    "application/x-7z-compressed"},
     {".tar",    "application/x-tar"},
     {".gz",     "application/gzip"},
+    {".tgz",    "application/gzip"},
+    {".deb",    "application/gzip"},
+    {".ipk",    "application/gzip"},
+    {".svgz",   "application/gzip"},
     {".bz2",    "application/x-bzip2"},
     {".xz",     "application/x-xz"},
     {".wim",    "application/x-ms-wim"},
@@ -303,12 +372,31 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".ear",    "application/java-archive"},
     {".aab",    "application/vnd.android.package-archive"},
     {".knz",    "application/x-kanzi"},
+    {".vcf",    "text/vcard"},
+    {".json",   "application/json"},
+    {".exe",    "application/x-msdownload"},
+    {".dll",    "application/x-msdownload"},
+    {".ocx",    "application/x-msdownload"},
+    {".scr",    "application/x-msdownload"},
+    {".cpl",    "application/x-msdownload"},
 
     // images
     {".jpg",    "image/jpeg"},
     {".jpeg",   "image/jpeg"},
+    {".jpe",    "image/jpeg"},
+    {".jif",    "image/jpeg"},
+    {".jfif",   "image/jpeg"},
+    {".jfi",    "image/jpeg"},
+    {".thm",    "image/jpeg"},
     {".png",    "image/png"},
+    {".apng",   "image/png"},
+    {".jp2",    "image/jp2"},
+    {".j2k",    "image/jp2"},
+    {".j2c",    "image/jp2"},
     {".jxl",    "image/jxl"},
+    {".pcx",    "image/x-pcx"},
+    {".dcx",    "image/x-pcx"},
+    {".pcc",    "image/x-pcx"},
     {".tif",    "image/tiff"},
     {".tiff",   "image/tiff"},
     {".webp",   "image/webp"},
@@ -317,13 +405,50 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
 
     // documents (office open xml)
     {".docx",   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    {".docm",   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    {".dotm",   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    {".dotx",   "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
     {".xlsx",   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    {".xlsm",   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    {".xltm",   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    {".xltx",   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
     {".pptx",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {".pptm",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {".potm",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {".potx",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {".ppsm",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+    {".ppsx",   "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
 
-    // documents (legacy office)
+    // documents (legacy office / CFBF)
     {".doc",    "application/msword"},
     {".xls",    "application/vnd.ms-excel"},
     {".ppt",    "application/vnd.ms-powerpoint"},
+    {".msi",    "application/x-msi"},
+    {".msp",    "application/x-msi"},
+    {".mst",    "application/x-msi"},
+    {".pub",    "application/x-ole-storage"},
+    {".vsd",    "application/x-ole-storage"},
+    {".vss",    "application/x-ole-storage"},
+    {".vst",    "application/x-ole-storage"},
+    {".adp",    "application/x-ole-storage"},
+    {".mdb",    "application/x-ole-storage"},
+    {".mdt",    "application/x-ole-storage"},
+    {".mpd",    "application/x-ole-storage"},
+    {".mpp",    "application/x-ole-storage"},
+    {".mpt",    "application/x-ole-storage"},
+    {".rvt",    "application/x-ole-storage"},
+    {".sldasm", "application/x-ole-storage"},
+    {".slddrw", "application/x-ole-storage"},
+    {".sldprt", "application/x-ole-storage"},
+    {".snt",    "application/x-ole-storage"},
+    {".thumbs.db", "application/x-ole-storage"},
+    {".chm",    "application/x-ole-storage"},
+    {".fla",    "application/x-ole-storage"},
+    {".one",    "application/x-ole-storage"},
+    {".ost",    "application/x-ole-storage"},
+    {".rfa",    "application/x-ole-storage"},
+    {".rte",    "application/x-ole-storage"},
+    {".wps",    "application/x-ole-storage"},
 
     // documents (open document format)
     {".odt",    "application/vnd.oasis.opendocument.text"},
@@ -331,7 +456,13 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".odp",    "application/vnd.oasis.opendocument.presentation"},
     {".odg",    "application/vnd.oasis.opendocument.graphics"},
     {".odf",    "application/vnd.oasis.opendocument.formula"},
+    {".odb",    "application/vnd.oasis.opendocument.database"},
     {".pdf",    "application/pdf"},
+
+    // xml variants
+    {".xml",    "application/xml"},
+    {".xsl",    "application/xml"},
+    {".xslt",   "application/xml"},
 
     // databases
     {".sqlite", "application/vnd.sqlite3"},

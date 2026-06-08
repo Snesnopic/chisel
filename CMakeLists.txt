@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.5.0 LANGUAGES CXX C)
+project(chisel VERSION 1.6.0 LANGUAGES CXX C)
 
 # prevents redefinition of 'uninstall' target
 macro(add_custom_target target_name)
@@ -629,6 +629,13 @@ set(CONCURRENCY_DISABLED ON CACHE BOOL "Disable multithreading in Kanzi" FORCE)
 set(KANZI_ENABLE_NATIVE_OPTIMIZATIONS OFF CACHE BOOL "Disable native optimizations for portability" FORCE)
 add_subdirectory(third_party/kanzi-cpp EXCLUDE_FROM_ALL)
 
+# openjpeg
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_STATIC_LIBS ON  CACHE BOOL "" FORCE)
+set(BUILD_CODEC OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/openjpeg EXCLUDE_FROM_ALL)
+
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
@@ -666,6 +673,7 @@ set(CHISEL_LIBS
         libkanzi
         mp3packercpp_core
         vbrfix_lib
+        openjp2
 )
 
 if(ENABLE_MATROSKA)
@@ -705,6 +713,7 @@ set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
         libdeflate_static zlibstatic tag liblzma libkanzi
+        openjp2
 )
 
 if(NOT WIN32)

@@ -30,14 +30,14 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kMimes = {
-                "audio/mp4", "audio/x-m4a", "video/mp4"
+            static constexpr std::array<std::string_view, 6> kMimes = {
+                "audio/mp4", "audio/x-m4a", "video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2"
             };
             return {kMimes.data(), kMimes.size()};
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kExts = { ".mp4", ".m4a", ".m4b" };
+            static constexpr std::array<std::string_view, 8> kExts = { ".mp4", ".m4a", ".m4b", ".m4v", ".mov", ".qt", ".3gp", ".3g2" };
             return {kExts.data(), kExts.size()};
         }
 

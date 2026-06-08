@@ -22,9 +22,9 @@ namespace chisel {
      * @brief libpng error handler that throws a C++ exception.
      * @param msg The error message from libpng.
      */
-    void png_error_fn(png_structp, const png_const_charp msg) {
+    void png_error_fn(png_structp png, const png_const_charp msg) {
         Logger::log(LogLevel::Error, std::string("libpng: ") + msg, "libpng");
-        throw std::runtime_error(msg);
+        longjmp(png_jmpbuf(png), 1);
     }
 
     /**
@@ -34,15 +34,6 @@ namespace chisel {
     void png_warning_fn(png_structp, const png_const_charp msg) {
         Logger::log(LogLevel::Warning, std::string("libpng: ") + msg, "libpng");
     }
-
-    /**
-     * @brief RAII wrapper for FILE pointers to ensure they are closed.
-     */
-    struct FileCloser {
-        void operator()(FILE *f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
     /**
      * @brief RAII wrapper for libpng read structs (png_structp, png_infop).

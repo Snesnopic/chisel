@@ -40,7 +40,7 @@ namespace fs = std::filesystem;
 static ContainerFormat detect_format(const fs::path& path) {
     const std::string mime = MimeDetector::detect(path);
     if (!mime.empty()) {
-        auto it = mime_to_format.find(mime);
+        const auto it = mime_to_format.find(mime);
         if (it != mime_to_format.end()) return it->second;
     }
 
@@ -134,7 +134,7 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
             if (link_target && link_target[0]) {
                 std::error_code rc;
                 fs::create_directories(out_path.parent_path(), rc);
-#if defined(_WIN32)
+#ifdef _WIN32
                 std::error_code tmp_ec;
                 fs::create_symlink(fs::path(link_target), out_path, tmp_ec);
                 (void)tmp_ec;
@@ -491,12 +491,12 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
 
     if (!can_read_format(content.format)) {
         Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + input_path.filename().string(), get_name());
-        return content;
+        return std::nullopt;
     }
 
     if (!extract_with_libarchive(input_path, content.temp_dir)) {
         Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
-        return content;
+        return std::nullopt;
     }
 
     for (auto& p : fs::recursive_directory_iterator(content.temp_dir)) {

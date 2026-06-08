@@ -19,15 +19,11 @@
 #include "file_utils.hpp"
 
 
+namespace chisel {
+
 namespace fs = std::filesystem;
 
 namespace {
-
-    struct FileCloser {
-        void operator()(FILE *f) const { if (f) std::fclose(f); }
-    };
-
-    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
     // wrapper for libpng structures (destroys in case of exceptions)
     struct PngRead {
@@ -97,8 +93,6 @@ namespace {
 
 } // namespace
 
-namespace chisel {
-
 void ZopfliPngProcessor::recompress(const fs::path& input,
                                     const fs::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
@@ -113,10 +107,11 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.num_iterations_large = options.iterations_large;
 
         if (options.preserve_metadata) {
-            // keep common metadata chunks
-            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs"};
+            // keep common metadata and specialized chunks (APNG, 9Patch)
+            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs", "acTL", "fcTL", "fdAT", "npTc"};
         } else {
-            opts.keepchunks.clear();
+            // even if not preserving metadata, we MUST keep animation/scaling chunks to avoid breaking the file functionality
+            opts.keepchunks = {"acTL", "fcTL", "fdAT", "npTc"};
         }
 
         std::vector<unsigned char> origpng;

@@ -39,7 +39,7 @@ ThreadPool::ThreadPool(unsigned threads) {
                     std::mutex &mtx;
                     std::condition_variable &cv;
                     ~PendingGuard() {
-                        std::lock_guard lock(mtx);
+                        std::scoped_lock lock(mtx);
                         if (pending > 0) --pending;
                         cv.notify_all();
                     }
@@ -49,6 +49,8 @@ ThreadPool::ThreadPool(unsigned threads) {
                     task(st);
                 } catch (const std::exception& e) {
                     Logger::log(LogLevel::Error, std::string("Unhandled exception in thread pool: ") + e.what());
+                } catch (...) {
+                    Logger::log(LogLevel::Error, "Unhandled non-standard exception in thread pool");
                 }
             }
         });

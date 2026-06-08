@@ -45,7 +45,7 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
         Logger::log(LogLevel::Error, "Failed to open odf for reading: " + std::string(archive_error_string(in)), get_name());
         archive_read_free(in);
         cleanup_temp_dir(temp_dir);
-        return content;
+        return std::nullopt;
     }
     if (open_r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), get_name());

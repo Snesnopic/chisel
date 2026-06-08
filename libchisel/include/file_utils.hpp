@@ -17,8 +17,17 @@
 #include <vector>
 #include <cstdint>
 #include <fstream>
+#include <memory>
 
 namespace chisel {
+    /**
+     * @brief RAII wrapper for FILE pointers to ensure they are closed.
+     */
+    struct FileCloser {
+        void operator()(FILE *f) const { if (f) std::fclose(f); }
+    };
+    using unique_FILE = std::unique_ptr<FILE, FileCloser>;
+
     uint16_t read_le16(const uint8_t* p);
     uint32_t read_le32(const uint8_t* p);
     uint64_t read_le64(const uint8_t* p);

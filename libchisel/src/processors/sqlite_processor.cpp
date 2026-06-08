@@ -30,26 +30,29 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     sqlite3* db = nullptr;
     int rc = sqlite3_open_v2(output.string().c_str(), &db, SQLITE_OPEN_READWRITE, nullptr);
     if (rc != SQLITE_OK) {
+        std::string err_msg = db ? sqlite3_errmsg(db) : "unknown error";
         if (db) sqlite3_close(db);
-        Logger::log(LogLevel::Error, "Cannot open database: " + std::string(sqlite3_errmsg(db)), get_name());
-        throw std::runtime_error("SqliteProcessor: cannot open database");
+        Logger::log(LogLevel::Warning, "Cannot open database (likely corrupt): " + err_msg, get_name());
+        return; // act as passthrough (file already copied)
     }
 
     // run VACUUM
     rc = sqlite3_exec(db, "VACUUM;", nullptr, nullptr, nullptr);
     if (rc != SQLITE_OK) {
-        Logger::log(LogLevel::Error, "Vacuum failed: " + std::string(sqlite3_errmsg(db)), get_name());
+        std::string err_msg = sqlite3_errmsg(db);
         sqlite3_close(db);
-        throw std::runtime_error("SqliteProcessor: VACUUM failed");
+        Logger::log(LogLevel::Warning, "Vacuum failed (likely corrupt): " + err_msg, get_name());
+        return; // act as passthrough (file already copied, though partially vacuumed, size won't improve)
     }
     Logger::log(LogLevel::Debug, "Vacuum completed", get_name());
 
     // run ANALYZE
     rc = sqlite3_exec(db, "ANALYZE;", nullptr, nullptr, nullptr);
     if (rc != SQLITE_OK) {
-        Logger::log(LogLevel::Error, "Analyze failed: " + std::string(sqlite3_errmsg(db)), get_name());
+        std::string err_msg = sqlite3_errmsg(db);
         sqlite3_close(db);
-        throw std::runtime_error("SqliteProcessor: ANALYZE failed");
+        Logger::log(LogLevel::Warning, "Analyze failed (likely corrupt): " + err_msg, get_name());
+        return; // act as passthrough
     }
     Logger::log(LogLevel::Debug, "Analyze completed", get_name());
 
@@ -82,8 +85,8 @@ std::string dump_sqlite_db(const std::filesystem::path &file) {
     std::stringstream dump_stream;
     char *err_msg = nullptr;
 
-    // dump schema and data
-    rc = sqlite3_exec(db, ".dump", sqlite_dump_callback, &dump_stream, &err_msg);
+    // dump schema and verify integrity instead of using CLI .dump
+    rc = sqlite3_exec(db, "PRAGMA integrity_check; SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name;", sqlite_dump_callback, &dump_stream, &err_msg);
 
     if (rc != SQLITE_OK) {
         Logger::log(LogLevel::Warning, "Raw_equal: Failed to dump database: " + std::string(err_msg),

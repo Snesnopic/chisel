@@ -225,7 +225,15 @@ namespace chisel {
         bool scheduled_for_recompression = false;
         std::optional<ExtractedContent> content;
         if (processor->can_extract_contents()) {
-             content = processor->prepare_extraction(current_path);
+            try {
+                content = processor->prepare_extraction(current_path);
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Error, "Exception during prepare_extraction for " + path.string() + ": " + e.what(), "Executor");
+                content = std::nullopt;
+            } catch (...) {
+                Logger::log(LogLevel::Error, "Unknown exception during prepare_extraction for " + path.string(), "Executor");
+                content = std::nullopt;
+            }
             if (content) {
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
@@ -237,8 +245,8 @@ namespace chisel {
                     Logger::log(LogLevel::Warning, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeSkippedEvent{path, "Extraction resulted in no elements"});
                 } else {
-                    Logger::log(LogLevel::Error, "Prepare_extraction failed for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed"});
+                    Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
+                    event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed or skipped"});
                 }
             }
         }
@@ -315,14 +323,25 @@ namespace chisel {
                                 : file.parent_path();
 #endif
 
-                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");                            candidates[i]->recompress(current, tmp, m_options);
+                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            struct TempFileGuard {
+                                fs::path path;
+                                bool release = false;
+                                ~TempFileGuard() {
+                                    if (!release && !path.empty()) {
+                                        std::error_code ec;
+                                        fs::remove(path, ec);
+                                    }
+                                }
+                            } tmp_guard{tmp, false};
+
+                            candidates[i]->recompress(current, tmp, m_options);
                             auto sz = safe_size(tmp);
                             if (sz == 0) {
                                 pipeline_ok = false;
-                                std::error_code ec;
-                                fs::remove(tmp, ec);
                                 break;
                             }
+                            tmp_guard.release = true; // file is good, don't delete yet
                             if (current != file) {
                                 std::error_code ec;
                                 fs::remove(current, ec);
@@ -447,6 +466,9 @@ namespace chisel {
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
                     event_bus_.publish(FileProcessErrorEvent{file, e.what()});
+                } catch (...) {
+                    Logger::log(LogLevel::Error, "Unknown error on " + file.string(), "Executor");
+                    event_bus_.publish(FileProcessErrorEvent{file, "Unknown non-standard exception"});
                 }
             });
         }
