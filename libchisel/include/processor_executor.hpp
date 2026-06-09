@@ -37,7 +37,7 @@ namespace chisel {
         /**
          * @brief Run all processors on the original file and pick the smallest result.
          */
-        PARALLEL
+        PARALLEL                 [[deprecated("Use PIPE instead. PARALLEL mode is no longer recommended and will be removed in the future.")]]
     };
 /**
  * @brief Orchestrates the analysis, processing, and finalization of files.
