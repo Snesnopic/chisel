@@ -73,8 +73,30 @@ std::string JsonProcessor::get_raw_checksum(const std::filesystem::path& /*file_
 }
 
 bool JsonProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    // TODO: 
-    return false;
+    yyjson_doc *doc_a = yyjson_read_file(a.string().c_str(), 0, nullptr, nullptr);
+    yyjson_doc *doc_b = yyjson_read_file(b.string().c_str(), 0, nullptr, nullptr);
+
+    if (!doc_a || !doc_b) {
+        if (doc_a) yyjson_doc_free(doc_a);
+        if (doc_b) yyjson_doc_free(doc_b);
+        return false;
+    }
+
+    size_t len_a = 0, len_b = 0;
+    char *json_a = yyjson_write(doc_a, 0, &len_a);
+    char *json_b = yyjson_write(doc_b, 0, &len_b);
+
+    bool equal = false;
+    if (json_a && json_b && len_a == len_b) {
+        equal = (memcmp(json_a, json_b, len_a) == 0);
+    }
+
+    if (json_a) free(json_a);
+    if (json_b) free(json_b);
+    yyjson_doc_free(doc_a);
+    yyjson_doc_free(doc_b);
+
+    return equal;
 }
 
 } // namespace chisel
