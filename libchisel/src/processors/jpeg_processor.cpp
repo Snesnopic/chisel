@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include <memory>
+#include <csetjmp>
 #include "file_utils.hpp"
 namespace chisel {
 
@@ -19,17 +20,18 @@ namespace {
 struct JpegErrorMgr {
     jpeg_error_mgr pub{};
     char msg[JMSG_LENGTH_MAX]{};
+    jmp_buf setjmp_buffer;
 };
 
 /**
- * @brief libjpeg error handler that throws a C++ exception.
+ * @brief libjpeg error handler that jumps back on error.
  * @param cinfo Pointer to the libjpeg error context.
  */
-void jpeg_error_exit_throw(const j_common_ptr cinfo) {
+void jpeg_error_exit_longjmp(const j_common_ptr cinfo) {
     auto *err = reinterpret_cast<JpegErrorMgr *>(cinfo->err);
     (*cinfo->err->format_message)(cinfo, err->msg);
     Logger::log(LogLevel::Warning, std::string("Libjpeg: ") + err->msg, "libjpeg");
-    throw std::runtime_error(err->msg);
+    longjmp(err->setjmp_buffer, 1);
 }
 
 /**
@@ -110,10 +112,26 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
 
     // error handlers must be set before any possible error
     srcinfo.err = jpeg_std_error(&jsrcerr.pub);
-    jsrcerr.pub.error_exit = jpeg_error_exit_throw;
+    jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
 
     dstinfo.err = jpeg_std_error(&jdsterr.pub);
-    jdsterr.pub.error_exit = jpeg_error_exit_throw;
+    jdsterr.pub.error_exit = jpeg_error_exit_longjmp;
+
+    if (setjmp(jsrcerr.setjmp_buffer) || setjmp(jdsterr.setjmp_buffer)) {
+        infile.reset();
+        outfile.reset();
+        Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", get_name());
+
+        try {
+            jpeg_destroy_compress(&dstinfo);
+        } catch (...) {}
+
+        try {
+            jpeg_destroy_decompress(&srcinfo);
+        } catch (...) {}
+
+        throw std::runtime_error("Libjpeg error");
+    }
 
     try {
         jpeg_create_decompress(&srcinfo);
@@ -144,7 +162,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         copy_saved_markers(&srcinfo, &dstinfo, options.preserve_metadata);
 
         jpeg_finish_compress(&dstinfo);
-        jpeg_finish_decompress(&srcinfo);
+        // Do NOT call jpeg_finish_decompress(&srcinfo) when using jpeg_read_coefficients
         // destroy structs on success path
         jpeg_destroy_compress(&dstinfo);
         jpeg_destroy_decompress(&srcinfo);
@@ -210,7 +228,12 @@ static bool decode_jpeg_raw(const std::filesystem::path &path,
     JpegErrorMgr jsrcerr{};
 
     cinfo.err = jpeg_std_error(&jsrcerr.pub);
-    jsrcerr.pub.error_exit = jpeg_error_exit_throw;
+    jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
+
+    if (setjmp(jsrcerr.setjmp_buffer)) {
+        jpeg_destroy_decompress(&cinfo);
+        return false;
+    }
 
     try {
         jpeg_create_decompress(&cinfo);
@@ -236,7 +259,7 @@ static bool decode_jpeg_raw(const std::filesystem::path &path,
             row_ptr += row_stride;
         }
 
-        jpeg_finish_decompress(&cinfo);
+        // Do not call jpeg_finish_decompress when we break early or just want to destroy
         jpeg_destroy_decompress(&cinfo);
     } catch (const std::exception &) {
         jpeg_destroy_decompress(&cinfo);
