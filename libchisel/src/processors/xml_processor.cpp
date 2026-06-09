@@ -11,95 +11,14 @@
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
 #include "../../include/random_utils.hpp"
+#include "../../include/base64_utils.hpp"
 #include <fstream>
 #include <regex>
 
 
 namespace {
 
-// base64 decode/encode utilities
-const std::string b64_chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789+/";
 
-/**
- * @brief checks if a given character belongs to the base64 alphabet.
- * @param c the character to check.
- * @return true if valid base64 character.
- */
-inline bool is_base64(unsigned char c) {
-    return (isalnum(c) || (c == '+') || (c == '/'));
-}
-
-/**
- * @brief decodes a base64 encoded string into raw binary data.
- * @param encoded_string string view containing base64 data.
- * @return vector of decoded bytes.
- */
-std::vector<uint8_t> base64_decode(std::string_view encoded_string) {
-    int in_len = encoded_string.size();
-    int i = 0, j = 0, in_ = 0;
-    unsigned char char_array_4[4], char_array_3[3];
-    std::vector<uint8_t> ret;
-
-    while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_])) {
-        char_array_4[i++] = encoded_string[in_]; in_++;
-        if (i == 4) {
-            for (i = 0; i < 4; i++)
-                char_array_4[i] = b64_chars.find(char_array_4[i]);
-            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-            for (i = 0; (i < 3); i++) ret.push_back(char_array_3[i]);
-            i = 0;
-        }
-    }
-    if (i) {
-        for (j = i; j < 4; j++) char_array_4[j] = 0;
-        for (j = 0; j < 4; j++) char_array_4[j] = b64_chars.find(char_array_4[j]);
-        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-        for (j = 0; (j < i - 1); j++) ret.push_back(char_array_3[j]);
-    }
-    return ret;
-}
-
-/**
- * @brief encodes raw binary data into a base64 string.
- * @param bytes_to_encode vector of bytes to encode.
- * @return base64 encoded string.
- */
-std::string base64_encode(const std::vector<uint8_t>& bytes_to_encode) {
-    std::string ret;
-    int i = 0, j = 0;
-    unsigned char char_array_3[3], char_array_4[4];
-    size_t in_len = bytes_to_encode.size();
-    const uint8_t* buf = bytes_to_encode.data();
-
-    while (in_len--) {
-        char_array_3[i++] = *(buf++);
-        if (i == 3) {
-            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-            char_array_4[3] = char_array_3[2] & 0x3f;
-            for (i = 0; (i < 4); i++) ret += b64_chars[char_array_4[i]];
-            i = 0;
-        }
-    }
-    if (i) {
-        for (j = i; j < 3; j++) char_array_3[j] = '\0';
-        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-        char_array_4[3] = char_array_3[2] & 0x3f;
-        for (j = 0; (j < i + 1); j++) ret += b64_chars[char_array_4[j]];
-        while ((i++ < 3)) ret += '=';
-    }
-    return ret;
-}
 
 } // namespace
 
@@ -157,7 +76,7 @@ std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::file
                     std::string ext = "." + match[1].str();
                     std::string b64_data = match[2].str();
 
-                    std::vector<uint8_t> binary_data = base64_decode(b64_data);
+                    std::vector<uint8_t> binary_data = Base64Utils::decode(b64_data);
 
                     std::filesystem::path tmp_file = content_ref.temp_dir /
                                                     ("asset_" + RandomUtils::random_suffix() + ext);
@@ -221,7 +140,7 @@ std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& 
                 }
 
                 if (read_ok) {
-                    std::string new_b64 = base64_encode(opt_data);
+                    std::string new_b64 = Base64Utils::encode(opt_data);
                     std::string ext = file_path.extension().string().substr(1);
                     std::string new_val = "data:image/" + ext + ";base64," + new_b64;
 

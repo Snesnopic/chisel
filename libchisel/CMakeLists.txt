@@ -8,6 +8,8 @@ set(LIBCHISEL_SOURCES
         include/flexigif_processor.hpp
         include/gif_processor.hpp
         include/jpeg_processor.hpp
+        include/mime_processor.hpp
+        src/processors/mime_processor.cpp
         include/pe_processor.hpp
         include/jxl_processor.hpp
         include/kanzi_processor.hpp
@@ -72,6 +74,7 @@ set(LIBCHISEL_SOURCES
         src/utils/file_utils.cpp
         include/audio_metadata_util.hpp
         src/utils/audio_metadata_util.cpp
+        src/utils/base64_utils.cpp
         include/mpeg_processor.hpp
         src/processors/mpeg_processor.cpp
         include/wav_processor.hpp
