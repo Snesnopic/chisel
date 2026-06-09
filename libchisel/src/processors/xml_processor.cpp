@@ -205,7 +205,7 @@ std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& 
 
     auto state = std::any_cast<xml_state>(content.extras);
 
-    for (const auto& [file_path, attr] : state.mappings) {
+    for (auto& [file_path, attr] : state.mappings) {
         if (std::filesystem::exists(file_path)) {
             std::ifstream in(file_path, std::ios::binary | std::ios::ate);
             if (in) {
