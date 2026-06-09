@@ -24,7 +24,7 @@ namespace chisel {
  */
 struct xml_state {
     std::shared_ptr<pugi::xml_document> doc;
-    std::vector<std::pair<std::filesystem::path, pugi::xml_node>> mappings;
+    std::vector<std::pair<std::filesystem::path, pugi::xml_attribute>> mappings;
 };
 
 /**

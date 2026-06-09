@@ -164,10 +164,12 @@ std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::file
 
                     std::ofstream out(tmp_file, std::ios::binary);
                     if (out) {
-                        out.write(reinterpret_cast<const char*>(binary_data.data()), binary_data.size());
+                        if (binary_data.size() > 0) {
+                            out.write(reinterpret_cast<const char*>(binary_data.data()), binary_data.size());
+                        }
                         out.close();
 
-                        state_ref.mappings.emplace_back(tmp_file, node);
+                        state_ref.mappings.emplace_back(tmp_file, attr);
                         content_ref.extracted_files.push_back(tmp_file);
                     } else {
                         Logger::log(LogLevel::Error, "Failed to write extracted base64 data", "XmlProcessor");
@@ -203,7 +205,7 @@ std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& 
 
     auto state = std::any_cast<xml_state>(content.extras);
 
-    for (const auto& [file_path, node] : state.mappings) {
+    for (const auto& [file_path, attr] : state.mappings) {
         if (std::filesystem::exists(file_path)) {
             std::ifstream in(file_path, std::ios::binary | std::ios::ate);
             if (in) {
@@ -211,17 +213,19 @@ std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& 
                 in.seekg(0, std::ios::beg);
 
                 std::vector<uint8_t> opt_data(size);
-                if (in.read(reinterpret_cast<char*>(opt_data.data()), size)) {
+                bool read_ok = false;
+                if (size == 0) {
+                    read_ok = true;
+                } else if (size > 0 && in.read(reinterpret_cast<char*>(opt_data.data()), size)) {
+                    read_ok = true;
+                }
+
+                if (read_ok) {
                     std::string new_b64 = base64_encode(opt_data);
                     std::string ext = file_path.extension().string().substr(1);
                     std::string new_val = "data:image/" + ext + ";base64," + new_b64;
 
-                    for (pugi::xml_attribute attr : node.attributes()) {
-                        if (std::string_view(attr.value()).starts_with("data:image/")) {
-                            attr.set_value(new_val.c_str());
-                            break;
-                        }
-                    }
+                    attr.set_value(new_val.c_str());
                 }
             }
         }
