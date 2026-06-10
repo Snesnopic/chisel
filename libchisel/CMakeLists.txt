@@ -189,28 +189,9 @@ target_include_directories(libchisel
 
 if(NOT WIN32)
     target_include_directories(libchisel SYSTEM PRIVATE
-            ${LIBMAGIC_INCLUDE_DIR}
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include
             ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
     )
-endif()
-if(WIN32)
-    set(MAGIC_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated_magic")
-    file(MAKE_DIRECTORY ${MAGIC_GEN_DIR})
-
-    add_custom_command(
-            OUTPUT "${MAGIC_GEN_DIR}/magic_mgc_windows.h"
-            COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_SOURCE_DIR}/scripts/gen_magic.ps1"
-            -InputFile "${unofficial-libmagic_DICTIONARY}"
-            -OutputFile "${MAGIC_GEN_DIR}/magic_mgc_windows.h"
-            DEPENDS "${unofficial-libmagic_DICTIONARY}" "${CMAKE_SOURCE_DIR}/scripts/gen_magic.ps1"
-            COMMENT "generating windows-specific magic_mgc.h via powershell"
-    )
-
-    add_custom_target(generate_windows_magic DEPENDS "${MAGIC_GEN_DIR}/magic_mgc_windows.h")
-    add_dependencies(libchisel generate_windows_magic)
-
-    target_include_directories(libchisel PRIVATE "${MAGIC_GEN_DIR}")
 endif()
 if(ENABLE_MATROSKA)
     target_include_directories(libchisel PRIVATE ${libebml_SOURCE_DIR}
@@ -268,7 +249,3 @@ add_dependencies(libchisel brotlicommon brotlidec brotlienc)
 add_dependencies(libchisel woff2common woff2dec woff2enc)
 add_dependencies(libchisel libkanzi)
 add_dependencies(libchisel openjp2)
-
-if(NOT WIN32)
-    add_dependencies(libchisel LIBMAGIC)
-endif()

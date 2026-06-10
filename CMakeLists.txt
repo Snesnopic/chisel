@@ -164,104 +164,8 @@ set(DEFLATE_FOUND TRUE CACHE BOOL "" FORCE)
 set(DEFLATE_LIBRARY libdeflate_static CACHE STRING "" FORCE)
 set(DEFLATE_INCLUDE_DIR "${libdeflate_SOURCE_DIR}" CACHE PATH "" FORCE)
 
-# libmagic
-if(WIN32)
-    find_package(unofficial-libmagic CONFIG REQUIRED)
-else()
-    # fetch libmagic source
-    FetchContent_Declare(
-            libmagic_ext
-            URL https://mirror.koddos.net/lfs/lfs-packages/12.0/file-5.45.tar.gz
-            URL_HASH SHA256=fc97f51029bb0e2c9f4e3bffefdaf678f0e039ee872b9de5c002a6d09c784d82
-    )
-    FetchContent_MakeAvailable(libmagic_ext)
-
-    set(MAGIC_SRC "${libmagic_ext_SOURCE_DIR}/src")
-    set(MAGIC_BIN "${libmagic_ext_BINARY_DIR}/src")
-    file(MAKE_DIRECTORY "${MAGIC_BIN}")
-
-    set(LIBMAGIC_SOURCES
-            "${MAGIC_SRC}/apprentice.c"
-            "${MAGIC_SRC}/apptype.c"
-            "${MAGIC_SRC}/ascmagic.c"
-            "${MAGIC_SRC}/buffer.c"
-            "${MAGIC_SRC}/cdf.c"
-            "${MAGIC_SRC}/cdf_time.c"
-            "${MAGIC_SRC}/compress.c"
-            "${MAGIC_SRC}/der.c"
-            "${MAGIC_SRC}/encoding.c"
-            "${MAGIC_SRC}/fsmagic.c"
-            "${MAGIC_SRC}/funcs.c"
-            "${MAGIC_SRC}/is_csv.c"
-            "${MAGIC_SRC}/is_json.c"
-            "${MAGIC_SRC}/is_tar.c"
-            "${MAGIC_SRC}/is_simh.c"
-            "${MAGIC_SRC}/magic.c"
-            "${MAGIC_SRC}/print.c"
-            "${MAGIC_SRC}/readcdf.c"
-            "${MAGIC_SRC}/readelf.c"
-            "${MAGIC_SRC}/softmagic.c"
-    )
-
-    if(APPLE)
-        set(MAGIC_CONFIG_H "
-#define HAVE_STDINT_H 1
-#define HAVE_INTTYPES_H 1
-#define HAVE_SYS_STAT_H 1
-#define HAVE_UNISTD_H 1
-#define HAVE_FCNTL_H 1
-#define HAVE_MMAP 1
-#define HAVE_STRNDUP 1
-#define HAVE_ASPRINTF 1
-#define HAVE_VASPRINTF 1
-#define HAVE_STRLCPY 1
-#define HAVE_STRLCAT 1
-#define HAVE_GETLINE 1
-#define HAVE_FMTCHECK 1
-#define VERSION \"5.45\"
-        ")
-    else()
-        list(APPEND LIBMAGIC_SOURCES
-                "${MAGIC_SRC}/fmtcheck.c"
-                "${MAGIC_SRC}/strlcpy.c"
-                "${MAGIC_SRC}/strlcat.c"
-        )
-        set(MAGIC_CONFIG_H "
-#define HAVE_STDINT_H 1
-#define HAVE_INTTYPES_H 1
-#define HAVE_SYS_STAT_H 1
-#define HAVE_UNISTD_H 1
-#define HAVE_FCNTL_H 1
-#define HAVE_MMAP 1
-#define HAVE_STRNDUP 1
-#define HAVE_ASPRINTF 1
-#define HAVE_VASPRINTF 1
-#define HAVE_GETLINE 1
-#undef HAVE_STRLCPY
-#undef HAVE_STRLCAT
-#undef HAVE_FMTCHECK
-#define VERSION \"5.45\"
-        ")
-    endif()
-
-    if(NOT EXISTS "${MAGIC_BIN}/magic.h")
-        file(READ "${MAGIC_SRC}/magic.h.in" magic_h_in)
-        string(REPLACE "X.YY" "5.45" magic_h_out "${magic_h_in}")
-        file(WRITE "${MAGIC_BIN}/magic.h" "${magic_h_out}")
-    endif()
-
-    file(WRITE "${MAGIC_BIN}/config.h" "${MAGIC_CONFIG_H}")
-
-    add_library(LIBMAGIC STATIC EXCLUDE_FROM_ALL ${LIBMAGIC_SOURCES})
-
-    target_include_directories(LIBMAGIC PUBLIC
-            $<BUILD_INTERFACE:${MAGIC_BIN}>
-            $<BUILD_INTERFACE:${MAGIC_SRC}>
-    )
-    target_compile_definitions(LIBMAGIC PRIVATE HAVE_CONFIG_H)
-
-    set(MAGIC_HEADER "${CMAKE_SOURCE_DIR}/libchisel/include/magic.mgc.h")
-endif()
+# qadmimes
+add_subdirectory(third_party/qadmimes EXCLUDE_FROM_ALL)
 
 # zlib
 set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -674,6 +578,7 @@ set(CHISEL_LIBS
         mp3packercpp_core
         vbrfix_lib
         openjp2
+        qadmimes-core
 )
 
 if(ENABLE_MATROSKA)
@@ -683,12 +588,7 @@ endif()
 
 if(WIN32)
     list(APPEND CHISEL_LIBS
-            unofficial::libmagic::libmagic
             Rpcrt4
-    )
-else()
-    list(APPEND CHISEL_LIBS
-            LIBMAGIC
     )
 endif()
 
@@ -716,9 +616,7 @@ set(NON_UNITY_TARGETS
         openjp2
 )
 
-if(NOT WIN32)
-    list(APPEND NON_UNITY_TARGETS LIBMAGIC)
-else()
+if(WIN32)
     list(APPEND NON_UNITY_TARGETS libgifsicle)
 endif()
 
