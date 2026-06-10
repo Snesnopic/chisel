@@ -105,3 +105,6 @@
 [submodule "third_party/openjpeg"]
 	path = third_party/openjpeg
 	url = https://github.com/uclouvain/openjpeg.git
+[submodule "third_party/qadmimes"]
+	path = third_party/qadmimes
+	url = https://github.com/Snesnopic/qadmimes
