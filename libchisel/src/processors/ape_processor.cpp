@@ -90,6 +90,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     if (pDecompress == nullptr || err != ERROR_SUCCESS) {
         delete pDecompress;
+        delete[] pMacString;
         throw std::runtime_error("ApeProcessor: cannot create APE decompress (err: " + std::to_string(err) + ")");
     }
 
@@ -100,6 +101,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
 
     if (channels == 0 || sample_rate == 0 || bits_per_sample == 0) {
         delete pDecompress;
+        delete[] pMacString;
         throw std::runtime_error("ApeProcessor: invalid APE file parameters");
     }
 
@@ -117,6 +119,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
     APE::IAPECompress *pCompress = CreateIAPECompress();
     if (pCompress == nullptr) {
         delete pDecompress;
+        delete[] pMacString;
         throw std::runtime_error("ApeProcessor: cannot create APE encoder");
     }
 
@@ -136,6 +139,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
     if (nRetVal != 0) {
         APE_SAFE_DELETE(pCompress)
         delete pDecompress;
+        delete[] pMacString;
         throw std::runtime_error("ApeProcessor: encoder start failed");
     }
 
@@ -149,6 +153,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
             pCompress->Finish(nullptr, 0, 0);
             APE_SAFE_DELETE(pCompress)
             delete pDecompress;
+            delete[] pMacString;
             throw std::runtime_error("ApeProcessor: decoding failed");
         }
         if (blocks_retrieved <= 0) break;
@@ -159,19 +164,23 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
             pCompress->Finish(NULL, 0, 0);
             APE_SAFE_DELETE(pCompress)
             delete pDecompress;
+            delete[] pMacString;
             throw std::runtime_error("ApeProcessor: AddData failed");
         }
 
         frames_processed_total += blocks_retrieved;
     }
 
-    delete pDecompress;
-
-    if (pCompress->Finish(nullptr, 0, 0) != 0) {
+    int fin_rc = pCompress->Finish(nullptr, 0, 0);
+    if (fin_rc != 0) {
         APE_SAFE_DELETE(pCompress)
+        delete pDecompress;
+        delete[] pMacString;
         throw std::runtime_error("ApeProcessor: Finish failed");
     }
     APE_SAFE_DELETE(pCompress)
+    delete pDecompress;
+    delete[] pMacString;
 
     if (options.preserve_metadata) {
         if (!copy_apetag(input, output)) {
