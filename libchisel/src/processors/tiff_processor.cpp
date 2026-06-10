@@ -67,7 +67,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
     }
 
     do {
-        uint32_t width, height;
+        uint32_t width = 0, height = 0;
         TIFFGetField(in, TIFFTAG_IMAGEWIDTH, &width);
         TIFFGetField(in, TIFFTAG_IMAGELENGTH, &height);
 
@@ -129,7 +129,7 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     // TODO: implement checksum of raw TIFF data
     return "";
 }
-    bool TiffProcessor::raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const {
+    bool TiffProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
     TIFF* in_a = TIFFOpen(a.string().c_str(), "r");
     if (!in_a) {
         Logger::log(LogLevel::Warning, "Raw_equal: Failed to open tiff: " + a.string(), get_name());
