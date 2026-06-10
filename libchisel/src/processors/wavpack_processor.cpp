@@ -40,7 +40,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
             return static_cast<int32_t>(std::fwrite(data, 1, static_cast<size_t>(bcount), static_cast<FILE*>(id)));
         },
         out,
-        error
+        nullptr
     );
 
     if (!ctx_out) {
