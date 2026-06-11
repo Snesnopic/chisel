@@ -197,7 +197,7 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
 
 ## How it works
 
-`chisel` scans the input file(s) to understand their actual format. On Windows, detection is currently based on file extensions, while on Linux and macOS it relies on `libmagic` for accurate MIME type detection. If a relevant `Processor` is found for the input, the file goes through a pipeline with 3 phases:
+`chisel` scans the input file(s) to understand their actual format. If a relevant `Processor` is found for the input, the file goes through a pipeline with 3 phases:
 
 **Phase 1: Extraction & discovery**
 The system identifies files whose compatible `Processor`s are flagged as containers. This includes traditional archives (like ZIP or Tar), PDF documents, and even audio files (like MP3 or FLAC) that contain embedded cover art within their ID3/APE tags. These internal files are extracted to a temporary location and exposed to the pipeline recursively. This means `chisel` is perfectly capable of compressing an image inside a ZIP archive, inside another ZIP archive.
