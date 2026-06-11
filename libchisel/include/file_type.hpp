@@ -35,7 +35,6 @@ enum class ContainerFormat {
     GZip,
     BZip2,
     Xz,
-    Rar,
     Wim,
     Mkv,
     Pdf,
@@ -79,8 +78,6 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/gzip",             ContainerFormat::GZip },
     { "application/x-bzip2",          ContainerFormat::BZip2 },
     { "application/x-xz",             ContainerFormat::Xz },
-    { "application/vnd.rar",          ContainerFormat::Rar },
-    { "application/x-rar-compressed", ContainerFormat::Rar },
     { "video/x-matroska",             ContainerFormat::Mkv },
     { "video/webm",                   ContainerFormat::Mkv },
     { "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ContainerFormat::Docx },
@@ -109,8 +106,6 @@ inline const std::unordered_map<std::string, ContainerFormat> mime_to_format = {
     { "application/x-archive",       ContainerFormat::Ar },
     { "application/zstd",            ContainerFormat::Zstd },
     { "application/x-zstd",          ContainerFormat::Zstd },
-    { "application/vnd.comicbook+rar",  ContainerFormat::Rar },
-    { "application/x-cbr",              ContainerFormat::Rar },
     { "application/vnd.ms-package.3dmanufacturing-3dmodel+xml", ContainerFormat::Zip },
     { "application/vnd.google-earth.kmz",       ContainerFormat::Zip },
     { "application/vsix",                       ContainerFormat::Zip },
@@ -145,7 +140,6 @@ inline std::string container_format_to_string(const ContainerFormat fmt) {
         case ContainerFormat::Wim:      return "wim";
         case ContainerFormat::Pdf:    return "pdf";
         case ContainerFormat::Mkv:      return "mkv";
-        case ContainerFormat::Rar:      return "rar";
         case ContainerFormat::Docx:     return "docx";
         case ContainerFormat::Xlsx:     return "xlsx";
         case ContainerFormat::Pptx:     return "pptx";
@@ -199,7 +193,6 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "bz2" || s == "bzip2")  return ContainerFormat::BZip2;
     if (s == "xz")    return ContainerFormat::Xz;
     if (s == "wim")   return ContainerFormat::Wim;
-    if (s == "rar")   return ContainerFormat::Rar;
     if (s == "mkv")   return ContainerFormat::Mkv;
     if (s == "docx" || s == "docm" || s == "dotm" || s == "dotx")  return ContainerFormat::Docx;
     if (s == "xlsx" || s == "xlsm" || s == "xltm" || s == "xltx" || s == "xl")  return ContainerFormat::Xlsx;
