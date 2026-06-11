@@ -1,7 +1,4 @@
 {
   "name": "chisel",
-  "version": "1.6.0",
-  "dependencies": [
-    "libmagic"
-  ]
+  "version": "1.6.0"
 }
