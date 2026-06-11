@@ -34,6 +34,9 @@ namespace chisel {
  * (e.g., MP4::CoverArt::Format, APE custom tag keys).
  */
 struct AudioCoverInfo {
+    // container-specific extras (optional, type-erased)
+    std::any format_specific;  // e.g., MP4::CoverArt::Format, custom APE tag info
+
     // path to the extracted/optimized image
     std::filesystem::path temp_file_path;
 
@@ -49,9 +52,6 @@ struct AudioCoverInfo {
     int height = 0;            // pixels
     int depth = 0;             // bits per pixel/channel configuration
     int colors = 0;            // optional; rarely used
-
-    // container-specific extras (optional, type-erased)
-    std::any format_specific;  // e.g., MP4::CoverArt::Format, custom APE tag info
 };
 
 /**

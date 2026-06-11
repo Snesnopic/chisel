@@ -142,19 +142,19 @@ private:
                             const std::filesystem::path& temp_file,
                             uintmax_t original_size,
                             std::chrono::milliseconds duration) const;
-
-    ProcessorRegistry& registry_;                 ///< Reference to the processor registry
+    ThreadPool pool_;                             ///< Thread pool for Phase 2
     ProcessingOptions m_options;
-    bool dry_run_;                                ///< If true, no files are written
+    std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
+    std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
     std::filesystem::path output_dir_;            ///< Optional output directory
+    EventBus& event_bus_;                         ///< Bus for publishing events
+    ProcessorRegistry& registry_;                 ///< Reference to the processor registry
+    EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression
+    bool dry_run_;                                ///< If true, no files are written
     bool has_output_dir_;                         ///< Convenience flag for !output_dir_.empty()
     bool output_is_directory_ = true;             ///< True if the output path refers to a directory
-    std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
-    std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
-    ThreadPool pool_;                             ///< Thread pool for Phase 2
     std::atomic<bool> stop_flag_{false};       ///< Flag to signal interruption
-    EventBus& event_bus_;                         ///< Bus for publishing events
-    EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression
+
 };
 
 } // namespace chisel
