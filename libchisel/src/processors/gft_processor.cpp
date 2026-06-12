@@ -76,10 +76,4 @@ std::filesystem::path GftProcessor::finalize_extraction(const ExtractedContent& 
     return output_path;
 }
 
-bool GftProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    const auto data_a = read_file(a);
-    const auto data_b = read_file(b);
-    return data_a == data_b;
-}
-
 } // namespace chisel

@@ -172,14 +172,4 @@ std::filesystem::path IcoProcessor::finalize_extraction(const ExtractedContent& 
     return output_path;
 }
 
-bool IcoProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    try {
-        const auto data_a = read_file(a);
-        const auto data_b = read_file(b);
-        return data_a == data_b;
-    } catch (...) {
-        return false;
-    }
-}
-
 } // namespace chisel
