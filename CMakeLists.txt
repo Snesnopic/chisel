@@ -315,8 +315,11 @@ set(ENABLE_COVERAGE OFF CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
 # set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
-set(LZ4_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/lz4/lib" CACHE PATH "" FORCE)
-set(LZ4_LIBRARY lz4_static CACHE STRING "" FORCE)
+set(LZ4_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/lz4/lib" CACHE PATH "LZ4 header dir" FORCE)
+set(LZ4_LIBRARY lz4_static CACHE FILEPATH "LZ4 static library" FORCE)
+set(LZ4_FOUND TRUE CACHE BOOL "Force LZ4 found" FORCE)
+set(HAVE_LIBLZ4 1 CACHE INTERNAL "Force liblz4 macros")
+set(HAVE_LZ4_H 1 CACHE INTERNAL "Force liblz4 macros")
 
 # liblzma
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
