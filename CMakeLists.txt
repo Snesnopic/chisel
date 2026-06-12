@@ -146,6 +146,11 @@ set(XZ_TOOL_SCRIPTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/xz ${CMAKE_BINARY_DIR}/xz-build EXCLUDE_FROM_ALL)
 set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "liblzma include" FORCE)
 
+# lz4
+set(LZ4_BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/lz4/build/cmake EXCLUDE_FROM_ALL)
+
 # zstd
 set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(ZSTD_BUILD_SHARED   OFF CACHE BOOL "" FORCE)
@@ -294,7 +299,7 @@ set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
 set(ENABLE_NETTLE  OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT   OFF CACHE BOOL "" FORCE)
-set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZ4 ON CACHE BOOL "" FORCE)
 set(ENABLE_BZip2 ON CACHE BOOL "" FORCE)
 set(ENABLE_LIBB2 ON CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX  OFF CACHE BOOL "" FORCE)
@@ -310,7 +315,10 @@ set(ENABLE_COVERAGE OFF CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
 # set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
-# set(HAVE_LZMA_H 1 CACHE INTERNAL "Force lzma.h found")
+set(LZ4_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/lz4/lib" CACHE PATH "" FORCE)
+set(LZ4_LIBRARY lz4_static CACHE STRING "" FORCE)
+
+# liblzma
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
 target_include_directories(archive_static PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
@@ -628,6 +636,7 @@ set(CHISEL_LIBS
         woff2dec
         woff2enc
         liblzma
+        lz4_static
         libkanzi
         mp3packercpp_core
         vbrfix_lib
@@ -666,7 +675,7 @@ endif()
 set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
-        libdeflate_static zlibstatic tag liblzma libkanzi
+        libdeflate_static zlibstatic tag liblzma lz4_static libkanzi
         openjp2
 )
 

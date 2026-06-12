@@ -130,6 +130,16 @@ set(LIBCHISEL_SOURCES
         src/processors/icns_processor.cpp
         include/woff_processor.hpp
         src/processors/woff_processor.cpp
+        include/gz_processor.hpp
+        src/processors/gz_processor.cpp
+        include/lua_processor.hpp
+        src/processors/lua_processor.cpp
+        include/stl_processor.hpp
+        src/processors/stl_processor.cpp
+        include/cab_processor.hpp
+        src/processors/cab_processor.cpp
+        include/lz4_processor.hpp
+        src/processors/lz4_processor.cpp
 
         ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src/app/BlockCompressor.cpp
         ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src/app/BlockDecompressor.cpp
@@ -185,6 +195,7 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/kanzi-cpp/src
         ${CMAKE_SOURCE_DIR}/third_party/openjpeg/src/lib/openjp2
         ${CMAKE_BINARY_DIR}/third_party/openjpeg/src/lib/openjp2
+        ${CMAKE_SOURCE_DIR}/third_party/lz4/lib
 )
 
 if(NOT WIN32)
@@ -223,6 +234,7 @@ target_compile_definitions(libchisel PRIVATE LZMA_API_STATIC)
 add_dependencies(libchisel zlibstatic)
 add_dependencies(libchisel mozjpeg)
 add_dependencies(libchisel liblzma)
+add_dependencies(libchisel lz4_static)
 add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
 add_dependencies(libchisel ogg)

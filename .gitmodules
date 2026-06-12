@@ -108,3 +108,6 @@
 [submodule "third_party/qadmimes"]
 	path = third_party/qadmimes
 	url = https://github.com/Snesnopic/qadmimes
+[submodule "third_party/lz4"]
+	path = third_party/lz4
+	url = https://github.com/lz4/lz4.git

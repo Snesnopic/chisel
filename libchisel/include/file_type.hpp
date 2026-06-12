@@ -475,7 +475,17 @@ static const std::unordered_map<std::string, std::string> ext_to_mime = {
     {".webm",   "video/webm"},
 
     // scientific / seismic
-    {".mseed",  "application/vnd.fdsn.mseed"}
+    {".mseed",  "application/vnd.fdsn.mseed"},
+
+    // 3D models
+    {".stl",    "model/stl"},
+
+    // Microsoft Cabinet
+    {".cab",    "application/vnd.ms-cab-compressed"},
+
+    // compiled Lua bytecode
+    {".lua",    "application/x-lua-bytecode"},
+    {".luac",   "application/x-lua-bytecode"}
 };
 
 } // namespace chisel

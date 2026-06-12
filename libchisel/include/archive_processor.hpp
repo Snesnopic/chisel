@@ -55,15 +55,16 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 58> kExts = {
+        static constexpr std::array<std::string_view, 54> kExts = {
             ".zip", ".tar", ".tgz", ".iso", ".cpio", ".jar", ".xpi", ".apk",
             ".cbz", ".cbt", ".epub", ".a", ".ar", ".lib",
             ".air", ".bsz", ".cdr", ".csl", ".gallery", ".gallerycollection",
             ".galleryitem", ".grs", ".ipa", ".ipsw", ".ita", ".itz", ".nbk",
             ".notebook", ".oex", ".osk", ".pk3", ".puz", ".stz", ".vlt",
-            ".wal", ".wba", ".wmz", ".wsz", ".xap", ".xl", ".xlam", ".xmz",
+            ".wal", ".wba", ".wsz", ".xap", ".xl", ".xlam", ".xmz",
             ".xsn", ".kmz", ".vsix", ".nupkg", ".appx", ".bar", ".dwf", ".easm",
-            ".rmskin", ".sldx", ".zipx", ".gz", ".deb", ".ipk", ".svgz"
+            ".rmskin", ".sldx", ".zipx", ".deb", ".ipk"
+            // .gz, .tgz handled via MIME; .svgz/.wmz/.emz handled by GzProcessor
         };
         return {kExts.data(), kExts.size()};
     }

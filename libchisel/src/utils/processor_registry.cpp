@@ -55,6 +55,11 @@
 #include "jp2_processor.hpp"
 #include "pe_processor.hpp"
 #include "mime_processor.hpp"
+#include "lua_processor.hpp"
+#include "stl_processor.hpp"
+#include "cab_processor.hpp"
+#include "gz_processor.hpp"
+#include "lz4_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -114,6 +119,11 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MngProcessor>());
     processors_.push_back(std::make_unique<PcxProcessor>());
     processors_.push_back(std::make_unique<MimeProcessor>());
+    processors_.push_back(std::make_unique<GzProcessor>());
+    processors_.push_back(std::make_unique<Lz4Processor>());
+    processors_.push_back(std::make_unique<LuaProcessor>());
+    processors_.push_back(std::make_unique<StlProcessor>());
+    processors_.push_back(std::make_unique<CabProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
