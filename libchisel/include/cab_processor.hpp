@@ -71,11 +71,6 @@ public:
         return "";
     }
 
-    [[nodiscard]] bool raw_equal(const std::filesystem::path& a,
-                                 const std::filesystem::path& b) const override {
-        // CAB is a container: delegate to default byte-level comparison.
-        return read_file(a) == read_file(b);
-    }
 };
 
 } // namespace chisel

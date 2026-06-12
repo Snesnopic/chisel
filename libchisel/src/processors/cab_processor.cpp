@@ -434,5 +434,4 @@ void CabProcessor::recompress(const std::filesystem::path& input_path,
         get_name());
 }
 
-
 } // namespace chisel
