@@ -40,15 +40,15 @@ The project fetches all its dependencies automatically via Git submodules.
   -   `ninja` (recommended)
   -   Rust toolchain (required for OptiVorbis integration; install via [rustup.rs](https://rustup.rs))
 -   **Linux:**
-  -   A modern C++23 compiler (GCC ≥ 11 or Clang ≥ 14)
+  -   A modern C++20 compiler (GCC ≥ 11 or Clang ≥ 14)
   -   `build-essential`, `pkg-config`
   -   `autoconf`, `automake`, `libtool`, `m4`, `nasm`, `yasm` (required by some submodules)
 -   **macOS:**
-  -   Xcode Command Line Tools (Clang with C++23 support)
+  -   Xcode Command Line Tools (Clang with C++20 support)
   -   `pkg-config`
   -   `autoconf`, `automake`, `libtool`, `nasm`, `yasm` (required by some submodules)
 -   **Windows:**
-  -   Visual Studio 2022 (with MSVC C++23 toolchain), `vcpkg`
+  -   Visual Studio 2022 (with MSVC C++20 toolchain), `vcpkg`
 
 ---
 
