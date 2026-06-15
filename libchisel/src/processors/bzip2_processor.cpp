@@ -21,7 +21,7 @@ static std::vector<uint8_t> decode_bzip2(const std::vector<uint8_t>& compressed)
     if (ret != BZ_OK) throw std::runtime_error("FAILED TO INIT BZIP2 DECODER");
 
     std::vector<uint8_t> decompressed;
-    const size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     // bzlib expects char* instead of uint8_t*
@@ -38,7 +38,7 @@ static std::vector<uint8_t> decode_bzip2(const std::vector<uint8_t>& compressed)
             throw std::runtime_error("BZIP2 DECOMPRESSION FAILED");
         }
 
-        size_t written = out_buf.size() - strm.avail_out;
+        const std::size_t written = out_buf.size() - strm.avail_out;
         if (written > 0) {
             decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + written);
         }
@@ -96,7 +96,7 @@ std::filesystem::path Bzip2Processor::finalize_extraction(const ExtractedContent
     if (ret != BZ_OK) throw std::runtime_error("FAILED TO INIT BZIP2 ENCODER");
 
     std::vector<uint8_t> compressed;
-    const size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     strm.next_in = reinterpret_cast<char*>(const_cast<uint8_t*>(raw_data.data()));
@@ -112,7 +112,7 @@ std::filesystem::path Bzip2Processor::finalize_extraction(const ExtractedContent
             throw std::runtime_error("BZIP2 COMPRESSION FAILED");
         }
 
-        size_t written = out_buf.size() - strm.avail_out;
+        std::size_t written = out_buf.size() - strm.avail_out;
         if (written > 0) {
             compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + written);
         }

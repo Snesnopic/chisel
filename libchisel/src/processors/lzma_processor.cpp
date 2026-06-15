@@ -21,7 +21,7 @@ static std::vector<uint8_t> decode_lzma(const std::vector<uint8_t>& compressed) 
     if (ret != LZMA_OK) throw std::runtime_error("failed to init lzma decoder");
 
     std::vector<uint8_t> decompressed;
-    const size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     strm.next_in = compressed.data();
@@ -37,7 +37,7 @@ static std::vector<uint8_t> decode_lzma(const std::vector<uint8_t>& compressed) 
             throw std::runtime_error("lzma decompression failed");
         }
 
-        size_t written = out_buf.size() - strm.avail_out;
+        const std::size_t written = out_buf.size() - strm.avail_out;
         if (written > 0) {
             decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + written);
         }
@@ -107,7 +107,7 @@ std::filesystem::path LzmaProcessor::finalize_extraction(const ExtractedContent&
     if (ret != LZMA_OK) throw std::runtime_error("failed to init lzma encoder");
 
     std::vector<uint8_t> compressed;
-    const size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     strm.next_in = raw_data.data();
@@ -123,7 +123,7 @@ std::filesystem::path LzmaProcessor::finalize_extraction(const ExtractedContent&
             throw std::runtime_error("lzma compression failed");
         }
 
-        size_t written = out_buf.size() - strm.avail_out;
+        std::size_t written = out_buf.size() - strm.avail_out;
         if (written > 0) {
             compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + written);
         }

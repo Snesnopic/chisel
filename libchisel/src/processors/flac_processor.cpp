@@ -94,7 +94,7 @@ static void metadata_callback(const FLAC__StreamDecoder*, const FLAC__StreamMeta
  * This function is called when a decoding error occurs.
  * @param status The specific error status code.
  */
-static void error_callback(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus status, void*) {
+static void error_callback(const FLAC__StreamDecoder*, const FLAC__StreamDecoderErrorStatus status, void*) {
     Logger::log(LogLevel::Warning,
                 std::string("FLAC decoder: ") + FLAC__StreamDecoderErrorStatusString[status],
                 "libFLAC");
@@ -361,9 +361,9 @@ std::vector<int32_t> decode_flac_pcm(const std::filesystem::path& file,
                        const FLAC__Frame* frame,
                        const FLAC__int32* const buffer[],
                        void* client_data) -> FLAC__StreamDecoderWriteStatus {
-        auto* c = static_cast<Context*>(client_data);
-        const size_t n = frame->header.blocksize;
-        for (size_t i = 0; i < n; ++i) {
+        const auto* c = static_cast<Context*>(client_data);
+        const std::size_t n = frame->header.blocksize;
+        for (std::size_t i = 0; i < n; ++i) {
             for (unsigned ch = 0; ch < frame->header.channels; ++ch) {
                 c->pcm->push_back(buffer[ch][i]);
             }

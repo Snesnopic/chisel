@@ -20,15 +20,15 @@ static std::vector<uint8_t> decode_brotli(const std::vector<uint8_t>& compressed
     if (!state) throw std::runtime_error("Failed to create brotli decoder");
 
     std::vector<uint8_t> decompressed;
-    size_t available_in = compressed.size();
+    std::size_t available_in = compressed.size();
     const uint8_t* next_in = compressed.data();
 
-    const size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> chunk(chunk_size);
 
     BrotliDecoderResult result;
     do {
-        size_t available_out = chunk_size;
+        std::size_t available_out = chunk_size;
         uint8_t* next_out = chunk.data();
 
         result = BrotliDecoderDecompressStream(
@@ -39,7 +39,7 @@ static std::vector<uint8_t> decode_brotli(const std::vector<uint8_t>& compressed
             throw std::runtime_error("Brotli decompression failed");
         }
 
-        size_t written = chunk_size - available_out;
+        const std::size_t written = chunk_size - available_out;
         if (written > 0) {
             decompressed.insert(decompressed.end(), chunk.data(), chunk.data() + written);
         }
@@ -93,9 +93,9 @@ std::filesystem::path BrotliProcessor::finalize_extraction(const ExtractedConten
     const auto& inner_path = content.extracted_files.front();
     const auto raw_data = read_file(inner_path);
 
-    const size_t max_out_size = BrotliEncoderMaxCompressedSize(raw_data.size());
+    const std::size_t max_out_size = BrotliEncoderMaxCompressedSize(raw_data.size());
     std::vector<uint8_t> output_data(max_out_size);
-    size_t out_size = max_out_size;
+    std::size_t out_size = max_out_size;
 
     const BROTLI_BOOL ok = BrotliEncoderCompress(
         11,

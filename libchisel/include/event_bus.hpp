@@ -42,7 +42,7 @@ namespace chisel {
          */
         template <typename Event>
         void subscribe(std::function<void(const Event&)> handler) {
-            std::lock_guard lock(mtx_);
+            std::scoped_lock lock(mtx_);
             auto& vec = subscribers_[std::type_index(typeid(Event))];
             vec.push_back([handler](const void* e) {
                 handler(*static_cast<const Event*>(e));
@@ -59,7 +59,7 @@ namespace chisel {
             std::vector<Callback> callbacks;
             {
                 std::scoped_lock lock(mtx_);
-                auto it = subscribers_.find(std::type_index(typeid(Event)));
+                const auto it = subscribers_.find(std::type_index(typeid(Event)));
                 if (it != subscribers_.end()) {
                     callbacks = it->second;
                 }

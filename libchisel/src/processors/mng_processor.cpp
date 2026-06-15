@@ -33,7 +33,7 @@ uint32_t read_u32(std::istream& is) {
     return read_be32(buf);
 }
 
-void write_u32(std::ostream& os, uint32_t val) {
+void write_u32(std::ostream& os, const uint32_t val) {
     uint8_t buf[4];
     write_be32(buf, val);
     os.write(reinterpret_cast<const char*>(buf), 4);
@@ -106,7 +106,7 @@ std::vector<uint8_t> decompress_deflate(const std::vector<uint8_t>& input) {
     do {
         strm.avail_out = sizeof(buffer);
         strm.next_out = buffer;
-        int ret = inflate(&strm, Z_NO_FLUSH);
+        const int ret = inflate(&strm, Z_NO_FLUSH);
         if (ret != Z_OK && ret != Z_STREAM_END) {
             inflateEnd(&strm);
             return {};
@@ -117,7 +117,7 @@ std::vector<uint8_t> decompress_deflate(const std::vector<uint8_t>& input) {
     return decompressed;
 }
 
-static std::vector<uint8_t> optimize_deflate(const std::vector<uint8_t>& input, int iterations) {
+static std::vector<uint8_t> optimize_deflate(const std::vector<uint8_t>& input, const int iterations) {
     auto raw = decompress_deflate(input);
     if (raw.empty()) return input;
 
@@ -227,9 +227,9 @@ bool MngProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
         std::ifstream is(p, std::ios::binary);
         if (!is) return payloads;
         uint8_t sig[8]; is.read(reinterpret_cast<char*>(sig), 8);
-        bool is_jng = (sig[0] == 0x8B);
+        const bool is_jng = (sig[0] == 0x8B);
         while (is.peek() != EOF) {
-            uint32_t len = read_u32(is);
+            const uint32_t len = read_u32(is);
             char type[4]; is.read(type, 4);
             std::vector<uint8_t> data(len);
             if (len > 0) is.read(reinterpret_cast<char*>(data.data()), len);
@@ -242,8 +242,8 @@ bool MngProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
         return payloads;
     };
 
-    auto payloadsA = get_payloads(a);
-    auto payloadsB = get_payloads(b);
+    const auto payloadsA = get_payloads(a);
+    const auto payloadsB = get_payloads(b);
     return payloadsA == payloadsB;
 }
 

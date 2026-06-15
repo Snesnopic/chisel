@@ -78,11 +78,11 @@ struct FileCloser {
 using unique_FILE = std::unique_ptr<FILE, FileCloser>;
 
 // libpng error handlers (quiet)
-void png_error_fn_quiet(png_structp png, png_const_charp msg) {
+void png_error_fn_quiet(const png_structp png, const png_const_charp msg) {
     Logger::log(LogLevel::Debug, std::string("Libpng (header read): ") + msg, "AudioMetadataUtil");
     longjmp(png_jmpbuf(png), 1);
 }
-void png_warning_fn_quiet(png_structp, png_const_charp msg) {
+void png_warning_fn_quiet(png_structp, const png_const_charp msg) {
     Logger::log(LogLevel::Debug, std::string("Libpng (header read warn): ") + msg, "AudioMetadataUtil");
 }
 
@@ -316,7 +316,7 @@ void extractApeV2Covers(TagLib::APE::Tag* tag,
             TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
 
             std::string mime = "image/jpeg";
-            if (imgData.size() >= 8 && !png_sig_cmp((unsigned char*)imgData.data(), 0, 8)) {
+            if (imgData.size() >= 8 && !png_sig_cmp(reinterpret_cast<unsigned char *>(imgData.data()), 0, 8)) {
                 mime = "image/png";
             }
 

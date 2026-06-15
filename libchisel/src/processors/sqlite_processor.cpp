@@ -30,7 +30,7 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     sqlite3* db = nullptr;
     int rc = sqlite3_open_v2(output.string().c_str(), &db, SQLITE_OPEN_READWRITE, nullptr);
     if (rc != SQLITE_OK) {
-        std::string err_msg = db ? sqlite3_errmsg(db) : "unknown error";
+        const std::string err_msg = db ? sqlite3_errmsg(db) : "unknown error";
         if (db) sqlite3_close(db);
         Logger::log(LogLevel::Warning, "Cannot open database (likely corrupt): " + err_msg, get_name());
         return; // act as passthrough (file already copied)
@@ -39,7 +39,7 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     // run VACUUM
     rc = sqlite3_exec(db, "VACUUM;", nullptr, nullptr, nullptr);
     if (rc != SQLITE_OK) {
-        std::string err_msg = sqlite3_errmsg(db);
+        const std::string err_msg = sqlite3_errmsg(db);
         sqlite3_close(db);
         Logger::log(LogLevel::Warning, "Vacuum failed (likely corrupt): " + err_msg, get_name());
         return; // act as passthrough (file already copied, though partially vacuumed, size won't improve)
@@ -49,7 +49,7 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     // run ANALYZE
     rc = sqlite3_exec(db, "ANALYZE;", nullptr, nullptr, nullptr);
     if (rc != SQLITE_OK) {
-        std::string err_msg = sqlite3_errmsg(db);
+        const std::string err_msg = sqlite3_errmsg(db);
         sqlite3_close(db);
         Logger::log(LogLevel::Warning, "Analyze failed (likely corrupt): " + err_msg, get_name());
         return; // act as passthrough
@@ -62,7 +62,7 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
 }
 
 // helper callback for sqlite3_exec to accumulate dump output
-static int sqlite_dump_callback(void *user_data, int argc, char **argv, char **azColName) {
+static int sqlite_dump_callback(void *user_data, const int argc, char **argv, char **azColName) {
     auto *out_stream = static_cast<std::stringstream *>(user_data);
     for (int i = 0; i < argc; i++) {
         if (argv[i]) {

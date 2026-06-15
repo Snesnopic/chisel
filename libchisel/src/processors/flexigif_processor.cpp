@@ -99,7 +99,7 @@ static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::pat
     FILE* f = chisel::open_file(path, "rb");
     if (!f) return {};
     fseek(f, 0, SEEK_END);
-    long size = ftell(f);
+    const long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size <= 0) {
         fclose(f);
@@ -112,8 +112,8 @@ static std::vector<unsigned char> read_file_to_buffer(const std::filesystem::pat
 }
 
 bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    auto bufA = read_file_to_buffer(a);
-    auto bufB = read_file_to_buffer(b);
+    const auto bufA = read_file_to_buffer(a);
+    const auto bufB = read_file_to_buffer(b);
 
     if (bufA.empty() || bufB.empty()) {
         Logger::log(LogLevel::Warning, "Raw_equal: empty or unreadable file(s)", get_name());
@@ -153,7 +153,7 @@ bool FlexiGifProcessor::raw_equal(const std::filesystem::path& a, const std::fil
         Logger::log(LogLevel::Debug, "Raw_equal: dimension/frame count mismatch", get_name());
         equal = false;
     } else {
-        size_t totalBytes = static_cast<size_t>(wA) * hA * 4 * framesA;
+        const std::size_t totalBytes = static_cast<std::size_t>(wA) * hA * 4 * framesA;
         if (std::memcmp(dataA, dataB, totalBytes) != 0) {
             Logger::log(LogLevel::Debug, "Raw_equal: pixel mismatch", get_name());
             equal = false;

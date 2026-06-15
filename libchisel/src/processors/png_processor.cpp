@@ -194,8 +194,8 @@ namespace chisel {
         png_read_update_info(png, info);
         // now, the buffer is guaranteed to be rgba8
 
-        const size_t rowbytes = png_get_rowbytes(png, info);
-        if (rowbytes != static_cast<size_t>(width) * 4) {
+        const std::size_t rowbytes = png_get_rowbytes(png, info);
+        if (rowbytes != static_cast<std::size_t>(width) * 4) {
              throw std::runtime_error("Rowbytes mismatch, expected RGBA8");
         }
 
@@ -260,7 +260,7 @@ namespace chisel {
 
                 if (can_use_palette) {
                     uint32_t color = pack_rgba(r, g, b, a);
-                    if (color_to_index_map.find(color) == color_to_index_map.end()) {
+                    if (!color_to_index_map.contains(color)) {
                         if (color_to_index_map.size() >= 256) {
                             can_use_palette = false;
                         } else {

@@ -250,7 +250,7 @@ static bool decode_jpeg_raw(const std::filesystem::path &path,
         height = static_cast<int>(cinfo.output_height);
         channels = static_cast<int>(cinfo.output_components); // usually 3 (rgb) or 1 (grayscale)
 
-        buffer.resize(static_cast<size_t>(width) * height * channels);
+        buffer.resize(static_cast<std::size_t>(width) * height * channels);
         unsigned char *row_ptr = buffer.data();
         const unsigned int row_stride = width * channels;
 

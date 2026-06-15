@@ -5,16 +5,14 @@ namespace chisel {
 
 namespace {
     const std::string b64_chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        "0123456789+/";
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    inline bool is_base64(unsigned char c) {
+    inline bool is_base64(const unsigned char c) {
         return (std::isalnum(c) || (c == '+') || (c == '/'));
     }
 } // namespace
 
-std::vector<uint8_t> Base64Utils::decode(std::string_view encoded_string) {
+std::vector<uint8_t> Base64Utils::decode(const std::string_view encoded_string) {
     int in_len = encoded_string.size();
     int i = 0, j = 0, in_ = 0;
     unsigned char char_array_4[4], char_array_3[3];

@@ -18,10 +18,10 @@
 namespace chisel {
 
 namespace {
-    void stbi_write_callback(void *context, void *data, int size) {
+    void stbi_write_callback(void *context, void *data, const int size) {
         if (size <= 0) return;
         FILE* f = static_cast<FILE *>(context);
-        std::fwrite(data, 1, static_cast<size_t>(size), f);
+        std::fwrite(data, 1, static_cast<std::size_t>(size), f);
     }
 } // namespace
 
@@ -44,7 +44,7 @@ namespace {
             throw std::runtime_error("TgaProcessor: Failed to load TGA");
         }
 
-        unique_FILE out_file(chisel::open_file(output, "wb"));
+        const unique_FILE out_file(chisel::open_file(output, "wb"));
         if (!out_file) {
             stbi_image_free(data);
             Logger::log(LogLevel::Error, "Failed to open output file", get_name());
@@ -96,7 +96,7 @@ static std::vector<unsigned char> decode_tga_rgba8(const std::filesystem::path& 
     }
 
     channels = 4;
-    const size_t data_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+    const size_t data_size = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4;
 
     // copy data to vector for safe handling
     std::vector<unsigned char> pcm(data, data + data_size);

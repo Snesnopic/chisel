@@ -17,13 +17,13 @@
 namespace chisel {
 
 namespace {
-    bool ci_compare(char a, char b) {
+    bool ci_compare(const char a, const char b) {
         return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
     }
 
-    size_t find_case_insensitive(std::string_view haystack, std::string_view needle, size_t pos = 0) {
+    std::size_t find_case_insensitive(const std::string_view haystack, const std::string_view needle, const std::size_t pos = 0) {
         if (pos >= haystack.size()) return std::string_view::npos;
-        auto it = std::search(haystack.begin() + pos, haystack.end(),
+        const auto it = std::search(haystack.begin() + pos, haystack.end(),
                               needle.begin(), needle.end(), ci_compare);
         if (it == haystack.end()) return std::string_view::npos;
         return std::distance(haystack.begin(), it);
@@ -43,21 +43,21 @@ std::optional<ExtractedContent> VcfProcessor::prepare_extraction(const std::file
     content.format = ContainerFormat::Vcf;
 
     std::vector<PhotoPosition> positions;
-    size_t last_search_pos = 0;
+    std::size_t last_search_pos = 0;
 
-    const std::string_view photo_tag = "PHOTO;";
+    constexpr std::string_view photo_tag = "PHOTO;";
 
     while (true) {
-        size_t photo_pos = find_case_insensitive(content_view, photo_tag, last_search_pos);
+        std::size_t photo_pos = find_case_insensitive(content_view, photo_tag, last_search_pos);
         if (photo_pos == std::string_view::npos) break;
 
-        size_t colon_pos = content_view.find(':', photo_pos);
+        std::size_t colon_pos = content_view.find(':', photo_pos);
         if (colon_pos == std::string_view::npos) break;
 
         std::string_view header = content_view.substr(photo_pos, colon_pos - photo_pos);
         
         // ensure it's base64 encoded
-        auto contains_ci = [](std::string_view haystack, std::string_view needle) {
+        auto contains_ci = [](const std::string_view haystack, const std::string_view needle) {
             return find_case_insensitive(haystack, needle) != std::string_view::npos;
         };
 
@@ -67,17 +67,17 @@ std::optional<ExtractedContent> VcfProcessor::prepare_extraction(const std::file
         }
 
         // find end of base64 data (first line that doesn't start with space/tab)
-        size_t data_start = colon_pos + 1;
-        size_t data_end = data_start;
+        std::size_t data_start = colon_pos + 1;
+        std::size_t data_end = data_start;
         
         while (data_end < content_view.size()) {
-            size_t next_newline = content_view.find('\n', data_end);
+            std::size_t next_newline = content_view.find('\n', data_end);
             if (next_newline == std::string_view::npos) {
                 data_end = content_view.size();
                 break;
             }
             
-            size_t line_after = next_newline + 1;
+            std::size_t line_after = next_newline + 1;
             if (line_after < content_view.size() && 
                 content_view[line_after] != ' ' && 
                 content_view[line_after] != '\t') {
@@ -142,11 +142,11 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
     std::string new_content;
     new_content.reserve(raw_data.size()); 
 
-    size_t last_pos = 0;
+    std::size_t last_pos = 0;
 
     for (size_t i = 0; i < positions.size(); ++i) {
         // text before this photo
-        size_t photo_entry_start = positions[i].start - positions[i].prefix.length();
+        std::size_t photo_entry_start = positions[i].start - positions[i].prefix.length();
         new_content.append(content_view.substr(last_pos, photo_entry_start - last_pos));
         
         // prefix (PHOTO;...)
@@ -158,7 +158,7 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
         TagLib::ByteVector b64_bv = bv.toBase64();
         std::string b64(b64_bv.data(), b64_bv.size());
 
-        size_t current_line_len = positions[i].prefix.length();
+        std::size_t current_line_len = positions[i].prefix.length();
         
         for (char c : b64) {
             if (current_line_len >= 74) {

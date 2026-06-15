@@ -31,7 +31,7 @@ std::vector<MemChunk> parse_mime_memory(const std::filesystem::path& input_path)
     auto flush_b64 = [&]() {
         if (!b64_buffer.empty()) {
             std::string clean_b64;
-            for (char c : b64_buffer) {
+            for (const char c : b64_buffer) {
                 if (!std::isspace(static_cast<unsigned char>(c))) {
                     clean_b64.push_back(c);
                 }
@@ -114,15 +114,15 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
     auto flush_b64 = [&]() {
         if (!b64_buffer.empty()) {
             std::string clean_b64;
-            for (char c : b64_buffer) {
+            for (const char c : b64_buffer) {
                 if (!std::isspace(static_cast<unsigned char>(c))) {
                     clean_b64.push_back(c);
                 }
             }
 
             if (!clean_b64.empty()) {
-                std::vector<uint8_t> binary_data = Base64Utils::decode(clean_b64);
-                std::filesystem::path tmp_file = content.temp_dir /
+                const std::vector<uint8_t> binary_data = Base64Utils::decode(clean_b64);
+                const std::filesystem::path tmp_file = content.temp_dir /
                                                 ("mime_asset_" + RandomUtils::random_suffix() + ".bin");
                 chisel::write_file(tmp_file, binary_data);
 
@@ -201,7 +201,7 @@ std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent&
         if (std::holds_alternative<TextChunk>(chunk)) {
             out << std::get<TextChunk>(chunk).text;
         } else if (std::holds_alternative<Base64Chunk>(chunk)) {
-            size_t idx = std::get<Base64Chunk>(chunk).file_index;
+            std::size_t idx = std::get<Base64Chunk>(chunk).file_index;
             const auto& file_path = content.extracted_files[idx];
             
             std::vector<uint8_t> opt_data = chisel::read_file(file_path);
@@ -223,8 +223,8 @@ std::string MimeProcessor::get_raw_checksum(const std::filesystem::path& /*file_
 }
 
 bool MimeProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    auto chunks_a = parse_mime_memory(a);
-    auto chunks_b = parse_mime_memory(b);
+    const auto chunks_a = parse_mime_memory(a);
+    const auto chunks_b = parse_mime_memory(b);
 
     if (chunks_a.size() != chunks_b.size()) {
         return false;

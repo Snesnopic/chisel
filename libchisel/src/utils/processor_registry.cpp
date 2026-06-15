@@ -153,7 +153,7 @@ std::vector<IProcessor*> ProcessorRegistry::find_by_extension(const std::string&
 
     auto iequals = [](const std::string_view s1, const std::string_view s2) {
         return std::equal(s1.begin(), s1.end(), s2.begin(), s2.end(),
-                          [](char a, char b) {
+                          [](const char a, const char b) {
                               return std::tolower(static_cast<unsigned char>(a)) ==
                                      std::tolower(static_cast<unsigned char>(b));
                           });

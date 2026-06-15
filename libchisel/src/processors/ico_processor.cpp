@@ -34,7 +34,7 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
     if (reserved != 0 || (type != 1 && type != 2)) {
         throw std::runtime_error("INVALID ICO/CUR HEADER");
     }
-    if (data.size() < 6 + static_cast<size_t>(count) * 16) {
+    if (data.size() < 6 + static_cast<std::size_t>(count) * 16) {
         throw std::runtime_error("TRUNCATED ICO/CUR DIRECTORY");
     }
 

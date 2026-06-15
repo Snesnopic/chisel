@@ -91,7 +91,7 @@ public:
 
     uint32_t read_u32() {
         if (pos_ + 4 > buf_.size()) throw std::runtime_error("LuaProcessor: unexpected end of file");
-        uint32_t v = static_cast<uint32_t>(buf_[pos_])
+        const uint32_t v = static_cast<uint32_t>(buf_[pos_])
                    | (static_cast<uint32_t>(buf_[pos_+1]) << 8)
                    | (static_cast<uint32_t>(buf_[pos_+2]) << 16)
                    | (static_cast<uint32_t>(buf_[pos_+3]) << 24);
@@ -108,34 +108,34 @@ public:
         return v;
     }
 
-    void skip(size_t n) {
+    void skip(const std::size_t n) {
         if (pos_ + n > buf_.size()) throw std::runtime_error("LuaProcessor: unexpected end of file");
         pos_ += n;
     }
 
     const uint8_t* ptr() const { return buf_.data() + pos_; }
-    size_t remaining() const { return buf_.size() - pos_; }
-    size_t pos() const { return pos_; }
+    std::size_t remaining() const { return buf_.size() - pos_; }
+    std::size_t pos() const { return pos_; }
 
 private:
     const std::vector<uint8_t>& buf_;
-    size_t pos_;
+    std::size_t pos_;
 };
 
 class ByteWriter {
 public:
     std::vector<uint8_t> buf;
 
-    void write_u8(uint8_t v) { buf.push_back(v); }
+    void write_u8(const uint8_t v) { buf.push_back(v); }
 
-    void write_u32(uint32_t v) {
+    void write_u32(const uint32_t v) {
         buf.push_back(static_cast<uint8_t>(v));
         buf.push_back(static_cast<uint8_t>(v >> 8));
         buf.push_back(static_cast<uint8_t>(v >> 16));
         buf.push_back(static_cast<uint8_t>(v >> 24));
     }
 
-    void write_bytes(const uint8_t* p, size_t n) {
+    void write_bytes(const uint8_t* p, const std::size_t n) {
         buf.insert(buf.end(), p, p + n);
     }
 };
@@ -146,22 +146,22 @@ public:
  * @brief Read and discard a Lua string (used for stripped debug strings).
  */
 void skip_lua_string_51(ByteReader& r) {
-    uint32_t len = r.read_u32();
+    const uint32_t len = r.read_u32();
     if (len > 0) r.skip(len);
 }
 
 void skip_lua_string_53(ByteReader& r) {
-    uint8_t b = r.read_u8();
+    const uint8_t b = r.read_u8();
     if (b == 0) return; // nil string
-    uint64_t len = (b == 0xFF) ? r.read_u64() : static_cast<uint64_t>(b);
-    r.skip(static_cast<size_t>(len));
+    const uint64_t len = (b == 0xFF) ? r.read_u64() : static_cast<uint64_t>(b);
+    r.skip(static_cast<std::size_t>(len));
 }
 
 /**
  * @brief Read a Lua 5.1/5.2 string and copy it to writer (for non-debug strings).
  */
 void copy_lua_string_51(ByteReader& r, ByteWriter& w) {
-    uint32_t len = r.read_u32();
+    const uint32_t len = r.read_u32();
     w.write_u32(len);
     if (len > 0) {
         w.write_bytes(r.ptr(), len);
@@ -173,7 +173,7 @@ void copy_lua_string_51(ByteReader& r, ByteWriter& w) {
  * @brief Read a Lua 5.3 string and copy it to writer.
  */
 void copy_lua_string_53(ByteReader& r, ByteWriter& w) {
-    uint8_t b = r.read_u8();
+    const uint8_t b = r.read_u8();
     w.write_u8(b);
     if (b == 0) return;
     uint64_t len;
@@ -206,16 +206,16 @@ void parse_proto_51(ByteReader& r, ByteWriter& w) {
     }
 
     // instruction list
-    uint32_t size_code = r.read_u32();
+    const uint32_t size_code = r.read_u32();
     w.write_u32(size_code);
     w.write_bytes(r.ptr(), size_code * 4);
     r.skip(size_code * 4);
 
     // constant list
-    uint32_t size_const = r.read_u32();
+    const uint32_t size_const = r.read_u32();
     w.write_u32(size_const);
     for (uint32_t i = 0; i < size_const; ++i) {
-        uint8_t tag = r.read_u8();
+        const uint8_t tag = r.read_u8();
         w.write_u8(tag);
         switch (tag) {
             case 0: break; // LUA_TNIL
@@ -232,7 +232,7 @@ void parse_proto_51(ByteReader& r, ByteWriter& w) {
     }
 
     // nested prototypes
-    uint32_t size_proto = r.read_u32();
+    const uint32_t size_proto = r.read_u32();
     w.write_u32(size_proto);
     for (uint32_t i = 0; i < size_proto; ++i) {
         parse_proto_51(r, w);
@@ -241,12 +241,12 @@ void parse_proto_51(ByteReader& r, ByteWriter& w) {
     // --- debug section — strip entirely ---
 
     // lineinfo: int32 count + count*int32
-    uint32_t size_lineinfo = r.read_u32();
+    const uint32_t size_lineinfo = r.read_u32();
     r.skip(size_lineinfo * 4);
     w.write_u32(0); // stripped
 
     // locvars: int32 count + per entry: string + int32 + int32
-    uint32_t size_locvars = r.read_u32();
+    const uint32_t size_locvars = r.read_u32();
     for (uint32_t i = 0; i < size_locvars; ++i) {
         skip_lua_string_51(r);
         r.skip(8); // startpc + endpc
@@ -254,7 +254,7 @@ void parse_proto_51(ByteReader& r, ByteWriter& w) {
     w.write_u32(0); // stripped
 
     // upvalue names: int32 count + per entry: string
-    uint32_t size_upvals = r.read_u32();
+    const uint32_t size_upvals = r.read_u32();
     for (uint32_t i = 0; i < size_upvals; ++i) {
         skip_lua_string_51(r);
     }
@@ -276,16 +276,16 @@ void parse_proto_52(ByteReader& r, ByteWriter& w) {
     for (int i = 0; i < 3; ++i) w.write_u8(r.read_u8());
 
     // instruction list
-    uint32_t size_code = r.read_u32();
+    const uint32_t size_code = r.read_u32();
     w.write_u32(size_code);
     w.write_bytes(r.ptr(), size_code * 4);
     r.skip(size_code * 4);
 
     // constant list
-    uint32_t size_const = r.read_u32();
+    const uint32_t size_const = r.read_u32();
     w.write_u32(size_const);
     for (uint32_t i = 0; i < size_const; ++i) {
-        uint8_t tag = r.read_u8();
+        const uint8_t tag = r.read_u8();
         w.write_u8(tag);
         switch (tag) {
             case 0: break; // LUA_TNIL
@@ -303,7 +303,7 @@ void parse_proto_52(ByteReader& r, ByteWriter& w) {
     }
 
     // upvalue descriptors (instack + idx, NOT names)
-    uint32_t size_upval = r.read_u32();
+    const uint32_t size_upval = r.read_u32();
     w.write_u32(size_upval);
     for (uint32_t i = 0; i < size_upval; ++i) {
         w.write_u8(r.read_u8()); // instack
@@ -311,7 +311,7 @@ void parse_proto_52(ByteReader& r, ByteWriter& w) {
     }
 
     // nested prototypes
-    uint32_t size_proto = r.read_u32();
+    const uint32_t size_proto = r.read_u32();
     w.write_u32(size_proto);
     for (uint32_t i = 0; i < size_proto; ++i) {
         parse_proto_52(r, w);
@@ -319,12 +319,12 @@ void parse_proto_52(ByteReader& r, ByteWriter& w) {
 
     // --- debug section — strip ---
     // lineinfo
-    uint32_t size_lineinfo = r.read_u32();
+    const uint32_t size_lineinfo = r.read_u32();
     r.skip(size_lineinfo * 4);
     w.write_u32(0);
 
     // locvars
-    uint32_t size_locvars = r.read_u32();
+    const uint32_t size_locvars = r.read_u32();
     for (uint32_t i = 0; i < size_locvars; ++i) {
         skip_lua_string_51(r);
         r.skip(8);
@@ -332,7 +332,7 @@ void parse_proto_52(ByteReader& r, ByteWriter& w) {
     w.write_u32(0);
 
     // upvalue names
-    uint32_t size_upnames = r.read_u32();
+    const uint32_t size_upnames = r.read_u32();
     for (uint32_t i = 0; i < size_upnames; ++i) {
         skip_lua_string_51(r);
     }
@@ -354,16 +354,16 @@ void parse_proto_53(ByteReader& r, ByteWriter& w) {
     for (int i = 0; i < 3; ++i) w.write_u8(r.read_u8());
 
     // instruction list
-    uint32_t size_code = r.read_u32();
+    const uint32_t size_code = r.read_u32();
     w.write_u32(size_code);
     w.write_bytes(r.ptr(), size_code * 4);
     r.skip(size_code * 4);
 
     // constant list — 5.3 uses different tags
-    uint32_t size_const = r.read_u32();
+    const uint32_t size_const = r.read_u32();
     w.write_u32(size_const);
     for (uint32_t i = 0; i < size_const; ++i) {
-        uint8_t tag = r.read_u8();
+        const uint8_t tag = r.read_u8();
         w.write_u8(tag);
         switch (tag) {
             case 0:  break; // LUA_TNIL
@@ -380,7 +380,7 @@ void parse_proto_53(ByteReader& r, ByteWriter& w) {
     }
 
     // upvalue descriptors (instack + idx)
-    uint32_t size_upval = r.read_u32();
+    const uint32_t size_upval = r.read_u32();
     w.write_u32(size_upval);
     for (uint32_t i = 0; i < size_upval; ++i) {
         w.write_u8(r.read_u8()); // instack
@@ -388,25 +388,25 @@ void parse_proto_53(ByteReader& r, ByteWriter& w) {
     }
 
     // nested prototypes
-    uint32_t size_proto = r.read_u32();
+    const uint32_t size_proto = r.read_u32();
     w.write_u32(size_proto);
     for (uint32_t i = 0; i < size_proto; ++i) {
         parse_proto_53(r, w);
     }
 
     // --- debug section — strip ---
-    uint32_t size_lineinfo = r.read_u32();
+    const uint32_t size_lineinfo = r.read_u32();
     r.skip(size_lineinfo * 4);
     w.write_u32(0);
 
-    uint32_t size_locvars = r.read_u32();
+    const uint32_t size_locvars = r.read_u32();
     for (uint32_t i = 0; i < size_locvars; ++i) {
         skip_lua_string_53(r);
         r.skip(8); // startpc + endpc
     }
     w.write_u32(0);
 
-    uint32_t size_upnames = r.read_u32();
+    const uint32_t size_upnames = r.read_u32();
     for (uint32_t i = 0; i < size_upnames; ++i) {
         skip_lua_string_53(r);
     }
@@ -436,7 +436,7 @@ bool is_lua_bytecode(const std::vector<uint8_t>& data) {
  *                   size_t_size(1) + instr_size(1) + int_sz(1) + float_sz(1) +
  *                   sample_int(8) + sample_float(8)   → 33 bytes total
  */
-size_t header_size(uint8_t version) {
+size_t header_size(const uint8_t version) {
     switch (version) {
         case kVer51: return 12;
         case kVer52: return 18;
@@ -452,8 +452,8 @@ size_t header_size(uint8_t version) {
 std::vector<uint8_t> strip_debug(const std::vector<uint8_t>& in) {
     if (!is_lua_bytecode(in)) return {};
 
-    uint8_t version = in[4];
-    size_t hdr = header_size(version);
+    const uint8_t version = in[4];
+    const std::size_t hdr = header_size(version);
     if (hdr == 0 || in.size() < hdr) return {};
 
     ByteReader r(in);

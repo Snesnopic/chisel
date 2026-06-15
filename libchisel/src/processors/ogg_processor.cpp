@@ -41,7 +41,7 @@ namespace {
             return false;
         }
 
-        int num_segments = header[26];
+        const int num_segments = header[26];
 
         if (fseek(f, num_segments, SEEK_CUR) != 0) {
             fseek(f, start_pos, SEEK_SET);
@@ -76,7 +76,7 @@ namespace {
             return false;
         }
 
-        int num_segments = header[26];
+        const int num_segments = header[26];
 
         if (fseek(f, num_segments, SEEK_CUR) != 0) {
             fseek(f, start_pos, SEEK_SET);
@@ -99,7 +99,7 @@ namespace {
     };
 
     FLAC__StreamDecoderReadStatus read_cb(const FLAC__StreamDecoder*, FLAC__byte buffer[], std::size_t *bytes, void *client_data) {
-        auto* io = static_cast<OggIO*>(client_data);
+        const auto* io = static_cast<OggIO*>(client_data);
         if (*bytes > 0) {
             *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, io->f_in);
             if (*bytes == 0 && ferror(io->f_in)) return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
@@ -109,14 +109,14 @@ namespace {
         return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
     }
 
-    FLAC__StreamDecoderSeekStatus seek_cb(const FLAC__StreamDecoder*, FLAC__uint64 absolute_byte_offset, void *client_data) {
-        auto* io = static_cast<OggIO*>(client_data);
+    FLAC__StreamDecoderSeekStatus seek_cb(const FLAC__StreamDecoder*, const FLAC__uint64 absolute_byte_offset, void *client_data) {
+        const auto* io = static_cast<OggIO*>(client_data);
         if (fseek(io->f_in, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
         return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
     }
 
     FLAC__StreamDecoderTellStatus tell_cb(const FLAC__StreamDecoder*, FLAC__uint64 *absolute_byte_offset, void *client_data) {
-        auto* io = static_cast<OggIO*>(client_data);
+        const auto* io = static_cast<OggIO*>(client_data);
         const long pos = ftell(io->f_in);
         if (pos < 0) return FLAC__STREAM_DECODER_TELL_STATUS_ERROR;
         *absolute_byte_offset = static_cast<FLAC__uint64>(pos);
@@ -124,7 +124,7 @@ namespace {
     }
 
     FLAC__StreamDecoderLengthStatus length_cb(const FLAC__StreamDecoder*, FLAC__uint64 *stream_length, void *client_data) {
-        auto* io = static_cast<OggIO*>(client_data);
+        const auto* io = static_cast<OggIO*>(client_data);
         const long curr = ftell(io->f_in);
         fseek(io->f_in, 0, SEEK_END);
         const long len = ftell(io->f_in);
@@ -135,19 +135,19 @@ namespace {
     }
 
     FLAC__bool eof_cb(const FLAC__StreamDecoder*, void *client_data) {
-        auto* io = static_cast<OggIO*>(client_data);
+        const auto* io = static_cast<OggIO*>(client_data);
         return feof(io->f_in) ? true : false;
     }
 
     // --- Encoder Callbacks ---
 
-    FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], std::size_t bytes, unsigned, unsigned, void *client_data) {
+    FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], const std::size_t bytes, unsigned, unsigned, void *client_data) {
         const auto f = static_cast<FILE*>(client_data);
         if (fwrite(buffer, 1, bytes, f) != bytes) return FLAC__STREAM_ENCODER_WRITE_STATUS_FATAL_ERROR;
         return FLAC__STREAM_ENCODER_WRITE_STATUS_OK;
     }
 
-    FLAC__StreamEncoderSeekStatus enc_seek_cb(const FLAC__StreamEncoder*, FLAC__uint64 absolute_byte_offset, void *client_data) {
+    FLAC__StreamEncoderSeekStatus enc_seek_cb(const FLAC__StreamEncoder*, const FLAC__uint64 absolute_byte_offset, void *client_data) {
        const auto f = static_cast<FILE*>(client_data);
         if (fseek(f, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_ENCODER_SEEK_STATUS_ERROR;
         return FLAC__STREAM_ENCODER_SEEK_STATUS_OK;
@@ -193,7 +193,7 @@ namespace {
             }
     }
 
-    void dec_error_cb(const FLAC__StreamDecoder*, FLAC__StreamDecoderErrorStatus status, void*) {
+    void dec_error_cb(const FLAC__StreamDecoder*, const FLAC__StreamDecoderErrorStatus status, void*) {
         Logger::log(LogLevel::Warning, "Libflac warning: " + std::string(FLAC__StreamDecoderErrorStatusString[status]), "OggProcessor");
     }
 
@@ -314,7 +314,7 @@ void OggProcessor::recompress(const fs::path& input,
         const std::string input_str = input.string();
         const std::string output_str = output.string();
 
-        int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str());
+        const int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str());
         if (result != 0) {
             const std::string msg = "Optivorbis failed with error code: " + std::to_string(result);
             Logger::log(LogLevel::Error, msg, get_name());
@@ -358,7 +358,7 @@ void OggProcessor::recompress(const fs::path& input,
     ctx.encoder = encoder;
     ctx.preserve_metadata = options.preserve_metadata;
 
-    FLAC__StreamDecoderInitStatus init_stat = FLAC__stream_decoder_init_ogg_stream(
+    const FLAC__StreamDecoderInitStatus init_stat = FLAC__stream_decoder_init_ogg_stream(
         decoder,
         read_cb, seek_cb, tell_cb, length_cb, eof_cb,
         dec_write_cb, dec_metadata_cb, dec_error_cb,

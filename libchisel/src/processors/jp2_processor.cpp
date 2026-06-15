@@ -32,7 +32,7 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
     // determine codec format based on extension
     OPJ_CODEC_FORMAT format = OPJ_CODEC_JP2;
     std::string ext = input_path.extension().string();
-    std::ranges::transform(ext, ext.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(ext, ext.begin(), [](const unsigned char c){ return static_cast<char>(std::tolower(c)); });
     
     if (ext == ".j2k" || ext == ".j2c") {
         format = OPJ_CODEC_J2K;
@@ -132,7 +132,7 @@ std::filesystem::path Jp2Processor::finalize_extraction(const ExtractedContent& 
 static std::vector<uint8_t> decode_jp2_rgba(const std::filesystem::path& path, int& w, int& h) {
     OPJ_CODEC_FORMAT format = OPJ_CODEC_JP2;
     std::string ext = path.extension().string();
-    std::ranges::transform(ext, ext.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(ext, ext.begin(), [](const unsigned char c){ return static_cast<char>(std::tolower(c)); });
     if (ext == ".j2k" || ext == ".j2c") format = OPJ_CODEC_J2K;
 
     opj_dparameters_t dparam;
@@ -157,7 +157,7 @@ static std::vector<uint8_t> decode_jp2_rgba(const std::filesystem::path& path, i
 
     w = static_cast<int>(image->x1 - image->x0);
     h = static_cast<int>(image->y1 - image->y0);
-    size_t size = static_cast<size_t>(w) * h * image->numcomps;
+    const std::size_t size = static_cast<size_t>(w) * h * image->numcomps;
     std::vector<uint8_t> pixels(size * sizeof(int));
 
     for (uint32_t i = 0; i < image->numcomps; ++i) {
@@ -178,8 +178,8 @@ std::string Jp2Processor::get_raw_checksum(const std::filesystem::path& /*file_p
 
 bool Jp2Processor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
     int wa, ha, wb, hb;
-    auto pixA = decode_jp2_rgba(a, wa, ha);
-    auto pixB = decode_jp2_rgba(b, wb, hb);
+    const auto pixA = decode_jp2_rgba(a, wa, ha);
+    const auto pixB = decode_jp2_rgba(b, wb, hb);
 
     if (pixA.empty() || pixB.empty()) return false;
     if (wa != wb || ha != hb) return false;

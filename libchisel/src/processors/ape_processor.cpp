@@ -126,7 +126,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
     constexpr int level = APE_COMPRESSION_LEVEL_INSANE;
     const APE::int64 maxAudioBytes = static_cast<APE::int64>(total_frames) * block_align;
 
-    int nRetVal = pCompress->Start(
+    const int nRetVal = pCompress->Start(
         output.wstring().c_str(),
         &wfeAudioFormat,
         false,
@@ -143,12 +143,12 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("ApeProcessor: encoder start failed");
     }
 
-    std::vector<uint8_t> block(static_cast<size_t>(block_bytes));
+    std::vector<uint8_t> block(static_cast<std::size_t>(block_bytes));
     int64_t frames_processed_total = 0;
 
     while (frames_processed_total < total_frames) {
         APE::int64 blocks_retrieved = 0;
-        int rc = pDecompress->GetData(block.data(), block_frames_request, &blocks_retrieved);
+        const int rc = pDecompress->GetData(block.data(), block_frames_request, &blocks_retrieved);
         if (rc != ERROR_SUCCESS) {
             pCompress->Finish(nullptr, 0, 0);
             APE_SAFE_DELETE(pCompress)
@@ -158,10 +158,10 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         }
         if (blocks_retrieved <= 0) break;
 
-        const size_t bytes_to_add = static_cast<size_t>(blocks_retrieved) * static_cast<size_t>(block_align);
-        int add_rc = pCompress->AddData(block.data(), static_cast<APE::int64>(bytes_to_add));
+        const std::size_t bytes_to_add = static_cast<std::size_t>(blocks_retrieved) * static_cast<std::size_t>(block_align);
+        const int add_rc = pCompress->AddData(block.data(), static_cast<APE::int64>(bytes_to_add));
         if (add_rc != 0) {
-            pCompress->Finish(NULL, 0, 0);
+            pCompress->Finish(nullptr, 0, 0);
             APE_SAFE_DELETE(pCompress)
             delete pDecompress;
             delete[] pMacString;
@@ -171,7 +171,7 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         frames_processed_total += blocks_retrieved;
     }
 
-    int fin_rc = pCompress->Finish(nullptr, 0, 0);
+    const int fin_rc = pCompress->Finish(nullptr, 0, 0);
     if (fin_rc != 0) {
         APE_SAFE_DELETE(pCompress)
         delete pDecompress;
@@ -296,19 +296,19 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
     constexpr int block_frames_request = 16384;
 
     std::vector<int32_t> pcm;
-    std::vector<uint8_t> block(static_cast<size_t>(block_frames_request) * block_align);
+    std::vector<uint8_t> block(static_cast<std::size_t>(block_frames_request) * block_align);
 
     int64_t frames_processed = 0;
     while (frames_processed < total_blocks) {
         APE::int64 blocks_retrieved = 0;
-        int rc = dec->GetData(block.data(), block_frames_request, &blocks_retrieved);
+        const int rc = dec->GetData(block.data(), block_frames_request, &blocks_retrieved);
         if (rc != ERROR_SUCCESS) {
             delete dec;
             throw std::runtime_error("APE decode failed");
         }
         if (blocks_retrieved <= 0) break;
 
-        const size_t bytes_to_copy = static_cast<size_t>(blocks_retrieved) * block_align;
+        const std::size_t bytes_to_copy = static_cast<std::size_t>(blocks_retrieved) * block_align;
         const auto* src16 = reinterpret_cast<const int16_t*>(block.data());
         const auto* src32 = reinterpret_cast<const int32_t*>(block.data());
 

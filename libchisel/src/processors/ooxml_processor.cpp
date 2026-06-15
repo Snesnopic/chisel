@@ -105,7 +105,7 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
                 Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), get_name());
                 break;
             }
-            ofs.write(reinterpret_cast<const char*>(buff), static_cast<std::streamsize>(size));
+            ofs.write(static_cast<const char*>(buff), static_cast<std::streamsize>(size));
         }
         ofs.close();
 

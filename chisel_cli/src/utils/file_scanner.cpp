@@ -10,24 +10,22 @@
 #include <algorithm>
 #include <regex>
 
-namespace fs = std::filesystem;
-
-static bool is_junk(const fs::path& p) {
-    auto name = p.filename().string();
+static bool is_junk(const std::filesystem::path& path) {
+    const auto name = path.filename().string();
     if (name.starts_with("._")) {
         return true;
     }
     
     auto iequals = [](const std::string& a, const std::string& b) {
         return std::equal(a.begin(), a.end(), b.begin(), b.end(),
-                          [](char a, char b) { return tolower(a) == tolower(b); });
+                          [](const char a, const char b) { return tolower(a) == tolower(b); });
     };
     
     return iequals(name, ".ds_store") || iequals(name, "desktop.ini");
 }
 
 namespace {
-bool is_filtered(const fs::path& path, const std::vector<std::regex>& exclude_regexes, const std::vector<std::regex>& include_regexes) {
+bool is_filtered(const std::filesystem::path& path, const std::vector<std::regex>& exclude_regexes, const std::vector<std::regex>& include_regexes) {
     const std::string path_str = path.string();
 
     if (!exclude_regexes.empty()) {
@@ -52,11 +50,11 @@ bool is_filtered(const fs::path& path, const std::vector<std::regex>& exclude_re
 } // namespace
 
 
-std::vector<fs::path>
-collect_input_files(const std::vector<fs::path>& inputs,
+std::vector<std::filesystem::path>
+collect_input_files(const std::vector<std::filesystem::path>& inputs,
                     const Settings& settings,
                     bool& is_pipe) {
-    std::vector<fs::path> result;
+    std::vector<std::filesystem::path> result;
     const bool recursive = settings.recursive;
 
     std::vector<std::regex> exclude_regexes;
@@ -79,7 +77,7 @@ collect_input_files(const std::vector<fs::path>& inputs,
 
     for (const auto& in : inputs) {
         if (in == "-") {
-            fs::path tmp = fs::temp_directory_path() / "stdin_chisel.bin";
+            std::filesystem::path tmp = std::filesystem::temp_directory_path() / "stdin_chisel.bin";
             std::ofstream out(tmp, std::ios::binary);
             out << std::cin.rdbuf();
             out.close();
@@ -87,23 +85,23 @@ collect_input_files(const std::vector<fs::path>& inputs,
             is_pipe = true;
             continue;
         }
-        if (!fs::exists(in)) {
+        if (!std::filesystem::exists(in)) {
             chisel::Logger::log(chisel::LogLevel::Error, "Input not found: " + in.string(), "scanner");
             continue;
         }
-        if (fs::is_directory(in)) {
+        if (std::filesystem::is_directory(in)) {
             if (recursive) {
-                for (const auto& e : fs::recursive_directory_iterator(in, fs::directory_options::skip_permission_denied)) {
-                    if (fs::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), exclude_regexes, include_regexes))
+                for (const auto& e : std::filesystem::recursive_directory_iterator(in, std::filesystem::directory_options::skip_permission_denied)) {
+                    if (std::filesystem::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), exclude_regexes, include_regexes))
                         result.push_back(e.path());
                 }
             } else {
-                for (const auto& e : fs::directory_iterator(in, fs::directory_options::skip_permission_denied)) {
-                    if (fs::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), exclude_regexes, include_regexes))
+                for (const auto& e : std::filesystem::directory_iterator(in, std::filesystem::directory_options::skip_permission_denied)) {
+                    if (std::filesystem::is_regular_file(e.path()) && !is_junk(e.path()) && !is_filtered(e.path(), exclude_regexes, include_regexes))
                         result.push_back(e.path());
                 }
             }
-        } else if (fs::is_regular_file(in) && !is_junk(in) && !is_filtered(in, exclude_regexes, include_regexes)) {
+        } else if (std::filesystem::is_regular_file(in) && !is_junk(in) && !is_filtered(in, exclude_regexes, include_regexes)) {
             result.push_back(in);
         }
     }

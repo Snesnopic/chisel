@@ -92,7 +92,7 @@ Chisel& Chisel::preserveMetadata(const bool val) {
     return *this;
 }
 
-Chisel& Chisel::verifyChecksums(bool val) {
+Chisel& Chisel::verifyChecksums(const bool val) {
     impl_->options.verify_checksums = val;
     return *this;
 }

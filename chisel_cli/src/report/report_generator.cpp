@@ -56,7 +56,7 @@ static std::string csv_escape(const std::string& data) {
     std::string result;
     result.reserve(data.size() + 4);
     result.push_back('"');
-    for (char c : data) {
+    for (const char c : data) {
         if (c == '"') {
             result.push_back('"'); // escape quote with another quote
         }
@@ -74,13 +74,13 @@ void print_console_report(const std::vector<Result>& results,
     const unsigned term_width = get_terminal_width();
     const bool use_colors = is_stdout_a_tty();
 
-    size_t max_mime = 15;
-    size_t max_before = 12;
-    size_t max_after = 12;
-    size_t max_delta = 10;
-    size_t max_time = 10;
-    size_t max_result = 10;
-    size_t max_error = 5;
+    std::size_t max_mime = 15;
+    std::size_t max_before = 12;
+    std::size_t max_after = 12;
+    std::size_t max_delta = 10;
+    std::size_t max_time = 10;
+    std::size_t max_result = 10;
+    std::size_t max_error = 5;
     #ifdef max
     #undef max
     #endif
@@ -119,7 +119,7 @@ void print_console_report(const std::vector<Result>& results,
                                 ? term_width - fixed_cols_width
                                 : 10;
 
-    auto truncate = [](const std::string& s, const size_t max_len) {
+    auto truncate = [](const std::string& s, const std::size_t max_len) {
         return s.size() <= max_len ? s : s.substr(0, max_len - 3) + "...";
     };
 
@@ -176,7 +176,7 @@ void print_console_report(const std::vector<Result>& results,
         if (!r.codecs_used.empty()) {
             if (mode == chisel::EncodeMode::PIPE) {
                 std::cerr << "    Pipeline: ";
-                for (size_t i = 0; i < r.codecs_used.size(); ++i) {
+                for (std::size_t i = 0; i < r.codecs_used.size(); ++i) {
                     std::ostringstream ossc;
                     ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
                     std::cerr << r.codecs_used[i].first << " (" << ossc.str() << "%)";

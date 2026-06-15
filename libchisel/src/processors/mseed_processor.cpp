@@ -36,13 +36,13 @@ struct FileDeleter {
 };
 using FilePtr = std::unique_ptr<FILE, FileDeleter>;
 
-extern "C" void record_handler_c(char *record, int reclen, void *userdata) {
+extern "C" void record_handler_c(char *record, const int reclen, void *userdata) {
     if (userdata == nullptr) {
         Logger::log(LogLevel::Error, "RECORD_HANDLER_C: USERDATA (FILE*) IS NULL", "MseedProcessor");
         return;
     }
-    auto outfile = static_cast<FILE*>(userdata);
-    if (fwrite(record, 1, reclen, outfile) != static_cast<size_t>(reclen)) {
+    const auto outfile = static_cast<FILE*>(userdata);
+    if (fwrite(record, 1, reclen, outfile) != static_cast<std::size_t>(reclen)) {
         Logger::log(LogLevel::Error, "RECORD_HANDLER_C: ERROR WRITING RECORD TO OUTPUT", "MseedProcessor");
     }
 }
@@ -55,16 +55,16 @@ int MseedProcessor::choose_reclen(const uint8_t original_version,
 
     if (original_version == 3) return MAX_COMPROMISE_RECLEN;
 
-    size_t estimated_data_size = 0;
+    std::size_t estimated_data_size = 0;
     if (sampleType == 'i' || sampleType == 'f') estimated_data_size = sample_count * 4;
     else if (sampleType == 'd') estimated_data_size = sample_count * 8;
     else estimated_data_size = sample_count;
 
-    const size_t total_estimated_size = estimated_data_size + 128;
+    const std::size_t total_estimated_size = estimated_data_size + 128;
     if (total_estimated_size <= MIN_RECLEN) return MIN_RECLEN;
 
     const int exponent = static_cast<int>(std::ceil(std::log2(total_estimated_size)));
-    int reclen = static_cast<int>(std::pow(2, exponent));
+    const int reclen = static_cast<int>(std::pow(2, exponent));
 
     return std::min(reclen, MAX_COMPROMISE_RECLEN);
 }
@@ -111,7 +111,7 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
 
     // scope limits fileptr lifetime to ensure flush/close before size check
     {
-        FilePtr outfile(chisel::open_file(output.string().c_str(), "wb"));
+        const FilePtr outfile(chisel::open_file(output.string().c_str(), "wb"));
         if (!outfile) {
             throw std::runtime_error("failed to open output file for writing");
         }
@@ -175,19 +175,19 @@ bool MseedProcessor::raw_equal(const std::filesystem::path &a,
 
     MS3TraceList *raw_a = nullptr, *raw_b = nullptr;
 
-    int ret_a = ms3_readtracelist(&raw_a, a.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
-    MstlPtr mstl_a(raw_a);
+    const int ret_a = ms3_readtracelist(&raw_a, a.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    const MstlPtr mstl_a(raw_a);
     if (ret_a != MS_NOERROR) return false;
 
-    int ret_b = ms3_readtracelist(&raw_b, b.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
-    MstlPtr mstl_b(raw_b);
+    const int ret_b = ms3_readtracelist(&raw_b, b.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
+    const MstlPtr mstl_b(raw_b);
     if (ret_b != MS_NOERROR) return false;
 
     if (!mstl_a || !mstl_b) return mstl_a.get() == mstl_b.get();
     if (mstl_a->numtraceids != mstl_b->numtraceids) return false;
 
-    MS3TraceID *id_a = mstl_a->traces.next[0];
-    MS3TraceID *id_b = mstl_b->traces.next[0];
+    const MS3TraceID *id_a = mstl_a->traces.next[0];
+    const MS3TraceID *id_b = mstl_b->traces.next[0];
 
     while (id_a != nullptr && id_b != nullptr) {
         if (strcmp(id_a->sid, id_b->sid) != 0) return false;

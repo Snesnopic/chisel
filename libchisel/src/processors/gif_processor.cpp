@@ -26,17 +26,17 @@ static std::vector<unsigned char> read_file_to_buffer_gif(const std::filesystem:
     FILE* f = chisel::open_file(path, "rb");
     if (!f) return {};
     fseek(f, 0, SEEK_END);
-    long size = ftell(f);
+    const long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size <= 0) {
         fclose(f);
         return {};
     }
     std::vector<unsigned char> buf(size);
-    size_t read_count = fread(buf.data(), 1, size, f);
+    const std::size_t read_count = fread(buf.data(), 1, size, f);
     fclose(f);
 
-    if (read_count != static_cast<size_t>(size)) {
+    if (read_count != static_cast<std::size_t>(size)) {
         return {};
     }
     return buf;
@@ -78,8 +78,7 @@ void GifProcessor::recompress(const std::filesystem::path& input,
                 throw std::runtime_error("Cannot open GIF output");
             }
 
-            Gif_CompressInfo local_info;
-            std::memset(&local_info, 0, sizeof(local_info));
+            Gif_CompressInfo local_info = {};
             Gif_InitCompressInfo(&local_info);
 
             if (!Gif_FullWriteFile(gfs, &local_info, out)) {
@@ -144,7 +143,7 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     if (wA != wB || hA != hB || framesA != framesB) {
         equal = false;
     } else {
-        size_t totalBytes = static_cast<size_t>(wA) * hA * 4 * framesA;
+        const std::size_t totalBytes = static_cast<std::size_t>(wA) * hA * 4 * framesA;
         if (std::memcmp(dataA, dataB, totalBytes) != 0) {
             equal = false;
         }

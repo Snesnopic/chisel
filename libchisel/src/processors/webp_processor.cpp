@@ -157,9 +157,9 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     if (!file) {
         return false;
     }
-    std::streamsize size = file.tellg();
+    const std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> input_data(static_cast<size_t>(size));
+    std::vector<uint8_t> input_data(static_cast<std::size_t>(size));
     if (!file.read(reinterpret_cast<char*>(input_data.data()), size)) {
         return false;
     }
@@ -168,8 +168,8 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
         return false;
     }
 
-    buffer.resize(static_cast<size_t>(width) * height * 4);
-    uint8_t* result = WebPDecodeRGBAInto(input_data.data(),
+    buffer.resize(static_cast<std::size_t>(width) * height * 4);
+    const uint8_t* result = WebPDecodeRGBAInto(input_data.data(),
                                          input_data.size(),
                                          buffer.data(),
                                          buffer.size(),
@@ -183,8 +183,8 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
     int wb, hb;
     std::vector<uint8_t> imgA, imgB;
 
-    bool okA = decode_webp_rgba8(a, wa, ha, imgA);
-    bool okB = decode_webp_rgba8(b, wb, hb, imgB);
+    const bool okA = decode_webp_rgba8(a, wa, ha, imgA);
+    const bool okB = decode_webp_rgba8(b, wb, hb, imgB);
 
     if (!okA || !okB) {
         return false;

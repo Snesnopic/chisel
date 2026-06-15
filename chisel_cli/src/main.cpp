@@ -36,7 +36,7 @@ inline void clear_line_internal() {
 }
 
 // Updated Progress bar printer that accepts status text
-inline void print_progress_bar_internal(const size_t done, const size_t total, const double elapsed_seconds, const std::string& status_text) {
+inline void print_progress_bar_internal(const std::size_t done, const std::size_t total, const double elapsed_seconds, const std::string& status_text) {
     const unsigned term_width = get_terminal_width();
 
     // Base info length estimation (~40 chars for stats)
@@ -199,8 +199,8 @@ int main(int argc, char* argv[]) {
     }
 
     // progress tracking
-    size_t total = 0;
-    std::atomic<size_t> done{0};
+    std::size_t total = 0;
+    std::atomic<std::size_t> done{0};
     auto start_total = std::chrono::steady_clock::now();
 
     // subscribe to events: print progress and collect results
@@ -233,18 +233,18 @@ int main(int argc, char* argv[]) {
         }
 
         // Force an immediate redraw of the bar with the new status
-        double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
         print_progress_bar_internal(done.load(), total, elapsed, status_text);
     });
 
     // generic handler for "finished" events to update progress bar
     auto on_finish = [&](const std::string& finished_filename) {
-        const size_t current = ++done;
+        const std::size_t current = ++done;
         if (settings.quiet) return;
 
         std::scoped_lock lock(g_console_mtx);
 
-        auto it = std::find(g_active_files.begin(), g_active_files.end(), finished_filename);
+        const auto it = std::find(g_active_files.begin(), g_active_files.end(), finished_filename);
         if (it != g_active_files.end()) {
             g_active_files.erase(it);
         }
@@ -256,7 +256,7 @@ int main(int argc, char* argv[]) {
         } else {
             status_text = "Processing: " + g_active_files.front();
         }
-        double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
         print_progress_bar_internal(current, total, elapsed, status_text);
     };
 
@@ -339,7 +339,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
+        const auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
         if (it != results.end()) {
             it->size_after = e.final_size;
         }

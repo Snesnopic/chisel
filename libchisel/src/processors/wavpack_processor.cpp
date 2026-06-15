@@ -36,8 +36,8 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
 
     // open output context
     WavpackContext* ctx_out = WavpackOpenFileOutput(
-        [](void* id, void* data, int32_t bcount) -> int32_t {
-            return static_cast<int32_t>(std::fwrite(data, 1, static_cast<size_t>(bcount), static_cast<FILE*>(id)));
+        [](void* id, void* data, const int32_t bcount) -> int32_t {
+            return static_cast<int32_t>(std::fwrite(data, 1, static_cast<std::size_t>(bcount), static_cast<FILE*>(id)));
         },
         out,
         nullptr
@@ -77,7 +77,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
 
     const int32_t num_channels = config.num_channels > 0 ? config.num_channels : 1;
     constexpr int32_t block_size = 65536;
-    std::vector<int32_t> buffer(static_cast<size_t>(block_size) * static_cast<size_t>(num_channels));
+    std::vector<int32_t> buffer(static_cast<std::size_t>(block_size) * static_cast<std::size_t>(num_channels));
 
     uint32_t samples = 0;
     while ((samples = WavpackUnpackSamples(ctx_in, buffer.data(), block_size)) > 0) {
@@ -102,9 +102,9 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
         for (int i = 0; i < num_tags; ++i) {
             char tag_name[256];
             if (WavpackGetTagItemIndexed(ctx_in, i, tag_name, sizeof(tag_name))) {
-                int size = WavpackGetTagItem(ctx_in, tag_name, nullptr, 0);
+                const int size = WavpackGetTagItem(ctx_in, tag_name, nullptr, 0);
                 if (size > 0) {
-                    std::vector<char> value(static_cast<size_t>(size) + 1);
+                    std::vector<char> value(static_cast<std::size_t>(size) + 1);
                     if (WavpackGetTagItem(ctx_in, tag_name, value.data(), size + 1) > 0) {
                         if (!WavpackAppendTagItem(ctx_out, tag_name, value.data(), size)) {
                             Logger::log(LogLevel::Warning,
@@ -161,7 +161,7 @@ std::vector<int32_t> decode_wavpack_pcm(const std::filesystem::path& file,
 
     const int32_t num_channels = channels;
     constexpr int32_t block_size = 65536;
-    std::vector<int32_t> buffer(static_cast<size_t>(block_size) * static_cast<size_t>(num_channels));
+    std::vector<int32_t> buffer(static_cast<std::size_t>(block_size) * static_cast<std::size_t>(num_channels));
     std::vector<int32_t> pcm;
 
     uint32_t samples = 0;

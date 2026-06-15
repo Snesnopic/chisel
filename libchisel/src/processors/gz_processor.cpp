@@ -84,8 +84,8 @@ constexpr int     kDeflateLevel = 12; // libdeflate max
 
 struct Reader {
     const uint8_t* data;
-    size_t         size;
-    size_t         pos = 0;
+    std::size_t         size;
+    std::size_t         pos = 0;
 
     uint8_t u8() {
         if (pos >= size) throw std::runtime_error("GzProcessor: unexpected end of file");
@@ -93,7 +93,8 @@ struct Reader {
     }
 
     uint16_t u16_le() {
-        uint8_t lo = u8(), hi = u8();
+        const uint8_t lo = u8();
+        const uint8_t hi = u8();
         return static_cast<uint16_t>(lo | (hi << 8));
     }
 
@@ -103,7 +104,7 @@ struct Reader {
         return v;
     }
 
-    void skip(size_t n) {
+    void skip(const std::size_t n) {
         if (pos + n > size) throw std::runtime_error("GzProcessor: unexpected end of file");
         pos += n;
     }
@@ -112,7 +113,7 @@ struct Reader {
     std::string nul_string() {
         std::string s;
         while (true) {
-            uint8_t c = u8();
+            const uint8_t c = u8();
             if (c == 0) break;
             s += static_cast<char>(c);
         }
@@ -120,27 +121,27 @@ struct Reader {
     }
 
     const uint8_t* cur() const { return data + pos; }
-    size_t remaining() const { return size - pos; }
+    std::size_t remaining() const { return size - pos; }
 };
 
 struct Writer {
     std::vector<uint8_t> buf;
 
-    void u8(uint8_t v) { buf.push_back(v); }
+    void u8(const uint8_t v) { buf.push_back(v); }
 
-    void u16_le(uint16_t v) {
+    void u16_le(const uint16_t v) {
         buf.push_back(static_cast<uint8_t>(v));
         buf.push_back(static_cast<uint8_t>(v >> 8));
     }
 
-    void u32_le(uint32_t v) {
+    void u32_le(const uint32_t v) {
         buf.push_back(static_cast<uint8_t>(v));
         buf.push_back(static_cast<uint8_t>(v >> 8));
         buf.push_back(static_cast<uint8_t>(v >> 16));
         buf.push_back(static_cast<uint8_t>(v >> 24));
     }
 
-    void bytes(const uint8_t* p, size_t n) {
+    void bytes(const uint8_t* p, const std::size_t n) {
         buf.insert(buf.end(), p, p + n);
     }
 
@@ -155,7 +156,7 @@ struct Writer {
 /**
  * @brief Compute CRC-32 using libdeflate.
  */
-uint32_t crc32_of(const uint8_t* data, size_t size) {
+uint32_t crc32_of(const uint8_t* data, const std::size_t size) {
     return libdeflate_crc32(0, data, size);
 }
 
@@ -174,7 +175,7 @@ uint32_t crc32_of(const uint8_t* data, size_t size) {
  * @param isize_out Output: ISIZE from trailer.
  * @returns Number of compressed bytes consumed from the reader.
  */
-size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
+size_t decompress_member(const Reader& r, std::vector<uint8_t>& raw,
                           uint32_t& crc32_out, uint32_t& isize_out) {
     // The trailer is 8 bytes at the end of this member (or before the next
     // member). We need to find the compressed length.
@@ -188,7 +189,7 @@ size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
     // For multi-member files we rely on libdeflate's exact_out_size mode
     // combined with the ISIZE hint.
 
-    const size_t avail = r.remaining();
+    const std::size_t avail = r.remaining();
     if (avail < 8) throw std::runtime_error("GzProcessor: too small for DEFLATE+trailer");
 
     // Read ISIZE from the last 4 bytes of this member (or the entire rest if
@@ -209,7 +210,7 @@ size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
     // We use a two-pass approach: decompress into a large buffer using
     // ISIZE as size hint. If ISIZE overflows (>= 2^32 bytes rare), fall back.
 
-    const size_t uncomp_hint = (isize_hint == 0 && avail > 65536)
+    const std::size_t uncomp_hint = (isize_hint == 0 && avail > 65536)
         ? avail * 4    // rough guess for very large streams
         : (isize_hint > 0 ? isize_hint : 65536);
 
@@ -217,9 +218,9 @@ size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
     if (!dec) throw std::runtime_error("GzProcessor: libdeflate_alloc_decompressor failed");
 
     // Try with (avail - 8) as compressed size
-    size_t compressed_len = avail - 8;
+    const std::size_t compressed_len = avail - 8;
     raw.resize(uncomp_hint);
-    size_t actual = 0;
+    std::size_t actual = 0;
     libdeflate_result res = libdeflate_deflate_decompress(
         dec, r.cur(), compressed_len, raw.data(), raw.size(), &actual);
 
@@ -246,7 +247,7 @@ size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
     std::memcpy(&file_isize, trailer + 4, 4);
 
     // Validate CRC32 (optional but catches corrupted files early)
-    uint32_t computed = crc32_of(raw.data(), raw.size());
+    const uint32_t computed = crc32_of(raw.data(), raw.size());
     if (computed != file_crc32) {
         throw std::runtime_error("GzProcessor: CRC32 mismatch — file is corrupted");
     }
@@ -268,20 +269,21 @@ size_t decompress_member(Reader& r, std::vector<uint8_t>& raw,
  * @param comp           libdeflate compressor (caller owns).
  * @returns true if the member was successfully processed.
  */
-bool process_member(Reader& r, Writer& w, bool preserve_meta,
+bool process_member(Reader& r, Writer& w, const bool preserve_meta,
                     libdeflate_compressor* comp) {
     // ── parse header ─────────────────────────────────────────────────────────
     if (r.remaining() < 10) return false;
 
-    uint8_t id1 = r.u8(), id2 = r.u8();
+    const uint8_t id1 = r.u8();
+    const uint8_t id2 = r.u8();
     if (id1 != kGzId1 || id2 != kGzId2)
         throw std::runtime_error("GzProcessor: invalid gzip magic");
 
-    uint8_t cm  = r.u8();
-    uint8_t flg = r.u8();
-    uint32_t mtime = r.u32_le();
-    uint8_t  xfl   = r.u8();
-    uint8_t  os    = r.u8();
+    const uint8_t cm  = r.u8();
+    const uint8_t flg = r.u8();
+    const uint32_t mtime = r.u32_le();
+    const uint8_t  xfl   = r.u8();
+    const uint8_t  os    = r.u8();
 
     if (cm != kGzCm)
         throw std::runtime_error("GzProcessor: unsupported compression method " + std::to_string(cm));
@@ -289,7 +291,7 @@ bool process_member(Reader& r, Writer& w, bool preserve_meta,
     // optional: FEXTRA
     std::vector<uint8_t> extra_data;
     if (flg & kFlgFextra) {
-        uint16_t xlen = r.u16_le();
+        const uint16_t xlen = r.u16_le();
         extra_data.resize(xlen);
         for (uint16_t i = 0; i < xlen; ++i) extra_data[i] = r.u8();
     }
@@ -314,13 +316,13 @@ bool process_member(Reader& r, Writer& w, bool preserve_meta,
     // ── decompress DEFLATE payload ────────────────────────────────────────────
     std::vector<uint8_t> raw;
     uint32_t orig_crc32, orig_isize;
-    size_t consumed = decompress_member(r, raw, orig_crc32, orig_isize);
+    const std::size_t consumed = decompress_member(r, raw, orig_crc32, orig_isize);
     r.skip(consumed);
 
     // ── recompress with libdeflate ────────────────────────────────────────────
-    size_t bound = libdeflate_deflate_compress_bound(comp, raw.size());
+    const std::size_t bound = libdeflate_deflate_compress_bound(comp, raw.size());
     std::vector<uint8_t> compressed(bound);
-    size_t new_compressed_len = libdeflate_deflate_compress(
+    const std::size_t new_compressed_len = libdeflate_deflate_compress(
         comp, raw.data(), raw.size(), compressed.data(), bound);
     if (new_compressed_len == 0)
         throw std::runtime_error("GzProcessor: libdeflate_deflate_compress failed");
@@ -379,20 +381,20 @@ std::vector<uint8_t> decompress_all(const std::vector<uint8_t>& gz_data) {
     while (r.remaining() >= 10 && r.data[r.pos] == kGzId1 && r.data[r.pos+1] == kGzId2) {
         // parse header
         r.skip(2); // ID1 ID2
-        uint8_t cm  = r.u8();
-        uint8_t flg = r.u8();
+        const uint8_t cm  = r.u8();
+        const uint8_t flg = r.u8();
         r.skip(6); // mtime(4) xfl os
 
         if (cm != kGzCm) break;
 
-        if (flg & kFlgFextra) { uint16_t xl = r.u16_le(); r.skip(xl); }
+        if (flg & kFlgFextra) { const uint16_t xl = r.u16_le(); r.skip(xl); }
         if (flg & kFlgFname)    { while (r.u8() != 0) {} }
         if (flg & kFlgFcomment) { while (r.u8() != 0) {} }
         if (flg & kFlgFhcrc)    { r.skip(2); }
 
         std::vector<uint8_t> member_raw;
         uint32_t crc32_out, isize_out;
-        size_t consumed = decompress_member(r, member_raw, crc32_out, isize_out);
+        const std::size_t consumed = decompress_member(r, member_raw, crc32_out, isize_out);
         r.skip(consumed);
         result.insert(result.end(), member_raw.begin(), member_raw.end());
     }

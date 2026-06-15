@@ -16,7 +16,7 @@ namespace chisel {
 
 
 // inflate zlib payload
-static std::vector<uint8_t> inflate_swf(const uint8_t* src, size_t src_len, size_t expected_len) {
+static std::vector<uint8_t> inflate_swf(const uint8_t* src, const std::size_t src_len, const std::size_t expected_len) {
     std::vector<uint8_t> uncompressed(expected_len);
     uLongf dest_len = static_cast<uLongf>(expected_len);
 
@@ -36,24 +36,23 @@ static std::vector<uint8_t> deflate_swf(const std::vector<uint8_t>& uncompressed
     }
 
     std::vector<uint8_t> compressed;
-    constexpr size_t chunk_size = 65536;
+    constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     strm.next_in = const_cast<uint8_t*>(uncompressed.data());
     strm.avail_in = static_cast<uInt>(uncompressed.size());
 
-    int ret;
     do {
         strm.next_out = out_buf.data();
         strm.avail_out = static_cast<uInt>(out_buf.size());
 
-        ret = deflate(&strm, Z_FINISH);
+        const int ret = deflate(&strm, Z_FINISH);
         if (ret == Z_STREAM_ERROR) {
             deflateEnd(&strm);
             throw std::runtime_error("zlib compression failed");
         }
 
-        size_t written = out_buf.size() - strm.avail_out;
+        const std::size_t written = out_buf.size() - strm.avail_out;
         if (written > 0) {
             compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + written);
         }
@@ -85,7 +84,7 @@ void SwfProcessor::recompress(const std::filesystem::path& input_path,
         if (magic[0] == 'F') {
             uncompressed_payload.assign(data.begin() + 8, data.end());
         } else if (magic[0] == 'C') {
-            size_t expected_size = uncompressed_file_size > 8 ? uncompressed_file_size - 8 : 0;
+            const std::size_t expected_size = uncompressed_file_size > 8 ? uncompressed_file_size - 8 : 0;
             uncompressed_payload = inflate_swf(data.data() + 8, data.size() - 8, expected_size);
         } else if (magic[0] == 'Z') {
             // lzma swf (ZWS) is rare and requires special setup. skip for now to maintain safety.
@@ -95,7 +94,7 @@ void SwfProcessor::recompress(const std::filesystem::path& input_path,
             return;
         }
 
-        auto compressed_payload = deflate_swf(uncompressed_payload);
+        const auto compressed_payload = deflate_swf(uncompressed_payload);
 
         std::ofstream out(output_path, std::ios::binary);
         if (!out) {
@@ -126,7 +125,7 @@ bool SwfProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
             if (data.size() < 8) return {};
             if (data[0] == 'F') return {data.begin() + 8, data.end()};
             if (data[0] == 'C') {
-                size_t expected = read_le32(data.data() + 4) - 8;
+                const std::size_t expected = read_le32(data.data() + 4) - 8;
                 return inflate_swf(data.data() + 8, data.size() - 8, expected);
             }
             return {};

@@ -44,7 +44,7 @@ void XmlProcessor::recompress(const std::filesystem::path& input_path,
 std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.filename().string(), get_name());
 
-    auto doc = std::make_shared<pugi::xml_document>();
+    const auto doc = std::make_shared<pugi::xml_document>();
     if (!doc->load_file(input_path.c_str())) {
         Logger::log(LogLevel::Error, "Failed to parse XML for extraction", get_name());
         return std::nullopt;
@@ -184,7 +184,7 @@ bool XmlProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     // helper to save XML to string
     struct xml_string_writer : pugi::xml_writer {
         std::string result;
-        void write(const void* data, size_t size) override {
+        void write(const void* data, const std::size_t size) override {
             result.append(static_cast<const char*>(data), size);
         }
     };

@@ -54,7 +54,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     };
     std::vector<FrameData> frames;
 
-    size_t stride = 0;
+    std::size_t stride = 0;
 
     JxlPixelFormat format = {};
     JxlDataType data_type = {};
@@ -170,11 +170,11 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
 
     std::vector<uint8_t> out_buf(1 << 20);
     uint8_t* next_out = out_buf.data();
-    size_t avail_out = out_buf.size();
+    std::size_t avail_out = out_buf.size();
     JxlEncoderStatus enc_status;
     while ((enc_status = JxlEncoderProcessOutput(enc, &next_out, &avail_out))
            == JXL_ENC_NEED_MORE_OUTPUT) {
-        size_t offset = next_out - out_buf.data();
+        std::size_t offset = next_out - out_buf.data();
         out_buf.resize(out_buf.size() * 2);
         next_out = out_buf.data() + offset;
         avail_out = out_buf.size() - offset;
@@ -183,7 +183,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
         JxlEncoderDestroy(enc);
         throw std::runtime_error("JxlProcessor: encode failed");
     }
-    size_t out_size = next_out - out_buf.data();
+    std::size_t out_size = next_out - out_buf.data();
     out_buf.resize(out_size);
     if (!chisel::write_file(output, out_buf)) {
         JxlEncoderDestroy(enc);
@@ -215,7 +215,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     JxlDecoderCloseInput(dec);
 
     JxlBasicInfo info{};
-    JxlPixelFormat format = {4, JXL_TYPE_UINT8, JXL_NATIVE_ENDIAN, 0}; // force rgba8 output
+    constexpr JxlPixelFormat format = {4, JXL_TYPE_UINT8, JXL_NATIVE_ENDIAN, 0}; // force rgba8 output
 
     for (;;) {
         const JxlDecoderStatus status = JxlDecoderProcessInput(dec);
@@ -224,7 +224,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
             if (JXL_DEC_SUCCESS != JxlDecoderGetBasicInfo(dec, &info)) return false;
             width = info.xsize;
             height = info.ysize;
-            buffer.resize(static_cast<size_t>(width) * height * 4);
+            buffer.resize(static_cast<std::size_t>(width) * height * 4);
             if (JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer(dec, &format,
                                                               buffer.data(),
                                                               buffer.size())) {
@@ -250,8 +250,8 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     uint32_t wb, hb;
     std::vector<uint8_t> imgA, imgB;
 
-    bool okA = decode_jxl_rgba8(a, wa, ha, imgA);
-    bool okB = decode_jxl_rgba8(b, wb, hb, imgB);
+    const bool okA = decode_jxl_rgba8(a, wa, ha, imgA);
+    const bool okB = decode_jxl_rgba8(b, wb, hb, imgB);
 
     if (!okA || !okB) {
         return false;

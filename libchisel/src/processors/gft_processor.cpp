@@ -36,7 +36,7 @@ std::optional<ExtractedContent> GftProcessor::prepare_extraction(const std::file
     content.format = ContainerFormat::Unknown;
 
     const uint8_t* payload = data.data() + header_size;
-    size_t payload_size = data.size() - header_size;
+    std::size_t payload_size = data.size() - header_size;
 
     // guess extension to help the pipeline
     std::string ext = ".bin";
@@ -50,7 +50,7 @@ std::optional<ExtractedContent> GftProcessor::prepare_extraction(const std::file
     out_file.close();
 
     content.extracted_files.push_back(inner_path);
-    content.extras = std::make_any<size_t>(header_size); // save for later
+    content.extras = std::make_any<std::size_t>(header_size); // save for later
 
     return content;
 }
@@ -59,7 +59,7 @@ std::filesystem::path GftProcessor::finalize_extraction(const ExtractedContent& 
     Logger::log(LogLevel::Debug, "starting gft finalization for " + content.original_path.string(), get_name());
 
     const auto orig_data = read_file(content.original_path);
-    size_t header_size = std::any_cast<size_t>(content.extras);
+    const std::size_t header_size = std::any_cast<std::size_t>(content.extras);
     const auto opt_payload = read_file(content.extracted_files.front());
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /

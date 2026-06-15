@@ -52,8 +52,8 @@ struct StlTriangle {
 
 static_assert(sizeof(StlTriangle) == 50, "StlTriangle must be 50 bytes");
 
-constexpr size_t kBinaryHeaderSize = 80;
-constexpr size_t kBinaryTriangleSize = 50;
+constexpr std::size_t kBinaryHeaderSize = 80;
+constexpr std::size_t kBinaryTriangleSize = 50;
 
 /**
  * @brief Heuristic: returns true if the data looks like an ASCII STL.
@@ -67,16 +67,16 @@ bool is_ascii_stl(const std::vector<uint8_t>& data) {
     if (data.size() < 5) return false;
 
     // Check for "solid" at the start (after optional whitespace/BOM)
-    size_t start = 0;
+    std::size_t start = 0;
     // skip BOM if present
     if (data.size() >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
         start = 3;
 
     // tolower comparison of first 5 non-space chars
-    size_t idx = start;
+    std::size_t idx = start;
     while (idx < data.size() && std::isspace(static_cast<unsigned char>(data[idx]))) ++idx;
 
-    const std::string_view kSolid = "solid";
+    constexpr std::string_view kSolid = "solid";
     if (idx + 5 > data.size()) return false;
     for (size_t i = 0; i < 5; ++i) {
         if (std::tolower(static_cast<unsigned char>(data[idx + i])) != kSolid[i])
@@ -91,7 +91,7 @@ bool is_ascii_stl(const std::vector<uint8_t>& data) {
         // On a little-endian host this is straightforward; on big-endian we
         // would need to byte-swap, but STL is defined as little-endian and
         // chisel targets x86/ARM little-endian platforms.
-        size_t expected = kBinaryHeaderSize + 4 + static_cast<size_t>(n_tri) * kBinaryTriangleSize;
+        const std::size_t expected = kBinaryHeaderSize + 4 + static_cast<size_t>(n_tri) * kBinaryTriangleSize;
         if (expected == data.size()) {
             // Perfect binary match — it is binary despite the "solid" header
             return false;
@@ -193,7 +193,7 @@ std::vector<StlTriangle> parse_ascii_stl(const std::vector<uint8_t>& data) {
  */
 std::vector<uint8_t> write_binary_stl(const std::vector<StlTriangle>& triangles,
                                       const uint8_t header[kBinaryHeaderSize],
-                                      bool preserve_header) {
+                                      const bool preserve_header) {
     std::vector<uint8_t> out;
     out.reserve(kBinaryHeaderSize + 4 + triangles.size() * kBinaryTriangleSize);
 
@@ -205,7 +205,7 @@ std::vector<uint8_t> write_binary_stl(const std::vector<StlTriangle>& triangles,
     }
 
     // Triangle count (little-endian uint32)
-    uint32_t n = static_cast<uint32_t>(triangles.size());
+    const uint32_t n = static_cast<uint32_t>(triangles.size());
     out.push_back(static_cast<uint8_t>(n));
     out.push_back(static_cast<uint8_t>(n >> 8));
     out.push_back(static_cast<uint8_t>(n >> 16));
@@ -231,7 +231,7 @@ std::vector<StlTriangle> read_binary_triangles(const std::vector<uint8_t>& data)
     uint32_t n_tri;
     std::memcpy(&n_tri, data.data() + kBinaryHeaderSize, 4);
 
-    size_t expected = kBinaryHeaderSize + 4 + static_cast<size_t>(n_tri) * kBinaryTriangleSize;
+    const std::size_t expected = kBinaryHeaderSize + 4 + static_cast<size_t>(n_tri) * kBinaryTriangleSize;
     if (data.size() < expected)
         throw std::runtime_error("StlProcessor: truncated binary STL");
 

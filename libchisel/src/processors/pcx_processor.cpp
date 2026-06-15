@@ -37,9 +37,9 @@ struct PcxHeader {
 /**
  * @brief Canonical PCX RLE encoder mimicking ImageMagick's behavior.
  */
-void encode_pcx_rle(const uint8_t* raw_data, size_t length, std::ostream& os) {
+void encode_pcx_rle(const uint8_t* raw_data, const std::size_t length, std::ostream& os) {
     for (size_t i = 0; i < length; ) {
-        uint8_t current = raw_data[i];
+        const uint8_t current = raw_data[i];
         uint8_t count = 1;
 
         // ImageMagick looks for runs up to 63 bytes
@@ -64,10 +64,10 @@ std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector
     is.read(reinterpret_cast<char*>(&header), sizeof(PcxHeader));
     if (!is || header.identifier != 0x0A) throw std::runtime_error("Invalid PCX identifier");
 
-    const size_t width = static_cast<size_t>(header.x_max) - header.x_min + 1;
-    const size_t height = static_cast<size_t>(header.y_max) - header.y_min + 1;
-    const size_t bpl = header.bytes_per_line;
-    const size_t planes = header.color_planes;
+    const std::size_t width = static_cast<size_t>(header.x_max) - header.x_min + 1;
+    const std::size_t height = static_cast<size_t>(header.y_max) - header.y_min + 1;
+    const std::size_t bpl = header.bytes_per_line;
+    const std::size_t planes = header.color_planes;
 
     Logger::log(LogLevel::Debug, "PCX Dimensions: " + std::to_string(width) + "x" + std::to_string(height) + " planes=" + std::to_string(planes) + " bpl=" + std::to_string(bpl), "PcxProcessor");
 
@@ -80,12 +80,12 @@ std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector
 
     for (size_t y = 0; y < height; ++y) {
         // Decompress RLE scanline
-        size_t bytes_read = 0;
+        std::size_t bytes_read = 0;
         while (bytes_read < scanline_buffer.size()) {
             uint8_t b;
             if (!is.read(reinterpret_cast<char*>(&b), 1)) break;
             if ((b & 0xC0) == 0xC0) {
-                uint8_t count = b & 0x3F;
+                const uint8_t count = b & 0x3F;
                 uint8_t val;
                 if (!is.read(reinterpret_cast<char*>(&val), 1)) break;
                 for (uint8_t i = 0; i < count && bytes_read < scanline_buffer.size(); ++i) {
@@ -106,7 +106,7 @@ std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector
 
     // Read 256-color palette if present
     if (header.version == 5 && header.bits_per_pixel == 8 && header.color_planes == 1) {
-        auto current_pos = is.tellg();
+        const auto current_pos = is.tellg();
         is.seekg(-769, std::ios::end);
         uint8_t marker;
         is.read(reinterpret_cast<char*>(&marker), 1);
@@ -124,7 +124,7 @@ std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector
 /**
  * @brief Writes a PCX file to a stream using optimized RLE.
  */
-void write_pcx_internal(std::ostream& os, const PcxHeader& orig_header, const std::vector<uint8_t>& pixels, const std::vector<uint8_t>& palette, bool preserve_metadata) {
+void write_pcx_internal(std::ostream& os, const PcxHeader& orig_header, const std::vector<uint8_t>& pixels, const std::vector<uint8_t>& palette, const bool preserve_metadata) {
     PcxHeader header = orig_header;
     
     if (!preserve_metadata) {
@@ -136,10 +136,10 @@ void write_pcx_internal(std::ostream& os, const PcxHeader& orig_header, const st
 
     os.write(reinterpret_cast<const char*>(&header), sizeof(header));
 
-    const size_t width = static_cast<size_t>(header.x_max) - header.x_min + 1;
-    const size_t height = static_cast<size_t>(header.y_max) - header.y_min + 1;
-    const size_t bpl = header.bytes_per_line;
-    const size_t planes = header.color_planes;
+    const std::size_t width = static_cast<size_t>(header.x_max) - header.x_min + 1;
+    const std::size_t height = static_cast<size_t>(header.y_max) - header.y_min + 1;
+    const std::size_t bpl = header.bytes_per_line;
+    const std::size_t planes = header.color_planes;
 
     Logger::log(LogLevel::Debug, "PCX Dimensions: " + std::to_string(width) + "x" + std::to_string(height) + " planes=" + std::to_string(planes) + " bpl=" + std::to_string(bpl), "PcxProcessor");
 

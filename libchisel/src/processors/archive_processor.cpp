@@ -47,7 +47,7 @@ static ContainerFormat detect_format(const fs::path& path) {
     std::string ext = to_lower_copy(path.extension().string());
     if (!ext.empty() && ext.front() == '.') ext.erase(0, 1);
     if (!ext.empty()) {
-        if (auto parsed = parse_container_format(ext)) {
+        if (const auto parsed = parse_container_format(ext)) {
             return *parsed;
         }
         const auto fname = to_lower_copy(path.filename().string());
@@ -152,7 +152,7 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
 
         // extract directly with libarchive preserving time and permissions
         constexpr int extract_flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
-        int ext_r = archive_read_extract(a, entry, extract_flags);
+        const int ext_r = archive_read_extract(a, entry, extract_flags);
 
         if (ext_r != ARCHIVE_OK) {
             Logger::log(LogLevel::Error, "extraction failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
@@ -455,7 +455,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                     ifs.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
                     std::streamsize got = ifs.gcount();
                     if (got > 0) {
-                        la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<size_t>(got));
+                        la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<std::size_t>(got));
                         if (wrote < 0) {
                             Logger::log(LogLevel::Error, "Archive_write_data: " + std::string(archive_error_string(a)), "ArchiveProcessor");
                             archive_entry_free(entry);

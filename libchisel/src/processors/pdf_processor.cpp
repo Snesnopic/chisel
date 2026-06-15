@@ -35,7 +35,7 @@ namespace {
         }
 
         // forces qpdf to write the stream exactly as provided
-        bool supportsCompression() {
+        static bool supportsCompression() {
             return false;
         }
     };
@@ -75,7 +75,7 @@ std::string guess_extension(QPDFObjectHandle const& stream,
             if (dict.hasKey("/Filter")) {
                 const auto filter = dict.getKey("/Filter");
                 if (filter.isName()) {
-                    std::string fname = filter.getName();
+                    const std::string fname = filter.getName();
                     if (fname == "/DCTDecode") return ".jpg";
                     if (fname == "/JPXDecode") return ".jp2";
                     if (fname == "/FlateDecode") {
@@ -241,7 +241,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             if (!obj.isStream()) continue;
 
             int obj_id = obj.getObjGen().getObj();
-            if (st.streams.find(obj_id) == st.streams.end()) continue;
+            if (!st.streams.contains(obj_id)) continue;
             auto& info = st.streams[obj_id];
 
             const QPDFObjectHandle dict = obj.getDict();
@@ -349,8 +349,8 @@ static bool get_all_raw_streams(const std::filesystem::path& path,
                              const std::filesystem::path& b) const {
     std::map<int, std::vector<uint8_t>> streamsA, streamsB;
 
-    bool okA = get_all_raw_streams(a, streamsA);
-    bool okB = get_all_raw_streams(b, streamsB);
+    const bool okA = get_all_raw_streams(a, streamsA);
+    const bool okB = get_all_raw_streams(b, streamsB);
 
     if (!okA || !okB) {
         return false; // failed to read one or both
@@ -373,8 +373,8 @@ std::filesystem::path PdfProcessor::make_temp_dir_for(const std::filesystem::pat
     std::error_code ec;
     std::filesystem::create_directories(base_tmp, ec);
 
-    auto now = std::chrono::system_clock::now().time_since_epoch();
-    auto ts = std::chrono::duration_cast<std::chrono::seconds>(now).count();
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    const auto ts = std::chrono::duration_cast<std::chrono::seconds>(now).count();
 
     std::mt19937_64 rng{static_cast<unsigned long long>(
         std::chrono::high_resolution_clock::now().time_since_epoch().count())};

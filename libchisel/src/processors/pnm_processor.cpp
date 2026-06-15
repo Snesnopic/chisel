@@ -55,7 +55,7 @@ void PnmProcessor::recompress(const std::filesystem::path& input,
     }
 
     // write raw binary data
-    const size_t data_size = static_cast<size_t>(width) * height * desired_channels;
+    const size_t data_size = static_cast<std::size_t>(width) * height * desired_channels;
     if (fwrite(data, 1, data_size, f_out) != data_size) {
         stbi_image_free(data);
         fclose(f_out);
@@ -97,7 +97,7 @@ bool PnmProcessor::raw_equal(const std::filesystem::path& a,
 
     bool equal = (w1 == w2) && (h1 == h2) && (c1 == c2);
     if (equal) {
-        const size_t sz = static_cast<size_t>(w1) * h1 * c1;
+        const size_t sz = static_cast<std::size_t>(w1) * h1 * c1;
         equal = (std::memcmp(d1, d2, sz) == 0);
     }
 

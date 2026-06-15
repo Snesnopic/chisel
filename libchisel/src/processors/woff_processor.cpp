@@ -10,11 +10,11 @@
 
 namespace chisel {
 
-static std::vector<uint8_t> inflate_zlib(const uint8_t* src, size_t src_len, size_t expected_len) {
+static std::vector<uint8_t> inflate_zlib(const uint8_t* src, const std::size_t src_len, const std::size_t expected_len) {
     std::vector<uint8_t> uncompressed(expected_len);
     uLongf dest_len = static_cast<uLongf>(expected_len);
     
-    int res = uncompress(uncompressed.data(), &dest_len, src, static_cast<uLong>(src_len));
+    const int res = uncompress(uncompressed.data(), &dest_len, src, static_cast<uLong>(src_len));
     if (res != Z_OK) {
         throw std::runtime_error("zlib decompression failed with code: " + std::to_string(res));
     }
@@ -44,7 +44,7 @@ static std::vector<uint8_t> deflate_zlib(const std::vector<uint8_t>& uncompresse
         
         ret = deflate(&strm, Z_FINISH);
         
-        size_t have = out_buf.size() - strm.avail_out;
+        const std::size_t have = out_buf.size() - strm.avail_out;
         if (have > 0) {
             compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + have);
         }
@@ -72,19 +72,19 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
     }
 
     uint16_t num_tables = read_be16(data.data() + 12);
-    if (data.size() < 44 + static_cast<size_t>(num_tables) * 20) return;
+    if (data.size() < 44 + static_cast<std::size_t>(num_tables) * 20) return;
 
     std::vector<uint8_t> new_woff;
     new_woff.insert(new_woff.end(), data.begin(), data.begin() + 44);
-    
-    const size_t dir_offset = 44;
+
+    constexpr std::size_t dir_offset = 44;
     new_woff.resize(44 + num_tables * 20);
 
     uint32_t current_offset = static_cast<uint32_t>(new_woff.size());
 
     try {
         for (uint16_t i = 0; i < num_tables; ++i) {
-            size_t entry_pos = dir_offset + i * 20;
+            std::size_t entry_pos = dir_offset + i * 20;
             uint32_t tag = read_be32(data.data() + entry_pos);
             uint32_t offset = read_be32(data.data() + entry_pos + 4);
             uint32_t comp_len = read_be32(data.data() + entry_pos + 8);
@@ -158,26 +158,26 @@ bool WoffProcessor::raw_equal(const std::filesystem::path& a, const std::filesys
 
         if (data_a.size() < 44 || data_b.size() < 44) return false;
         
-        uint16_t num_tables_a = read_be16(data_a.data() + 12);
-        uint16_t num_tables_b = read_be16(data_b.data() + 12);
+        const uint16_t num_tables_a = read_be16(data_a.data() + 12);
+        const uint16_t num_tables_b = read_be16(data_b.data() + 12);
         
         if (num_tables_a != num_tables_b) return false;
 
         // compare uncompressed tables one by one
         for (uint16_t i = 0; i < num_tables_a; ++i) {
-            size_t entry_a = 44 + i * 20;
-            size_t entry_b = 44 + i * 20;
+            const std::size_t entry_a = 44 + i * 20;
+            const std::size_t entry_b = 44 + i * 20;
 
             if (read_be32(data_a.data() + entry_a) != read_be32(data_b.data() + entry_b)) return false; // Tags must match
             
-            uint32_t orig_len_a = read_be32(data_a.data() + entry_a + 12);
-            uint32_t orig_len_b = read_be32(data_b.data() + entry_b + 12);
+            const uint32_t orig_len_a = read_be32(data_a.data() + entry_a + 12);
+            const uint32_t orig_len_b = read_be32(data_b.data() + entry_b + 12);
             if (orig_len_a != orig_len_b) return false;
 
-            uint32_t comp_len_a = read_be32(data_a.data() + entry_a + 8);
-            uint32_t comp_len_b = read_be32(data_b.data() + entry_b + 8);
-            uint32_t offset_a = read_be32(data_a.data() + entry_a + 4);
-            uint32_t offset_b = read_be32(data_b.data() + entry_b + 4);
+            const uint32_t comp_len_a = read_be32(data_a.data() + entry_a + 8);
+            const uint32_t comp_len_b = read_be32(data_b.data() + entry_b + 8);
+            const uint32_t offset_a = read_be32(data_a.data() + entry_a + 4);
+            const uint32_t offset_b = read_be32(data_b.data() + entry_b + 4);
 
             std::vector<uint8_t> table_a;
             if (comp_len_a < orig_len_a) table_a = inflate_zlib(data_a.data() + offset_a, comp_len_a, orig_len_a);

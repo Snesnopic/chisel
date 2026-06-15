@@ -15,24 +15,24 @@ namespace chisel {
 
 static std::vector<uint8_t> decode_lz4(const std::vector<uint8_t>& compressed) {
     LZ4F_dctx* dctx;
-    LZ4F_errorCode_t err = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
+    const LZ4F_errorCode_t err = LZ4F_createDecompressionContext(&dctx, LZ4F_VERSION);
     if (LZ4F_isError(err)) {
         throw std::runtime_error("CANNOT CREATE LZ4 DECOMPRESSION CONTEXT");
     }
 
     std::vector<uint8_t> decompressed;
-    size_t srcSize = compressed.size();
-    size_t srcPtr = 0;
+    const std::size_t srcSize = compressed.size();
+    std::size_t srcPtr = 0;
     
     // Decompress chunk by chunk since output size is unknown
-    size_t dstCapacity = 64 * 1024; // 64 KB initial chunk
+    constexpr std::size_t dstCapacity = 64 * 1024; // 64 KB initial chunk
     std::vector<uint8_t> dstBuf(dstCapacity);
 
     while (srcPtr < srcSize) {
-        size_t srcRemaining = srcSize - srcPtr;
-        size_t dstSize = dstCapacity;
+        std::size_t srcRemaining = srcSize - srcPtr;
+        std::size_t dstSize = dstCapacity;
         
-        size_t ret = LZ4F_decompress(dctx, dstBuf.data(), &dstSize, compressed.data() + srcPtr, &srcRemaining, nullptr);
+        const std::size_t ret = LZ4F_decompress(dctx, dstBuf.data(), &dstSize, compressed.data() + srcPtr, &srcRemaining, nullptr);
         
         if (LZ4F_isError(ret)) {
             LZ4F_freeDecompressionContext(dctx);
@@ -100,10 +100,10 @@ std::filesystem::path Lz4Processor::finalize_extraction(const ExtractedContent& 
         prefs.frameInfo.blockChecksumFlag = LZ4F_noBlockChecksum;
     }
 
-    size_t const bound = LZ4F_compressFrameBound(raw_data.size(), &prefs);
+    std::size_t const bound = LZ4F_compressFrameBound(raw_data.size(), &prefs);
     std::vector<uint8_t> compressed(bound);
 
-    size_t const result = LZ4F_compressFrame(compressed.data(), bound, raw_data.data(), raw_data.size(), &prefs);
+    std::size_t const result = LZ4F_compressFrame(compressed.data(), bound, raw_data.data(), raw_data.size(), &prefs);
 
     if (LZ4F_isError(result)) {
         throw std::runtime_error(std::string("LZ4 COMPRESSION FAILED: ") + LZ4F_getErrorName(result));

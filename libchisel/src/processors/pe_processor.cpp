@@ -30,7 +30,7 @@ uint32_t PeProcessor::calculate_pe_checksum(const std::span<const uint8_t> raw_d
     // offset is 64 for pe32, 68 for pe32+
     const uint32_t checksum_offset = pe_pos + 24 + (magic == 0x20B ? 68 : 64);
 
-    for (size_t i = 0; i < size; i += 2) {
+    for (std::size_t i = 0; i < size; i += 2) {
         if (i == checksum_offset || i == checksum_offset + 2) {
             continue;
         }
@@ -109,7 +109,7 @@ std::optional<ExtractedContent> PeProcessor::prepare_extraction(const std::files
     content.temp_dir = make_temp_dir_for(input_path, "pe");
     content.format = ContainerFormat::Pe;
 
-    for (size_t i = 0; i < rsrc_entries.size(); ++i) {
+    for (std::size_t i = 0; i < rsrc_entries.size(); ++i) {
         const auto& entry = rsrc_entries[i];
         uint32_t data_file_offset = rva_to_offset(entry.data_entry.OffsetToData, sections);
         
@@ -190,7 +190,7 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
     std::vector<ImageSectionHeader> sections(file_header.NumberOfSections);
     std::memcpy(sections.data(), raw_data.data() + section_table_pos, sections.size() * sizeof(ImageSectionHeader));
 
-    for (size_t i = 0; i < content.extracted_files.size(); ++i) {
+    for (std::size_t i = 0; i < content.extracted_files.size(); ++i) {
         auto opt_data = read_file(content.extracted_files[i]);
         if (opt_data.size() <= rsrc_entries[i].data_entry.Size) {
             uint32_t data_offset = rva_to_offset(rsrc_entries[i].data_entry.OffsetToData, sections);

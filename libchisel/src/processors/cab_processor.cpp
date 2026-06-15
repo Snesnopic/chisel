@@ -131,16 +131,16 @@ struct CfData {
 
 struct Span {
     const uint8_t* data;
-    size_t size;
-    size_t pos = 0;
+    std::size_t size;
+    std::size_t pos = 0;
 
-    void read(void* dst, size_t n) {
+    void read(void* dst, const std::size_t n) {
         if (pos + n > size) throw std::runtime_error("CabProcessor: unexpected end of data");
         std::memcpy(dst, data + pos, n);
         pos += n;
     }
 
-    void skip(size_t n) {
+    void skip(const std::size_t n) {
         if (pos + n > size) throw std::runtime_error("CabProcessor: unexpected end of data");
         pos += n;
     }
@@ -156,7 +156,7 @@ struct Span {
  * MSZIP payload = "CK" + raw DEFLATE stream.  The uncompressed size is
  * given by the CFDATA.cbUncomp field.
  */
-std::vector<uint8_t> mszip_decompress(const uint8_t* src, size_t src_len, size_t uncomp_len) {
+std::vector<uint8_t> mszip_decompress(const uint8_t* src, const std::size_t src_len, const std::size_t uncomp_len) {
     if (src_len < 2 || src[0] != 'C' || src[1] != 'K')
         throw std::runtime_error("CabProcessor: missing MSZIP 'CK' magic");
 
@@ -164,8 +164,8 @@ std::vector<uint8_t> mszip_decompress(const uint8_t* src, size_t src_len, size_t
     if (!dec) throw std::runtime_error("CabProcessor: libdeflate_alloc_decompressor failed");
 
     std::vector<uint8_t> out(uncomp_len);
-    size_t actual = 0;
-    libdeflate_result res = libdeflate_deflate_decompress(
+    std::size_t actual = 0;
+    const libdeflate_result res = libdeflate_deflate_decompress(
         dec,
         src + 2, src_len - 2,  // skip "CK"
         out.data(), uncomp_len,
@@ -185,12 +185,12 @@ std::vector<uint8_t> mszip_decompress(const uint8_t* src, size_t src_len, size_t
  * @brief Compress a raw buffer into an MSZIP CFDATA payload ("CK" + raw DEFLATE).
  */
 std::vector<uint8_t> mszip_compress(libdeflate_compressor* comp,
-                                    const uint8_t* src, size_t src_len) {
-    size_t bound = libdeflate_deflate_compress_bound(comp, src_len);
+                                    const uint8_t* src, const std::size_t src_len) {
+    const std::size_t bound = libdeflate_deflate_compress_bound(comp, src_len);
     std::vector<uint8_t> out(2 + bound);
     out[0] = 'C';
     out[1] = 'K';
-    size_t actual = libdeflate_deflate_compress(comp, src, src_len, out.data() + 2, bound);
+    const std::size_t actual = libdeflate_deflate_compress(comp, src, src_len, out.data() + 2, bound);
     if (actual == 0)
         throw std::runtime_error("CabProcessor: libdeflate_deflate_compress failed");
     out.resize(2 + actual);
@@ -277,8 +277,8 @@ void CabProcessor::recompress(const std::filesystem::path& input_path,
     // ── Read CFFILE table verbatim ────────────────────────────────────────────
     // The file table starts at coffFiles and extends to the first folder data.
     // We copy it exactly.
-    size_t files_offset = hdr.coffFiles;
-    size_t files_end = in_data.size(); // will be tightened below
+    std::size_t files_offset = hdr.coffFiles;
+    std::size_t files_end = in_data.size(); // will be tightened below
 
     // Find the earliest folder data start to bound the file table
     for (const auto& f : folders) {
@@ -369,19 +369,19 @@ void CabProcessor::recompress(const std::filesystem::path& input_path,
     // (We strip the RESERVE extension to remove any empty signing space.)
 
     // Step 1: calculate folder coffCabStart offsets
-    size_t base_hdr_size = sizeof(CfHeader) + hdr.cFolders * sizeof(CfFolder);
-    size_t files_size = file_table.size();
-    size_t data_start = base_hdr_size + files_size;
+    std::size_t base_hdr_size = sizeof(CfHeader) + hdr.cFolders * sizeof(CfFolder);
+    std::size_t files_size = file_table.size();
+    std::size_t data_start = base_hdr_size + files_size;
 
     std::vector<uint32_t> new_folder_offsets(hdr.cFolders);
-    size_t cur_offset = data_start;
+    std::size_t cur_offset = data_start;
     for (uint16_t fi = 0; fi < hdr.cFolders; ++fi) {
         new_folder_offsets[fi] = static_cast<uint32_t>(cur_offset);
         for (size_t bi = 0; bi < result_folders[fi].blocks.size(); ++bi) {
             cur_offset += sizeof(CfData) + result_folders[fi].blocks[bi].size();
         }
     }
-    size_t total_size = cur_offset;
+    std::size_t total_size = cur_offset;
 
     // Step 2: assemble output buffer
     std::vector<uint8_t> out;

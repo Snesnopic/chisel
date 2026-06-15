@@ -71,7 +71,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         TIFFGetField(in, TIFFTAG_IMAGEWIDTH, &width);
         TIFFGetField(in, TIFFTAG_IMAGELENGTH, &height);
 
-        std::vector<uint32_t> raster(static_cast<size_t>(width) * static_cast<size_t>(height));
+        std::vector<uint32_t> raster(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
         if (raster.empty()) {
             Logger::log(LogLevel::Debug, "Skipping empty tiff directory", get_name());
             continue;
@@ -101,7 +101,7 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         TIFFSetField(out, TIFFTAG_EXTRASAMPLES, 1, &extra_samples);
 
         for (uint32_t row = 0; row < height; ++row) {
-            tdata_t row_data = &raster[static_cast<size_t>(row) * width];
+            const tdata_t row_data = &raster[static_cast<std::size_t>(row) * width];
             if (TIFFWriteScanline(out, row_data, row) < 0) {
                 TIFFClose(in);
                 TIFFClose(out);
@@ -165,8 +165,8 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
             continue;
         }
 
-        std::vector<uint32_t> raster_a(static_cast<size_t>(w_a) * static_cast<size_t>(h_a));
-        std::vector<uint32_t> raster_b(static_cast<size_t>(w_b) * static_cast<size_t>(h_b));
+        std::vector<uint32_t> raster_a(static_cast<std::size_t>(w_a) * static_cast<std::size_t>(h_a));
+        std::vector<uint32_t> raster_b(static_cast<std::size_t>(w_b) * static_cast<std::size_t>(h_b));
 
         if (raster_a.empty()) { // both are empty, continue
              more_a = TIFFReadDirectory(in_a);
