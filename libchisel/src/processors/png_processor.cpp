@@ -347,7 +347,7 @@ namespace chisel {
 
         // prepare output row buffer
         const png_size_t out_channels = png_get_channels(wr.png, wr.info);
-        std::vector<unsigned char> out_rowbuf(static_cast<size_t>(width) * out_channels * (out_bit_depth / 8));
+        std::vector<unsigned char> out_rowbuf(static_cast<std::size_t>(width) * out_channels * (out_bit_depth / 8));
         png_bytep out_row = out_rowbuf.data();
 
         // re-point to the start of the in-memory buffer
@@ -386,11 +386,11 @@ namespace chisel {
                     dst += 3;
                 }
             } else { // RGBA
-                memcpy(dst, src, static_cast<size_t>(width) * 4);
+                memcpy(dst, src, static_cast<std::size_t>(width) * 4);
             }
 
             png_write_rows(wr.png, &out_row, 1);
-            p += static_cast<size_t>(width) * 4; // advance in-memory buffer pointer
+            p += static_cast<std::size_t>(width) * 4; // advance in-memory buffer pointer
         }
 
         png_write_end(wr.png, wr.info);
@@ -452,7 +452,7 @@ namespace chisel {
 
         png_read_update_info(png, info);
 
-        const size_t rowbytes = png_get_rowbytes(png, info);
+        const std::size_t rowbytes = png_get_rowbytes(png, info);
         std::vector<unsigned char> image(rowbytes * height);
         std::vector<png_bytep> row_pointers(height);
         for (png_uint_32 y = 0; y < height; ++y) {

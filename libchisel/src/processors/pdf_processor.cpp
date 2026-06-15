@@ -47,15 +47,16 @@ struct LoggerStreamBuf final : std::stringbuf {
     LogLevel level;
     std::string module;
     LoggerStreamBuf(const LogLevel lvl, const char* mod) : level(lvl), module(mod) {}
-    int sync() override {
-        std::string s = str();
+    ~LoggerStreamBuf() override { LoggerStreamBuf::sync(); }
+    protected:
+    int sync() noexcept override {
+        const std::string s = str();
         if (!s.empty()) {
             Logger::log(level, s, module);
             str("");
         }
         return 0;
     }
-    ~LoggerStreamBuf() override { LoggerStreamBuf::sync(); }
 };
 
 /**

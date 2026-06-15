@@ -98,7 +98,7 @@ namespace {
         FILE* f_in = nullptr;
     };
 
-    FLAC__StreamDecoderReadStatus read_cb(const FLAC__StreamDecoder*, FLAC__byte buffer[], size_t *bytes, void *client_data) {
+    FLAC__StreamDecoderReadStatus read_cb(const FLAC__StreamDecoder*, FLAC__byte buffer[], std::size_t *bytes, void *client_data) {
         auto* io = static_cast<OggIO*>(client_data);
         if (*bytes > 0) {
             *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, io->f_in);
@@ -141,7 +141,7 @@ namespace {
 
     // --- Encoder Callbacks ---
 
-    FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], size_t bytes, unsigned, unsigned, void *client_data) {
+    FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], std::size_t bytes, unsigned, unsigned, void *client_data) {
         const auto f = static_cast<FILE*>(client_data);
         if (fwrite(buffer, 1, bytes, f) != bytes) return FLAC__STREAM_ENCODER_WRITE_STATUS_FATAL_ERROR;
         return FLAC__STREAM_ENCODER_WRITE_STATUS_OK;
@@ -254,8 +254,8 @@ namespace {
             c->sample_rate = frame->header.sample_rate;
         }
 
-        const size_t n = frame->header.blocksize;
-        for (size_t i = 0; i < n; ++i) {
+        const std::size_t n = frame->header.blocksize;
+        for (std::size_t i = 0; i < n; ++i) {
             for (unsigned ch = 0; ch < frame->header.channels; ++ch) {
                 c->pcm.push_back(buffer[ch][i]);
             }

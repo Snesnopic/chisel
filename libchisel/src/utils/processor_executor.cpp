@@ -307,7 +307,7 @@ namespace chisel {
                         fs::path last_tmp;
                         bool pipeline_ok = true;
 
-                        for (size_t i = 0; i < candidates.size(); ++i) {
+                        for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) {
                                 pipeline_ok = false;
                                 break;
@@ -384,7 +384,7 @@ namespace chisel {
                         };
                         std::vector<Result> results;
 
-                        for (size_t i = 0; i < candidates.size(); ++i) {
+                        for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
 #ifdef __APPLE__
                             fs::path target_dir = has_output_dir_

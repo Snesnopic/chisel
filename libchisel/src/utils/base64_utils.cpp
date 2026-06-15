@@ -47,7 +47,7 @@ std::string Base64Utils::encode(const std::vector<uint8_t>& bytes_to_encode) {
     std::string ret;
     int i = 0, j = 0;
     unsigned char char_array_3[3], char_array_4[4];
-    size_t in_len = bytes_to_encode.size();
+    std::size_t in_len = bytes_to_encode.size();
     const uint8_t* buf = bytes_to_encode.data();
 
     while (in_len--) {

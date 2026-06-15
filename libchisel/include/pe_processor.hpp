@@ -149,7 +149,7 @@ namespace chisel {
 
         struct RsrcEntry {
             ImageResourceDataEntry data_entry;
-            size_t data_entry_offset; ///< Absolute offset of the ImageResourceDataEntry in the file
+            std::size_t data_entry_offset; ///< Absolute offset of the ImageResourceDataEntry in the file
             std::string name;
         };
 

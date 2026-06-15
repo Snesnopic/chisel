@@ -74,8 +74,8 @@ namespace {
 
         png_read_update_info(rd.png, rd.info);
 
-        const size_t rowbytes = png_get_rowbytes(rd.png, rd.info);
-        if (rowbytes != static_cast<size_t>(width) * 4) {
+        const std::size_t rowbytes = png_get_rowbytes(rd.png, rd.info);
+        if (rowbytes != static_cast<std::size_t>(width) * 4) {
              throw std::runtime_error("Rowbytes mismatch, expected RGBA8");
         }
 

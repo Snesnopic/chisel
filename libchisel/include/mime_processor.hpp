@@ -15,7 +15,7 @@ struct TextChunk {
 };
 
 struct Base64Chunk {
-    size_t file_index;
+    std::size_t file_index;
 };
 
 using MimeChunk = std::variant<TextChunk, Base64Chunk>;

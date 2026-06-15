@@ -94,8 +94,8 @@ namespace chisel {
          * @brief Stores the position of a photo within the VCF text.
          */
         struct PhotoPosition {
-            size_t start;       ///< start of the Base64 string
-            size_t end;         ///< end of the Base64 string
+            std::size_t start;       ///< start of the Base64 string
+            std::size_t end;         ///< end of the Base64 string
             std::string prefix; ///< the PHOTO;...: part
         };
     };

@@ -35,7 +35,7 @@ ThreadPool::ThreadPool(unsigned threads) {
                 }
 
                 struct PendingGuard {
-                    size_t &pending;
+                    std::size_t &pending;
                     std::mutex &mtx;
                     std::condition_variable &cv;
                     ~PendingGuard() {

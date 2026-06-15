@@ -108,7 +108,7 @@ private:
     std::condition_variable idle_cv_;       ///< Notifies wait_idle() when pending_ is zero
     std::queue<std::function<void(stop_token)>> tasks_; ///< The queue of tasks
     std::vector<std::thread> workers_;      ///< The worker threads
-    size_t pending_{0};                     ///< Number of tasks enqueued or running
+    std::size_t pending_{0};                     ///< Number of tasks enqueued or running
     std::atomic<bool> stop_flag_{false};    ///< Flag to signal workers to stop
 };
 
