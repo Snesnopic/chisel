@@ -29,14 +29,14 @@ namespace chisel {
                                          fs::path output_dir,
                                          EventBus &bus,
                                          const unsigned threads)
-        : registry_(registry),
+        : pool_(threads),
           m_options(options),
-          dry_run_(dry_run),
           output_dir_(std::move(output_dir)),
-          has_output_dir_(!output_dir_.empty()),
-          pool_(threads),
           event_bus_(bus),
-          mode_(mode)
+          registry_(registry),
+          mode_(mode),
+          dry_run_(dry_run),
+          has_output_dir_(!output_dir_.empty())
            {
            }
 
