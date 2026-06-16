@@ -94,20 +94,29 @@ jobs:
 
   update-winget:
     runs-on: windows-latest
+    env:
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
     steps:
-      - name: Install wingetcreate
-        run: dotnet tool install --global Microsoft.WingetCreateCLI
-
-      - name: Submit update to winget-pkgs
+      - name: Submit package using wingetcreate
+        shell: powershell
         run: |
-          $tag = "${{ github.event.release.tag_name }}"
-          $ver = $tag.TrimStart('v')
-          $base = "https://github.com/Snesnopic/chisel/releases/download/$tag"
-          
-          # multi-architecture binaries for windows release
-          $x64 = "$base/chsl-windows-x64.zip"
-          $x86 = "$base/chsl-windows-x86.zip"
-          $arm64 = "$base/chsl-windows-arm64.zip"
-          
-          Write-Host "SUBMITTING NEW MANIFEST TO WINGET FOR VERSION: $ver"
-          wingetcreate update Snesnopic.Chisel -v $ver -u $x64 $x86 $arm64 --token ${{ secrets.WINGET_TOKEN }} --submit
+          # extract version and assets from release event
+          $rawVersion = "${{ github.event.release.tag_name }}"
+          $packageVersion = $rawVersion.TrimStart('v')
+          $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
+
+          Write-Host "STARTING WINGET SUBMISSION FOR VERSION: $packageVersion"
+
+          # filter urls for each architecture based on asset names
+          $urlX64 = $assets | Where-Object -Property name -like '*windows-x64.zip' | Select-Object -ExpandProperty browser_download_url
+          $urlX86 = $assets | Where-Object -Property name -like '*windows-x86.zip' | Select-Object -ExpandProperty browser_download_url
+          $urlArm64 = $assets | Where-Object -Property name -like '*windows-arm64.zip' | Select-Object -ExpandProperty browser_download_url
+
+          # download latest wingetcreate standalone binary
+          curl.exe -JLO https://aka.ms/wingetcreate/latest
+
+          # execute update with explicit architecture mapping
+          .\wingetcreate.exe update Snesnopic.Chisel `
+            --version $packageVersion `
+            --urls "$urlX64|x64" "$urlX86|x86" "$urlArm64|arm64" `
+            --submit
