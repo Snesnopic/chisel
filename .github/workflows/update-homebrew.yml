@@ -1,4 +1,4 @@
-name: Update Homebrew Formula
+name: Update package managers
 
 on:
   release:
@@ -91,3 +91,23 @@ jobs:
           else
             echo "Formula already up to date."
           fi
+
+  update-winget:
+    runs-on: windows-latest
+    steps:
+      - name: Install wingetcreate
+        run: dotnet tool install --global Microsoft.WingetCreateCLI
+
+      - name: Submit update to winget-pkgs
+        run: |
+          $tag = "${{ github.event.release.tag_name }}"
+          $ver = $tag.TrimStart('v')
+          $base = "https://github.com/Snesnopic/chisel/releases/download/$tag"
+          
+          # multi-architecture binaries for windows release
+          $x64 = "$base/chsl-windows-x64.zip"
+          $x86 = "$base/chsl-windows-x86.zip"
+          $arm64 = "$base/chsl-windows-arm64.zip"
+          
+          Write-Host "SUBMITTING NEW MANIFEST TO WINGET FOR VERSION: $ver"
+          wingetcreate update Snesnopic.Chisel -v $ver -u $x64 $x86 $arm64 --token ${{ secrets.WINGET_TOKEN }} --submit
