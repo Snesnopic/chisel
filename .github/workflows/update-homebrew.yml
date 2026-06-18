@@ -116,7 +116,12 @@ jobs:
           curl.exe -JLO https://aka.ms/wingetcreate/latest
 
           # execute update with explicit architecture mapping
+          $urls = @()
+          if ($urlX64) { $urls += "$urlX64|x64" }
+          if ($urlX86) { $urls += "$urlX86|x86" }
+          if ($urlArm64) { $urls += "$urlArm64|arm64" }
+
           .\wingetcreate.exe update Snesnopic.Chisel `
             --version $packageVersion `
-            --urls "$urlX64|x64" "$urlX86|x86" "$urlArm64|arm64" `
+            --urls $urls `
             --submit
