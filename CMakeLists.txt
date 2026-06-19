@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.5...4.1.2)
 
 project(chisel VERSION 1.7.0 LANGUAGES CXX C)
 
+if(MSVC)
+    # force static msvc runtime linkage (/mt for release, /mtd for debug)
+    if(POLICY CMP0091)
+        cmake_policy(SET CMP0091 NEW)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+endif()
+
 # prevents redefinition of 'uninstall' target
 macro(add_custom_target target_name)
     if("${target_name}" STREQUAL "uninstall")
