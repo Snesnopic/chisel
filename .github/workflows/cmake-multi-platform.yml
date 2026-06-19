@@ -82,6 +82,15 @@ jobs:
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-arm64"
 
+          - id: windows-x86
+            runs_on: windows-latest
+            build_type: Release
+            c_compiler: cl
+            cpp_compiler: cl
+            extra_cmake_args: -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static
+            binary_path: bin/Release/chsl.exe
+            asset_name: "windows-x86"
+
     steps:
       - name: Disable Git AutoCRLF
         if: runner.os == 'Windows'
@@ -119,7 +128,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
-          arch: ${{ matrix.id == 'windows-arm' && 'arm64' || 'x64' }}
+          arch: ${{ matrix.id == 'windows-arm' && 'arm64' || (matrix.id == 'windows-x86' && 'x86' || 'x64') }}
 
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
