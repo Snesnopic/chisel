@@ -3,6 +3,8 @@
 //
 
 #include "../../include/jp2_processor.hpp"
+#include <algorithm>
+#include <cstring>
 #include "../../include/logger.hpp"
 #include <openjpeg.h>
 #include <filesystem>
