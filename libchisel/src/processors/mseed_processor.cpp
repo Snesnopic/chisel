@@ -3,6 +3,7 @@
 //
 
 #include "mseed_processor.hpp"
+#include <mseedout/mseedout.hpp>
 #include <libmseed.h>
 #include <stdexcept>
 #include <iostream>
@@ -73,93 +74,16 @@ void MseedProcessor::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "ENTERING RECOMPRESS FOR " + input.string(), get_name());
 
-    static std::once_flag flag;
-    std::call_once(flag, []() {
-        ms_rloginit(nullptr, nullptr, [](const char*){}, nullptr, 0);
-    });
-
-    MS3Record *msr = nullptr;
-    uint8_t original_version = 3;
-    uint32_t pack_flags = MSF_FLUSHDATA;
-
-    MS3FileParam *msfp = nullptr;
-    int ret = ms3_readmsr_r(&msfp, &msr, input.string().c_str(), 0, 0);
-    if (ret != MS_NOERROR) {
-        Logger::log(LogLevel::Warning, "COULD NOT PEEK FIRST RECORD, ATTEMPTING FULL READ.", get_name());
-    } else {
-        original_version = msr->formatversion;
-    }
-    if (msfp != nullptr) {
-        // force libmseed to close the file handle and free the local msfp
-        ms3_readmsr_r(&msfp, &msr, nullptr, 0, 0);
-    }
-    if (msr != nullptr) {
-        msr3_free(&msr);
+    bool success = false;
+    try {
+        success = mseedout::recompress_mseed(input, output);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, std::string("mseedout exception: ") + e.what(), get_name());
     }
 
-    if (original_version == 2) pack_flags |= MSF_PACKVER2;
-
-    MS3TraceList *raw_mstl = nullptr;
-    ret = ms3_readtracelist(&raw_mstl, input.string().c_str(), nullptr, 0, MSF_UNPACKDATA, 0);
-    const MstlPtr mstl(raw_mstl);
-
-    if (ret != MS_NOERROR) {
-        throw std::runtime_error("failed to read trace list. libmseed code: " + std::to_string(ret));
-    }
-
-    bool wrote_any_data = false;
-
-    // scope limits fileptr lifetime to ensure flush/close before size check
-    {
-        const FilePtr outfile(chisel::open_file(output.string().c_str(), "wb"));
-        if (!outfile) {
-            throw std::runtime_error("failed to open output file for writing");
-        }
-
-        if (mstl && mstl->traces.next[0]) {
-            for (MS3TraceID *id = mstl->traces.next[0]; id != nullptr; id = id->next[0]) {
-                for (MS3TraceSeg *seg = id->first; seg != nullptr; seg = seg->next) {
-                    if (seg->samplecnt <= 0) continue;
-
-                    int8_t target_encoding = -1;
-                    const int reclen = choose_reclen(original_version, seg->sampletype, seg->samplecnt);
-                    int64_t packed_samples = 0;
-
-                    if (seg->sampletype == 'i') target_encoding = DE_STEIM2;
-                    else if (seg->sampletype == 'f') target_encoding = DE_FLOAT32;
-                    else if (seg->sampletype == 'd') target_encoding = DE_FLOAT64;
-                    else if (seg->sampletype == 't') target_encoding = DE_TEXT;
-
-                    int64_t ret_pack = mstl3_pack_segment(mstl.get(), id, seg,
-                                                          record_handler_c, outfile.get(),
-                                                          reclen, target_encoding,
-                                                          &packed_samples, pack_flags, 0, nullptr);
-
-                    if (ret_pack < 0 && seg->sampletype == 'i') {
-                        Logger::log(LogLevel::Warning, std::string("SID ") + id->sid +
-                                                       ": STEIM2 PACKING FAILED. RETRYING DE_INT32.", get_name());
-                        target_encoding = DE_INT32;
-                        packed_samples = 0;
-                        ret_pack = mstl3_pack_segment(mstl.get(), id, seg,
-                                                      record_handler_c, outfile.get(),
-                                                      reclen, target_encoding,
-                                                      &packed_samples, pack_flags, 0, nullptr);
-                    }
-
-                    if (ret_pack > 0 || packed_samples > 0) {
-                        wrote_any_data = true;
-                    } else if (ret_pack < 0) {
-                        Logger::log(LogLevel::Error, std::string("FINAL PACKING ERROR FOR SID ") + id->sid, get_name());
-                    }
-                }
-            }
-        }
-    }
-
-    // fallback: if packing did not process actual samples or file size is 0
     std::error_code ec;
-    if (!wrote_any_data || std::filesystem::file_size(output, ec) == 0) {
-        Logger::log(LogLevel::Debug, "NO COMPRESSIBLE DATA GENERATED. COPYING ORIGINAL.", get_name());
+    if (!success || std::filesystem::file_size(output, ec) == 0) {
+        Logger::log(LogLevel::Debug, "NO COMPRESSIBLE DATA GENERATED OR PACKING FAILED. COPYING ORIGINAL.", get_name());
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
     }
 

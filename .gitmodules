@@ -43,9 +43,6 @@
 [submodule "third_party/qpdf"]
 	path = third_party/qpdf
 	url = https://github.com/Snesnopic/qpdf.git
-[submodule "third_party/libmseed"]
-	path = third_party/libmseed
-	url = https://github.com/EarthScope/libmseed.git
 [submodule "third_party/xz"]
 	path = third_party/xz
 	url = https://github.com/tukaani-project/xz.git
@@ -111,3 +108,6 @@
 [submodule "third_party/lz4"]
 	path = third_party/lz4
 	url = https://github.com/lz4/lz4.git
+[submodule "third_party/mseedout"]
+	path = third_party/mseedout
+	url = https://github.com/Snesnopic/mseedout

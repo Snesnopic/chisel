@@ -537,14 +537,8 @@ set(sqlite3_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/sqlite3")
 set(sqlite3_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/sqlite3-build")
 add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 
-# libmseed
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(LIBMSEED_URL OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(third_party/libmseed EXCLUDE_FROM_ALL)
+# mseedout
+add_subdirectory(third_party/mseedout EXCLUDE_FROM_ALL)
 
 # gifsicle
 set(BUILD_GIFSICLE_CLI OFF CACHE BOOL "" FORCE)
@@ -638,6 +632,7 @@ set(CHISEL_LIBS
         tag
         libgifsicle
         pugixml
+        mseedout_lib
         mseed_static
         bmplib
         brotlicommon
@@ -677,6 +672,8 @@ add_dependencies(libchisel copy_mozjpeg_jconfig)
 target_include_directories(libchisel SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/include"
         "${CMAKE_SOURCE_DIR}/third_party/gifsicle/src"
+        "${CMAKE_SOURCE_DIR}/third_party/mseedout/include"
+        "${CMAKE_SOURCE_DIR}/third_party/mseedout/third_party/libmseed"
 )
 
 if(CHISEL_BUILD_CLI)
