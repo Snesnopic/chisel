@@ -192,7 +192,7 @@ namespace chisel {
         return std::make_pair(dest, replaced);
     }
 
-    void ProcessorExecutor::analyze_path(const fs::path &path) {
+    void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
 
         auto name = path.filename().string();
@@ -235,9 +235,12 @@ namespace chisel {
                 content = std::nullopt;
             }
             if (content) {
+                std::error_code ec;
+                content->original_size = fs::file_size(content->original_path, ec);
+                if (ec) content->original_size = 0;
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
-                    analyze_path(child);
+                    analyze_path(child, path);
                 }
                 scheduled_for_extraction = true;
             } else {
@@ -251,7 +254,7 @@ namespace chisel {
             }
         }
         if (processor->can_recompress()) {
-            work_list_.push_back(current_path);
+            work_list_.push_back({current_path, parent, scheduled_for_extraction});
             scheduled_for_recompression = true;
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
@@ -267,14 +270,16 @@ namespace chisel {
     }
 
     void ProcessorExecutor::process_work_list() {
-        for (const auto &file: work_list_) {
+        for (const auto &item: work_list_) {
             if (stop_flag_.load(std::memory_order_relaxed)) return;
-            pool_.enqueue([this, file](stop_token st) {
+            pool_.enqueue([this, item](stop_token st) {
+                const auto& file = item.path;
+                const auto& parent_container = item.parent_container;
                 if (st.stop_requested()) {
-                    event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                    event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted", item.is_container});
                     return;
                 }
-                event_bus_.publish(FileProcessStartEvent{file});
+                event_bus_.publish(FileProcessStartEvent{file, parent_container, item.is_container});
 
                 // collect all candidates
                 auto candidates = registry_.find_by_mime(MimeDetector::detect(file));
@@ -365,15 +370,15 @@ namespace chisel {
                                 std::error_code ec;
                                 fs::remove(last_tmp, ec);
                                 if (!checksum_ok) {
-                                    event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected"});
+                                    event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected", item.is_container});
                                 } else {
-                                    event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                                    event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
                                 }
                             }
                         } else if (!st.stop_requested()) {
                             auto err = std::error_code{};
                             if (!last_tmp.empty()) fs::remove(last_tmp, err);
-                            event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed"});
+                            event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed", item.is_container});
                         }
                     } else {
                         // parallel
@@ -438,7 +443,7 @@ namespace chisel {
                                 fs::remove(r.tmp, ec);
                             }
                             if (!st.stop_requested()) {
-                                event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement"});
+                                event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
                             }
                         }
                     }
@@ -455,20 +460,22 @@ namespace chisel {
                                 orig_size,
                                 new_size,
                                 move_result->second,
-                                duration
+                                duration,
+                                parent_container,
+                                item.is_container
                             });
                         } else {
-                            event_bus_.publish(FileProcessErrorEvent{file, "Failed to move optimized file"});
+                            event_bus_.publish(FileProcessErrorEvent{file, "Failed to move optimized file", item.is_container});
                         }
                     } else if (st.stop_requested()) {
-                        event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted"});
+                        event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted", item.is_container});
                     }
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
-                    event_bus_.publish(FileProcessErrorEvent{file, e.what()});
+                    event_bus_.publish(FileProcessErrorEvent{file, e.what(), item.is_container});
                 } catch (...) {
                     Logger::log(LogLevel::Error, "Unknown error on " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessErrorEvent{file, "Unknown non-standard exception"});
+                    event_bus_.publish(FileProcessErrorEvent{file, "Unknown non-standard exception", item.is_container});
                 }
             });
         }
@@ -499,8 +506,7 @@ namespace chisel {
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
                 std::error_code ec;
-                auto orig_size = std::filesystem::file_size(content.original_path, ec);
-                if (ec) orig_size = 0;
+                auto orig_size = content.original_size;
 
                 if (new_temp_file.empty()) {
                     Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");

@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <vector>
 #include <stack>
+#include <optional>
 #include <thread>
 #include <mutex>
 #include "event_bus.hpp"
@@ -110,8 +111,9 @@ private:
      * work_list_, and the container is added to finalize_stack_.
      *
      * @param path The file or directory path to analyze.
+     * @param parent The parent container path if this is an extracted file.
      */
-    void analyze_path(const std::filesystem::path& path);
+    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt);
 
     /**
      * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
@@ -145,7 +147,12 @@ private:
     ThreadPool pool_;                             ///< Thread pool for Phase 2
     ProcessingOptions m_options;
     std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
-    std::vector<std::filesystem::path> work_list_;///< (Phase 1->2) Files to be recompressed
+    struct WorkItem {
+        std::filesystem::path path;                            ///< Path to the file to be processed
+        std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any
+        bool is_container = false;                             ///< True if this item is the intermediate recompression of a container
+    };
+    std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
     std::filesystem::path output_dir_;            ///< Optional output directory
     EventBus& event_bus_;                         ///< Bus for publishing events
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry

@@ -220,7 +220,7 @@ int main(int argc, char* argv[]) {
 
     // Process Start: Update the "Processing: ..." text dynamically
     bus.subscribe<FileProcessStartEvent>([&](const FileProcessStartEvent& e) {
-        if (settings.quiet) return;
+        if (settings.quiet || e.is_container) return;
 
         std::scoped_lock lock(g_console_mtx);
         g_active_files.push_back(e.path.filename().string());
@@ -261,7 +261,7 @@ int main(int argc, char* argv[]) {
     };
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
-        if (!settings.quiet) {
+        if (!settings.quiet && !e.is_container) {
             std::string status_msg;
             if (!e.replaced) {
                 status_msg = settings.dry_run ? " [DRY-RUN]" : " [kept]";

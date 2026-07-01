@@ -57,6 +57,7 @@ struct ExtractedContent {
      */
     std::any extras;
     std::filesystem::path original_path;                ///< Path to the original container file
+    uintmax_t original_size = 0;                        ///< Original size before any processing
     std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
     std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
     ContainerFormat format;                             ///< Format of the container

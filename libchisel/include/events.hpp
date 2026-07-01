@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <string>
 #include <chrono>
+#include <optional>
 
 namespace chisel {
 
@@ -69,6 +70,8 @@ struct FileAnalyzeSkippedEvent {
  */
 struct FileProcessStartEvent {
     std::filesystem::path path; ///< Path of the file being processed
+    std::optional<std::filesystem::path> parent_container = std::nullopt; ///< Path of the container this file was extracted from, if any
+    bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
 /**
@@ -81,6 +84,8 @@ struct FileProcessCompleteEvent {
     uintmax_t new_size = 0;                 ///< New file size in bytes
     bool replaced = false;                  ///< True if the original file was replaced/written
     std::chrono::milliseconds duration{0};  ///< Processing duration
+    std::optional<std::filesystem::path> parent_container = std::nullopt; ///< Path of the container this file was extracted from, if any
+    bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
 /**
@@ -88,7 +93,8 @@ struct FileProcessCompleteEvent {
  */
 struct FileProcessErrorEvent {
     std::filesystem::path path; ///< Path of the file
-    std::string error_message;  ///< Error description
+    std::string error_message;                                            ///< Error description
+    bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
 /**
@@ -96,7 +102,8 @@ struct FileProcessErrorEvent {
  */
 struct FileProcessSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
-    std::string reason;         ///< Reason for skipping
+    std::string reason;                                                   ///< Reason for skipping
+    bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
 // --- Phase 3: Finalization ---
