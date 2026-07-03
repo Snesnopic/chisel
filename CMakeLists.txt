@@ -391,6 +391,14 @@ ExternalProject_Add(mozjpeg
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        # ExternalProject_Add does NOT inherit the parent project's compiler/linker
+        # flags automatically; forward them explicitly so cross-compilation flags
+        # (e.g. -m32) reach mozjpeg's own CMake configure and its CPU_TYPE/BITS
+        # detection, which otherwise defaults to the host's native architecture.
+        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+        -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+        -DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
+        -DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}
         UPDATE_DISCONNECTED 1
         BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
