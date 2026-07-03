@@ -53,7 +53,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            extra_cmake_args: -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_ASM_FLAGS=-m32 -DCMAKE_EXE_LINKER_FLAGS=-m32 -DCMAKE_LIBRARY_PATH=/usr/lib/i386-linux-gnu -DRust_CARGO_TARGET=i686-unknown-linux-gnu
+            extra_cmake_args: -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_ASM_FLAGS=-m32 -DCMAKE_EXE_LINKER_FLAGS=-m32 -DCMAKE_LIBRARY_PATH=/usr/lib/i386-linux-gnu -DRust_CARGO_TARGET=i686-unknown-linux-gnu -DRust_RUSTUP_INSTALL_MISSING_TARGET=ON
             binary_path: bin/Release/chsl
             asset_name: "linux-x86"
 
