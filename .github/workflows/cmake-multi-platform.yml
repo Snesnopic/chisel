@@ -130,13 +130,14 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
+          sudo apt-get install -y gcc-multilib g++-multilib libc6:i386 libc6-dev:i386
 
-          # libc6-dev-i386 ships the versioned libm.so.N runtime but, unlike the
-          # native libc6-dev package, omits the unversioned libm.so dev symlink
-          # that find_library()/-lm expect. Its actual location varies by image
-          # (multiarch triplet dir vs. classic biarch /usr/lib32), so locate it
-          # wherever it actually is instead of assuming a fixed path.
+          # gcc-multilib/g++-multilib pull in the "biarch" libc6-dev-i386 shim
+          # (headers + symlinks for -m32 compiling), but on some images that
+          # does NOT transitively install the actual libc6:i386 multiarch
+          # runtime package, leaving libm.so.6/libc.so.6 for i386 missing
+          # entirely (hence the explicit install above). Locate the runtime
+          # wherever it actually landed instead of assuming a fixed path.
           echo "--- searching for the 32-bit libm runtime ---"
           sudo find /usr/lib /lib -iname 'libm.so*' 2>/dev/null
 
