@@ -48,6 +48,15 @@ jobs:
             binary_path: bin/Release/chsl
             asset_name: "linux-arm64"
 
+          - id: ubuntu-x86
+            runs_on: ubuntu-latest
+            build_type: Release
+            c_compiler: gcc
+            cpp_compiler: g++
+            extra_cmake_args: -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_EXE_LINKER_FLAGS=-m32
+            binary_path: bin/Release/chsl
+            asset_name: "linux-x86"
+
           - id: macos-intel
             runs_on: macos-15-intel
             build_type: Release
@@ -115,6 +124,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
             autoconf automake libtool m4 nasm yasm curl unzip tar gzip python3-pip
+
+      - name: Install multilib dependencies (Linux x86)
+        if: matrix.id == 'ubuntu-x86'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
 
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
@@ -347,6 +363,10 @@ jobs:
           - id: ubuntu-arm
             runs_on: ubuntu-24.04-arm
             asset_name: "linux-arm64"
+
+          - id: ubuntu-x86
+            runs_on: ubuntu-latest
+            asset_name: "linux-x86"
 
           - id: macos-intel
             runs_on: macos-15-intel
@@ -800,11 +820,12 @@ jobs:
           package_unix "binary-linux-x64-gcc"   "chsl-linux-x64-gcc"
           package_unix "binary-linux-x64-clang" "chsl-linux-x64-clang"
           package_unix "binary-linux-arm64"     "chsl-linux-arm64"
-          
+          package_unix "binary-linux-x86"       "chsl-linux-x86"
+
           # --- macOS ---
           package_unix "binary-macos-x64"       "chsl-macos-x64"
           package_unix "binary-macos-arm64"     "chsl-macos-arm64"
-          
+
           # --- Windows ---
           package_windows "binary-windows-x64"    "chsl-windows-x64"
           package_windows "binary-windows-arm64"  "chsl-windows-arm64"
@@ -876,6 +897,7 @@ jobs:
           package_unix "binary-linux-x64-gcc"   "chsl-linux-x64-gcc"
           package_unix "binary-linux-x64-clang" "chsl-linux-x64-clang"
           package_unix "binary-linux-arm64"     "chsl-linux-arm64"
+          package_unix "binary-linux-x86"       "chsl-linux-x86"
           package_unix "binary-macos-x64"       "chsl-macos-x64"
           package_unix "binary-macos-arm64"     "chsl-macos-arm64"
           package_unix "binary-freebsd-x64"     "chsl-freebsd-x64"
@@ -915,6 +937,10 @@ jobs:
           - id: ubuntu-arm
             runs_on: ubuntu-24.04-arm
             asset_name: "linux-arm64"
+
+          - id: ubuntu-x86
+            runs_on: ubuntu-latest
+            asset_name: "linux-x86"
 
           - id: macos-intel
             runs_on: macos-15-intel
