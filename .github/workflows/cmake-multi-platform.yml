@@ -134,11 +134,25 @@ jobs:
 
           # libc6-dev-i386 ships the versioned libm.so.N runtime but, unlike the
           # native libc6-dev package, omits the unversioned libm.so dev symlink
-          # that find_library()/-lm expect. Recreate it if missing.
+          # that find_library()/-lm expect. Its actual location varies by image
+          # (multiarch triplet dir vs. classic biarch /usr/lib32), so locate it
+          # wherever it actually is instead of assuming a fixed path.
+          echo "--- searching for the 32-bit libm runtime ---"
+          sudo find /usr/lib /lib -iname 'libm.so*' 2>/dev/null
+
+          real_libm=$(sudo find /usr/lib /lib -name 'libm.so.*' 2>/dev/null | grep -v x86_64 | sort -V | tail -1)
+          echo "Resolved 32-bit libm: ${real_libm:-<none found>}"
+
+          if [ -z "$real_libm" ]; then
+            echo "::error::Could not locate a 32-bit libm.so.* anywhere under /usr/lib or /lib"
+            exit 1
+          fi
+
+          # normalize it under the multiarch path that CMAKE_LIBRARY_PATH points to
+          sudo mkdir -p /usr/lib/i386-linux-gnu
           if [ ! -e /usr/lib/i386-linux-gnu/libm.so ]; then
-            real_libm=$(find /usr/lib/i386-linux-gnu -maxdepth 1 -name 'libm.so.*' | sort -V | tail -1)
-            echo "libm.so symlink missing, linking to: $real_libm"
-            sudo ln -s "$(basename "$real_libm")" /usr/lib/i386-linux-gnu/libm.so
+            sudo ln -s "$real_libm" /usr/lib/i386-linux-gnu/libm.so
+            echo "Linked /usr/lib/i386-linux-gnu/libm.so -> $real_libm"
           fi
 
       - name: Install build dependencies (macOS)
