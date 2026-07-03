@@ -53,7 +53,7 @@ jobs:
             build_type: Release
             c_compiler: gcc
             cpp_compiler: g++
-            extra_cmake_args: -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_ASM_FLAGS=-m32 -DCMAKE_EXE_LINKER_FLAGS=-m32 -DCMAKE_LIBRARY_PATH=/usr/lib/i386-linux-gnu -DCMath_LIBRARY=/usr/lib/i386-linux-gnu/libm.so -DCMath_HAVE_LIBC_POW=1
+            extra_cmake_args: -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_ASM_FLAGS=-m32 -DCMAKE_EXE_LINKER_FLAGS=-m32 -DCMAKE_LIBRARY_PATH=/usr/lib/i386-linux-gnu
             binary_path: bin/Release/chsl
             asset_name: "linux-x86"
 
@@ -131,6 +131,15 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y gcc-multilib g++-multilib
+
+          # libc6-dev-i386 ships the versioned libm.so.N runtime but, unlike the
+          # native libc6-dev package, omits the unversioned libm.so dev symlink
+          # that find_library()/-lm expect. Recreate it if missing.
+          if [ ! -e /usr/lib/i386-linux-gnu/libm.so ]; then
+            real_libm=$(find /usr/lib/i386-linux-gnu -maxdepth 1 -name 'libm.so.*' | sort -V | tail -1)
+            echo "libm.so symlink missing, linking to: $real_libm"
+            sudo ln -s "$(basename "$real_libm")" /usr/lib/i386-linux-gnu/libm.so
+          fi
 
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
