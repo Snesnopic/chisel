@@ -66,7 +66,7 @@ jobs:
               if build.head?
                 system "cmake", "-S", ".", "-B", "build", *std_cmake_args
                 system "cmake", "--build", "build", "--config", "Release"
-                bin.install "build/bin/Release/chsl"
+                bin.install "bin/Release/chsl"
               else
                 bin.install "chsl"
               end
