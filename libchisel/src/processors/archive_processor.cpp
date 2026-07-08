@@ -541,11 +541,13 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
 
     if (!can_read_format(content.format)) {
         Logger::log(LogLevel::Warning, "Unreadable or unrecognized format: " + input_path.filename().string(), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }
 
     if (!extract_with_libarchive(input_path, content.temp_dir)) {
         Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }
 
@@ -586,6 +588,10 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
     if (!create_with_libarchive(content.temp_dir, tmp_archive, out_fmt)) {
         Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), get_name());
         fs::remove_all(content.temp_dir);
+        // create_with_libarchive may have already opened/partially written tmp_archive
+        // before failing mid-stream; don't leak the truncated file.
+        std::error_code rm_ec;
+        fs::remove(tmp_archive, rm_ec);
         throw std::runtime_error("ArchiveProcessor: create_with_libarchive failed");
     }
 
