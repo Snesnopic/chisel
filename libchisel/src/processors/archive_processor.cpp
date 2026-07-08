@@ -229,7 +229,13 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         case ContainerFormat::Epub:
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
+                // "store" applies only to the mandatory "mimetype" entry written
+                // below; it's switched back to deflate right after via
+                // archive_write_zip_set_compression_deflate(). compression-level
+                // is a separate field untouched by that call, so it's safe to
+                // set it once here for the rest of the archive's entries.
                 archive_write_set_format_option(a, "zip", "compression", "store");
+                archive_write_set_format_option(a, "zip", "compression-level", "9");
             }
             break;
         case ContainerFormat::Zip:
@@ -372,6 +378,15 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             archive_write_finish_entry(a); // finish this entry
             archive_entry_free(entry);
         }
+
+        // "compression=store" above was needed only for the mandatory,
+        // uncompressed "mimetype" entry per the EPUB spec; restore normal
+        // deflate compression so the rest of the archive's contents aren't
+        // also written uncompressed. archive_write_set_format_option() only
+        // accepts changes in the writer's "new" state (before any entry is
+        // written), so it can't be used here; archive_write_zip_set_compression_deflate()
+        // is explicitly allowed after entries have already been written.
+        archive_write_zip_set_compression_deflate(a);
     }
 
     std::vector<fs::path> files;
