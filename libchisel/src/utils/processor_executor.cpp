@@ -525,6 +525,25 @@ namespace chisel {
                 }
 
                 auto new_size = std::filesystem::file_size(new_temp_file, ec);
+
+                // Only enforce "must be strictly smaller" for processors that are
+                // *pure* containers (can_recompress() == false), e.g. ArchiveProcessor,
+                // OdfProcessor, OOXMLProcessor: for these, Phase 2 never touches the
+                // original file, so falling back to it on a non-improving finalize is
+                // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor) already
+                // overwrite content.original_path during Phase 2 recompression as part of
+                // extracting an embedded resource (like cover art) - by the time this runs,
+                // the "original" is already gone, so finalize_extraction's result must
+                // always be accepted or the extracted resource would be lost permanently.
+                if (!procs.front()->can_recompress() && !ec && new_size >= orig_size) {
+                    Logger::log(LogLevel::Debug,
+                                "Container finalize discarded (no size improvement): " + content.original_path.string(),
+                                "Executor");
+                    std::filesystem::remove(new_temp_file, ec);
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, content.original_path, orig_size, orig_size, false, duration});
+                    continue;
+                }
+
                 // use the helper and publish the specific Phase 3 event
                 auto move_result = move_to_destination(content.original_path, new_temp_file);
                 if (move_result) {
