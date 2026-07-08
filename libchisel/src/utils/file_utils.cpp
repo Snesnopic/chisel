@@ -134,10 +134,16 @@ namespace chisel {
     }
 
     std::string rel_path_of(const fs::path &root, const fs::path &p) {
-        std::error_code ec;
-        const auto rel = fs::relative(p, root, ec);
+        // lexically_relative operates purely on path components and never
+        // touches the filesystem, unlike fs::relative() which internally
+        // calls weakly_canonical() and therefore resolves symlinks. Since p
+        // may itself be (or contain) a symlink, resolving it here would make
+        // the computed name reflect the symlink's target instead of its
+        // location within root, which is unsafe when used to name archive
+        // entries during repacking.
+        const auto rel = p.lexically_relative(root);
         std::string s = rel.generic_string();
-        return s.empty() ? p.filename().generic_string() : s;
+        return s.empty() || s == "." ? p.filename().generic_string() : s;
     }
 
     bool natural_less_string(const std::string &sa, const std::string &sb) {

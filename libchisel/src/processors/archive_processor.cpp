@@ -73,6 +73,44 @@ static bool is_archive_file(const fs::path& path, ContainerFormat& fmt_out) {
 // --- libarchive extract/create ---
 
 /**
+ * @brief Validates that a symlink entry's target stays within the extraction sandbox.
+ *
+ * A symlink's own path is sanitized separately (see sanitize_archive_entry_path);
+ * this additionally validates what it *points to*, since an unvalidated absolute
+ * or ".."-laden target lets a crafted archive plant a link to any file on the
+ * host filesystem. Relative targets are resolved against the symlink's own
+ * directory, matching POSIX symlink semantics.
+ *
+ * @param raw_target The raw symlink target string from the archive entry.
+ * @param symlink_parent_dir The directory that will contain the symlink.
+ * @param dest_dir The extraction destination (sandbox root).
+ * @return True if the resolved target stays inside dest_dir.
+ */
+static bool sanitize_symlink_target(const std::string& raw_target,
+                                     const fs::path& symlink_parent_dir,
+                                     const fs::path& dest_dir) {
+    if (raw_target.empty()) return false;
+    if (raw_target.find('\0') != std::string::npos) return false;
+
+    std::string t = raw_target;
+    for (auto& c : t) { if (c == '\\') c = '/'; }
+
+    const fs::path target_path(t);
+    const fs::path candidate = target_path.is_absolute()
+        ? target_path
+        : symlink_parent_dir / target_path;
+
+    const auto normalized = candidate.lexically_normal();
+    const auto base = fs::path(dest_dir).lexically_normal();
+
+    const auto ns = normalized.string();
+    const auto bs = base.string();
+
+    if (ns.size() < bs.size()) return false;
+    return ns.starts_with(bs);
+}
+
+/**
  * @brief Extracts the contents of an archive to a destination directory using libarchive.
  * @param archive_path The path to the archive file.
  * @param dest_dir The directory where contents will be extracted.
@@ -132,16 +170,23 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
         if (archive_entry_filetype(entry) == AE_IFLNK) {
             const char* link_target = archive_entry_symlink(entry);
             if (link_target && link_target[0]) {
-                std::error_code rc;
-                fs::create_directories(out_path.parent_path(), rc);
+                if (!sanitize_symlink_target(link_target, out_path.parent_path(), dest_dir)) {
+                    Logger::log(LogLevel::Warning,
+                                "Skipping symlink with unsafe target (escapes extraction sandbox): " +
+                                std::string(current) + " -> " + link_target,
+                                "ArchiveProcessor");
+                } else {
+                    std::error_code rc;
+                    fs::create_directories(out_path.parent_path(), rc);
 #ifdef _WIN32
-                std::error_code tmp_ec;
-                fs::create_symlink(fs::path(link_target), out_path, tmp_ec);
-                (void)tmp_ec;
+                    std::error_code tmp_ec;
+                    fs::create_symlink(fs::path(link_target), out_path, tmp_ec);
+                    (void)tmp_ec;
 #else
-                std::error_code sce;
-                fs::create_symlink(fs::path(link_target), out_path, sce);
+                    std::error_code sce;
+                    fs::create_symlink(fs::path(link_target), out_path, sce);
 #endif
+                }
             }
             archive_read_data_skip(a);
             continue;
@@ -376,7 +421,19 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         if (rel.empty()) rel = p.filename().generic_string();
         archive_entry_set_pathname(entry, rel.c_str());
 
-        if (is_dir) {
+        if (is_symlink) {
+            // must be checked before is_dir/is_reg: fs::is_directory() and
+            // fs::is_regular_file() both follow symlinks, so a symlink
+            // pointing to a file or directory would otherwise be silently
+            // dereferenced here, reading/naming entries after its target
+            // instead of preserving it as a symlink.
+            archive_entry_set_filetype(entry, AE_IFLNK);
+            archive_entry_set_perm(entry, 0777);
+            auto target = fs::read_symlink(p, ec);
+            if (!ec) {
+                archive_entry_set_symlink(entry, target.string().c_str());
+            }
+        } else if (is_dir) {
             archive_entry_set_filetype(entry, AE_IFDIR);
             archive_entry_set_perm(entry, 0755);
         } else if (is_reg) {
@@ -416,13 +473,6 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                 archive_entry_set_mtime(entry, tt, 0);
             }
 #endif
-        } else if (is_symlink) {
-            archive_entry_set_filetype(entry, AE_IFLNK);
-            archive_entry_set_perm(entry, 0777);
-            auto target = fs::read_symlink(p, ec);
-            if (!ec) {
-                archive_entry_set_symlink(entry, target.string().c_str());
-            }
         } else {
             archive_entry_free(entry);
             continue;
