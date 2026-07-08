@@ -23,7 +23,6 @@
 ## Archives
 
 - [ ] Add support for 7Z recompression using 7zip SDK.
-- [ ] Rewrite hardlink handling in archive_processor with a cross-platform approach, since current implementation is not available on Windows.
 
 ## MKV / Matroska
 

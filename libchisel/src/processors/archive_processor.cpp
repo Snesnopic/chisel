@@ -22,7 +22,9 @@
 #include "file_utils.hpp"
 #ifndef _WIN32
 #include <sys/stat.h>
-
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #endif
 
 namespace chisel {
@@ -125,6 +127,13 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
     std::error_code ec;
     std::vector<char> buffer(64 * 1024);
 
+    // maps each entry's original (unsanitized) pathname, as recorded in the
+    // archive, to the actual sanitized path it was extracted to. Needed to
+    // resolve hardlink targets: libarchive's own hardlink field always
+    // refers to the original name, which no longer matches once we
+    // override the entry's pathname to the sanitized extraction path below.
+    std::unordered_map<std::string, fs::path> extracted_paths;
+
     while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
         const char* current = archive_entry_pathname(entry);
         if (!current) {
@@ -138,6 +147,7 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
             archive_read_data_skip(a);
             continue;
         }
+        extracted_paths[current] = out_path;
 
         if (!ensure_parent_dirs(out_path, ec)) {
             Logger::log(LogLevel::Error, "Can't create folder for: " + out_path.string(), "ArchiveProcessor");
@@ -170,6 +180,33 @@ static bool extract_with_libarchive(const fs::path& archive_path, const fs::path
                     std::error_code sce;
                     fs::create_symlink(fs::path(link_target), out_path, sce);
 #endif
+                }
+            }
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        // hardlink entries (tar/cpio/pax) reference a previously-seen entry
+        // by its *original* archive-internal name, which no longer matches
+        // once entries are rewritten to sanitized, absolute paths. Resolve
+        // it against extracted_paths and recreate the link ourselves,
+        // instead of letting libarchive resolve it (it can't, since it only
+        // knows the original, pre-sanitization names).
+        if (const char* hardlink_target = archive_entry_hardlink(entry)) {
+            const auto it_target = extracted_paths.find(hardlink_target);
+            if (it_target == extracted_paths.end()) {
+                Logger::log(LogLevel::Warning,
+                            "Skipping hardlink with unresolved target: " + std::string(current) +
+                            " -> " + hardlink_target,
+                            "ArchiveProcessor");
+            } else {
+                std::error_code link_ec;
+                fs::create_hard_link(it_target->second, out_path, link_ec);
+                if (link_ec) {
+                    Logger::log(LogLevel::Warning,
+                                "Failed to create hardlink " + out_path.string() + " -> " +
+                                it_target->second.string() + ": " + link_ec.message(),
+                                "ArchiveProcessor");
                 }
             }
             archive_read_data_skip(a);
@@ -211,6 +248,34 @@ struct PairHash {
         return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
     }
 };
+
+/**
+ * @brief Returns a (volume_id, file_id) pair uniquely identifying the file
+ * a path resolves to, used to detect and preserve hardlinks when creating
+ * an archive. Analogous to POSIX's (st_dev, st_ino) on every platform.
+ * @param p The path to query.
+ * @return The file identity, or std::nullopt if it could not be determined.
+ */
+static std::optional<std::pair<uintmax_t, uintmax_t>> get_file_identity(const fs::path& p) {
+#ifdef _WIN32
+    HANDLE h = CreateFileW(p.c_str(), 0,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return std::nullopt;
+
+    BY_HANDLE_FILE_INFORMATION info{};
+    const bool ok = GetFileInformationByHandle(h, &info) != 0;
+    CloseHandle(h);
+    if (!ok) return std::nullopt;
+
+    const auto file_id = (static_cast<uintmax_t>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+    return std::make_pair(static_cast<uintmax_t>(info.dwVolumeSerialNumber), file_id);
+#else
+    struct stat st{};
+    if (stat(p.c_str(), &st) != 0) return std::nullopt;
+    return std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
+#endif
+}
 
 /**
  * @brief Creates an archive from a source directory using libarchive.
@@ -447,17 +512,6 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             if (stat(p.c_str(), &st) == 0) {
                 archive_entry_set_perm(entry, st.st_mode);
                 archive_entry_set_mtime(entry, st.st_mtime, 0);
-
-                if (st.st_nlink > 1) {
-                    auto key = std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
-                    auto it_hl = hardlink_map.find(key);
-                    if (it_hl != hardlink_map.end()) {
-                        archive_entry_set_hardlink(entry, it_hl->second.c_str());
-                        archive_entry_set_size(entry, 0);
-                    } else {
-                        hardlink_map[key] = rel;
-                    }
-                }
             } else {
                 archive_entry_set_perm(entry, 0644);
             }
@@ -472,6 +526,20 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
                 archive_entry_set_mtime(entry, tt, 0);
             }
 #endif
+            // hardlink detection/deduplication (cross-platform): only bother
+            // resolving a file identity if the filesystem reports more than
+            // one link to begin with.
+            if (const auto link_count = fs::hard_link_count(p, ec); !ec && link_count > 1) {
+                if (const auto id = get_file_identity(p)) {
+                    auto it_hl = hardlink_map.find(*id);
+                    if (it_hl != hardlink_map.end()) {
+                        archive_entry_set_hardlink(entry, it_hl->second.c_str());
+                        archive_entry_set_size(entry, 0);
+                    } else {
+                        hardlink_map[*id] = rel;
+                    }
+                }
+            }
         } else {
             archive_entry_free(entry);
             continue;
