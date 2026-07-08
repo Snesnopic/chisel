@@ -87,7 +87,7 @@ constexpr uint16_t kFlagNextCab   = 0x0002; ///< NEXT_CABINET
 constexpr uint16_t kCompNone      = 0x0000;
 constexpr uint16_t kCompMszip     = 0x0001;
 constexpr uint8_t  kMszipMagic[2] = { 'C', 'K' };
-constexpr int      kDeflateLevel  = 12; ///< libdeflate max level
+constexpr int      kCabDeflateLevel  = 12; ///< libdeflate max level
 
 // ─── layout structs ──────────────────────────────────────────────────────────
 
@@ -293,7 +293,7 @@ void CabProcessor::recompress(const std::filesystem::path& input_path,
         in_data.begin() + static_cast<ptrdiff_t>(files_end));
 
     // ── Recompress MSZIP folders ──────────────────────────────────────────────
-    libdeflate_compressor* comp = libdeflate_alloc_compressor(kDeflateLevel);
+    libdeflate_compressor* comp = libdeflate_alloc_compressor(kCabDeflateLevel);
     if (!comp) throw std::runtime_error("CabProcessor: libdeflate_alloc_compressor failed");
 
     struct RecompressedFolder {

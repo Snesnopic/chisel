@@ -7,6 +7,7 @@
 #include "../../include/random_utils.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/zopfli_compressor.hpp"
+#include "../../include/zip_extract_util.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -38,81 +39,12 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
 
-    archive* in = archive_read_new();
-    archive_read_support_format_zip(in);
-    int open_r = archive_read_open_filename(in, input_path.string().c_str(), 10240);
-    if (open_r != ARCHIVE_OK && open_r != ARCHIVE_WARN) {
-        Logger::log(LogLevel::Error, "Failed to open odf for reading: " + std::string(archive_error_string(in)), get_name());
-        archive_read_free(in);
-        cleanup_temp_dir(temp_dir);
+    auto extracted = extract_zip_entries(input_path, temp_dir, get_name());
+    if (!extracted) {
+        cleanup_temp_dir(temp_dir, get_name());
         return std::nullopt;
     }
-    if (open_r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(in), get_name());
-    }
-
-    archive_entry* entry = nullptr;
-    int r = ARCHIVE_OK;
-    while ((r = archive_read_next_header(in, &entry)) == ARCHIVE_OK) {
-        const char* ename = archive_entry_pathname(entry);
-        if (ename == nullptr) {
-            Logger::log(LogLevel::Warning, "Entry with null name skipped", get_name());
-            archive_read_data_skip(in);
-            continue;
-        }
-
-        const fs::path out_path = temp_dir / ename;
-        std::error_code ec;
-        const auto filetype = archive_entry_filetype(entry);
-
-        if (filetype == AE_IFDIR) {
-            fs::create_directories(out_path, ec);
-            if (ec) {
-                Logger::log(LogLevel::Error, "Failed to create directory: " + out_path.string(), get_name());
-            }
-            archive_read_data_skip(in);
-            continue;
-        }
-
-        fs::create_directories(out_path.parent_path(), ec);
-        if (ec) {
-            Logger::log(LogLevel::Error,
-                        "Failed to create parent dir: " + out_path.parent_path().string() + " (" + ec.message() + ")",
-                        get_name());
-            archive_read_data_skip(in);
-            continue;
-        }
-
-        std::ofstream ofs(out_path, std::ios::binary);
-        if (!ofs) {
-            Logger::log(LogLevel::Error, "Failed to create file during extraction: " + out_path.string(), get_name());
-            archive_read_data_skip(in);
-            continue;
-        }
-
-        const void* buff = nullptr;
-        size_t size = 0;
-        la_int64_t offset = 0;
-        while (true) {
-            const int rb = archive_read_data_block(in, &buff, &size, &offset);
-            if (rb == ARCHIVE_EOF) break;
-            if (rb != ARCHIVE_OK) {
-                Logger::log(LogLevel::Error, "Error reading data block: " + std::string(archive_error_string(in)), get_name());
-                break;
-            }
-            ofs.write(static_cast<const char*>(buff), static_cast<std::streamsize>(size));
-        }
-        ofs.close();
-
-        content.extracted_files.push_back(out_path);
-    }
-
-    if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::Error, "Iteration error: " + std::string(archive_error_string(in)), get_name());
-    }
-
-    archive_read_close(in);
-    archive_read_free(in);
+    content.extracted_files = std::move(*extracted);
 
     Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
 

@@ -78,7 +78,7 @@ constexpr uint8_t kFlgFextra  = 0x04;
 constexpr uint8_t kFlgFname   = 0x08;
 constexpr uint8_t kFlgFcomment = 0x10;
 
-constexpr int     kDeflateLevel = 12; // libdeflate max
+constexpr int     kGzDeflateLevel = 12; // libdeflate max
 
 // ─── safe span reader ─────────────────────────────────────────────────────────
 
@@ -418,7 +418,7 @@ void GzProcessor::recompress(const std::filesystem::path& input_path,
         throw std::runtime_error("GzProcessor: not a valid gzip file");
     }
 
-    libdeflate_compressor* comp = libdeflate_alloc_compressor(kDeflateLevel);
+    libdeflate_compressor* comp = libdeflate_alloc_compressor(kGzDeflateLevel);
     if (!comp) throw std::runtime_error("GzProcessor: libdeflate_alloc_compressor failed");
 
     Reader r{ in_data.data(), in_data.size() };
