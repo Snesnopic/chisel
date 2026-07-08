@@ -192,8 +192,17 @@ namespace chisel {
         return std::make_pair(dest, replaced);
     }
 
-    void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent) {
+    void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
+
+        if (depth > kMaxNestingDepth) {
+            Logger::log(LogLevel::Error,
+                        "Maximum container nesting depth (" + std::to_string(kMaxNestingDepth) +
+                        ") exceeded, refusing to descend further into: " + path.string(),
+                        "Executor");
+            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Maximum nesting depth exceeded"});
+            return;
+        }
 
         auto name = path.filename().string();
 
@@ -240,7 +249,7 @@ namespace chisel {
                 if (ec) content->original_size = 0;
                 finalize_stack_.push(*content);
                 for (const auto &child: content->extracted_files) {
-                    analyze_path(child, path);
+                    analyze_path(child, path, depth + 1);
                 }
                 scheduled_for_extraction = true;
             } else {

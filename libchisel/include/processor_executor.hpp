@@ -104,6 +104,15 @@ public:
 
 private:
     /**
+     * @brief Maximum container nesting depth (archive-in-archive-in-archive...).
+     *
+     * Guards against maliciously crafted or accidental deeply-nested archives
+     * exhausting the call stack or disk space (temp dirs accumulate until
+     * Phase 3 finalization).
+     */
+    static constexpr unsigned kMaxNestingDepth = 256;
+
+    /**
      * @brief Phase 1: Recursively analyze a path.
      *
      * If it's a file, it's added to work_list_.
@@ -112,8 +121,9 @@ private:
      *
      * @param path The file or directory path to analyze.
      * @param parent The parent container path if this is an extracted file.
+     * @param depth Current container nesting depth (0 for top-level inputs).
      */
-    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt);
+    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt, unsigned depth = 0);
 
     /**
      * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
