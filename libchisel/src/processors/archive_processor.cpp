@@ -50,24 +50,8 @@ static ContainerFormat detect_format(const fs::path& path) {
         if (const auto parsed = parse_container_format(ext)) {
             return *parsed;
         }
-        const auto fname = to_lower_copy(path.filename().string());
-        if (fname.ends_with(".tar.gz"))  return ContainerFormat::GZip;
-        if (fname.ends_with(".tar.bz2")) return ContainerFormat::BZip2;
-        if (fname.ends_with(".tar.xz"))  return ContainerFormat::Xz;
-        if (fname.ends_with(".tar.zst") || fname.ends_with(".tzst")) return ContainerFormat::Zstd;
     }
     return ContainerFormat::Unknown;
-}
-
-/**
- * @brief Checks if a file is a supported archive format.
- * @param path The path to the file.
- * @param fmt_out The detected container format if the file is a readable archive.
- * @return True if the file is a readable archive, false otherwise.
- */
-static bool is_archive_file(const fs::path& path, ContainerFormat& fmt_out) {
-    fmt_out = detect_format(path);
-    return fmt_out != ContainerFormat::Unknown && can_read_format(fmt_out);
 }
 
 // --- libarchive extract/create ---
@@ -554,14 +538,10 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
     for (auto& p : fs::recursive_directory_iterator(content.temp_dir)) {
         std::error_code ec;
         if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
-            ContainerFormat inner_fmt;
-            if (is_archive_file(p.path(), inner_fmt)) {
-                Logger::log(LogLevel::Debug, "Found nested archive: " + p.path().string(), get_name());
-                // Push nested content path to extracted_files; ProcessorExecutor will recurse
-                content.extracted_files.push_back(p.path());
-            } else {
-                content.extracted_files.push_back(p.path());
-            }
+            // nested archives are not special-cased here: ProcessorExecutor
+            // recurses into every extracted file regardless, re-detecting its
+            // format independently.
+            content.extracted_files.push_back(p.path());
         }
     }
 
