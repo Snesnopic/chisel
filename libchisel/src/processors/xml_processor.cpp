@@ -29,7 +29,7 @@ void XmlProcessor::recompress(const std::filesystem::path& input_path,
     Logger::log(LogLevel::Debug, "Entering recompress for " + input_path.filename().string(), get_name());
 
     pugi::xml_document doc;
-    if (!doc.load_file(input_path.c_str())) {
+    if (!doc.load_file(input_path.c_str(), pugi::parse_full)) {
         Logger::log(LogLevel::Error, "Failed to load XML file for recompression", get_name());
         return;
     }
@@ -45,7 +45,7 @@ std::optional<ExtractedContent> XmlProcessor::prepare_extraction(const std::file
     Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.filename().string(), get_name());
 
     const auto doc = std::make_shared<pugi::xml_document>();
-    if (!doc->load_file(input_path.c_str())) {
+    if (!doc->load_file(input_path.c_str(), pugi::parse_full)) {
         Logger::log(LogLevel::Error, "Failed to parse XML for extraction", get_name());
         return std::nullopt;
     }
@@ -177,7 +177,7 @@ bool XmlProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     pugi::xml_document doc_a;
     pugi::xml_document doc_b;
 
-    if (!doc_a.load_file(a.c_str()) || !doc_b.load_file(b.c_str())) {
+    if (!doc_a.load_file(a.c_str(), pugi::parse_full) || !doc_b.load_file(b.c_str(), pugi::parse_full)) {
         return false;
     }
 
