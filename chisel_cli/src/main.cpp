@@ -29,6 +29,9 @@ static std::vector<std::string> g_active_files;
 // Global mutex to synchronize console output from multiple threads
 std::mutex g_console_mtx;
 
+// Guards results/container_results, mutated concurrently from ThreadPool worker threads via EventBus
+std::mutex g_results_mtx;
+
 // Helper to clear the current line
 inline void clear_line_internal() {
     const unsigned term_width = get_terminal_width();
@@ -290,7 +293,10 @@ int main(int argc, char* argv[]) {
         r.success = true;
         r.replaced = e.replaced;
         r.seconds = static_cast<double>(e.duration.count()) / 1000.0;
-        results.push_back(std::move(r));
+        {
+            std::scoped_lock lock(g_results_mtx);
+            results.push_back(std::move(r));
+        }
 
         on_finish(e.path.filename().string());
     });
@@ -307,7 +313,10 @@ int main(int argc, char* argv[]) {
         r.mime = MimeDetector::detect(e.path);
         r.success = false;
         r.error_msg = e.error_message;
-        results.push_back(std::move(r));
+        {
+            std::scoped_lock lock(g_results_mtx);
+            results.push_back(std::move(r));
+        }
 
         on_finish(e.path.filename().string());
     });
@@ -339,17 +348,20 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        const auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
-        if (it != results.end()) {
-            it->size_after = e.final_size;
-        }
+        {
+            std::scoped_lock lock(g_results_mtx);
+            const auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
+            if (it != results.end()) {
+                it->size_after = e.final_size;
+            }
 
-        ContainerResult c;
-        c.filename = e.path;
-        c.success = true;
-        c.size_before = e.original_size;
-        c.size_after = e.final_size;
-        container_results.push_back(std::move(c));
+            ContainerResult c;
+            c.filename = e.path;
+            c.success = true;
+            c.size_before = e.original_size;
+            c.size_after = e.final_size;
+            container_results.push_back(std::move(c));
+        }
         on_finish(e.path.filename().string());
     });
 
@@ -364,7 +376,10 @@ int main(int argc, char* argv[]) {
         c.filename = e.path;
         c.success = false;
         c.error_msg = e.error_message;
-        container_results.push_back(std::move(c));
+        {
+            std::scoped_lock lock(g_results_mtx);
+            container_results.push_back(std::move(c));
+        }
 
         on_finish(e.path.filename().string());
     });
