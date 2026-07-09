@@ -48,8 +48,9 @@ public:
     }
 
     /**
-     * @brief This processor supports recompression (via finalize_extraction).
-     * @return true
+     * @brief This processor does not implement recompress(); its recompression
+     * logic runs entirely inside finalize_extraction() instead.
+     * @return false
      */
     [[nodiscard]] bool can_recompress() const noexcept override { return false; }
     /**
@@ -140,16 +141,6 @@ private:
         std::unordered_map<int, StreamInfo> streams; ///< Info for each object index
         std::filesystem::path temp_dir;  ///< The temp dir holding extracted streams
     };
-
-    /**
-     * @brief Creates a unique temporary directory for PDF extraction.
-     */
-    static std::filesystem::path make_temp_dir_for(const std::filesystem::path& input);
-
-    /**
-     * @brief Recursively deletes the temporary directory.
-     */
-    static void cleanup_temp_dir(const std::filesystem::path& dir);
 };
 
 } // namespace chisel

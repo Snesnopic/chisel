@@ -5,17 +5,17 @@
 #include "../../include/pdf_processor.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFWriter.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDFLogger.hh>
 #include <fstream>
+#include <sstream>
 #include <memory>
 #include <string>
 #include <vector>
-#include <random>
-#include <chrono>
 #include "zlib_container.h"
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
@@ -153,7 +153,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
 
     ExtractedContent content;
     content.original_path = input_path;
-    content.temp_dir = make_temp_dir_for(input_path);
+    content.temp_dir = make_temp_dir_for(input_path, "pdf");
 
     LoggerStreamBuf warn_buf(LogLevel::Warning, "PdfProcessor");
     std::ostream warn_os(&warn_buf);
@@ -263,7 +263,26 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                     auto sz = ifs.tellg(); ifs.seekg(0);
                     raw_data_to_inject.resize(sz);
                     ifs.read(reinterpret_cast<char*>(raw_data_to_inject.data()), sz);
-                    replace_stream = true;
+
+                    // the extracted file holds *decoded* content (e.g. a full PNG file
+                    // guessed from a FlateDecode Image stream); the original filter is
+                    // being kept on the dict, so the bytes must be re-compressed to stay
+                    // valid under it. DCTDecode/JPXDecode extractions are already in their
+                    // final on-disk form and need no re-wrapping.
+                    if (is_flate) {
+                        try {
+                            raw_data_to_inject = ZopfliCompressor::compress(
+                                raw_data_to_inject, options.iterations, ZopfliFormat::ZLIB);
+                        } catch (const std::exception& e) {
+                            Logger::log(LogLevel::Warning,
+                                        "Failed to re-compress optimized stream for obj " +
+                                        std::to_string(obj_id) + ", skipping injection: " + e.what(),
+                                        get_name());
+                            raw_data_to_inject.clear();
+                        }
+                    }
+
+                    replace_stream = !raw_data_to_inject.empty();
                 }
             }
             // if no external file, but it's an internal flate stream, optimize with zopfli
@@ -301,7 +320,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         writer.setStreamDataMode(qpdf_s_compress);
         writer.write();
 
-        cleanup_temp_dir(st.temp_dir);
+        cleanup_temp_dir(st.temp_dir, get_name());
 
         Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
 
@@ -366,34 +385,6 @@ static bool get_all_raw_streams(const std::filesystem::path& path,
 std::string PdfProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw PDF data
     return "";
-}
-
-std::filesystem::path PdfProcessor::make_temp_dir_for(const std::filesystem::path& input) {
-    const auto base_tmp = std::filesystem::temp_directory_path() / "chisel-pdf";
-    std::error_code ec;
-    std::filesystem::create_directories(base_tmp, ec);
-
-    const auto now = std::chrono::system_clock::now().time_since_epoch();
-    const auto ts = std::chrono::duration_cast<std::chrono::seconds>(now).count();
-
-    std::mt19937_64 rng{static_cast<unsigned long long>(
-        std::chrono::high_resolution_clock::now().time_since_epoch().count())};
-    const unsigned long long r = rng();
-
-    const std::string stem = input.stem().string();
-    const std::string dir_name = stem + "-" + std::to_string(ts) + "-" + std::to_string(r & 0xFFFFULL);
-    auto dir = base_tmp / dir_name;
-
-    std::filesystem::create_directories(dir, ec);
-    return dir;
-}
-
-void PdfProcessor::cleanup_temp_dir(const std::filesystem::path& dir) {
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
-    if (ec) {
-        Logger::log(LogLevel::Warning, "Failed to cleanup temp dir: " + dir.string(), "PdfProcessor");
-    }
 }
 
 } // namespace chisel
