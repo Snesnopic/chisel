@@ -11,9 +11,6 @@
 #include <sstream>
 #include <taglib/tag.h>
 #include "audio_metadata_util.hpp"
-#include "file_type.hpp"
-#include "file_utils.hpp"
-#include "random_utils.hpp"
 
 
 namespace chisel {
@@ -230,33 +227,7 @@ void FlacProcessor::recompress(const std::filesystem::path& input,
 std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
     const std::filesystem::path& input_path)
 {
-    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), get_name());
-
-    ExtractedContent content;
-    content.original_path = input_path;
-    content.temp_dir = make_temp_dir_for(input_path, "flac-processor");
-
-    // audiometadatautil does the heavy lifting
-    AudioExtractionState state = AudioMetadataUtil::extractCovers(input_path, content.temp_dir);
-
-    if (state.extracted_covers.empty()) {
-        Logger::log(LogLevel::Info, "No embedded cover art found", get_name());
-        cleanup_temp_dir(content.temp_dir);
-        return std::nullopt; // nothing to extract
-    }
-
-    // populate extracted files for ProcessorExecutor
-    for (const auto& cover_info : state.extracted_covers) {
-        content.extracted_files.push_back(cover_info.temp_file_path);
-    }
-
-    // save state in std::any for phase 3
-    content.extras = std::make_any<AudioExtractionState>(std::move(state));
-
-    Logger::log(LogLevel::Info, "Extracted " + std::to_string(content.extracted_files.size()) + " covers", get_name());
-    content.format = ContainerFormat::Unknown; // You may want to define ContainerFormat::Flac
-    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
-    return content;
+    return AudioMetadataUtil::prepareCoverExtraction(input_path, "flac-processor", get_name());
 }
 
 /**
@@ -272,46 +243,7 @@ std::optional<ExtractedContent> FlacProcessor::prepare_extraction(
  */
 std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options)
 {
-    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
-
-    // 1. retrieve state from std::any
-    const AudioExtractionState* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
-    if (!state_ptr) {
-        Logger::log(LogLevel::Error, "Failed to retrieve extraction state", get_name());
-        cleanup_temp_dir(content.temp_dir);
-        return {}; // return empty path on failure
-    }
-
-    // 2. define a new temp path for the *final* file
-    const std::filesystem::path& optimized_audio_path = content.original_path; // this is the audio already optimized by recompress
-    const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
-                                                  (optimized_audio_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".flac");
-
-    try {
-        // 3. copy the optimized audio (phase 2) to the final location
-        std::filesystem::copy_file(optimized_audio_path, final_temp_path, std::filesystem::copy_options::overwrite_existing);
-    } catch (const std::exception& e) {
-        Logger::log(LogLevel::Error, "Failed to copy audio file for finalization: " + std::string(e.what()), get_name());
-        cleanup_temp_dir(content.temp_dir);
-        return {};
-    }
-
-    // 4. use audiometadatautil to re-insert covers (read from temp_dir) into the final file
-    //    images in temp_dir were already optimized in phase 2.
-    if (!AudioMetadataUtil::rebuildCovers(final_temp_path, *state_ptr)) {
-        Logger::log(LogLevel::Error, "RebuildCovers failed for: " + final_temp_path.string(), get_name());
-        cleanup_temp_dir(content.temp_dir);
-        std::filesystem::remove(final_temp_path); // remove the partially good file
-        return {};
-    }
-
-    // 5. cleanup
-    cleanup_temp_dir(content.temp_dir);
-
-    // 6. return path to the finalized file.
-    // processorexecutor will handle replacing the original.
-    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), get_name());
-    return final_temp_path;
+    return AudioMetadataUtil::finalizeCoverExtraction(content, get_name());
 }
 
 

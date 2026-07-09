@@ -20,6 +20,7 @@
 #include "ogg/vorbis/vorbisfile.h"
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
+#include "../../include/random_utils.hpp"
 #include <png.h>
 #include <jpeglib.h>
 #include <webp/decode.h>
@@ -286,11 +287,12 @@ bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
 
 
 int getPictureTypeFromApeKey(const TagLib::String &key) {
-    if (key == "Cover Art (Back)") return 4;
-    if (key == "Cover Art (Leaflet)") return 5;
-    if (key == "Cover Art (Media)") return 6;
-    if (key == "Cover Art (Lead artist)") return 8;
-    if (key == "Cover Art (Icon)") return 1;
+    const TagLib::String upperKey = key.upper();
+    if (upperKey == "COVER ART (BACK)") return 4;
+    if (upperKey == "COVER ART (LEAFLET)") return 5;
+    if (upperKey == "COVER ART (MEDIA)") return 6;
+    if (upperKey == "COVER ART (LEAD ARTIST)") return 8;
+    if (upperKey == "COVER ART (ICON)") return 1;
     return 3; // default front
 }
 
@@ -307,7 +309,9 @@ void extractApeV2Covers(TagLib::APE::Tag* tag,
     for (const auto & it : itemListMap) {
         TagLib::String key = it.first;
 
-        if (key.startsWith("Cover Art ") && it.second.type() == TagLib::APE::Item::Binary) {
+        // itemListMap keys are always upper-cased by TagLib::APE::Tag::parse() when read from
+        // a file, regardless of the case originally written, so the comparison must match that.
+        if (key.upper().startsWith("COVER ART ") && it.second.type() == TagLib::APE::Item::Binary) {
             TagLib::ByteVector val = it.second.binaryData();
             int nullPos = val.find(0);
             if (nullPos < 0) continue;
@@ -346,10 +350,10 @@ bool rebuildApeV2Covers(TagLib::APE::Tag* tag,
                         const std::vector<AudioCoverInfo>& covers) {
     if (tag == nullptr) return false;
 
-    // clean up all existing covers dynamically
+    // clean up all existing covers dynamically (map keys are always upper-cased by TagLib)
     auto itemList = tag->itemListMap();
     for (auto & it : itemList) {
-        if (it.first.startsWith("Cover Art ")) {
+        if (it.first.upper().startsWith("COVER ART ")) {
             tag->removeItem(it.first);
         }
     }
@@ -984,6 +988,88 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     }
 
     return false;
+}
+
+std::optional<ExtractedContent> AudioMetadataUtil::prepareCoverExtraction(
+    const std::filesystem::path& input_path,
+    const std::string& temp_dir_prefix,
+    const std::string_view tag) {
+    Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.string(), tag);
+
+    ExtractedContent content;
+    content.original_path = input_path;
+    content.temp_dir = make_temp_dir_for(input_path, temp_dir_prefix);
+
+    AudioExtractionState state = extractCovers(input_path, content.temp_dir);
+
+    if (state.extracted_covers.empty()) {
+        Logger::log(LogLevel::Debug, "No embedded cover art found", tag);
+        cleanup_temp_dir(content.temp_dir, tag);
+        return std::nullopt;
+    }
+
+    for (const auto& cover_info : state.extracted_covers) {
+        content.extracted_files.push_back(cover_info.temp_file_path);
+    }
+
+    content.extras = std::make_any<AudioExtractionState>(std::move(state));
+    content.format = ContainerFormat::Unknown;
+
+    Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), tag);
+    return content;
+}
+
+std::filesystem::path AudioMetadataUtil::finalizeCoverExtraction(
+    const ExtractedContent& content,
+    const std::string_view tag) {
+    Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), tag);
+
+    const auto* state_ptr = std::any_cast<AudioExtractionState>(&content.extras);
+    if (state_ptr == nullptr) {
+        Logger::log(LogLevel::Error, "Failed to retrieve extraction state", tag);
+        cleanup_temp_dir(content.temp_dir, tag);
+        return {};
+    }
+
+    const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
+        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() +
+         content.original_path.extension().string());
+
+    try {
+        std::filesystem::copy_file(content.original_path, final_temp_path,
+                                   std::filesystem::copy_options::overwrite_existing);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, "Failed to copy audio file: " + std::string(e.what()), tag);
+        cleanup_temp_dir(content.temp_dir, tag);
+        return {};
+    }
+
+    if (!rebuildCovers(final_temp_path, *state_ptr)) {
+        Logger::log(LogLevel::Error, "RebuildCovers failed", tag);
+        cleanup_temp_dir(content.temp_dir, tag);
+        std::filesystem::remove(final_temp_path);
+        return {};
+    }
+
+    cleanup_temp_dir(content.temp_dir, tag);
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), tag);
+    return final_temp_path;
+}
+
+void AudioMetadataUtil::placeholderCopyRecompress(
+    const std::filesystem::path& input,
+    const std::filesystem::path& output,
+    const std::string_view tag) {
+    Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), tag);
+    Logger::log(LogLevel::Warning, "Recompress called with a copy-only placeholder", tag);
+
+    std::error_code ec;
+    std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing, ec);
+    if (ec) {
+        throw std::runtime_error("Placeholder recompress failed to copy file.");
+    }
+
+    Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), tag);
 }
 
 } // namespace chisel

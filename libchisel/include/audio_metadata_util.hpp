@@ -12,8 +12,12 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <any>
+#include <optional>
+#include "processor.hpp"
+#include "file_type.hpp"
 
 namespace chisel {
 
@@ -102,6 +106,41 @@ public:
      */
     static bool rebuildCovers(const std::filesystem::path& input_path,
                               const AudioExtractionState& state);
+
+    /**
+     * @brief Shared prepare_extraction() for audio processors that only expose cover
+     * art as extractable content (identical across wav/aiff/mpc/tta/dsf/dsdiff/asf/mp4/ogg/flac/ape).
+     * @param input_path Path to the source audio file.
+     * @param temp_dir_prefix Format-specific prefix for the temp dir (e.g. "wav-processor").
+     * @param tag Logger tag for the calling processor.
+     * @return ExtractedContent, or std::nullopt if no cover art was found.
+     */
+    static std::optional<ExtractedContent> prepareCoverExtraction(
+        const std::filesystem::path& input_path,
+        const std::string& temp_dir_prefix,
+        std::string_view tag);
+
+    /**
+     * @brief Shared finalize_extraction() counterpart to prepareCoverExtraction().
+     * @param content The ExtractedContent produced by prepareCoverExtraction().
+     * @param tag Logger tag for the calling processor.
+     * @return Path to the finalized file, or an empty path on failure.
+     */
+    static std::filesystem::path finalizeCoverExtraction(
+        const ExtractedContent& content,
+        std::string_view tag);
+
+    /**
+     * @brief Shared recompress() for processors that don't yet implement real
+     * recompression and just copy the input through unchanged.
+     * @param input Source file path.
+     * @param output Destination file path.
+     * @param tag Logger tag for the calling processor.
+     */
+    static void placeholderCopyRecompress(
+        const std::filesystem::path& input,
+        const std::filesystem::path& output,
+        std::string_view tag);
 };
 
 } // namespace chisel
