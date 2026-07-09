@@ -39,7 +39,7 @@ inline void clear_line_internal() {
 }
 
 // Updated Progress bar printer that accepts status text
-inline void print_progress_bar_internal(const std::size_t done, const std::size_t total, const double elapsed_seconds, const std::string& status_text) {
+inline void print_progress_bar_internal(const std::size_t done, const std::size_t total, const std::string& status_text) {
     const unsigned term_width = get_terminal_width();
 
     // Base info length estimation (~40 chars for stats)
@@ -49,24 +49,6 @@ inline void print_progress_bar_internal(const std::size_t done, const std::size_
     // Dynamic adjustment
     if (available_width > 80) bar_width = 30;
     else if (available_width < 60) bar_width = 10;
-
-    std::string eta_str = "--:--";
-    if (done > 0 && total > 0) {
-        const double rate = static_cast<double>(done) / elapsed_seconds;
-        const double remaining_items = static_cast<double>(total - done);
-        if (rate > 0) {
-            const double eta_seconds = remaining_items / rate;
-            const int eta_h = static_cast<int>(eta_seconds) / 3600;
-            const int eta_m = (static_cast<int>(eta_seconds) % 3600) / 60;
-            const int eta_s = static_cast<int>(eta_seconds) % 60;
-
-            std::ostringstream oss;
-            if (eta_h > 0) oss << eta_h << "h ";
-            oss << std::setfill('0') << std::setw(2) << eta_m << "m "
-                << std::setw(2) << eta_s << "s";
-            eta_str = oss.str();
-        }
-    }
 
     const double progress = (total != 0U) ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
     const unsigned pos = static_cast<unsigned>(bar_width * progress);
@@ -84,8 +66,7 @@ inline void print_progress_bar_internal(const std::size_t done, const std::size_
     }
     std::cerr << "] "
               << std::setw(5) << std::fixed << std::setprecision(1) << percent << "% "
-              << "(" << done << "/" << total << ") "
-              << "ETA: " << eta_str;
+              << "(" << done << "/" << total << ")";
 
     if (!status_text.empty()) {
         std::cerr << " " << status_text;
@@ -202,23 +183,65 @@ int main(int argc, char* argv[]) {
     }
 
     // progress tracking
+    // overall discovered-file count (scheduled + extracted), used only for the
+    // phase-1 "N files found" summary
     std::size_t total = 0;
-    std::atomic<std::size_t> done{0};
+    // phase 2 (recompression) and phase 3 (finalization) each get their own
+    // done/total pair, so each phase's bar reaches 100% on its own work only
+    std::size_t phase2_total = 0;
+    std::atomic<std::size_t> phase2_done{0};
+    std::size_t phase3_total = 0;
+    std::atomic<std::size_t> phase3_done{0};
     auto start_total = std::chrono::steady_clock::now();
 
-    // subscribe to events: print progress and collect results
-    // bus.subscribe<FileAnalyzeStartEvent>([](const FileAnalyzeStartEvent& e) {
-    //     std::cerr << "[ANALYZE] " << e.path.filename().string() << std::endl;
-    // });
+    // true once finalization (phase 3) has started; switches the status label
+    // from "Processing: " to "Finalizing: " for the shared progress bar
+    bool phase3_started = false;
+    // guards the one-time phase-1 summary line ("N files found"), printed
+    // right before whichever of phase 2/3 actually starts first
+    bool phase1_summary_printed = false;
 
-    // update total if a container is extracted (finalization step counts as extra work)
+    // builds the "Processing: x.jpg" / "Finalizing: x.pdf" / "...: N files" status
+    // text from the currently active file/container list; caller holds g_console_mtx
+    auto make_status_text = [&]() -> std::string {
+        if (g_active_files.empty()) return "";
+        const std::string label = phase3_started ? "Finalizing: " : "Processing: ";
+        if (g_active_files.size() > 1) {
+            return label + std::to_string(g_active_files.size()) + " files";
+        }
+        return label + g_active_files.front();
+    };
+
+    // prints the "N files found" phase-1 summary exactly once; caller holds g_console_mtx
+    auto ensure_phase1_summary_printed = [&]() {
+        if (phase1_summary_printed) return;
+        phase1_summary_printed = true;
+        std::cerr << "\n" << total << " files found\n\n";
+    };
+
+    // guards the one-time "Processing files..." phase header
+    bool phase2_header_printed = false;
+
+    // subscribe to events: print progress and collect results
+
+    // phase 1 (analysis): a permanent line for every container found (regular
+    // files print nothing here), indented by nesting depth so containers found
+    // inside another container are visually distinguishable from direct input
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
         if (e.scheduled) {
             total++;
+            phase2_total++;
         }
         if (e.extracted) {
             total++;
+            phase3_total++;
         }
+
+        if (settings.quiet || !(e.extracted && e.num_children > 0)) return;
+
+        std::scoped_lock lock(g_console_mtx);
+        std::cerr << std::string(2 + 2 * e.depth, ' ') << e.path.filename().string()
+                  << " -> found " << e.num_children << " files inside" << std::endl;
     });
 
     // Process Start: Update the "Processing: ..." text dynamically
@@ -226,23 +249,23 @@ int main(int argc, char* argv[]) {
         if (settings.quiet || e.is_container) return;
 
         std::scoped_lock lock(g_console_mtx);
+        if (!phase2_header_printed) {
+            phase2_header_printed = true;
+            ensure_phase1_summary_printed();
+            std::cerr << "Processing files...\n\n";
+        }
         g_active_files.push_back(e.path.filename().string());
 
-        std::string status_text;
-        if (g_active_files.size() > 1) {
-            status_text = "Processing: " + std::to_string(g_active_files.size()) + " files";
-        } else {
-            status_text = "Processing: " + g_active_files.back();
-        }
-
         // Force an immediate redraw of the bar with the new status
-        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
-        print_progress_bar_internal(done.load(), total, elapsed, status_text);
+        print_progress_bar_internal(phase2_done.load(), phase2_total, make_status_text());
     });
 
-    // generic handler for "finished" events to update progress bar
+    // generic handler for "finished" events to update progress bar; phase 2 and
+    // phase 3 completions share this handler but advance their own counter, so
+    // each phase's bar reaches N/N on its own work rather than the combined total
     auto on_finish = [&](const std::string& finished_filename) {
-        const std::size_t current = ++done;
+        const std::size_t current = phase3_started ? ++phase3_done : ++phase2_done;
+        const std::size_t phase_total = phase3_started ? phase3_total : phase2_total;
         if (settings.quiet) return;
 
         std::scoped_lock lock(g_console_mtx);
@@ -252,16 +275,24 @@ int main(int argc, char* argv[]) {
             g_active_files.erase(it);
         }
 
-        std::string status_text;
-        if (g_active_files.empty()) {
-        } else if (g_active_files.size() > 1) {
-            status_text = "Processing: " + std::to_string(g_active_files.size()) + " files";
-        } else {
-            status_text = "Processing: " + g_active_files.front();
-        }
-        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
-        print_progress_bar_internal(current, total, elapsed, status_text);
+        print_progress_bar_internal(current, phase_total, make_status_text());
     };
+
+    // phase 3 (finalization): same status-bar mechanism as phase 2, with the
+    // "Finalizing: " label; containers finalize one at a time, so at most one
+    // entry is ever active
+    bus.subscribe<ContainerFinalizeStartEvent>([&](const ContainerFinalizeStartEvent& e) {
+        if (settings.quiet) return;
+
+        std::scoped_lock lock(g_console_mtx);
+        if (!phase3_started) {
+            phase3_started = true;
+            ensure_phase1_summary_printed();
+            std::cerr << "\n\nFinalizing opened containers...\n\n";
+        }
+        g_active_files.push_back(e.path.filename().string());
+        print_progress_bar_internal(phase3_done.load(), phase3_total, make_status_text());
+    });
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
         if (!settings.quiet && !e.is_container) {
@@ -398,15 +429,21 @@ int main(int argc, char* argv[]) {
                                bus,
                                settings.num_threads);
     g_executor.store(&executor);
+
+    if (!settings.quiet) {
+        std::cerr << "\nCollecting files...\n\n" << std::flush;
+    }
+
     // run processing
     executor.process(inputs);
     g_executor.store(nullptr);
 
-    // Final cleanup of the progress bar line
+    // Final cleanup of the progress bar line: reflect whichever phase actually
+    // ran last (phase 3 if any containers were finalized, else phase 2)
     if (!settings.quiet) {
         std::lock_guard<std::mutex> lock(g_console_mtx);
-        double total_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_total).count();
-        print_progress_bar_internal(total, total, total_seconds, "Completed.");
+        const std::size_t final_total = phase3_total > 0 ? phase3_total : phase2_total;
+        print_progress_bar_internal(final_total, final_total, "Completed.");
         std::cerr << std::endl;
     }
 

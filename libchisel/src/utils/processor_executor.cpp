@@ -268,9 +268,9 @@ namespace chisel {
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
             if (scheduled_for_extraction) {
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, scheduled_for_recompression, content->extracted_files.size()});
+                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, scheduled_for_recompression, content->extracted_files.size(), depth});
             } else {
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, false, scheduled_for_recompression});
+                event_bus_.publish(FileAnalyzeCompleteEvent{path, false, scheduled_for_recompression, 0, depth});
             }
         } else {
             Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");

@@ -45,6 +45,7 @@ struct FileAnalyzeCompleteEvent {
     bool extracted = false;         ///< True if the file was a container and extracted
     bool scheduled = false;         ///< True if the file was scheduled for recompression
     std::size_t num_children = 0;   ///< Number of files found if extracted
+    unsigned depth = 0;              ///< Nesting depth (0 = direct input, >0 = found inside another container)
 };
 
 /**
