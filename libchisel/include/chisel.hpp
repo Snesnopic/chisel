@@ -34,6 +34,9 @@ namespace chisel {
 
 /**
  * @brief Interface for receiving progress and status events during execution.
+ * @note Callbacks are invoked concurrently from multiple worker threads during
+ * the recompression phase (one per in-flight file), not serialized onto a
+ * single thread. Implementations must synchronize any shared state they touch.
  */
 struct ChiselObserver {
     virtual ~ChiselObserver() = default;
