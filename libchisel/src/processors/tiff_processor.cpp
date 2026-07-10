@@ -4,6 +4,7 @@
 
 #include "../../include/tiff_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <tiffio.h>
 #include <vector>
 #include <stdexcept>
@@ -45,6 +46,30 @@ void copy_tags_with_metadata(TIFF* in, TIFF* out, const bool preserve_metadata) 
     // note: color map is intentionally skipped as we convert to rgba
 }
 
+/**
+ * @brief Checks whether a TIFF directory can be safely round-tripped through
+ * TIFFReadRGBAImageOriented(), which always collapses everything to 8-bit RGBA.
+ *
+ * That's bit-exact only for already-8-bit-per-sample integer data; 16/32-bit
+ * samples, floating point data, and CMYK (which undergoes an actual, lossy
+ * colorimetric conversion to RGB) would otherwise be silently destroyed.
+ */
+bool directory_is_safe_for_rgba_conversion(TIFF* tif) {
+    uint16_t bits_per_sample = 0;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+    if (bits_per_sample != 8) return false;
+
+    uint16_t sample_format = SAMPLEFORMAT_UINT;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sample_format);
+    if (sample_format == SAMPLEFORMAT_IEEEFP) return false;
+
+    uint16_t photometric = 0;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_PHOTOMETRIC, &photometric);
+    if (photometric == PHOTOMETRIC_SEPARATED) return false;
+
+    return true;
+}
+
 } // namespace
 
 namespace chisel {
@@ -58,6 +83,32 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         Logger::log(LogLevel::Error, "Failed to open input tiff: " + input.string(), get_name());
         throw std::runtime_error("TiffProcessor: cannot open input");
     }
+
+    // check every directory upfront: TIFFReadRGBAImageOriented() always collapses
+    // to 8-bit RGBA, which would silently destroy 16/32-bit samples, floating point
+    // data, or CMYK color data. If any page can't survive that round-trip losslessly,
+    // copy the whole file through unchanged rather than corrupt it.
+    bool all_pages_safe = true;
+    do {
+        if (!directory_is_safe_for_rgba_conversion(in)) {
+            all_pages_safe = false;
+            break;
+        }
+    } while (TIFFReadDirectory(in));
+
+    if (!all_pages_safe) {
+        TIFFClose(in);
+        Logger::log(LogLevel::Info,
+            "Skipping " + input.filename().string() +
+            ": contains samples that can't be losslessly represented as 8-bit RGBA "
+            "(16/32-bit depth, floating point, or CMYK)", get_name());
+        std::vector<uint8_t> data;
+        if (!read_file(input, data) || !write_file(output, data))
+            throw std::runtime_error("TiffProcessor: failed to copy input to output");
+        return;
+    }
+
+    TIFFSetDirectory(in, 0);
 
     TIFF* out = TIFFOpen(output.string().c_str(), "w");
     if (!out) {
@@ -142,6 +193,29 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
         Logger::log(LogLevel::Warning, "Raw_equal: Failed to open tiff: " + b.string(), get_name());
         return false;
     }
+
+    // TIFFReadRGBAImageOriented() (used below) always collapses to 8-bit RGBA, which
+    // would make this comparison blind to real differences in 16/32-bit, floating
+    // point, or CMYK samples (both files would decode to the same lossy projection
+    // even if their true sample data differs). Fall back to a byte compare instead.
+    bool any_unsafe = false;
+    do {
+        if (!directory_is_safe_for_rgba_conversion(in_a)) { any_unsafe = true; break; }
+    } while (TIFFReadDirectory(in_a));
+    if (!any_unsafe) {
+        do {
+            if (!directory_is_safe_for_rgba_conversion(in_b)) { any_unsafe = true; break; }
+        } while (TIFFReadDirectory(in_b));
+    }
+    if (any_unsafe) {
+        TIFFClose(in_a);
+        TIFFClose(in_b);
+        std::vector<uint8_t> data_a, data_b;
+        if (!read_file(a, data_a) || !read_file(b, data_b)) return false;
+        return data_a == data_b;
+    }
+    TIFFSetDirectory(in_a, 0);
+    TIFFSetDirectory(in_b, 0);
 
     bool same = true;
     bool more_a, more_b;
