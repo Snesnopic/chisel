@@ -14,6 +14,7 @@
 #include <png.h>
 #include <zlib.h>
 #include <cstring>
+#include <cstdint>
 #include <memory>
 #include <iostream>
 #include "file_utils.hpp"
@@ -91,6 +92,27 @@ namespace {
         return image;
     }
 
+    // walks the chunk table for acTL, present iff the png is animated
+    bool has_actl_chunk(const std::vector<unsigned char>& png) {
+        constexpr std::size_t kSigSize = 8;
+        if (png.size() < kSigSize + 8) return false;
+
+        std::size_t pos = kSigSize;
+        while (pos + 8 <= png.size()) {
+            const std::uint32_t length = (static_cast<std::uint32_t>(png[pos]) << 24) |
+                                         (static_cast<std::uint32_t>(png[pos + 1]) << 16) |
+                                         (static_cast<std::uint32_t>(png[pos + 2]) << 8) |
+                                         static_cast<std::uint32_t>(png[pos + 3]);
+            const char* type = reinterpret_cast<const char*>(&png[pos + 4]);
+
+            if (std::memcmp(type, "acTL", 4) == 0) return true;
+            if (std::memcmp(type, "IDAT", 4) == 0) return false; // acTL must precede IDAT
+
+            pos += 8 + length + 4; // length + type + data + crc
+        }
+        return false;
+    }
+
 } // namespace
 
 void ZopfliPngProcessor::recompress(const fs::path& input,
@@ -98,6 +120,14 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
     try {
+        std::vector<unsigned char> origpng;
+        try {
+            origpng = chisel::read_file(input);
+        } catch (const std::exception& e) {
+            Logger::log(LogLevel::Error, std::string("Failed to open input file: ") + e.what(), get_name());
+            throw std::runtime_error("ZopflipngProcessor: cannot open input");
+        }
+
         // configure options
         ZopfliPNGOptions opts;
         opts.lossy_transparent = false;
@@ -106,20 +136,17 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.num_iterations = options.iterations;
         opts.num_iterations_large = options.iterations_large;
 
+        // fdAT frames are only ever copied byte-for-byte, never re-encoded, so a new color type would desync them
+        if (has_actl_chunk(origpng)) {
+            opts.keep_colortype = true;
+        }
+
         if (options.preserve_metadata) {
             // keep common metadata and specialized chunks (APNG, 9Patch)
             opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs", "acTL", "fcTL", "fdAT", "npTc"};
         } else {
             // even if not preserving metadata, we MUST keep animation/scaling chunks to avoid breaking the file functionality
             opts.keepchunks = {"acTL", "fcTL", "fdAT", "npTc"};
-        }
-
-        std::vector<unsigned char> origpng;
-        try {
-            origpng = chisel::read_file(input);
-        } catch (const std::exception& e) {
-            Logger::log(LogLevel::Error, std::string("Failed to open input file: ") + e.what(), get_name());
-            throw std::runtime_error("ZopflipngProcessor: cannot open input");
         }
 
         // optimize

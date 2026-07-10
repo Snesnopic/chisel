@@ -172,17 +172,44 @@ namespace chisel {
     }
 
     /**
-     * @brief Reads and decodes a PNG into a standard 8-bit RGBA buffer.
-     * @param png The libpng read struct.
-     * @param info The libpng info struct.
-     * @param width Output parameter for the image width.
-     * @param height Output parameter for the image height.
-     * @return A vector containing the raw 8-bit RGBA pixel data.
+     * @brief One decoded APNG frame (or the single image of a static PNG),
+     * always as 8-bit RGBA, at its own frame-local width/height (which for
+     * animation frames after the first can be a sub-region of the canvas).
      */
-    std::vector<unsigned char> read_to_rgba8(png_structp png, png_infop info,
-                                             png_uint_32& width, png_uint_32& height) {
+    struct PngFrame {
+        png_uint_32 width = 0, height = 0;
+        png_uint_32 x_offset = 0, y_offset = 0;
+        png_uint_16 delay_num = 0, delay_den = 0;
+        png_byte dispose_op = PNG_fcTL_DISPOSE_OP_NONE;
+        png_byte blend_op = PNG_fcTL_BLEND_OP_SOURCE;
+        bool has_fctl = false; // false only for a hidden default image
+        std::vector<unsigned char> rgba;
+    };
+
+    /**
+     * @brief Result of decoding a (possibly animated) PNG: canvas size, APNG
+     * animation parameters if any, and every frame decoded to RGBA8.
+     */
+    struct PngDecoded {
+        png_uint_32 canvas_width = 0, canvas_height = 0;
+        bool is_animated = false;
+        png_uint_32 num_frames = 0;
+        png_uint_32 num_plays = 0;
+        bool first_frame_hidden = false;
+        std::vector<PngFrame> frames;
+    };
+
+    /**
+     * @brief Reads and decodes a (possibly animated) PNG into 8-bit RGBA frames.
+     * @param png The libpng read struct, positioned right after png_read_info().
+     * @param info The libpng info struct.
+     * @return The decoded canvas/animation metadata and per-frame pixel data.
+     */
+    PngDecoded read_png_frames(png_structp png, png_infop info) {
+        PngDecoded result;
         int bit_depth, color_type;
-        png_get_IHDR(png, info, &width, &height, &bit_depth, &color_type, nullptr, nullptr, nullptr);
+        png_get_IHDR(png, info, &result.canvas_width, &result.canvas_height,
+                     &bit_depth, &color_type, nullptr, nullptr, nullptr);
 
         if (bit_depth == 16) png_set_strip_16(png);
         if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(png);
@@ -192,23 +219,55 @@ namespace chisel {
         if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(png);
 
         png_read_update_info(png, info);
-        // now, the buffer is guaranteed to be rgba8
+        // now, every row read from here on out is guaranteed to be rgba8
 
-        const std::size_t rowbytes = png_get_rowbytes(png, info);
-        if (rowbytes != static_cast<std::size_t>(width) * 4) {
-             throw std::runtime_error("Rowbytes mismatch, expected RGBA8");
+#ifdef PNG_APNG_SUPPORTED
+        if (png_get_valid(png, info, PNG_INFO_acTL)) {
+            result.is_animated = true;
+            png_get_acTL(png, info, &result.num_frames, &result.num_plays);
+            result.first_frame_hidden = png_get_first_frame_is_hidden(png, info) != 0;
+        }
+#endif
+
+        // a hidden default image is an extra frame beyond num_frames (no fcTL of its own)
+        const png_uint_32 total_images = result.is_animated
+            ? (result.num_frames + (result.first_frame_hidden ? 1 : 0))
+            : 1;
+
+        result.frames.reserve(total_images);
+        for (png_uint_32 i = 0; i < total_images; ++i) {
+#ifdef PNG_READ_APNG_SUPPORTED
+            if (result.is_animated) png_read_frame_head(png, info);
+#endif
+            PngFrame frame;
+#ifdef PNG_APNG_SUPPORTED
+            if (result.is_animated && png_get_valid(png, info, PNG_INFO_fcTL)) {
+                frame.has_fctl = true;
+                png_get_next_frame_fcTL(png, info, &frame.width, &frame.height,
+                                        &frame.x_offset, &frame.y_offset,
+                                        &frame.delay_num, &frame.delay_den,
+                                        &frame.dispose_op, &frame.blend_op);
+            } else
+#endif
+            {
+                // no fcTL: hidden default image, spans the full canvas
+                frame.width = result.canvas_width;
+                frame.height = result.canvas_height;
+            }
+
+            const std::size_t rowbytes = static_cast<std::size_t>(frame.width) * 4;
+            frame.rgba.resize(rowbytes * frame.height);
+            std::vector<png_bytep> row_pointers(frame.height);
+            for (png_uint_32 y = 0; y < frame.height; ++y) {
+                row_pointers[y] = frame.rgba.data() + y * rowbytes;
+            }
+
+            png_read_image(png, row_pointers.data());
+            result.frames.push_back(std::move(frame));
         }
 
-        std::vector<unsigned char> image(rowbytes * height);
-        std::vector<png_bytep> row_pointers(height);
-        for (png_uint_32 y = 0; y < height; ++y) {
-            row_pointers[y] = image.data() + y * rowbytes;
-        }
-
-        png_read_image(png, row_pointers.data());
         png_read_end(png, info);
-
-        return image;
+        return result;
     }
 
 
@@ -238,11 +297,11 @@ namespace chisel {
         png_init_io(rd.png, fp_in.get());
         png_read_info(rd.png, rd.info);
 
-        png_uint_32 width, height;
+        const PngDecoded decoded = read_png_frames(rd.png, rd.info);
+        const png_uint_32 width = decoded.canvas_width;
+        const png_uint_32 height = decoded.canvas_height;
 
-        std::vector<unsigned char> rgba_buffer = read_to_rgba8(rd.png, rd.info, width, height);
-
-        // Analyze the in-memory buffer
+        // plte/color-type apply to the whole file, not per-frame, so the palette must fit all frames
         bool all_gray = true;
         bool all_opaque = true;
         bool can_use_palette = true;
@@ -250,28 +309,30 @@ namespace chisel {
         std::vector<png_color> palette;
         std::vector<png_byte> transparency;
 
-        const unsigned char* p = rgba_buffer.data();
-        for (png_uint_32 y = 0; y < height; ++y) {
-            for (png_uint_32 x = 0; x < width; ++x) {
-                unsigned char r = p[0], g = p[1], b = p[2], a = p[3];
+        for (const auto& frame : decoded.frames) {
+            const unsigned char* p = frame.rgba.data();
+            for (png_uint_32 y = 0; y < frame.height; ++y) {
+                for (png_uint_32 x = 0; x < frame.width; ++x) {
+                    unsigned char r = p[0], g = p[1], b = p[2], a = p[3];
 
-                if (r != g || g != b) all_gray = false;
-                if (a != 0xFF) all_opaque = false;
+                    if (r != g || g != b) all_gray = false;
+                    if (a != 0xFF) all_opaque = false;
 
-                if (can_use_palette) {
-                    uint32_t color = pack_rgba(r, g, b, a);
-                    if (!color_to_index_map.contains(color)) {
-                        if (color_to_index_map.size() >= 256) {
-                            can_use_palette = false;
-                        } else {
-                            uint8_t index = static_cast<uint8_t>(color_to_index_map.size());
-                            color_to_index_map[color] = index;
-                            palette.push_back({r, g, b});
-                            transparency.push_back(a);
+                    if (can_use_palette) {
+                        uint32_t color = pack_rgba(r, g, b, a);
+                        if (!color_to_index_map.contains(color)) {
+                            if (color_to_index_map.size() >= 256) {
+                                can_use_palette = false;
+                            } else {
+                                uint8_t index = static_cast<uint8_t>(color_to_index_map.size());
+                                color_to_index_map[color] = index;
+                                palette.push_back({r, g, b});
+                                transparency.push_back(a);
+                            }
                         }
                     }
+                    p += 4;
                 }
-                p += 4;
             }
         }
 
@@ -327,6 +388,16 @@ namespace chisel {
             }
         }
 
+#ifdef PNG_APNG_SUPPORTED
+        // animation structure is content, not metadata: always preserved regardless of preserve_metadata
+        if (decoded.is_animated) {
+            png_set_acTL(wr.png, wr.info, decoded.num_frames, decoded.num_plays);
+            if (decoded.first_frame_hidden) {
+                png_set_first_frame_is_hidden(wr.png, wr.info, 1);
+            }
+        }
+#endif
+
         // copy metadata (must be done *before* png_write_info)
         // re-open read struct to get metadata
         {
@@ -345,52 +416,67 @@ namespace chisel {
 
         png_write_info(wr.png, wr.info);
 
-        // prepare output row buffer
+        // output row buffer sized for the canvas, the largest any frame region can be
         const png_size_t out_channels = png_get_channels(wr.png, wr.info);
         std::vector<unsigned char> out_rowbuf(static_cast<std::size_t>(width) * out_channels * (out_bit_depth / 8));
         png_bytep out_row = out_rowbuf.data();
 
-        // re-point to the start of the in-memory buffer
-        p = rgba_buffer.data();
+        for (const auto& frame : decoded.frames) {
+#ifdef PNG_WRITE_APNG_SUPPORTED
+            if (decoded.is_animated) {
+                png_write_frame_head(wr.png, wr.info, nullptr, frame.width, frame.height,
+                                     frame.x_offset, frame.y_offset,
+                                     frame.delay_num, frame.delay_den,
+                                     frame.dispose_op, frame.blend_op);
+            }
+#endif
 
-        for (png_uint_32 y = 0; y < height; ++y) {
-            const unsigned char *src = p;
-            unsigned char *dst = out_row;
+            const unsigned char* p = frame.rgba.data();
+            for (png_uint_32 y = 0; y < frame.height; ++y) {
+                const unsigned char *src = p;
+                unsigned char *dst = out_row;
 
-            if (out_color_type == PNG_COLOR_TYPE_PALETTE) {
-                for (png_uint_32 x = 0; x < width; ++x) {
-                    uint32_t color = pack_rgba(src[0], src[1], src[2], src[3]);
-                    dst[0] = color_to_index_map.at(color); // find index
-                    src += 4;
-                    dst += 1;
+                if (out_color_type == PNG_COLOR_TYPE_PALETTE) {
+                    for (png_uint_32 x = 0; x < frame.width; ++x) {
+                        uint32_t color = pack_rgba(src[0], src[1], src[2], src[3]);
+                        dst[0] = color_to_index_map.at(color); // find index
+                        src += 4;
+                        dst += 1;
+                    }
+                } else if (out_color_type == PNG_COLOR_TYPE_GRAY) {
+                    for (png_uint_32 x = 0; x < frame.width; ++x) {
+                        dst[0] = src[0]; // r = g = b
+                        src += 4;
+                        dst += 1;
+                    }
+                } else if (out_color_type == PNG_COLOR_TYPE_GA) {
+                    for (png_uint_32 x = 0; x < frame.width; ++x) {
+                        dst[0] = src[0]; // r = g = b
+                        dst[1] = src[3]; // alpha
+                        src += 4;
+                        dst += 2;
+                    }
+                } else if (out_color_type == PNG_COLOR_TYPE_RGB) {
+                    for (png_uint_32 x = 0; x < frame.width; ++x) {
+                        dst[0] = src[0]; // r
+                        dst[1] = src[1]; // g
+                        dst[2] = src[2]; // b
+                        src += 4;
+                        dst += 3;
+                    }
+                } else { // RGBA
+                    memcpy(dst, src, static_cast<std::size_t>(frame.width) * 4);
                 }
-            } else if (out_color_type == PNG_COLOR_TYPE_GRAY) {
-                for (png_uint_32 x = 0; x < width; ++x) {
-                    dst[0] = src[0]; // r = g = b
-                    src += 4;
-                    dst += 1;
-                }
-            } else if (out_color_type == PNG_COLOR_TYPE_GA) {
-                for (png_uint_32 x = 0; x < width; ++x) {
-                    dst[0] = src[0]; // r = g = b
-                    dst[1] = src[3]; // alpha
-                    src += 4;
-                    dst += 2;
-                }
-            } else if (out_color_type == PNG_COLOR_TYPE_RGB) {
-                for (png_uint_32 x = 0; x < width; ++x) {
-                    dst[0] = src[0]; // r
-                    dst[1] = src[1]; // g
-                    dst[2] = src[2]; // b
-                    src += 4;
-                    dst += 3;
-                }
-            } else { // RGBA
-                memcpy(dst, src, static_cast<std::size_t>(width) * 4);
+
+                png_write_rows(wr.png, &out_row, 1);
+                p += static_cast<std::size_t>(frame.width) * 4; // advance in-memory buffer pointer
             }
 
-            png_write_rows(wr.png, &out_row, 1);
-            p += static_cast<std::size_t>(width) * 4; // advance in-memory buffer pointer
+#ifdef PNG_WRITE_APNG_SUPPORTED
+            if (decoded.is_animated) {
+                png_write_frame_tail(wr.png, wr.info);
+            }
+#endif
         }
 
         png_write_end(wr.png, wr.info);
@@ -404,77 +490,62 @@ namespace chisel {
         return "";
     }
 
-    /**
-     * @brief Decodes a PNG file into a standard 8-bit RGBA buffer.
-     * This is a standalone utility function used for checksum verification.
-     * @param file The path to the PNG file.
-     * @param width Output parameter for the image width.
-     * @param height Output parameter for the image height.
-     * @return A vector containing the raw 8-bit RGBA pixel data.
-     */
-    std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
-                                                png_uint_32 &width,
-                                                png_uint_32 &height) {
-        FILE *fp = chisel::open_file(file.string().c_str(), "rb");
-        if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
+    namespace {
+        /**
+         * @brief Decodes a PNG file into canvas/animation metadata and
+         * per-frame RGBA8 pixel data, for use by raw_equal().
+         */
+        PngDecoded decode_png_file(const std::filesystem::path &file) {
+            const unique_FILE fp(chisel::open_file(file.string().c_str(), "rb"));
+            if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
 
-        png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-        if (!png) {
-            fclose(fp);
-            throw std::runtime_error("png_create_read_struct failed");
+            PngRead rd;
+            rd.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+            if (!rd.png) throw std::runtime_error("png_create_read_struct failed");
+            rd.info = png_create_info_struct(rd.png);
+            if (!rd.info) throw std::runtime_error("png_create_info_struct failed");
+            if (setjmp(png_jmpbuf(rd.png))) {
+                throw std::runtime_error("libpng error while reading " + file.string());
+            }
+
+            png_init_io(rd.png, fp.get());
+            png_read_info(rd.png, rd.info);
+
+            return read_png_frames(rd.png, rd.info);
         }
-
-        png_infop info = png_create_info_struct(png);
-        if (!info) {
-            png_destroy_read_struct(&png, nullptr, nullptr);
-            fclose(fp);
-            throw std::runtime_error("png_create_info_struct failed");
-        }
-
-        if (setjmp(png_jmpbuf(png))) {
-            png_destroy_read_struct(&png, &info, nullptr);
-            fclose(fp);
-            throw std::runtime_error("libpng error while reading " + file.string());
-        }
-
-        png_init_io(png, fp);
-        png_read_info(png, info);
-
-        int bit_depth, color_type;
-        png_get_IHDR(png, info, &width, &height, &bit_depth, &color_type, nullptr, nullptr, nullptr);
-
-        if (bit_depth == 16) png_set_strip_16(png);
-        if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(png);
-        if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) png_set_expand_gray_1_2_4_to_8(png);
-        if (png_get_valid(png, info, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png);
-        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
-        if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(png);
-
-        png_read_update_info(png, info);
-
-        const std::size_t rowbytes = png_get_rowbytes(png, info);
-        std::vector<unsigned char> image(rowbytes * height);
-        std::vector<png_bytep> row_pointers(height);
-        for (png_uint_32 y = 0; y < height; ++y) {
-            row_pointers[y] = image.data() + y * rowbytes;
-        }
-
-        png_read_image(png, row_pointers.data());
-        png_read_end(png, info);
-
-        png_destroy_read_struct(&png, &info, nullptr);
-        fclose(fp);
-
-        return image;
-    }
+    } // namespace
 
     bool PngProcessor::raw_equal(const std::filesystem::path &a,
                                  const std::filesystem::path &b) const {
-        png_uint_32 wa, ha, wb, hb;
-        const auto imgA = decode_png_rgba8(a, wa, ha);
-        const auto imgB = decode_png_rgba8(b, wb, hb);
+        PngDecoded da, db;
+        try {
+            da = decode_png_file(a);
+            db = decode_png_file(b);
+        } catch (const std::exception& e) {
+            Logger::log(LogLevel::Warning, std::string("raw_equal: failed to decode: ") + e.what(), get_name());
+            return false;
+        }
 
-        if (wa != wb || ha != hb) return false;
-        return imgA == imgB;
+        if (da.canvas_width != db.canvas_width || da.canvas_height != db.canvas_height) return false;
+        if (da.is_animated != db.is_animated) return false;
+        if (da.is_animated && (da.num_plays != db.num_plays || da.first_frame_hidden != db.first_frame_hidden)) {
+            return false;
+        }
+        if (da.frames.size() != db.frames.size()) return false;
+
+        for (std::size_t i = 0; i < da.frames.size(); ++i) {
+            const auto& fa = da.frames[i];
+            const auto& fb = db.frames[i];
+            if (fa.width != fb.width || fa.height != fb.height) return false;
+            if (fa.has_fctl != fb.has_fctl) return false;
+            if (fa.has_fctl && (fa.x_offset != fb.x_offset || fa.y_offset != fb.y_offset ||
+                                fa.delay_num != fb.delay_num || fa.delay_den != fb.delay_den ||
+                                fa.dispose_op != fb.dispose_op || fa.blend_op != fb.blend_op)) {
+                return false;
+            }
+            if (fa.rgba != fb.rgba) return false;
+        }
+
+        return true;
     }
 } // namespace chisel
