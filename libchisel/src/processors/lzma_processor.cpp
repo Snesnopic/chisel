@@ -16,8 +16,9 @@ namespace chisel {
 
 static std::vector<uint8_t> decode_lzma(const std::vector<uint8_t>& compressed) {
     lzma_stream strm = LZMA_STREAM_INIT;
-    // auto_decoder handles both .xz and legacy .lzma
-    lzma_ret ret = lzma_auto_decoder(&strm, UINT64_MAX, 0);
+    // auto_decoder handles both .xz and legacy .lzma; LZMA_CONCATENATED is required
+    // to decode .xz files made of multiple concatenated streams (a standard, spec-mandated technique)
+    lzma_ret ret = lzma_auto_decoder(&strm, UINT64_MAX, LZMA_CONCATENATED);
     if (ret != LZMA_OK) throw std::runtime_error("failed to init lzma decoder");
 
     std::vector<uint8_t> decompressed;
@@ -41,7 +42,7 @@ static std::vector<uint8_t> decode_lzma(const std::vector<uint8_t>& compressed) 
         if (written > 0) {
             decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + written);
         }
-    } while (strm.avail_out == 0);
+    } while (ret != LZMA_STREAM_END);
 
     lzma_end(&strm);
     return decompressed;
