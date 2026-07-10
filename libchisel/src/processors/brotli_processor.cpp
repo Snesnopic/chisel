@@ -45,7 +45,16 @@ static std::vector<uint8_t> decode_brotli(const std::vector<uint8_t>& compressed
         }
     } while (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT);
 
+    // NEEDS_MORE_INPUT here means the stream is truncated (no more input will ever come);
+    // leftover available_in after SUCCESS means trailing garbage after the end of the stream.
+    // Brotli has no concatenation support, so both cases indicate a corrupt/malformed file.
+    const bool truncated = (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT);
+    const bool trailing_garbage = (result == BROTLI_DECODER_RESULT_SUCCESS && available_in > 0);
     BrotliDecoderDestroyInstance(state);
+
+    if (truncated) throw std::runtime_error("Brotli decompression failed: truncated input");
+    if (trailing_garbage) throw std::runtime_error("Brotli decompression failed: trailing data after end of stream");
+
     return decompressed;
 }
 
