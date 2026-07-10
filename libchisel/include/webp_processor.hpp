@@ -21,9 +21,9 @@ namespace chisel {
      * @brief Implements IProcessor for WebP files using libwebp.
      *
      * @details This processor performs a decode and re-encode cycle
-     * *only* for lossless WebP files, applying the highest
-     * compression settings (`-m 6`, `-q 100` equivalent).
-     * Lossy WebP files are skipped.
+     * *only* for lossless WebP files (static or animated), applying
+     * the highest compression settings (`-m 6`, `-q 100` equivalent).
+     * Lossy WebP files, and animated WebPs with any lossy frame, are skipped.
      */
     class WebpProcessor final : public IProcessor {
     public:
@@ -51,9 +51,11 @@ namespace chisel {
         /**
          * @brief Recompresses a lossless WebP file using libwebp.
          *
-         * If the input file is lossy, it is skipped.
-         * If lossless, it performs a full decode and re-encode cycle
-         * using the maximum lossless preset (level 9).
+         * If the input file is lossy (or an animation with any lossy frame),
+         * it is skipped. Static lossless files are decoded and re-encoded
+         * at the maximum lossless preset (level 9). Animated lossless files
+         * are decoded frame-by-frame via WebPAnimDecoder and re-assembled via
+         * WebPAnimEncoder, which picks minimal per-frame regions/dispose/blend.
          *
          * @param input Path to the source WebP file.
          * @param output Path to write the optimized WebP file.
@@ -81,8 +83,10 @@ namespace chisel {
         /**
          * @brief Compares two WebP files pixel by pixel.
          *
-         * Decodes both images into a raw RGBA8 buffer using libwebp
-         * and compares the buffers and dimensions.
+         * For static images, decodes both into a raw RGBA8 buffer and
+         * compares dimensions and pixels. For animations, decodes both
+         * via WebPAnimDecoder and compares canvas size, loop count, and
+         * every frame's timestamp and fully-composited pixel data.
          *
          * @param a Path to the first WebP file.
          * @param b Path to the second WebP file.
