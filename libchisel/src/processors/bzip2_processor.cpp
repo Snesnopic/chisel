@@ -14,37 +14,47 @@
 
 namespace chisel {
 
-// extract pure payload from bzip2 stream
+// extract pure payload from a bzip2 stream, decoding all concatenated streams
+// (bzlib has no concatenation flag: BZ2_bzDecompress only ever handles one stream,
+// so the caller must re-init after BZ_STREAM_END while input remains, same as bzip2/bunzip2 itself)
 static std::vector<uint8_t> decode_bzip2(const std::vector<uint8_t>& compressed) {
-    bz_stream strm{};
-    int ret = BZ2_bzDecompressInit(&strm, 0, 0);
-    if (ret != BZ_OK) throw std::runtime_error("FAILED TO INIT BZIP2 DECODER");
-
     std::vector<uint8_t> decompressed;
     constexpr std::size_t chunk_size = 65536;
     std::vector<uint8_t> out_buf(chunk_size);
 
     // bzlib expects char* instead of uint8_t*
-    strm.next_in = reinterpret_cast<char*>(const_cast<uint8_t*>(compressed.data()));
-    strm.avail_in = static_cast<unsigned int>(compressed.size());
+    char* next_in = reinterpret_cast<char*>(const_cast<uint8_t*>(compressed.data()));
+    unsigned int avail_in = static_cast<unsigned int>(compressed.size());
 
-    do {
-        strm.next_out = reinterpret_cast<char*>(out_buf.data());
-        strm.avail_out = static_cast<unsigned int>(out_buf.size());
+    while (avail_in > 0) {
+        bz_stream strm{};
+        int ret = BZ2_bzDecompressInit(&strm, 0, 0);
+        if (ret != BZ_OK) throw std::runtime_error("FAILED TO INIT BZIP2 DECODER");
 
-        ret = BZ2_bzDecompress(&strm);
-        if (ret != BZ_OK && ret != BZ_STREAM_END) {
-            BZ2_bzDecompressEnd(&strm);
-            throw std::runtime_error("BZIP2 DECOMPRESSION FAILED");
-        }
+        strm.next_in = next_in;
+        strm.avail_in = avail_in;
 
-        const std::size_t written = out_buf.size() - strm.avail_out;
-        if (written > 0) {
-            decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + written);
-        }
-    } while (ret != BZ_STREAM_END);
+        do {
+            strm.next_out = reinterpret_cast<char*>(out_buf.data());
+            strm.avail_out = static_cast<unsigned int>(out_buf.size());
 
-    BZ2_bzDecompressEnd(&strm);
+            ret = BZ2_bzDecompress(&strm);
+            if (ret != BZ_OK && ret != BZ_STREAM_END) {
+                BZ2_bzDecompressEnd(&strm);
+                throw std::runtime_error("BZIP2 DECOMPRESSION FAILED");
+            }
+
+            const std::size_t written = out_buf.size() - strm.avail_out;
+            if (written > 0) {
+                decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + written);
+            }
+        } while (ret != BZ_STREAM_END);
+
+        next_in = strm.next_in;
+        avail_in = strm.avail_in;
+        BZ2_bzDecompressEnd(&strm);
+    }
+
     return decompressed;
 }
 
