@@ -98,4 +98,41 @@ std::string KanziProcessor::get_raw_checksum(const std::filesystem::path& /*file
     return "";
 }
 
+namespace {
+
+std::vector<uint8_t> decode_kanzi(const std::filesystem::path& path) {
+    const std::filesystem::path temp_dir = make_temp_dir_for(path, "kanzi_rawequal");
+    const std::filesystem::path raw_bin = temp_dir / "stream.raw";
+
+    kanzi::Context ctx;
+    ctx.putString("inputName", path.string());
+    ctx.putString("outputName", raw_bin.string());
+    ctx.putInt("jobs", 1);
+    ctx.putInt("overwrite", 1);
+    ctx.putInt("verbosity", 0);
+
+    kanzi::BlockDecompressor bd(ctx);
+    uint64_t read = 0;
+
+    if (bd.decompress(read) != 0) {
+        cleanup_temp_dir(temp_dir);
+        throw std::runtime_error("KanziProcessor: decompression failed for raw_equal");
+    }
+
+    auto data = read_file(raw_bin);
+    cleanup_temp_dir(temp_dir);
+    return data;
+}
+
+} // namespace
+
+bool KanziProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    try {
+        return decode_kanzi(a) == decode_kanzi(b);
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, std::string("raw_equal failed: ") + e.what(), get_name());
+        return false;
+    }
+}
+
 } // namespace chisel
