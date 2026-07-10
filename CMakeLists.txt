@@ -513,6 +513,7 @@ add_subdirectory(${libjxl_SOURCE_DIR} ${libjxl_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libtiff
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(tiff-framework OFF CACHE BOOL "" FORCE)
 set(tiff-deprecated OFF CACHE BOOL "" FORCE)
 set(tiff-install OFF CACHE BOOL "" FORCE)
 set(tiff-tools OFF CACHE BOOL "" FORCE)
