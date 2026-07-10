@@ -14,19 +14,32 @@
 
 namespace chisel {
 
-// extract pure payload from zstd stream
+// extract pure payload from a zstd stream, decoding all concatenated frames
 static std::vector<uint8_t> decode_zstd(const std::vector<uint8_t>& compressed) {
-    unsigned long long const decompressed_size = ZSTD_getFrameContentSize(compressed.data(), compressed.size());
-    if (decompressed_size == ZSTD_CONTENTSIZE_ERROR || decompressed_size == ZSTD_CONTENTSIZE_UNKNOWN) {
-        throw std::runtime_error("INVALID OR UNKNOWN ZSTD FRAME SIZE");
+    ZSTD_DStream* dstream = ZSTD_createDStream();
+    if (!dstream) throw std::runtime_error("ZSTD_createDStream FAILED");
+
+    size_t const init_result = ZSTD_initDStream(dstream);
+    if (ZSTD_isError(init_result)) {
+        ZSTD_freeDStream(dstream);
+        throw std::runtime_error(std::string("ZSTD_initDStream FAILED: ") + ZSTD_getErrorName(init_result));
     }
 
-    std::vector<uint8_t> decompressed(decompressed_size);
-    size_t const result = ZSTD_decompress(decompressed.data(), decompressed_size, compressed.data(), compressed.size());
+    std::vector<uint8_t> decompressed;
+    std::vector<uint8_t> out_buf(ZSTD_DStreamOutSize());
+    ZSTD_inBuffer in = { compressed.data(), compressed.size(), 0 };
 
-    if (ZSTD_isError(result)) {
-        throw std::runtime_error(std::string("ZSTD DECOMPRESSION FAILED: ") + ZSTD_getErrorName(result));
+    while (in.pos < in.size) {
+        ZSTD_outBuffer out = { out_buf.data(), out_buf.size(), 0 };
+        size_t const result = ZSTD_decompressStream(dstream, &out, &in);
+        if (ZSTD_isError(result)) {
+            ZSTD_freeDStream(dstream);
+            throw std::runtime_error(std::string("ZSTD DECOMPRESSION FAILED: ") + ZSTD_getErrorName(result));
+        }
+        decompressed.insert(decompressed.end(), out_buf.data(), out_buf.data() + out.pos);
     }
+
+    ZSTD_freeDStream(dstream);
     return decompressed;
 }
 
