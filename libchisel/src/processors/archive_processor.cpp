@@ -457,7 +457,11 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
     std::vector<fs::path> files;
     for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
         std::error_code ec2;
-        if (fs::is_regular_file(it->path(), ec2) || fs::is_symlink(it->path(), ec2)) {
+        // is_symlink is checked first: is_directory()/is_regular_file() both follow
+        // symlinks, so a symlink to a directory would otherwise be misclassified here
+        const bool is_symlink = fs::is_symlink(it->path(), ec2);
+        const bool include = is_symlink || fs::is_regular_file(it->path(), ec2) || fs::is_directory(it->path(), ec2);
+        if (include) {
             if (fmt == ContainerFormat::Epub && it->path().filename() == "mimetype") continue;
             files.push_back(it->path());
         }
