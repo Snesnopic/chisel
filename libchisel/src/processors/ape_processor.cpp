@@ -66,6 +66,50 @@ bool copy_apetag(const std::filesystem::path &input,
     }
 }
 
+/**
+ * @brief RAII guard that provides a path to open with MACLib, guaranteeing a
+ * recognized extension (.ape/.mac/.apl) as CreateIAPEDecompress requires one and
+ * fails outright otherwise -- notably breaking on the executor's own pipeline temp
+ * files, which are always suffixed ".tmp" regardless of the original format.
+ */
+class ApeExtensionGuard {
+public:
+    explicit ApeExtensionGuard(const std::filesystem::path& original) : path_(original) {
+        std::string ext = original.extension().string();
+        for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (ext == ".ape" || ext == ".mac" || ext == ".apl") return;
+
+        temp_link_ = original.parent_path() / (original.filename().string() + ".ape");
+        std::error_code ec;
+        std::filesystem::create_hard_link(original, temp_link_, ec);
+        if (ec) {
+            // cross-filesystem or unsupported hardlink; fall back to a copy
+            std::filesystem::copy_file(original, temp_link_, std::filesystem::copy_options::overwrite_existing, ec);
+        }
+        if (ec) {
+            temp_link_.clear();
+            throw std::runtime_error("ApeProcessor: failed to prepare a .ape-suffixed path for decoding");
+        }
+        path_ = temp_link_;
+    }
+
+    ~ApeExtensionGuard() {
+        if (!temp_link_.empty()) {
+            std::error_code ec;
+            std::filesystem::remove(temp_link_, ec);
+        }
+    }
+
+    ApeExtensionGuard(const ApeExtensionGuard&) = delete;
+    ApeExtensionGuard& operator=(const ApeExtensionGuard&) = delete;
+
+    [[nodiscard]] const std::filesystem::path& path() const { return path_; }
+
+private:
+    std::filesystem::path path_;
+    std::filesystem::path temp_link_;
+};
+
 } // namespace
 
 namespace chisel {
@@ -215,7 +259,8 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
                                     unsigned& bps) {
     int err = 0;
 
-    const auto *const pMacString = APE::CAPECharacterHelper::GetUTFNFromANSI(file.string().c_str());
+    const ApeExtensionGuard ext_guard(file);
+    const auto *const pMacString = APE::CAPECharacterHelper::GetUTFNFromANSI(ext_guard.path().string().c_str());
 
     APE::IAPEDecompress* dec = CreateIAPEDecompress(pMacString,
                                                     &err,
@@ -262,7 +307,16 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
             for (size_t i = 0; i < bytes_to_copy / 2; ++i) {
                 pcm.push_back(static_cast<int32_t>(src16[i]));
             }
-        } else if (bps == 24 || bps == 32) {
+        } else if (bps == 24) {
+            // packed 3 bytes per sample (like WAV), NOT 4-byte aligned like int32_t
+            for (size_t off = 0; off + 3 <= bytes_to_copy; off += 3) {
+                int32_t sample = static_cast<int32_t>(block[off]) |
+                                 (static_cast<int32_t>(block[off + 1]) << 8) |
+                                 (static_cast<int32_t>(block[off + 2]) << 16);
+                if (sample & 0x00800000) sample |= static_cast<int32_t>(0xFF000000);
+                pcm.push_back(sample);
+            }
+        } else if (bps == 32) {
             for (size_t i = 0; i < bytes_to_copy / 4; ++i) {
                 pcm.push_back(src32[i]);
             }
@@ -280,13 +334,18 @@ std::vector<int32_t> decode_ape_pcm(const std::filesystem::path& file,
 
 bool ApeProcessor::raw_equal(const std::filesystem::path& a,
                              const std::filesystem::path& b) const {
-    unsigned ra, ca, bpsa;
-    unsigned rb, cb, bpsb;
-    const auto pcmA = decode_ape_pcm(a, ra, ca, bpsa);
-    const auto pcmB = decode_ape_pcm(b, rb, cb, bpsb);
+    try {
+        unsigned ra, ca, bpsa;
+        unsigned rb, cb, bpsb;
+        const auto pcmA = decode_ape_pcm(a, ra, ca, bpsa);
+        const auto pcmB = decode_ape_pcm(b, rb, cb, bpsb);
 
-    if (ra != rb || ca != cb || bpsa != bpsb) return false;
-    return pcmA == pcmB;
+        if (ra != rb || ca != cb || bpsa != bpsb) return false;
+        return pcmA == pcmB;
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Error, std::string("raw_equal failed: ") + e.what(), get_name());
+        return false;
+    }
 }
 
 } // namespace chisel
