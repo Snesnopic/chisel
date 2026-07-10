@@ -134,13 +134,14 @@ std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &
     cleanup_temp_dir(content.temp_dir, get_name());
     Logger::log(LogLevel::Debug, "exiting finalize_extraction for " + final_temp_path.string(), get_name());
 
-    // the executor will then call recompress on this final_temp_path to clean the container
+    // recompress() (mkclean) already ran in phase 2, on content.original_path,
+    // before this attachment reinsertion - not after; the executor does not
+    // call recompress() again on the path returned here
     return final_temp_path;
 }
 
 std::string MkvProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
-    // TODO: implement per-cluster payload hashing using libmatroska2
-    return std::to_string(std::filesystem::file_size(file_path));
+    return "";
 }
 
 } // namespace chisel

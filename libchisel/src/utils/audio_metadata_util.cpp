@@ -7,6 +7,7 @@
 #include <iterator>
 #include <setjmp.h>
 #include <vector>
+#include <map>
 #include <taglib/fileref.h>
 #include "flac/flacfile.h"
 #include "flac/flacpicture.h"
@@ -63,6 +64,8 @@ const char* extFromMime(const std::string &mime) {
     if (mime == "image/webp") return ".webp";
     if (mime == "application/x-truetype-font" || mime == "font/ttf") return ".ttf";
     if (mime == "application/vnd.ms-opentype" || mime == "font/otf") return ".otf";
+    if (mime == "font/woff2") return ".woff2";
+    if (mime == "font/woff") return ".woff";
     if (mime == "text/xml" || mime == "application/xml") return ".xml";
     return ".bin";
 }
@@ -594,42 +597,50 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     // mkv (matroska / webm)
     if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
         int idx = 0;
-        TagLib::List<TagLib::VariantMap> all_attachments = mkvFile->complexProperties("PICTURE");
 
-        // append non-picture attachments (fonts, xml)
-        for (const auto& att : mkvFile->complexProperties("ATTACHMENT")) {
-            all_attachments.append(att);
-        }
+        // TagLib::Matroska::File::complexProperties("ATTACHMENT") is *not* a generic
+        // "all non-picture attachments" query: it only matches attachments whose
+        // filename/mimeType/uid is literally the string "ATTACHMENT", which real
+        // files never have. complexPropertyKeys() is the correct way to enumerate
+        // every attachment (it yields "PICTURE" for images, and each attachment's
+        // own filename otherwise), so fonts/xml/etc. are picked up too.
+        for (const auto &key : mkvFile->complexPropertyKeys()) {
+            for (const auto &attMap : mkvFile->complexProperties(key)) {
+                if (!attMap.contains("data") || !attMap.contains("mimeType")) continue;
 
-        for (const auto &picMap : all_attachments) {
-            if (!picMap.contains("data") || !picMap.contains("mimeType")) continue;
+                TagLib::ByteVector data = attMap["data"].toByteVector();
+                std::string mime = attMap["mimeType"].toString().to8Bit(true);
+                std::string original_fileName = attMap.contains("fileName") ? attMap["fileName"].toString().to8Bit(true) : "";
 
-            TagLib::ByteVector data = picMap["data"].toByteVector();
-            std::string mime = picMap["mimeType"].toString().to8Bit(true);
+                // prefer the attachment's own filename extension (e.g. font.woff2)
+                // so it gets picked up by the matching processor; fall back to a
+                // mime-based guess only if the filename has none
+                std::string ext = std::filesystem::path(original_fileName).extension().string();
+                if (ext.empty()) ext = extFromMime(mime);
+                std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx) + ext);
 
-            const char *ext = extFromMime(mime);
-            std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx) + ext);
+                std::ofstream out(outPath, std::ios::binary);
+                out.write(data.data(), data.size());
+                out.close();
 
-            std::ofstream out(outPath, std::ios::binary);
-            out.write(data.data(), data.size());
-            out.close();
+                AudioCoverInfo info;
+                info.temp_file_path = outPath;
+                info.mime_type = mime;
+                info.picture_type = defaultFrontCoverType();
 
-            AudioCoverInfo info;
-            info.temp_file_path = outPath;
-            info.mime_type = mime;
-            info.picture_type = defaultFrontCoverType();
+                if (attMap.contains("description")) {
+                    info.description = attMap["description"].toString().to8Bit(true);
+                }
 
-            if (picMap.contains("description")) {
-                info.description = picMap["description"].toString().to8Bit(true);
+                // store the original TagLib complex-property key and filename so
+                // finalize can group entries back under the same key on rebuild
+                // (multiple pictures all share the "PICTURE" key; every other
+                // attachment is keyed by its own filename)
+                info.format_specific = std::make_any<std::pair<std::string, std::string>>(key.to8Bit(true), original_fileName);
+
+                state.extracted_covers.push_back(std::move(info));
+                ++idx;
             }
-
-            // store original filename and attachment type (picture or attachment) to rebuild correctly
-            std::string original_fileName = picMap.contains("fileName") ? picMap["fileName"].toString().to8Bit(true) : "";
-            bool is_picture = mime.find("image/") == 0;
-            info.format_specific = std::make_any<std::pair<std::string, bool>>(original_fileName, is_picture);
-
-            state.extracted_covers.push_back(std::move(info));
-            ++idx;
         }
         return state;
     }
@@ -875,37 +886,37 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // mkv (matroska / webm)
     if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
-        TagLib::List<TagLib::VariantMap> pictures;
-        TagLib::List<TagLib::VariantMap> attachments;
+        // group by original TagLib complex-property key: setComplexProperties(key, list)
+        // replaces *all* attachments under that key in one call, so entries sharing a
+        // key (e.g. every picture shares "PICTURE") must be batched into a single call
+        // rather than one call per attachment, or each call would wipe the previous one
+        std::map<std::string, TagLib::List<TagLib::VariantMap>> grouped;
 
         for (const auto &info : state.extracted_covers) {
             TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
             if (data.isEmpty()) continue;
 
+            std::string key = "PICTURE";
+            std::string fileName = "attachment" + std::string(extFromMime(info.mime_type));
+
+            if (info.format_specific.has_value() && info.format_specific.type() == typeid(std::pair<std::string, std::string>)) {
+                auto meta = std::any_cast<std::pair<std::string, std::string>>(info.format_specific);
+                if (!meta.first.empty()) key = meta.first;
+                if (!meta.second.empty()) fileName = meta.second;
+            }
+
             TagLib::VariantMap attMap;
             attMap.insert("data", data);
             attMap.insert("mimeType", TagLib::String(info.mime_type, TagLib::String::UTF8));
             attMap.insert("description", TagLib::String(info.description, TagLib::String::UTF8));
-
-            std::string fileName = "attachment" + std::string(extFromMime(info.mime_type));
-            bool is_picture = info.mime_type.find("image/") == 0;
-
-            if (info.format_specific.has_value() && info.format_specific.type() == typeid(std::pair<std::string, bool>)) {
-                auto meta = std::any_cast<std::pair<std::string, bool>>(info.format_specific);
-                if (!meta.first.empty()) fileName = meta.first;
-                is_picture = meta.second;
-            }
             attMap.insert("fileName", TagLib::String(fileName, TagLib::String::UTF8));
 
-            if (is_picture) {
-                pictures.append(attMap);
-            } else {
-                attachments.append(attMap);
-            }
+            grouped[key].append(attMap);
         }
 
-        mkvFile->setComplexProperties("PICTURE", pictures);
-        mkvFile->setComplexProperties("ATTACHMENT", attachments);
+        for (const auto &[key, list] : grouped) {
+            mkvFile->setComplexProperties(TagLib::String(key, TagLib::String::UTF8), list);
+        }
         return mkvFile->save();
     }
 
