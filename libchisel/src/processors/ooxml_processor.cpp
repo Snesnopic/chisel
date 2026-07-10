@@ -15,9 +15,6 @@
 #include <vector>
 #include <algorithm>
 #include "file_utils.hpp"
-#include "zlib_container.h"
-#include "zopfli.h"
-#include "zopfli_compressor.hpp"
 
 
 namespace chisel {
@@ -82,7 +79,8 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: set_format_zip failed");
     }
-    archive_write_set_options(out, "compression=deflate");
+    archive_write_set_format_option(out, "zip", "compression", "deflate");
+    archive_write_set_format_option(out, "zip", "compression-level", "9");
 
     const int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
@@ -95,15 +93,23 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
         throw std::runtime_error("OOXMLProcessor: open_filename failed");
     }
 
+    // walk the temp dir directly (not content.extracted_files, which never includes
+    // directories) so empty directory entries aren't silently dropped on rebuild
+    std::vector<fs::path> all_entries;
+    for (auto dit = fs::recursive_directory_iterator(content.temp_dir, ec);
+         !ec && dit != fs::recursive_directory_iterator(); ++dit) {
+        all_entries.push_back(dit->path());
+    }
+
     // ensure [Content_Types].xml is written first
     std::vector<fs::path> files_ordered;
-    auto it = std::find_if(content.extracted_files.begin(), content.extracted_files.end(),
+    auto it = std::find_if(all_entries.begin(), all_entries.end(),
                            [](const fs::path& f){ return f.filename() == "[Content_Types].xml"; });
-    if (it != content.extracted_files.end()) {
+    if (it != all_entries.end()) {
         files_ordered.push_back(*it);
     }
-    for (const auto& f : content.extracted_files) {
-        if (fs::path(f).filename() != "[Content_Types].xml") {
+    for (const auto& f : all_entries) {
+        if (f.filename() != "[Content_Types].xml") {
             files_ordered.push_back(f);
         }
     }
@@ -114,14 +120,17 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
             fs::path rel = fs::relative(file, content.temp_dir, ec);
             if (ec) rel = fs::path(file).filename();
 
-            std::ifstream ifs(file, std::ios::binary);
-            if (!ifs) {
-                Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), get_name());
-                continue;
-            }
-            const std::vector<unsigned char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+            const bool is_dir = fs::is_directory(file, ec);
 
-            std::vector<unsigned char> final_data = buf;
+            std::vector<unsigned char> final_data;
+            if (!is_dir) {
+                std::ifstream ifs(file, std::ios::binary);
+                if (!ifs) {
+                    Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), get_name());
+                    continue;
+                }
+                final_data.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+            }
             Logger::log(LogLevel::Debug, "Copied entry to OOXML: " + rel.string(), get_name());
 
             archive_entry* entry = archive_entry_new();
@@ -131,9 +140,9 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
             }
 
             archive_entry_set_pathname(entry, rel.generic_string().c_str());
-            archive_entry_set_size(entry, static_cast<la_int64_t>(final_data.size()));
-            archive_entry_set_filetype(entry, AE_IFREG);
-            archive_entry_set_perm(entry, 0644);
+            archive_entry_set_size(entry, is_dir ? 0 : static_cast<la_int64_t>(final_data.size()));
+            archive_entry_set_filetype(entry, is_dir ? AE_IFDIR : AE_IFREG);
+            archive_entry_set_perm(entry, is_dir ? 0755 : 0644);
             archive_entry_set_mtime(entry, 0, 0); // determinism
 
             const int wh = archive_write_header(out, entry);
@@ -148,13 +157,15 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
                 throw std::runtime_error("OOXMLProcessor: write_header failed");
             }
 
-            const la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
-            if (wrote < 0) {
-                Logger::log(LogLevel::Error,
-                            "Failed to write data for: " + rel.string() +
-                            " (" + std::string(archive_error_string(out)) + ")", get_name());
-                archive_entry_free(entry);
-                throw std::runtime_error("OOXMLProcessor: write_data failed");
+            if (!is_dir) {
+                const la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
+                if (wrote < 0) {
+                    Logger::log(LogLevel::Error,
+                                "Failed to write data for: " + rel.string() +
+                                " (" + std::string(archive_error_string(out)) + ")", get_name());
+                    archive_entry_free(entry);
+                    throw std::runtime_error("OOXMLProcessor: write_data failed");
+                }
             }
 
             archive_entry_free(entry);

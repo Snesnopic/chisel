@@ -21,9 +21,11 @@ namespace chisel {
  * @brief Implements IProcessor for Office Open XML (OOXML) files.
  *
  * @details This processor handles .docx, .xlsx, and .pptx files.
- * It treats them as ZIP archives, extracts their contents,
- * and specifically re-compresses embedded images (PNG/JPG)
- * using Zopfli during the finalization phase.
+ * It treats them as ZIP archives and extracts their contents; embedded
+ * images (PNG/JPG) and other recognized parts are optimized independently
+ * by the executor recursing into each extracted file (dispatched to
+ * PngProcessor/ZopfliPngProcessor/JpegProcessor/etc. as appropriate).
+ * finalize_extraction() just re-zips whatever ends up on disk.
  */
 class OOXMLProcessor final : public IProcessor {
 public:
@@ -88,11 +90,13 @@ public:
         const std::filesystem::path& input_path) override;
 
     /**
-     * @brief Rebuilds the OOXML archive with optimized images.
+     * @brief Rebuilds the OOXML archive from the (possibly already
+     * independently optimized) extracted files.
      *
-     * Iterates through the extracted files. PNG/JPG files are
-     * recompressed using Zopfli. All other files are copied.
-     * The archive is then rebuilt as a ZIP using libarchive.
+     * Walks the temp directory and re-zips every file and directory found
+     * there (each part having already been optimized in place, if
+     * applicable, by the executor's own recursive per-file dispatch)
+     * using libarchive at maximum deflate compression.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
      * @param options Processing options (e.g. metadata preservation).
