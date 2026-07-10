@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "zlib_container.h"
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
@@ -308,6 +309,10 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             }
         }
 
+        if (!options.preserve_metadata) {
+            strip_metadata(pdf);
+        }
+
         // Always write to a new temporary file
         auto tmp_path = content.original_path;
         tmp_path += ".refinalized.pdf";
@@ -332,14 +337,19 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
 }
 
 /**
- * @brief Extracts all raw (unfiltered) streams from a PDF file.
- * This is used for checksum verification.
+ * @brief Extracts the decoded content of all streams from a PDF file.
+ * This is used for checksum verification. Decoded (not raw/still-compressed)
+ * content is compared, since recompression legitimately changes the raw
+ * bytes of a stream (e.g. re-flating with zopfli) without changing its content.
+ * Streams are collected into a vector (not keyed by object number/generation),
+ * since operations like linearization freely renumber objects between the
+ * original and finalized file even when no stream content actually changed.
  * @param path The path to the PDF file.
- * @param streams A map to be populated with object numbers and their raw stream data.
+ * @param streams A vector to be populated with each stream's decoded data.
  * @return True on success, false if the PDF could not be processed.
  */
-static bool get_all_raw_streams(const std::filesystem::path& path,
-                                    std::map<int, std::vector<uint8_t>>& streams)
+static bool get_all_decoded_streams(const std::filesystem::path& path,
+                                    std::vector<std::vector<uint8_t>>& streams)
 {
     try {
         QPDF pdf;
@@ -352,12 +362,27 @@ static bool get_all_raw_streams(const std::filesystem::path& path,
 
         auto objects = pdf.getAllObjects();
         for (auto& obj : objects) {
-            if (obj.isStream()) {
-                const std::shared_ptr<Buffer> buf = obj.getRawStreamData();
-                streams[obj.getObjGen().getObj()] =
-                    std::vector<uint8_t>(buf->getBuffer(), buf->getBuffer() + buf->getSize());
+            if (!obj.isStream()) continue;
+
+            // /ObjStm and /XRef streams are QPDFWriter's own low-level serialization
+            // plumbing (object streams, cross-reference streams), not PDF content;
+            // their presence/count/encoding legitimately differs between writer runs
+            // (e.g. after linearization) even when no actual content changed
+            const QPDFObjectHandle dict = obj.getDict();
+            if (dict.isDictionary() && dict.hasKey("/Type") && dict.getKey("/Type").isName()) {
+                const std::string type = dict.getKey("/Type").getName();
+                if (type == "/ObjStm" || type == "/XRef") continue;
             }
+
+            std::shared_ptr<Buffer> buf;
+            try {
+                buf = obj.getStreamData(qpdf_dl_specialized);
+            } catch (QPDFExc&) {
+                buf = obj.getRawStreamData();
+            }
+            streams.emplace_back(buf->getBuffer(), buf->getBuffer() + buf->getSize());
         }
+        std::sort(streams.begin(), streams.end());
         return true;
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Warning, "Failed to read pdf streams: " + std::string(e.what()), "PdfProcessor");
@@ -366,10 +391,10 @@ static bool get_all_raw_streams(const std::filesystem::path& path,
 }
     bool PdfProcessor::raw_equal(const std::filesystem::path& a,
                              const std::filesystem::path& b) const {
-    std::map<int, std::vector<uint8_t>> streamsA, streamsB;
+    std::vector<std::vector<uint8_t>> streamsA, streamsB;
 
-    const bool okA = get_all_raw_streams(a, streamsA);
-    const bool okB = get_all_raw_streams(b, streamsB);
+    const bool okA = get_all_decoded_streams(a, streamsA);
+    const bool okB = get_all_decoded_streams(b, streamsB);
 
     if (!okA || !okB) {
         return false; // failed to read one or both

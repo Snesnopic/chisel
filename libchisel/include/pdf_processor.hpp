@@ -103,16 +103,22 @@ public:
     std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
     /**
-     * @brief Compares two PDF files by their raw stream content.
+     * @brief Compares two PDF files by their decoded stream content.
      *
-     * Iterates through all objects in both PDF files using qpdf,
-     * extracts the *raw, compressed* data for each stream, and
-     * compares the resulting maps of (Object ID -> Stream Data).
+     * Iterates through all objects in both PDF files using qpdf, extracts
+     * the *decoded* data for each stream (falling back to raw data for
+     * non-decodable streams), sorts each file's collection, and compares
+     * them. Decoded content is compared rather than raw bytes since
+     * recompression legitimately changes a stream's raw bytes (e.g.
+     * re-flating with zopfli) without changing its content; streams are
+     * compared as an order-independent collection rather than keyed by
+     * object ID, since operations like linearization freely renumber
+     * objects between the original and finalized file.
      *
      * @param a Path to the first PDF file.
      * @param b Path to the second PDF file.
-     * @return true if both files contain identical streams for
-     * identical object IDs, false otherwise.
+     * @return true if both files contain the same multiset of decoded
+     * stream contents, false otherwise.
      */
     [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 
