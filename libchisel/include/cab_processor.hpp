@@ -71,6 +71,9 @@ public:
         return "";
     }
 
+    [[nodiscard]] bool raw_equal(const std::filesystem::path& a,
+                                 const std::filesystem::path& b) const override;
+
 };
 
 } // namespace chisel

@@ -223,6 +223,63 @@ bool is_safe_to_recompress(const CfHeader& hdr, const CfHeaderExt& ext,
     return true;
 }
 
+/**
+ * @brief Decode the logical (uncompressed) content of every folder in a CAB file.
+ *
+ * MSZIP blocks are decompressed, stored blocks and unsupported (Quantum/LZX)
+ * blocks are taken verbatim, and everything is concatenated in folder/block
+ * order. Used by raw_equal() to verify content wasn't altered by recompression.
+ */
+std::vector<uint8_t> decode_cab_payload(const std::filesystem::path& path) {
+    const auto in_data = read_file(path);
+    if (in_data.size() < sizeof(CfHeader))
+        throw std::runtime_error("CabProcessor: file too small");
+
+    Span r{ in_data.data(), in_data.size() };
+
+    CfHeader hdr{};
+    r.read(&hdr, sizeof(hdr));
+    if (std::memcmp(hdr.signature, kMscfSig, 4) != 0)
+        throw std::runtime_error("CabProcessor: not an MSCF cabinet");
+
+    CfHeaderExt ext{};
+    if (hdr.flags & kFlagReserve) {
+        r.read(&ext, sizeof(ext));
+        if (ext.cbCFHeader > 0) r.skip(ext.cbCFHeader);
+    }
+
+    std::vector<CfFolder> folders(hdr.cFolders);
+    for (uint16_t i = 0; i < hdr.cFolders; ++i) {
+        r.read(&folders[i], sizeof(CfFolder));
+        if (ext.cbCFFolder > 0) r.skip(ext.cbCFFolder);
+    }
+
+    std::vector<uint8_t> payload;
+    for (const auto& folder : folders) {
+        Span fr{ in_data.data(), in_data.size() };
+        fr.skip(folder.coffCabStart);
+
+        for (uint16_t bi = 0; bi < folder.cCFDATA; ++bi) {
+            CfData block{};
+            fr.read(&block, sizeof(block));
+            if (ext.cbCFData > 0) fr.skip(ext.cbCFData);
+
+            const uint8_t* data_ptr = fr.cur();
+            fr.skip(block.cbData);
+
+            if (folder.typeCompress == kCompMszip) {
+                auto raw = mszip_decompress(data_ptr, block.cbData, block.cbUncomp);
+                payload.insert(payload.end(), raw.begin(), raw.end());
+            } else {
+                // stored or unsupported (Quantum/LZX) — verbatim payload
+                payload.insert(payload.end(), data_ptr, data_ptr + block.cbData);
+            }
+        }
+    }
+
+    return payload;
+}
+
 } // namespace
 
 // ─── IProcessor interface ─────────────────────────────────────────────────────
@@ -432,6 +489,14 @@ void CabProcessor::recompress(const std::filesystem::path& input_path,
         "CAB recompressed: " + std::to_string(in_data.size()) +
         " → " + std::to_string(out.size()) + " bytes",
         get_name());
+}
+
+bool CabProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    try {
+        return decode_cab_payload(a) == decode_cab_payload(b);
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 } // namespace chisel
