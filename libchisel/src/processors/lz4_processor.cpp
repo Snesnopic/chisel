@@ -43,8 +43,9 @@ static std::vector<uint8_t> decode_lz4(const std::vector<uint8_t>& compressed) {
             decompressed.insert(decompressed.end(), dstBuf.begin(), dstBuf.begin() + dstSize);
         }
         srcPtr += srcRemaining;
-        
-        if (ret == 0) break; // Frame fully decoded
+
+        // ret == 0 means the current frame is done; the same dctx can decode
+        // a concatenated next frame directly, so only stop once input is exhausted
     }
     
     LZ4F_freeDecompressionContext(dctx);
