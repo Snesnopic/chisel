@@ -43,7 +43,7 @@ namespace chisel {
 
         // --- capabilities ---
         [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-        [[nodiscard]] bool can_extract_contents() const noexcept override { return true; } // in futuro
+        [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
         // --- operations ---
 
