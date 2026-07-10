@@ -36,7 +36,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kExts = { ".wv", ".wvp", ".wvc" };
+            static constexpr std::array<std::string_view, 2> kExts = { ".wv", ".wvp" };
             return {kExts.data(), kExts.size()};
         }
 

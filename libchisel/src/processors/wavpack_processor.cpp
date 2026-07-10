@@ -14,14 +14,39 @@
 
 namespace chisel {
 
+namespace {
+// .wvc correction files share the same "wvpk" block signature as regular .wv files
+// (so the MIME sniffer and, in turn, the executor can dispatch one directly here on
+// its own), but they can never be unpacked standalone: their content is only
+// meaningful alongside their .wv counterpart, already merged in via OPEN_WVC below.
+// libwavpack's own error message for this case isn't reliable to pattern-match on
+// (it varies depending on the correction file's internal structure/size), so detect
+// this purely from the extension instead.
+bool is_correction_file(const std::filesystem::path& p) {
+    auto ext = p.extension().string();
+    for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return ext == ".wvc";
+}
+}
+
 void WavPackProcessor::recompress(const std::filesystem::path& input,
                                   const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
+    if (is_correction_file(input)) {
+        Logger::log(LogLevel::Debug, "Skipping standalone WavPack correction file: " + input.string(), get_name());
+        std::vector<uint8_t> data;
+        if (!read_file(input, data) || !write_file(output, data))
+            throw std::runtime_error("WavPack: failed to pass through correction file");
+        return;
+    }
+
     char error[128]{};
 
     // open input context
-    WavpackContext* ctx_in = WavpackOpenFileInput(input.string().c_str(), error, OPEN_TAGS, 0);
+    // OPEN_WVC: auto-load a sibling .wvc correction file, without which a
+    // hybrid-mode source would be silently decoded as its lossy-only approximation
+    WavpackContext* ctx_in = WavpackOpenFileInput(input.string().c_str(), error, OPEN_TAGS | OPEN_WVC, 0);
     if (!ctx_in) {
         Logger::log(LogLevel::Error, std::string("Wavpack open failed: ") + error, get_name());
         throw std::runtime_error("WavPack open failed");
@@ -145,7 +170,7 @@ std::vector<int32_t> decode_wavpack_pcm(const std::filesystem::path& file,
                                         int& channels,
                                         int& bps) {
     char error[128]{};
-    WavpackContext* ctx = WavpackOpenFileInput(file.string().c_str(), error, OPEN_TAGS, 0);
+    WavpackContext* ctx = WavpackOpenFileInput(file.string().c_str(), error, OPEN_TAGS | OPEN_WVC, 0);
     if (!ctx) {
         throw std::runtime_error("WavPack open failed: " + std::string(error));
     }
@@ -176,13 +201,25 @@ std::vector<int32_t> decode_wavpack_pcm(const std::filesystem::path& file,
 
 bool WavPackProcessor::raw_equal(const std::filesystem::path& a,
                                  const std::filesystem::path& b) const {
-    int ra, ca, bpsa;
-    int rb, cb, bpsb;
-    const auto pcmA = decode_wavpack_pcm(a, ra, ca, bpsa);
-    const auto pcmB = decode_wavpack_pcm(b, rb, cb, bpsb);
+    // standalone .wvc correction files (passed through unchanged by recompress())
+    // can't be decoded to PCM on their own; fall back to a byte compare
+    if (is_correction_file(a) || is_correction_file(b)) {
+        std::vector<uint8_t> bufA, bufB;
+        if (!read_file(a, bufA) || !read_file(b, bufB)) return false;
+        return bufA == bufB;
+    }
 
-    if (ra != rb || ca != cb || bpsa != bpsb) return false;
-    return pcmA == pcmB;
+    try {
+        int ra, ca, bpsa;
+        int rb, cb, bpsb;
+        const auto pcmA = decode_wavpack_pcm(a, ra, ca, bpsa);
+        const auto pcmB = decode_wavpack_pcm(b, rb, cb, bpsb);
+
+        if (ra != rb || ca != cb || bpsa != bpsb) return false;
+        return pcmA == pcmB;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 } // namespace chisel
