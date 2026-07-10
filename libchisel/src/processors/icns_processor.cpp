@@ -6,12 +6,14 @@
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
 #include "../../include/file_utils.hpp"
+#include "stb_image.h"
 #include <fstream>
 #include <vector>
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <optional>
 
 
 namespace chisel {
@@ -121,6 +123,71 @@ std::filesystem::path IcnsProcessor::finalize_extraction(const ExtractedContent&
 
     cleanup_temp_dir(content.temp_dir, get_name());
     return output_path;
+}
+
+namespace {
+
+struct IcnsBlock {
+    uint32_t ostype;
+    std::vector<uint8_t> payload;
+};
+
+std::optional<std::vector<IcnsBlock>> parse_icns_blocks(const std::filesystem::path& path) {
+    const auto data = read_file(path);
+    if (data.size() < 8 || data[0] != 'i' || data[1] != 'c' || data[2] != 'n' || data[3] != 's') {
+        return std::nullopt;
+    }
+
+    uint32_t file_size = read_be32(data.data() + 4);
+    if (file_size > data.size()) return std::nullopt;
+
+    std::vector<IcnsBlock> blocks;
+    size_t offset = 8;
+    while (offset + 8 <= file_size && offset + 8 <= data.size()) {
+        const uint32_t ostype = read_be32(data.data() + offset);
+        const uint32_t block_size = read_be32(data.data() + offset + 4);
+        if (block_size < 8 || offset + block_size > data.size()) break;
+
+        blocks.push_back({ostype, std::vector<uint8_t>(data.data() + offset + 8, data.data() + offset + block_size)});
+        offset += block_size;
+    }
+    return blocks;
+}
+
+// decodes to pixels if the payload is a format stb_image understands (PNG);
+// otherwise falls back to raw byte comparison, which is the only meaningful
+// check for opaque/proprietary payloads (Apple's RLE-compressed ARGB blocks,
+// 'info' plists, etc.) that this processor never touches
+bool block_payload_equal(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+    int wA, hA, cA, wB, hB, cB;
+    unsigned char* dataA = stbi_load_from_memory(a.data(), static_cast<int>(a.size()), &wA, &hA, &cA, 4);
+    if (!dataA) return a == b;
+
+    unsigned char* dataB = stbi_load_from_memory(b.data(), static_cast<int>(b.size()), &wB, &hB, &cB, 4);
+    if (!dataB) {
+        stbi_image_free(dataA);
+        return a == b;
+    }
+
+    bool equal = (wA == wB && hA == hB &&
+                  std::memcmp(dataA, dataB, static_cast<std::size_t>(wA) * hA * 4) == 0);
+    stbi_image_free(dataA);
+    stbi_image_free(dataB);
+    return equal;
+}
+
+} // namespace
+
+bool IcnsProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    const auto blocksA = parse_icns_blocks(a);
+    const auto blocksB = parse_icns_blocks(b);
+    if (!blocksA || !blocksB || blocksA->size() != blocksB->size()) return false;
+
+    for (size_t i = 0; i < blocksA->size(); ++i) {
+        if ((*blocksA)[i].ostype != (*blocksB)[i].ostype) return false;
+        if (!block_payload_equal((*blocksA)[i].payload, (*blocksB)[i].payload)) return false;
+    }
+    return true;
 }
 
 } // namespace chisel
