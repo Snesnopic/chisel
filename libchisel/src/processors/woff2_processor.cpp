@@ -4,8 +4,10 @@
 
 #include "../../include/woff2_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <woff2/decode.h>
 #include <woff2/encode.h>
+#include <brotli/decode.h>
 #include <fstream>
 #include <vector>
 #include <stdexcept>
@@ -28,20 +30,50 @@ static std::vector<uint8_t> decode_to_ttf(const std::vector<uint8_t>& woff2_data
     return ttf_data;
 }
 
+// extracts the WOFF2 extended metadata block (WOFF-spec XML: license/credits/description),
+// which ConvertWOFF2ToTTF has no way to expose since it only outputs sfnt table data
+static std::string extract_extended_metadata(const std::vector<uint8_t>& woff2_data) {
+    if (woff2_data.size() < 48) return "";
+
+    const uint32_t meta_offset = read_be32(woff2_data.data() + 28);
+    const uint32_t meta_length = read_be32(woff2_data.data() + 32);
+    const uint32_t meta_length_orig = read_be32(woff2_data.data() + 36);
+
+    if (meta_offset == 0 || meta_length == 0 ||
+        static_cast<uint64_t>(meta_offset) + meta_length > woff2_data.size()) {
+        return "";
+    }
+
+    std::string result(meta_length_orig, '\0');
+    size_t decoded_size = meta_length_orig;
+    const auto status = BrotliDecoderDecompress(
+        meta_length, woff2_data.data() + meta_offset,
+        &decoded_size, reinterpret_cast<uint8_t*>(result.data()));
+
+    if (status != BROTLI_DECODER_RESULT_SUCCESS || decoded_size != meta_length_orig) {
+        return "";
+    }
+    return result;
+}
+
 void Woff2Processor::recompress(const std::filesystem::path& input,
                                 const std::filesystem::path& output,
-                                const ProcessingOptions& /*options*/) {
+                                const ProcessingOptions& options) {
     Logger::log(LogLevel::Debug, "Starting WOFF2 recompression for " + input.string(), get_name());
 
     const auto input_data = chisel::read_file(input);
     const auto ttf_data = decode_to_ttf(input_data);
 
-    size_t max_woff2_size = woff2::MaxWOFF2CompressedSize(ttf_data.data(), ttf_data.size());
-    std::vector<uint8_t> output_data(max_woff2_size);
-
     // force highest brotli dictionary quality
     woff2::WOFF2Params params;
     params.brotli_quality = 11;
+    if (options.preserve_metadata) {
+        params.extended_metadata = extract_extended_metadata(input_data);
+    }
+
+    size_t max_woff2_size = woff2::MaxWOFF2CompressedSize(
+        ttf_data.data(), ttf_data.size(), params.extended_metadata);
+    std::vector<uint8_t> output_data(max_woff2_size);
 
     if (!woff2::ConvertTTFToWOFF2(ttf_data.data(), ttf_data.size(),
                                   output_data.data(), &max_woff2_size, params)) {
