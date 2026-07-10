@@ -463,6 +463,10 @@ namespace chisel {
                     if (success) {
                         auto move_result = move_to_destination(file, final_temp_path);
                         if (move_result) {
+                            {
+                                std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+                                recompressed_paths_[file.string()] = move_result->first;
+                            }
                             event_bus_.publish(FileProcessCompleteEvent{
                                 file,
                                 move_result->first,
@@ -509,8 +513,19 @@ namespace chisel {
             }
 
             try {
+                // if Phase 2 already recompressed this same file, rebuild on top of
+                // those bytes instead of the (possibly stale, with --output-dir) original
+                ExtractedContent effective_content = content;
+                {
+                    std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+                    auto it = recompressed_paths_.find(content.original_path.string());
+                    if (it != recompressed_paths_.end()) {
+                        effective_content.original_path = it->second;
+                    }
+                }
+
                 auto start = std::chrono::steady_clock::now();
-                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(content, m_options);
+                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(effective_content, m_options);
                 auto end = std::chrono::steady_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
@@ -530,11 +545,14 @@ namespace chisel {
                 // *pure* containers (can_recompress() == false), e.g. ArchiveProcessor,
                 // OdfProcessor, OOXMLProcessor: for these, Phase 2 never touches the
                 // original file, so falling back to it on a non-improving finalize is
-                // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor) already
-                // overwrite content.original_path during Phase 2 recompression as part of
-                // extracting an embedded resource (like cover art) - by the time this runs,
-                // the "original" is already gone, so finalize_extraction's result must
-                // always be accepted or the extracted resource would be lost permanently.
+                // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor,
+                // MkvProcessor) already rebuild on top of Phase 2's recompressed bytes
+                // (effective_content.original_path, redirected above via
+                // recompressed_paths_) as part of reinserting an extracted resource
+                // (like cover art) - discarding this result would mean serving Phase 2's
+                // intermediate output with the pre-reinsertion resource still in place,
+                // not losing anything, but the extraction/reinsertion round-trip itself
+                // is treated as always worth keeping rather than re-compared by size.
                 if (!procs.front()->can_recompress() && !ec && new_size >= orig_size) {
                     Logger::log(LogLevel::Debug,
                                 "Container finalize discarded (no size improvement): " + content.original_path.string(),

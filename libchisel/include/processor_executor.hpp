@@ -22,6 +22,8 @@
 #include <optional>
 #include <thread>
 #include <mutex>
+#include <unordered_map>
+#include <string>
 #include "event_bus.hpp"
 #include "thread_pool.hpp"
 
@@ -163,6 +165,23 @@ private:
         bool is_container = false;                             ///< True if this item is the intermediate recompression of a container
     };
     std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
+
+    /**
+     * @brief (Phase 2->3) Actual on-disk location of each successfully recompressed
+     * file, keyed by its pre-recompression path.
+     *
+     * For "mixed" processors (can_recompress() && can_extract_contents(), e.g.
+     * FlacProcessor, ApeProcessor, OggProcessor, MkvProcessor, XmlProcessor),
+     * Phase 3's finalize_extraction() rebuilds starting from ExtractedContent::original_path.
+     * In the default in-place mode Phase 2 overwrites that same path, so this is a
+     * no-op; but with --output-dir, Phase 2 writes the recompressed result to a
+     * different path entirely, leaving original_path pointing at the untouched
+     * pristine file. Without this map, Phase 3 would silently rebuild from that
+     * stale original, discarding Phase 2's recompression outright.
+     */
+    std::unordered_map<std::string, std::filesystem::path> recompressed_paths_;
+    mutable std::mutex recompressed_paths_mutex_; ///< Guards recompressed_paths_ (written concurrently by Phase 2's thread pool)
+
     std::filesystem::path output_dir_;            ///< Optional output directory
     EventBus& event_bus_;                         ///< Bus for publishing events
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry
