@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <memory>
 #include <csetjmp>
+#include <cstring>
 #include "file_utils.hpp"
 namespace chisel {
 
@@ -74,7 +75,7 @@ void copy_saved_markers(const j_decompress_ptr srcinfo,
         }
     }
 
-    std::ranges::sort(markers,
+    std::ranges::stable_sort(markers,
                       [](const auto &a, const auto &b) { return a.marker < b.marker; });
 
     markers.erase(std::unique(markers.begin(), markers.end(),
@@ -84,6 +85,15 @@ void copy_saved_markers(const j_decompress_ptr srcinfo,
                   markers.end());
 
     for (const auto &m: markers) {
+        // jpeg_write_coefficients() already wrote its own JFIF/Adobe header; skip the source's to avoid a duplicate
+        if (dstinfo->write_JFIF_header && m.marker == JPEG_APP0 &&
+            m.data.size() >= 5 && memcmp(m.data.data(), "JFIF\0", 5) == 0) {
+            continue;
+        }
+        if (dstinfo->write_Adobe_marker && m.marker == JPEG_APP0 + 14 &&
+            m.data.size() >= 5 && memcmp(m.data.data(), "Adobe", 5) == 0) {
+            continue;
+        }
         jpeg_write_marker(dstinfo, m.marker, m.data.data(), m.data.size());
     }
 }
