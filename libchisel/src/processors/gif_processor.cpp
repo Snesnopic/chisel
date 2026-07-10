@@ -147,6 +147,15 @@ bool GifProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
         if (std::memcmp(dataA, dataB, totalBytes) != 0) {
             equal = false;
         }
+        // pixel data alone doesn't capture animation timing: compare per-frame
+        // delays too, since a recompressor could reproduce identical frames
+        // while still corrupting playback speed
+        if (equal && (delaysA == nullptr) != (delaysB == nullptr)) {
+            equal = false;
+        } else if (equal && delaysA && delaysB &&
+                   std::memcmp(delaysA, delaysB, static_cast<std::size_t>(framesA) * sizeof(int)) != 0) {
+            equal = false;
+        }
     }
 
     stbi_image_free(dataA);
