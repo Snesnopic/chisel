@@ -12,6 +12,7 @@
 #include <fstream>
 #include "../../../third_party/vbrfix/include/vbrfix/vbrfix.hpp"
 #include "packer.hpp"
+#include "decoder.hpp"
 #include "file_type.hpp"
 
 
@@ -117,6 +118,21 @@ std::filesystem::path MpegProcessor::finalize_extraction(const ExtractedContent 
     cleanup_temp_dir(content.temp_dir, get_name());
     Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), get_name());
     return final_temp_path;
+}
+
+bool MpegProcessor::raw_equal(const std::filesystem::path &a,
+                              const std::filesystem::path &b) const {
+    mp3packer::PcmAudio pcm_a, pcm_b;
+    try {
+        pcm_a = mp3packer::decode_pcm(a.string());
+        pcm_b = mp3packer::decode_pcm(b.string());
+    } catch (const std::exception& e) {
+        Logger::log(LogLevel::Warning, std::string("raw_equal: failed to decode: ") + e.what(), get_name());
+        return false;
+    }
+
+    if (pcm_a.channels != pcm_b.channels || pcm_a.sample_rate != pcm_b.sample_rate) return false;
+    return pcm_a.samples == pcm_b.samples;
 }
 
 } // namespace chisel

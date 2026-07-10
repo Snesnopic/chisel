@@ -83,6 +83,15 @@ namespace chisel {
 
         // --- integrity check ---
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }
+
+        /**
+         * @brief Compares two MP3 files by decoding them to raw PCM (via
+         * mp3packercpp's minimp3-based decoder) and comparing.
+         * @param a First MP3 file.
+         * @param b Second MP3 file.
+         * @return true if the decoded PCM data and audio parameters are identical.
+         */
+        [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
     };
 
 } // namespace chisel
