@@ -128,9 +128,12 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
             current_offset += padded_len;
         }
 
-        // update header length
-        write_be32(new_woff.data() + 8, current_offset);
-        
+        const uint32_t orig_meta_offset = read_be32(data.data() + 24);
+        const uint32_t orig_meta_length = read_be32(data.data() + 28);
+        const uint32_t orig_meta_orig_length = read_be32(data.data() + 32);
+        const uint32_t orig_priv_offset = read_be32(data.data() + 36);
+        const uint32_t orig_priv_length = read_be32(data.data() + 40);
+
         if (!options.preserve_metadata) {
             // correct WOFF header offsets for metadata and private data
             write_be32(new_woff.data() + 24, 0); // metaOffset
@@ -139,8 +142,49 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
             write_be32(new_woff.data() + 36, 0); // privOffset
             write_be32(new_woff.data() + 40, 0); // privLength
         } else {
-            // TODO: logic to append metadata block if it existed, updating offset 24, 28, 32.
+            // metadata/private blocks are opaque (metadata already zlib-compressed, private
+            // data never compressed per spec) so they're copied verbatim; only their offsets
+            // change, since the table data preceding them has been resized by recompression
+            if (orig_meta_offset != 0 && orig_meta_length != 0 &&
+                static_cast<uint64_t>(orig_meta_offset) + orig_meta_length <= data.size()) {
+                const uint32_t new_meta_offset = current_offset;
+                new_woff.insert(new_woff.end(), data.begin() + orig_meta_offset,
+                                 data.begin() + orig_meta_offset + orig_meta_length);
+                current_offset += orig_meta_length;
+
+                write_be32(new_woff.data() + 24, new_meta_offset);
+                write_be32(new_woff.data() + 28, orig_meta_length);
+                write_be32(new_woff.data() + 32, orig_meta_orig_length);
+            } else {
+                write_be32(new_woff.data() + 24, 0);
+                write_be32(new_woff.data() + 28, 0);
+                write_be32(new_woff.data() + 32, 0);
+            }
+
+            if (orig_priv_offset != 0 && orig_priv_length != 0 &&
+                static_cast<uint64_t>(orig_priv_offset) + orig_priv_length <= data.size()) {
+                // privOffset must land on a four-byte boundary
+                const uint32_t padded_offset = align4(current_offset);
+                if (padded_offset > current_offset) {
+                    new_woff.insert(new_woff.end(), padded_offset - current_offset, 0);
+                    current_offset = padded_offset;
+                }
+
+                const uint32_t new_priv_offset = current_offset;
+                new_woff.insert(new_woff.end(), data.begin() + orig_priv_offset,
+                                 data.begin() + orig_priv_offset + orig_priv_length);
+                current_offset += orig_priv_length;
+
+                write_be32(new_woff.data() + 36, new_priv_offset);
+                write_be32(new_woff.data() + 40, orig_priv_length);
+            } else {
+                write_be32(new_woff.data() + 36, 0);
+                write_be32(new_woff.data() + 40, 0);
+            }
         }
+
+        // update header length (must run last: metadata/private blocks above extend the file)
+        write_be32(new_woff.data() + 8, current_offset);
 
         std::ofstream out(output_path, std::ios::binary);
         out.write(reinterpret_cast<const char*>(new_woff.data()), new_woff.size());
