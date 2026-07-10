@@ -21,9 +21,11 @@ namespace chisel {
      * @brief Implements IProcessor for OpenDocument Format (ODF) files.
      *
      * @details This processor handles .odt, .ods, .odp, and .odg files.
-     * It treats them as ZIP archives, extracts their contents,
-     * and re-compresses embedded XML files (e.g., content.xml)
-     * using Zopfli during the finalization phase.
+     * It treats them as ZIP archives and extracts their contents; embedded
+     * parts (images, etc.) are optimized independently by the executor
+     * recursing into each extracted file. finalize_extraction() re-zips
+     * everything at maximum deflate, keeping the mandatory "mimetype"
+     * entry uncompressed as required by the ODF spec.
      */
     class OdfProcessor final : public IProcessor {
     public:
@@ -83,12 +85,17 @@ namespace chisel {
             const std::filesystem::path& input_path) override;
 
         /**
-         * @brief Rebuilds the ODF archive with optimized XML.
+         * @brief Rebuilds the ODF archive from the (possibly already
+         * independently optimized) extracted files.
          *
-         * Iterates through the extracted files. The `mimetype` file is
-         * stored uncompressed (as required by the ODF standard).
-         * Embedded XML files are recompressed using Zopfli.
-         * All other files (e.g., images) are re-added using standard Deflate.
+         * Walks the temp directory and re-zips every file and directory
+         * found there. The `mimetype` entry is stored uncompressed (as
+         * required by the ODF standard); every other entry uses libarchive's
+         * own maximum-level deflate (libarchive's zip writer applies
+         * compression per its current writer-wide mode, not per entry, so
+         * pre-compressing e.g. with zopfli and writing under "store" would
+         * embed raw deflate bytes in an entry flagged uncompressed --
+         * corrupting the file for any standards-compliant reader).
          *
          * @param content The ExtractedContent struct from `prepare_extraction`.
          * @param options Processing options (e.g. metadata preservation).
