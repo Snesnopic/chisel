@@ -11,6 +11,8 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <fstream>
+#include <algorithm>
 #include <FLAC/all.h>
 
 #ifdef HAVE_OPTIVORBIS
@@ -139,6 +141,18 @@ namespace {
 
     // --- Encoder Callbacks ---
 
+    // required alongside enc_seek_cb: finish() seeks back to rewrite STREAMINFO stats, which needs to read the old bytes first
+    FLAC__StreamEncoderReadStatus enc_read_cb(const FLAC__StreamEncoder*, FLAC__byte buffer[], std::size_t *bytes, void *client_data) {
+        const auto f = static_cast<FILE*>(client_data);
+        if (*bytes > 0) {
+            *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, f);
+            if (*bytes == 0 && ferror(f)) return FLAC__STREAM_ENCODER_READ_STATUS_ABORT;
+            if (*bytes == 0 && feof(f)) return FLAC__STREAM_ENCODER_READ_STATUS_END_OF_STREAM;
+            return FLAC__STREAM_ENCODER_READ_STATUS_CONTINUE;
+        }
+        return FLAC__STREAM_ENCODER_READ_STATUS_ABORT;
+    }
+
     FLAC__StreamEncoderWriteStatus write_cb(const FLAC__StreamEncoder*, const FLAC__byte buffer[], const std::size_t bytes, unsigned, unsigned, void *client_data) {
         const auto f = static_cast<FILE*>(client_data);
         if (fwrite(buffer, 1, bytes, f) != bytes) return FLAC__STREAM_ENCODER_WRITE_STATUS_FATAL_ERROR;
@@ -212,16 +226,18 @@ namespace {
             FLAC__stream_encoder_set_apodization(ctx->encoder, "tukey(0.5);partial_tukey(2);punchout_tukey(3);gauss(0.2)");
             FLAC__stream_encoder_set_do_mid_side_stereo(ctx->encoder, true);
             FLAC__stream_encoder_set_loose_mid_side_stereo(ctx->encoder, false);
+            FLAC__stream_encoder_set_streamable_subset(ctx->encoder, false);
 
             if (!ctx->meta_blocks.empty()) {
                 FLAC__stream_encoder_set_metadata(ctx->encoder, ctx->meta_blocks.data(), static_cast<unsigned>(ctx->meta_blocks.size()));
             }
 
-            if (FLAC__stream_encoder_init_ogg_stream(
+            const auto init_status = FLAC__stream_encoder_init_ogg_stream(
                     ctx->encoder,
-                    nullptr, write_cb, enc_seek_cb, enc_tell_cb, nullptr,
-                    ctx->f_out) != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
-                Logger::log(LogLevel::Error, "Failed to init FLAC Ogg encoder", "OggProcessor");
+                    enc_read_cb, write_cb, enc_seek_cb, enc_tell_cb, nullptr,
+                    ctx->f_out);
+            if (init_status != FLAC__STREAM_ENCODER_INIT_STATUS_OK) {
+                Logger::log(LogLevel::Error, std::string("Failed to init FLAC Ogg encoder: ") + FLAC__StreamEncoderInitStatusString[init_status], "OggProcessor");
                 ctx->failed = true;
                 return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
             }
@@ -259,6 +275,20 @@ namespace {
             }
         }
         return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+    }
+
+    bool files_byte_equal(const fs::path& a, const fs::path& b) {
+        std::error_code ec_a, ec_b;
+        const auto size_a = fs::file_size(a, ec_a);
+        const auto size_b = fs::file_size(b, ec_b);
+        if (ec_a || ec_b || size_a != size_b) return false;
+
+        std::ifstream fa(a, std::ios::binary);
+        std::ifstream fb(b, std::ios::binary);
+        if (!fa || !fb) return false;
+
+        return std::equal(std::istreambuf_iterator<char>(fa), std::istreambuf_iterator<char>(),
+                          std::istreambuf_iterator<char>(fb));
     }
 
     std::vector<int32_t> decode_ogg_pcm(const fs::path& file, unsigned& sr, unsigned& ch, unsigned& bps) {
@@ -371,7 +401,8 @@ void OggProcessor::recompress(const fs::path& input,
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
     }
 
-    FILE* f_out = chisel::open_file(output, "wb");
+    // read+write: enc_seek_cb/enc_read_cb need to seek back and re-read bytes to rewrite STREAMINFO stats on finish()
+    FILE* f_out = chisel::open_file(output, "w+b");
     if (f_out == nullptr) {
         FLAC__stream_decoder_delete(decoder);
         FLAC__stream_encoder_delete(encoder);
@@ -428,17 +459,30 @@ bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
         return false;
     }
 
+    // neither file decoded as ogg-flac: check the actual stream type of each
     FILE* fA = fopen(a.string().c_str(), "rb");
     FILE* fB = fopen(b.string().c_str(), "rb");
 
-    // accept both vorbis and opus as valid fallback streams
-    const bool validA = is_vorbis_stream(fA) || is_opus_stream(fA);
-    const bool validB = is_vorbis_stream(fB) || is_opus_stream(fB);
+    const bool opus_a = is_opus_stream(fA);
+    const bool opus_b = is_opus_stream(fB);
+    const bool vorbis_a = is_vorbis_stream(fA);
+    const bool vorbis_b = is_vorbis_stream(fB);
 
     if (fA != nullptr) fclose(fA);
     if (fB != nullptr) fclose(fB);
 
-    return validA && validB;
+    if (opus_a && opus_b) {
+        // recompress() always falls back to a direct copy for opus, so bytes must match exactly
+        return files_byte_equal(a, b);
+    }
+
+    if (vorbis_a && vorbis_b) {
+        // OptiVorbis is documented to losslessly preserve the audio stream; no vorbis decoder
+        // is vendored here to verify that independently, so this trusts that guarantee
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace chisel
