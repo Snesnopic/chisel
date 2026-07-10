@@ -248,19 +248,20 @@ std::filesystem::path FlacProcessor::finalize_extraction(const ExtractedContent 
 
 
 std::string FlacProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
-    FLAC__StreamMetadata* metadata = nullptr;
+    // FLAC__StreamMetadata has no internal allocation: pass the address of a
+    // plain struct, not a pointer-to-pointer (there is nothing to free after)
+    FLAC__StreamMetadata metadata;
 
-    if (!FLAC__metadata_get_streaminfo(file_path.string().c_str(), metadata)) {
+    if (!FLAC__metadata_get_streaminfo(file_path.string().c_str(), &metadata)) {
         throw std::runtime_error("Failed to read STREAMINFO from FLAC file: " + file_path.string());
     }
 
     std::ostringstream oss;
     for (int i = 0; i < 16; ++i) {
         oss << std::hex << std::setw(2) << std::setfill('0')
-            << static_cast<int>(metadata->data.stream_info.md5sum[i]);
+            << static_cast<int>(metadata.data.stream_info.md5sum[i]);
     }
 
-    FLAC__metadata_object_delete(metadata);
     return oss.str();
 }
 
