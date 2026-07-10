@@ -56,8 +56,9 @@
  * Strategy:
  *   For each member:
  *     1. Parse the member header, recording all optional fields.
- *     2. Determine the DEFLATE payload length by finding the trailer:
- *        decompress with libdeflate_deflate_decompress to get raw bytes.
+ *     2. Decompress with libdeflate_deflate_decompress_ex, which reports back
+ *        how many compressed bytes it actually consumed for this member alone
+ *        (needed since a multi-member file has further members following).
  *     3. Recompress the raw bytes with libdeflate at level 12.
  *     4. Emit a minimal header (10 bytes, FLG=0x00 if !preserve_metadata,
  *        else keep FNAME/FCOMMENT/MTIME), the new DEFLATE stream,
@@ -163,11 +164,10 @@ uint32_t crc32_of(const uint8_t* data, const std::size_t size) {
 // ─── decompress the DEFLATE stream in a gz member ────────────────────────────
 
 /**
- * @brief Try to decompress a raw DEFLATE stream of unknown compressed length.
+ * @brief Decompress a raw DEFLATE stream of unknown compressed length.
  *
- * libdeflate requires knowing the compressed length. We find it by scanning
- * for the 8-byte trailer and working backwards, using the ISIZE field to
- * validate.
+ * Uses libdeflate_deflate_decompress_ex's actual_in_nbytes_ret to find exactly
+ * where this member's stream ends, then validates the trailer right after it.
  *
  * @param r     Reader positioned at the start of the DEFLATE stream.
  * @param raw   Output: decompressed bytes.
@@ -177,59 +177,23 @@ uint32_t crc32_of(const uint8_t* data, const std::size_t size) {
  */
 size_t decompress_member(const Reader& r, std::vector<uint8_t>& raw,
                           uint32_t& crc32_out, uint32_t& isize_out) {
-    // The trailer is 8 bytes at the end of this member (or before the next
-    // member). We need to find the compressed length.
-    //
-    // Strategy: try progressively larger windows using libdeflate. This is
-    // O(n) in practice because we start from the full remaining size and
-    // binary-search if needed. In practice, gzip files are single-member or
-    // have well-delimited boundaries, so we can just try the full remaining
-    // data minus 8 bytes for the trailer.
-    //
-    // For multi-member files we rely on libdeflate's exact_out_size mode
-    // combined with the ISIZE hint.
-
+    // "remaining" spans any further members too, so use actual_in_nbytes_ret to find just this one's end
     const std::size_t avail = r.remaining();
     if (avail < 8) throw std::runtime_error("GzProcessor: too small for DEFLATE+trailer");
 
-    // Read ISIZE from the last 4 bytes of this member (or the entire rest if
-    // single-member). We'll refine below.
-    uint32_t isize_hint;
-    std::memcpy(&isize_hint, r.data + r.size - 4, 4); // little-endian read
-
-    // For a proper multi-member file, we'd need to find where this member ends.
-    // We use a greedy approach: try the maximum compressed length first.
-    // libdeflate will stop at the end of the valid deflate stream and we read
-    // the 8 bytes that follow.
-
-    // Maximum possible compressed size: everything except the 8-byte trailer.
-    // For single-member files this is exact. For multi-member we may overshoot,
-    // but libdeflate_deflate_decompress will return LIBDEFLATE_SHORT_OUTPUT
-    // if the stream ends before filling the buffer.
-
-    // We use a two-pass approach: decompress into a large buffer using
-    // ISIZE as size hint. If ISIZE overflows (>= 2^32 bytes rare), fall back.
-
-    const std::size_t uncomp_hint = (isize_hint == 0 && avail > 65536)
-        ? avail * 4    // rough guess for very large streams
-        : (isize_hint > 0 ? isize_hint : 65536);
+    const std::size_t upper_bound = avail - 8;
 
     libdeflate_decompressor* dec = libdeflate_alloc_decompressor();
     if (!dec) throw std::runtime_error("GzProcessor: libdeflate_alloc_decompressor failed");
 
-    // Try with (avail - 8) as compressed size
-    const std::size_t compressed_len = avail - 8;
-    raw.resize(uncomp_hint);
-    std::size_t actual = 0;
-    libdeflate_result res = libdeflate_deflate_decompress(
-        dec, r.cur(), compressed_len, raw.data(), raw.size(), &actual);
-
-    if (res == LIBDEFLATE_INSUFFICIENT_SPACE) {
-        // Need a bigger output buffer — grow and retry
-        raw.resize(raw.size() * 2 + 65536);
-        res = libdeflate_deflate_decompress(
-            dec, r.cur(), compressed_len, raw.data(), raw.size(), &actual);
-    }
+    raw.resize(65536);
+    std::size_t actual_in = 0, actual_out = 0;
+    libdeflate_result res;
+    do {
+        res = libdeflate_deflate_decompress_ex(
+            dec, r.cur(), upper_bound, raw.data(), raw.size(), &actual_in, &actual_out);
+        if (res == LIBDEFLATE_INSUFFICIENT_SPACE) raw.resize(raw.size() * 2 + 65536);
+    } while (res == LIBDEFLATE_INSUFFICIENT_SPACE);
 
     libdeflate_free_decompressor(dec);
 
@@ -238,10 +202,10 @@ size_t decompress_member(const Reader& r, std::vector<uint8_t>& raw,
                                  std::to_string(res) + ")");
     }
 
-    raw.resize(actual);
+    raw.resize(actual_out);
 
-    // Read 8-byte trailer that follows the DEFLATE stream
-    const uint8_t* trailer = r.cur() + compressed_len;
+    // trailer immediately follows the bytes libdeflate actually consumed for this member
+    const uint8_t* trailer = r.cur() + actual_in;
     uint32_t file_crc32, file_isize;
     std::memcpy(&file_crc32, trailer,     4);
     std::memcpy(&file_isize, trailer + 4, 4);
@@ -255,7 +219,7 @@ size_t decompress_member(const Reader& r, std::vector<uint8_t>& raw,
     crc32_out = file_crc32;
     isize_out = file_isize;
 
-    return compressed_len + 8; // consumed: deflate stream + trailer
+    return actual_in + 8; // consumed: deflate stream + trailer
 }
 
 // ─── Process a single gz member ──────────────────────────────────────────────
