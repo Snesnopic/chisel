@@ -60,8 +60,16 @@ constexpr std::size_t kBinaryTriangleSize = 50;
  *
  * An ASCII STL starts with the token "solid" (case-insensitive, possibly
  * preceded by a BOM or whitespace).  A binary STL can also start with
- * "solid" in its 80-byte header, so we disambiguate by checking the
- * uint32 triangle count at offset 80 against the actual file size.
+ * "solid" in its 80-byte header (common: many real-world exporters always
+ * write "solid <name>" regardless of format), so we disambiguate by
+ * checking the uint32 triangle count at offset 80 against the actual file
+ * size: the file only needs to be *at least* big enough to hold that many
+ * triangles, not an exact match, since some binary STL writers append
+ * trailing padding/metadata after the formal end of triangle data (not
+ * part of the spec, but tolerated by lenient readers in practice). A random
+ * 4-byte count derived from genuine ASCII text is astronomically unlikely
+ * to happen to be small enough to satisfy this, so this stays a reliable
+ * signal in the other direction too.
  */
 bool is_ascii_stl(const std::vector<uint8_t>& data) {
     if (data.size() < 5) return false;
@@ -84,31 +92,22 @@ bool is_ascii_stl(const std::vector<uint8_t>& data) {
     }
 
     // File starts with "solid" — now check if it's actually binary
-    // A valid binary STL has size == 80 + 4 + N*50
-    if (data.size() > kBinaryHeaderSize + 4) {
+    if (data.size() >= kBinaryHeaderSize + 4) {
         uint32_t n_tri;
         std::memcpy(&n_tri, data.data() + kBinaryHeaderSize, 4);
         // On a little-endian host this is straightforward; on big-endian we
         // would need to byte-swap, but STL is defined as little-endian and
         // chisel targets x86/ARM little-endian platforms.
-        const std::size_t expected = kBinaryHeaderSize + 4 + static_cast<size_t>(n_tri) * kBinaryTriangleSize;
-        if (expected == data.size()) {
-            // Perfect binary match — it is binary despite the "solid" header
+        const uint64_t expected = kBinaryHeaderSize + 4 +
+            static_cast<uint64_t>(n_tri) * kBinaryTriangleSize;
+        if (expected <= data.size()) {
+            // Big enough to hold that many triangles — it is binary despite
+            // the "solid" header, regardless of any trailing bytes past that
             return false;
         }
     }
 
     return true;
-}
-
-/**
- * @brief Parse a float from an ASCII token.
- */
-float parse_float(const std::string& tok) {
-    try { return std::stof(tok); }
-    catch (...) {
-        throw std::runtime_error("StlProcessor: invalid float token: " + tok);
-    }
 }
 
 /**
@@ -126,20 +125,39 @@ float parse_float(const std::string& tok) {
  *   ...
  *   endsolid [name]
  */
+std::string to_lower(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+/**
+ * @brief Reads the next whitespace-delimited token and requires it to
+ * case-insensitively match @p expected, throwing a clear, catchable error
+ * otherwise.
+ *
+ * Every structural keyword in the grammar must be validated this way rather
+ * than read-and-discarded: silently accepting whatever token happens to be
+ * in a keyword's position (e.g. a missing "vertex" before a coordinate
+ * triple) desyncs every subsequent read for the rest of the file. Once a
+ * later numeric extraction then fails on a non-numeric token, the stream
+ * enters a failed state and every following `>>` silently becomes a no-op
+ * that leaves the target at 0 -- turning one malformed line into an entire
+ * model's worth of undetected, silently-zeroed geometry.
+ */
+void expect_keyword(std::istringstream& ss, const char* expected) {
+    std::string token;
+    if (!(ss >> token) || to_lower(token) != expected)
+        throw std::runtime_error(std::string("StlProcessor: expected '") + expected + "', got '" + token + "'");
+}
+
 std::vector<StlTriangle> parse_ascii_stl(const std::vector<uint8_t>& data) {
     std::string text(reinterpret_cast<const char*>(data.data()), data.size());
     std::istringstream ss(text);
     std::string token;
 
     // Consume "solid [name]"
-    if (!(ss >> token) || token != "solid") // case-sensitive after our heuristic
-    {
-        // Re-try case-insensitively
-        std::string lower_tok = token;
-        for (char& c : lower_tok) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (lower_tok != "solid")
-            throw std::runtime_error("StlProcessor: ASCII STL does not start with 'solid'");
-    }
+    if (!(ss >> token) || to_lower(token) != "solid")
+        throw std::runtime_error("StlProcessor: ASCII STL does not start with 'solid'");
 
     // Skip remainder of "solid" line (name)
     std::string line;
@@ -148,8 +166,7 @@ std::vector<StlTriangle> parse_ascii_stl(const std::vector<uint8_t>& data) {
     std::vector<StlTriangle> triangles;
 
     while (ss >> token) {
-        std::string lower = token;
-        for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        const std::string lower = to_lower(token);
 
         if (lower == "endsolid") break;
 
@@ -159,24 +176,25 @@ std::vector<StlTriangle> parse_ascii_stl(const std::vector<uint8_t>& data) {
         StlTriangle tri{};
 
         // "normal nx ny nz"
-        std::string norm_kw;
-        ss >> norm_kw >> tri.normal[0] >> tri.normal[1] >> tri.normal[2];
+        expect_keyword(ss, "normal");
+        ss >> tri.normal[0] >> tri.normal[1] >> tri.normal[2];
+        if (!ss) throw std::runtime_error("StlProcessor: malformed normal in ASCII STL");
 
         // "outer loop"
-        std::string kw1, kw2;
-        ss >> kw1 >> kw2;
+        expect_keyword(ss, "outer");
+        expect_keyword(ss, "loop");
 
         // three vertices
         for (int v = 0; v < 3; ++v) {
-            std::string vkw;
             float* dst = (v == 0) ? tri.v1 : (v == 1) ? tri.v2 : tri.v3;
-            ss >> vkw >> dst[0] >> dst[1] >> dst[2];
+            expect_keyword(ss, "vertex");
+            ss >> dst[0] >> dst[1] >> dst[2];
+            if (!ss) throw std::runtime_error("StlProcessor: malformed vertex in ASCII STL");
         }
 
-        // "endloop"
-        ss >> kw1;
-        // "endfacet"
-        ss >> kw1;
+        // "endloop", "endfacet"
+        expect_keyword(ss, "endloop");
+        expect_keyword(ss, "endfacet");
 
         tri.attr = 0;
         triangles.push_back(tri);
@@ -259,6 +277,9 @@ bool triangles_equal(const std::vector<StlTriangle>& a, const std::vector<StlTri
         for (int j = 0; j < 3; ++j) {
             if (std::fabs(a[i].normal[j] - b[i].normal[j]) > 1e-5f) return false;
         }
+        // Attribute byte count: nominally unused by the spec, but some tools
+        // (e.g. certain slicers) repurpose it to store a per-facet color
+        if (a[i].attr != b[i].attr) return false;
     }
     return true;
 }
