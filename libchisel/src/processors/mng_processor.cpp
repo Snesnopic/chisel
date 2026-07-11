@@ -145,9 +145,8 @@ void MngProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("MngProcessor: invalid MNG/JNG signature");
     }
 
-    std::ofstream os(output, std::ios::binary);
-    os.write(reinterpret_cast<const char*>(sig), 8);
-
+    // read every chunk first: an IDAT/JDAT stream can span multiple chunks, must reassemble before decoding
+    std::vector<Chunk> chunks;
     while (is.peek() != EOF) {
         Chunk chunk;
         chunk.length = read_u32(is);
@@ -158,39 +157,49 @@ void MngProcessor::recompress(const std::filesystem::path& input,
             is.read(reinterpret_cast<char*>(chunk.data.data()), chunk.length);
         }
         chunk.crc = read_u32(is);
-
-        // --- OPTIMIZATION LOGIC ---
-        bool modified = false;
-        std::string type(chunk.type);
-
-        if (is_mng && type == "IDAT") {
-            // Re-compress MNG image data
-            chunk.data = optimize_deflate(chunk.data, options.iterations);
-            modified = true;
-        } else if (is_jng && type == "JDAT") {
-            // Re-compress JNG JPEG data
-            chunk.data = optimize_jpeg(chunk.data);
-            modified = true;
-        } else if (is_jng && type == "IDAT") {
-            // Re-compress JNG Alpha channel (Deflate)
-            chunk.data = optimize_deflate(chunk.data, options.iterations);
-            modified = true;
-        }
-
-        if (modified) {
-            chunk.length = static_cast<uint32_t>(chunk.data.size());
-            update_crc(chunk);
-        }
-
-        // write chunk
-        write_u32(os, chunk.length);
-        os.write(chunk.type, 4);
-        if (chunk.length > 0) {
-            os.write(reinterpret_cast<const char*>(chunk.data.data()), chunk.length);
-        }
-        write_u32(os, chunk.crc);
-
+        const std::string type(chunk.type);
+        chunks.push_back(std::move(chunk));
         if (type == "MEND" || type == "IEND") break;
+    }
+
+    std::ofstream os(output, std::ios::binary);
+    os.write(reinterpret_cast<const char*>(sig), 8);
+
+    for (size_t i = 0; i < chunks.size(); ) {
+        const std::string type(chunks[i].type);
+        const bool is_deflate_run = (is_mng && type == "IDAT") || (is_jng && type == "IDAT");
+        const bool is_jpeg_run = is_jng && type == "JDAT";
+
+        if (is_deflate_run || is_jpeg_run) {
+            // gather the whole run of consecutive same-type chunks into one stream
+            std::vector<uint8_t> combined;
+            size_t j = i;
+            while (j < chunks.size() && std::string(chunks[j].type) == type) {
+                combined.insert(combined.end(), chunks[j].data.begin(), chunks[j].data.end());
+                ++j;
+            }
+
+            Chunk merged;
+            std::memcpy(merged.type, type.c_str(), 4);
+            merged.type[4] = '\0';
+            merged.data = is_jpeg_run ? optimize_jpeg(combined) : optimize_deflate(combined, options.iterations);
+            merged.length = static_cast<uint32_t>(merged.data.size());
+            update_crc(merged);
+
+            write_u32(os, merged.length);
+            os.write(merged.type, 4);
+            if (merged.length > 0) os.write(reinterpret_cast<const char*>(merged.data.data()), merged.length);
+            write_u32(os, merged.crc);
+
+            i = j;
+        } else {
+            const auto& chunk = chunks[i];
+            write_u32(os, chunk.length);
+            os.write(chunk.type, 4);
+            if (chunk.length > 0) os.write(reinterpret_cast<const char*>(chunk.data.data()), chunk.length);
+            write_u32(os, chunk.crc);
+            ++i;
+        }
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
@@ -222,12 +231,23 @@ std::string MngProcessor::get_raw_checksum(const std::filesystem::path& /*file_p
 }
 
 bool MngProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    // reassemble IDAT/JDAT runs first, same reasoning as recompress(): must compare by content, not chunk count
     auto get_payloads = [](const std::filesystem::path& p) {
         std::vector<std::vector<uint8_t>> payloads;
         std::ifstream is(p, std::ios::binary);
         if (!is) return payloads;
         uint8_t sig[8]; is.read(reinterpret_cast<char*>(sig), 8);
         const bool is_jng = (sig[0] == 0x8B);
+
+        std::string pending_type;
+        std::vector<uint8_t> pending_data;
+        auto flush_pending = [&]() {
+            if (pending_type == "IDAT") payloads.push_back(decompress_deflate(pending_data));
+            else if (is_jng && pending_type == "JDAT") payloads.push_back(decode_jpeg_to_pixels(pending_data));
+            pending_type.clear();
+            pending_data.clear();
+        };
+
         while (is.peek() != EOF) {
             const uint32_t len = read_u32(is);
             char type[4]; is.read(type, 4);
@@ -235,10 +255,21 @@ bool MngProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
             if (len > 0) is.read(reinterpret_cast<char*>(data.data()), len);
             read_u32(is); // crc
             std::string stype(type, 4);
-            if (stype == "IDAT") payloads.push_back(decompress_deflate(data));
-            else if (is_jng && stype == "JDAT") payloads.push_back(decode_jpeg_to_pixels(data));
+
+            const bool is_streamable = (stype == "IDAT") || (is_jng && stype == "JDAT");
+            if (is_streamable && stype == pending_type) {
+                pending_data.insert(pending_data.end(), data.begin(), data.end());
+            } else {
+                flush_pending();
+                if (is_streamable) {
+                    pending_type = stype;
+                    pending_data = std::move(data);
+                }
+            }
+
             if (stype == "MEND" || stype == "IEND") break;
         }
+        flush_pending();
         return payloads;
     };
 
