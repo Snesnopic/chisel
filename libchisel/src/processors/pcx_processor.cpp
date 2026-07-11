@@ -59,8 +59,10 @@ void encode_pcx_rle(const uint8_t* raw_data, const std::size_t length, std::ostr
 
 /**
  * @brief Decodes a PCX stream into a raw pixel buffer.
+ * @param page_end End of this page's data (for DCX pages sharing one stream); -1 means true end of stream.
  */
-std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector<uint8_t>& palette) {
+std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector<uint8_t>& palette,
+                                 const std::streamoff page_end = -1) {
     is.read(reinterpret_cast<char*>(&header), sizeof(PcxHeader));
     if (!is || header.identifier != 0x0A) throw std::runtime_error("Invalid PCX identifier");
 
@@ -104,10 +106,14 @@ std::vector<uint8_t> decode_pcx(std::istream& is, PcxHeader& header, std::vector
         }
     }
 
-    // Read 256-color palette if present
+    // read the 256-color palette from this page's end (page_end), not std::ios::end, which would always land in the last DCX page
     if (header.version == 5 && header.bits_per_pixel == 8 && header.color_planes == 1) {
         const auto current_pos = is.tellg();
-        is.seekg(-769, std::ios::end);
+        if (page_end < 0) {
+            is.seekg(-769, std::ios::end);
+        } else {
+            is.seekg(page_end - 769);
+        }
         uint8_t marker;
         is.read(reinterpret_cast<char*>(&marker), 1);
         if (marker == 0x0C) {
@@ -197,19 +203,25 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
             os.write(reinterpret_cast<const char*>(tmp), 4);
         }
 
+        is.clear();
+        is.seekg(0, std::ios::end);
+        const std::streamoff input_size = is.tellg();
+
         std::vector<uint32_t> new_offsets;
-        for (uint32_t off : offsets) {
+        for (std::size_t p = 0; p < offsets.size(); ++p) {
+            const uint32_t off = offsets[p];
+            const std::streamoff page_end = (p + 1 < offsets.size()) ? offsets[p + 1] : input_size;
             new_offsets.push_back(static_cast<uint32_t>(os.tellp()));
             is.seekg(off);
             PcxHeader h_page;
             std::vector<uint8_t> pal;
             try {
-                auto pix = decode_pcx(is, h_page, pal);
+                auto pix = decode_pcx(is, h_page, pal, page_end);
                 write_pcx_internal(os, h_page, pix, pal, options.preserve_metadata);
             } catch (const std::exception& e) {
                 Logger::log(LogLevel::Error, "DCX page decode failed at offset " + std::to_string(off) + ": " + std::string(e.what()), get_name());
                 // In case of failure, we must maintain the DCX structure integrity or abort
-                throw; 
+                throw;
             }
         }
 
@@ -235,28 +247,37 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
 }
 
 bool PcxProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    auto get_all_pixels = [](const std::filesystem::path& p) {
-        std::vector<std::vector<uint8_t>> all_pixels;
+    // compares pixel data and palette per page, since a wrong palette alone still gives a wrong-colored image
+    auto get_all_pages = [](const std::filesystem::path& p) {
+        std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>> pages;
         std::ifstream is(p, std::ios::binary);
-        if (!is) return all_pixels;
-        
-        uint32_t dcx_id = 0;
-        is.read(reinterpret_cast<char*>(&dcx_id), 4);
-        
+        if (!is) return pages;
+
+        uint8_t id_buf[4];
+        is.read(reinterpret_cast<char*>(id_buf), 4);
+        const uint32_t dcx_id = read_le32(id_buf);
+
         if (dcx_id == 0x3ADE68B1) { // DCX
             std::vector<uint32_t> offsets;
             for (int i = 0; i < 1024; ++i) {
-                uint32_t off;
-                is.read(reinterpret_cast<char*>(&off), 4);
+                uint8_t off_buf[4];
+                is.read(reinterpret_cast<char*>(off_buf), 4);
+                const uint32_t off = read_le32(off_buf);
                 if (off == 0) break;
                 offsets.push_back(off);
             }
-            for (uint32_t off : offsets) {
-                is.seekg(off);
+
+            is.clear();
+            is.seekg(0, std::ios::end);
+            const std::streamoff input_size = is.tellg();
+
+            for (std::size_t i = 0; i < offsets.size(); ++i) {
+                const std::streamoff page_end = (i + 1 < offsets.size()) ? offsets[i + 1] : input_size;
+                is.seekg(offsets[i]);
                 PcxHeader h;
                 std::vector<uint8_t> pal;
                 try {
-                    all_pixels.push_back(decode_pcx(is, h, pal));
+                    pages.emplace_back(decode_pcx(is, h, pal, page_end), std::move(pal));
                 } catch (...) {}
             }
         } else {
@@ -265,13 +286,13 @@ bool PcxProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
             PcxHeader h;
             std::vector<uint8_t> pal;
             try {
-                all_pixels.push_back(decode_pcx(is, h, pal));
+                pages.emplace_back(decode_pcx(is, h, pal), std::move(pal));
             } catch (...) {}
         }
-        return all_pixels;
+        return pages;
     };
 
-    return get_all_pixels(a) == get_all_pixels(b);
+    return get_all_pages(a) == get_all_pages(b);
 }
 
 std::string PcxProcessor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {
