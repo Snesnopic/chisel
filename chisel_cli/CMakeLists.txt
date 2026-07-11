@@ -78,9 +78,6 @@ if(NOT WIN32)
                 DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/man/man1
                 COMPONENT Runtime
         )
-
-    else()
-        message(WARNING "help2man not found. Manpage (chsl.1) will not be generated.")
     endif()
 
 endif()
