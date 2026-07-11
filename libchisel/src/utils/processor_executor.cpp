@@ -320,6 +320,16 @@ namespace chisel {
                         fs::path current = file;
                         fs::path last_tmp;
                         bool pipeline_ok = true;
+                        struct LastTmpGuard {
+                            fs::path& path;
+                            bool release = false;
+                            ~LastTmpGuard() {
+                                if (!release && !path.empty()) {
+                                    std::error_code ec;
+                                    fs::remove(path, ec);
+                                }
+                            }
+                        } last_tmp_guard{last_tmp, false};
 
                         for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) {
@@ -375,6 +385,7 @@ namespace chisel {
                             if (size_improved && checksum_ok) {
                                 final_temp_path = last_tmp;
                                 success = true;
+                                last_tmp_guard.release = true; // ownership transferred to final_temp_path
                             } else {
                                 std::error_code ec;
                                 fs::remove(last_tmp, ec);
