@@ -46,6 +46,18 @@ public:
     static void clear_sinks();
 
     /**
+     * @brief Remove a single previously-registered sink by identity.
+     *
+     * Used by callers that register a scoped sink (e.g. Chisel::recompress()'s
+     * observer bridge) and need to unregister exactly that instance afterwards,
+     * without disturbing other sinks registered elsewhere in the process.
+     * This operation is thread-safe. No-op if the sink isn't currently registered.
+     * @param sink Raw pointer to the sink to remove (as returned by the caller
+     * before add_sink() took ownership of it).
+     */
+    static void remove_sink(const ILogSink* sink);
+
+    /**
      * @brief Log a message to all registered sinks.
      * This operation is thread-safe.
      * @param level Severity level.

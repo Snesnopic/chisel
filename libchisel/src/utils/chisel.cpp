@@ -171,10 +171,17 @@ void Chisel::recompress(const std::vector<std::filesystem::path>& paths) const {
     impl_->setupEventBridging();
 
     // inject bridge sink if observer is present
+    std::unique_ptr<BridgeLogSink> owned_sink;
+    ILogSink* sink_ptr = nullptr;
     if (impl_->observer) {
-        auto sink = std::make_unique<BridgeLogSink>(impl_->observer);
-        Logger::add_sink(std::move(sink));
+        owned_sink = std::make_unique<BridgeLogSink>(impl_->observer);
+        sink_ptr = owned_sink.get();
+        Logger::add_sink(std::move(owned_sink));
     }
+    struct SinkGuard {
+        ILogSink* sink;
+        ~SinkGuard() { if (sink) Logger::remove_sink(sink); }
+    } sink_guard{sink_ptr};
 
     ProcessorExecutor executor(
         impl_->registry,

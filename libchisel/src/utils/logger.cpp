@@ -4,6 +4,7 @@
 
 #include "../../include/logger.hpp"
 #include <vector>
+#include <algorithm>
 
 
 namespace chisel {
@@ -22,6 +23,11 @@ void Logger::add_sink(std::unique_ptr<ILogSink> sink) {
 void Logger::clear_sinks() {
     std::lock_guard lock(mtx_);
     sinks_.clear();
+}
+
+void Logger::remove_sink(const ILogSink* sink) {
+    std::lock_guard lock(mtx_);
+    std::erase_if(sinks_, [sink](const std::unique_ptr<ILogSink>& s) { return s.get() == sink; });
 }
 
 void Logger::log(const LogLevel level,
