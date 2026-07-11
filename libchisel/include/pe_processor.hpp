@@ -153,10 +153,23 @@ namespace chisel {
             std::string name;
         };
 
+        /// @brief Parsed, validated PE header fields shared by prepare_extraction() and finalize_extraction().
+        struct PeLayout {
+            uint32_t pe_pos;
+            uint16_t magic;             ///< 0x10B (PE32) or 0x20B (PE32+)
+            uint32_t data_dir_offset;   ///< absolute file offset of DataDirectory[0]
+            uint32_t num_data_dir;
+            uint32_t file_alignment;
+            uint32_t section_alignment;
+            uint32_t section_table_pos; ///< absolute file offset of the section header table
+            ImageFileHeader file_header;
+            std::vector<ImageSectionHeader> sections;
+        };
+
         /**
          * @brief Calculates the PE checksum using the standard 16-bit 1s-complement algorithm.
          */
-        [[nodiscard]] static uint32_t calculate_pe_checksum(std::span<const uint8_t> raw_data, uint32_t pe_pos, uint16_t magic);
+        [[nodiscard]] static uint32_t calculate_pe_checksum(std::span<const uint8_t> raw_data, uint32_t pe_pos);
 
         /**
          * @brief Translates a Relative Virtual Address (RVA) to a physical file offset.
@@ -170,6 +183,18 @@ namespace chisel {
                                   uint32_t dir_offset, std::vector<RsrcEntry>& rsrc_data,
                                   const std::vector<ImageSectionHeader>& sections,
                                   const std::string &name = "", int depth = 0);
+
+        /**
+         * @brief Parses and validates the DOS/PE/optional headers and section table.
+         * @return std::nullopt if the file isn't a valid PE, or bounds checks fail.
+         */
+        [[nodiscard]] static std::optional<PeLayout> parse_layout(const std::vector<uint8_t>& raw_data);
+
+        /**
+         * @brief Finds the section table index whose VirtualAddress matches the given RVA range start.
+         * @return -1 if not found.
+         */
+        [[nodiscard]] static int find_section_by_rva(const PeLayout& layout, uint32_t rva);
     };
 
 } // namespace chisel
