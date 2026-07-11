@@ -33,14 +33,15 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 2> kMimes = {
-                "image/x-portable-anymap", "image/x-portable-pixmap"
+            static constexpr std::array<std::string_view, 4> kMimes = {
+                "image/x-portable-anymap", "image/x-portable-pixmap",
+                "image/x-portable-graymap", "image/x-portable-bitmap"
             };
             return {kMimes.data(), kMimes.size()};
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kExts = { ".ppm", ".pgm", ".pnm" };
+            static constexpr std::array<std::string_view, 4> kExts = { ".ppm", ".pgm", ".pnm", ".pbm" };
             return {kExts.data(), kExts.size()};
         }
 
