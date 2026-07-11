@@ -53,7 +53,7 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
     const uint16_t type = read_le16(data.data() + 2);
     const uint16_t count = read_le16(data.data() + 4);
 
-    if (reserved != 0 || (type != 1 && type != 2)) {
+    if (reserved != 0 || (type != 1 && type != 2) || count == 0) {
         throw std::runtime_error("INVALID ICO/CUR HEADER");
     }
     if (data.size() < 6 + static_cast<std::size_t>(count) * 16) {
