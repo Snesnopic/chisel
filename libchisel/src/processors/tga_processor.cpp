@@ -8,6 +8,10 @@
 #include <memory>
 #include <vector>
 #include <mutex>
+#include <optional>
+#include <cstring>
+#include <fstream>
+#include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../third_party/stb/stb_image.h"
@@ -22,6 +26,47 @@ namespace {
         if (size <= 0) return;
         FILE* f = static_cast<FILE *>(context);
         std::fwrite(data, 1, static_cast<std::size_t>(size), f);
+    }
+
+    // stb_image_write's TGA writer never emits a TGA 2.0 footer/extension area (author,
+    // comments, gamma, etc.), so it's pulled from the raw input bytes here instead
+    struct TgaTrailer {
+        std::vector<uint8_t> blob; // developer area + extension area, as one opaque region
+        uint32_t ext_area_offset = 0;
+        uint32_t dev_area_offset = 0;
+        uint32_t blob_start = 0;
+    };
+
+    std::optional<TgaTrailer> extract_tga_trailer(const std::filesystem::path& path) {
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return std::nullopt;
+        f.seekg(0, std::ios::end);
+        const auto file_size = static_cast<uint64_t>(f.tellg());
+        if (file_size < 26) return std::nullopt;
+
+        f.seekg(static_cast<std::streamoff>(file_size - 26));
+        uint8_t footer[26];
+        f.read(reinterpret_cast<char*>(footer), 26);
+        if (!f || std::memcmp(footer + 8, "TRUEVISION-XFILE.", 17) != 0) return std::nullopt;
+
+        const uint32_t ext_off = read_le32(footer);
+        const uint32_t dev_off = read_le32(footer + 4);
+        if (ext_off == 0 && dev_off == 0) return std::nullopt;
+
+        const uint32_t blob_start = (ext_off != 0 && dev_off != 0) ? std::min(ext_off, dev_off)
+                                                                    : (ext_off != 0 ? ext_off : dev_off);
+        if (blob_start >= file_size - 26) return std::nullopt;
+
+        TgaTrailer t;
+        t.ext_area_offset = ext_off;
+        t.dev_area_offset = dev_off;
+        t.blob_start = blob_start;
+        t.blob.resize(file_size - 26 - blob_start);
+        f.seekg(blob_start);
+        f.read(reinterpret_cast<char*>(t.blob.data()), static_cast<std::streamsize>(t.blob.size()));
+        if (!f) return std::nullopt;
+
+        return t;
     }
 } // namespace
 
@@ -69,6 +114,25 @@ namespace {
         if (!success) {
             Logger::log(LogLevel::Error, "Failed to write rle tga: " + output.string(), get_name());
             throw std::runtime_error("TgaProcessor: Failed to write TGA");
+        }
+
+        if (options.preserve_metadata) {
+            if (auto trailer = extract_tga_trailer(input)) {
+                const auto new_blob_start = static_cast<uint32_t>(std::ftell(out_file.get()));
+                std::fwrite(trailer->blob.data(), 1, trailer->blob.size(), out_file.get());
+
+                const auto shift = static_cast<int64_t>(new_blob_start) - static_cast<int64_t>(trailer->blob_start);
+                const auto shifted = [shift](uint32_t off) {
+                    return off ? static_cast<uint32_t>(static_cast<int64_t>(off) + shift) : 0;
+                };
+
+                uint8_t footer[26];
+                write_le32(footer, shifted(trailer->ext_area_offset));
+                write_le32(footer + 4, shifted(trailer->dev_area_offset));
+                std::memcpy(footer + 8, "TRUEVISION-XFILE.", 17);
+                footer[25] = 0;
+                std::fwrite(footer, 1, sizeof(footer), out_file.get());
+            }
         }
 
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
