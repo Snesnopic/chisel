@@ -200,6 +200,18 @@ void PeProcessor::traverse_rsrc(const std::vector<uint8_t>& data, const uint32_t
         const bool is_dir = (entry.OffsetToDataOrDirectory & 0x80000000) != 0;
         const uint32_t offset = entry.OffsetToDataOrDirectory & 0x7FFFFFFF;
 
+        // at the top level, NameOrId is the RT_* resource type. RT_GROUP_ICON (14) /
+        // RT_GROUP_CURSOR (12) are just small ID/size directory listings (referencing
+        // the real image data in separate RT_ICON/RT_CURSOR entries), never
+        // compressible content themselves -- and their first bytes happen to match
+        // the ICO/CUR magic closely enough that qadmimes misroutes them to
+        // IcoProcessor, which then (correctly) rejects them as not a real standalone
+        // ICO/CUR file. Skipping extraction here avoids that false error entirely.
+        if (depth == 0) {
+            const uint32_t type_id = entry.NameOrId & 0x7FFFFFFF;
+            if (type_id == 12 || type_id == 14) continue;
+        }
+
         if (is_dir) {
             traverse_rsrc(data, rsrc_base_offset, offset, rsrc_data, sections, name + "_" + std::to_string(i), depth + 1);
         } else {
