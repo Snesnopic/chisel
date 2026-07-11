@@ -139,8 +139,13 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
     std::string_view content_view(reinterpret_cast<const char*>(raw_data.data()), raw_data.size());
     auto positions = std::any_cast<std::vector<PhotoPosition>>(content.extras);
 
+    // match the file's own line-ending convention instead of hardcoding CRLF:
+    // a file that otherwise uses bare LF throughout would end up with wrapped
+    // base64 lines using CRLF while every other line stays LF-only
+    const std::string_view line_break = content_view.find("\r\n") != std::string_view::npos ? "\r\n" : "\n";
+
     std::string new_content;
-    new_content.reserve(raw_data.size()); 
+    new_content.reserve(raw_data.size());
 
     std::size_t last_pos = 0;
 
@@ -162,8 +167,9 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
         
         for (char c : b64) {
             if (current_line_len >= 74) {
-                new_content.append("\r\n ");
-                current_line_len = 1; 
+                new_content.append(line_break);
+                new_content.push_back(' ');
+                current_line_len = 1;
             }
             new_content.push_back(c);
             current_line_len++;
