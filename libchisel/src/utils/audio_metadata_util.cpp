@@ -8,6 +8,7 @@
 #include <setjmp.h>
 #include <vector>
 #include <map>
+#include <cstring>
 #include <taglib/fileref.h>
 #include "flac/flacfile.h"
 #include "flac/flacpicture.h"
@@ -62,12 +63,30 @@ const char* extFromMime(const std::string &mime) {
     if (mime == "image/png") return ".png";
     if (mime == "image/jpeg" || mime == "image/jpg") return ".jpg";
     if (mime == "image/webp") return ".webp";
+    if (mime == "image/gif") return ".gif";
+    if (mime == "image/bmp") return ".bmp";
+    if (mime == "image/tiff") return ".tiff";
     if (mime == "application/x-truetype-font" || mime == "font/ttf") return ".ttf";
     if (mime == "application/vnd.ms-opentype" || mime == "font/otf") return ".otf";
     if (mime == "font/woff2") return ".woff2";
     if (mime == "font/woff") return ".woff";
     if (mime == "text/xml" || mime == "application/xml") return ".xml";
     return ".bin";
+}
+
+// guess image mime type from magic bytes, for containers (APEv2) that don't
+// store an explicit mime type alongside the cover art binary; falls back to
+// "image/jpeg" since that's the overwhelmingly common case in the wild
+std::string guessImageMimeFromMagic(const TagLib::ByteVector &data) {
+    const auto *bytes = reinterpret_cast<const unsigned char *>(data.data());
+    const auto size = data.size();
+
+    if (size >= 8 && !png_sig_cmp(bytes, 0, 8)) return "image/png";
+    if (size >= 6 && (std::memcmp(bytes, "GIF87a", 6) == 0 || std::memcmp(bytes, "GIF89a", 6) == 0)) return "image/gif";
+    if (size >= 2 && bytes[0] == 'B' && bytes[1] == 'M') return "image/bmp";
+    if (size >= 12 && std::memcmp(bytes, "RIFF", 4) == 0 && std::memcmp(bytes + 8, "WEBP", 4) == 0) return "image/webp";
+    if (size >= 4 && (std::memcmp(bytes, "II*\0", 4) == 0 || std::memcmp(bytes, "MM\0*", 4) == 0)) return "image/tiff";
+    return "image/jpeg";
 }
 
 // infer mp4 format from mime
@@ -322,11 +341,7 @@ void extractApeV2Covers(TagLib::APE::Tag* tag,
             TagLib::ByteVector imgData = val.mid(nullPos + 1);
             TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
 
-            std::string mime = "image/jpeg";
-            if (imgData.size() >= 8 && !png_sig_cmp(reinterpret_cast<unsigned char *>(imgData.data()), 0, 8)) {
-                mime = "image/png";
-            }
-
+            std::string mime = guessImageMimeFromMagic(imgData);
             const char *ext = extFromMime(mime);
             std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
 
