@@ -92,9 +92,23 @@ std::filesystem::path RdbProcessor::finalize_extraction(const ExtractedContent& 
 
         if (p_index + 16 > content_offset) break;
 
+        uint64_t orig_offset = read_le64(new_rdb.data() + p_index);
         uint64_t orig_size = read_le64(new_rdb.data() + p_index + 8);
 
-        if (orig_size > 0) {
+        // must match prepare_extraction()'s exact skip condition, or the two
+        // passes disagree on which index slots were actually extracted and
+        // extracted_idx drifts out of sync with content.extracted_files
+        const bool was_extracted = orig_size > 0 && orig_offset <= orig_data.size() &&
+                                    orig_size <= orig_data.size() - orig_offset;
+
+        if (was_extracted) {
+            if (extracted_idx >= content.extracted_files.size()) {
+                Logger::log(LogLevel::Error,
+                            "rdb: index/extracted-file count mismatch, aborting finalization", get_name());
+                cleanup_temp_dir(content.temp_dir, get_name());
+                return {};
+            }
+
             const auto opt_payload = read_file(content.extracted_files[extracted_idx++]);
 
             // update offset and size in the index
