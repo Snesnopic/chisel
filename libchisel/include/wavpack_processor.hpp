@@ -42,7 +42,7 @@ namespace chisel {
 
         // --- capabilities ---
         [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-        [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
+        [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
 
         // --- operations ---
 
@@ -63,17 +63,20 @@ namespace chisel {
                         const std::filesystem::path& output, const ProcessingOptions &options) override;
 
         /**
-         * @brief This format cannot be extracted.
-         * @return std::nullopt
+         * @brief Extracts embedded APEv2 cover art for separate reoptimization.
+         * @param input_path Path to the source file.
+         * @return ExtractedContent struct or nullopt if no cover art was found.
          */
         std::optional<ExtractedContent> prepare_extraction(
-            [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
+            const std::filesystem::path& input_path) override;
 
         /**
-         * @brief This format cannot be extracted.
-         * @return Empty path.
+         * @brief Rebuilds the file from extracted cover art content.
+         * @param content The ExtractedContent struct.
+         * @param options Processing options.
+         * @return Path to the finalized file.
          */
-        std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override {return {};}
+        std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
         // --- integrity check ---
 

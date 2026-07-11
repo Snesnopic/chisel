@@ -4,6 +4,7 @@
 
 #include "../../include/wavpack_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/audio_metadata_util.hpp"
 #include <wavpack.h>
 #include <stdexcept>
 #include <vector>
@@ -150,6 +151,14 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     WavpackCloseFile(ctx_in);
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+}
+
+std::optional<ExtractedContent> WavPackProcessor::prepare_extraction(const std::filesystem::path& input_path) {
+    return AudioMetadataUtil::prepareCoverExtraction(input_path, "wavpack-processor", get_name());
+}
+
+std::filesystem::path WavPackProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
+    return AudioMetadataUtil::finalizeCoverExtraction(content, get_name());
 }
 
 std::string WavPackProcessor::get_raw_checksum(const std::filesystem::path&) const {
