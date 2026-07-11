@@ -127,6 +127,20 @@ namespace chisel {
     bool sanitize_archive_entry_path(const std::string& entry_name, const std::filesystem::path& dest_dir, std::filesystem::path& out_path);
 
     /**
+     * @brief Checks whether a lexically-normalized path is base, or actually inside it.
+     *
+     * A plain string-prefix check (e.g. "starts_with") would incorrectly accept a
+     * sibling directory that merely shares a prefix with base (e.g. "/tmp/extract-evil"
+     * vs "/tmp/extract"); this additionally requires a path separator (or exact
+     * equality) at the boundary.
+     *
+     * @param normalized The lexically-normalized candidate path.
+     * @param base The lexically-normalized containing directory.
+     * @return True if normalized is base or a genuine descendant of it.
+     */
+    bool path_is_within(const std::filesystem::path& normalized, const std::filesystem::path& base);
+
+    /**
      * @brief Writes a byte buffer to a file.
      *
      * Overwrites the file if it already exists. Creates parent directories

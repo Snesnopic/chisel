@@ -89,11 +89,7 @@ static bool sanitize_symlink_target(const std::string& raw_target,
     const auto normalized = candidate.lexically_normal();
     const auto base = fs::path(dest_dir).lexically_normal();
 
-    const auto ns = normalized.string();
-    const auto bs = base.string();
-
-    if (ns.size() < bs.size()) return false;
-    return ns.starts_with(bs);
+    return path_is_within(normalized, base);
 }
 
 /**

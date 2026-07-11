@@ -188,6 +188,17 @@ namespace chisel {
         return natural_less_string(sa, sb);
     }
 
+    bool path_is_within(const fs::path &normalized, const fs::path &base) {
+        const auto ns = normalized.string();
+        const auto bs = base.string();
+
+        if (ns.size() < bs.size()) return false;
+        if (!ns.starts_with(bs)) return false;
+        // require an exact match or a path-separator boundary right after the
+        // prefix, so a sibling like "bs-evil" isn't mistaken for a descendant
+        return ns.size() == bs.size() || ns[bs.size()] == '/' || ns[bs.size()] == fs::path::preferred_separator;
+    }
+
     bool sanitize_archive_entry_path(const std::string &entry_name, const fs::path &dest_dir, fs::path &out_path) {
         if (entry_name.empty()) return false;
         // Check for null bytes (poisoning)
@@ -205,12 +216,7 @@ namespace chisel {
         auto normalized = candidate.lexically_normal();
         auto base = fs::path(dest_dir).lexically_normal();
 
-        const auto ns = normalized.string();
-        const auto bs = base.string();
-
-        // Check if normalized path still starts with dest_dir
-        if (ns.size() < bs.size()) return false;
-        if (!ns.starts_with(bs)) return false;
+        if (!path_is_within(normalized, base)) return false;
 
         out_path = normalized;
         return true;
