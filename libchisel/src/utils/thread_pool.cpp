@@ -69,6 +69,7 @@ void ThreadPool::request_stop() {
         }
     }
     condition_.notify_all();
+    idle_cv_.notify_all();
 }
 
 void ThreadPool::wait_idle() {
