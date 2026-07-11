@@ -79,14 +79,10 @@ set(LIBCHISEL_SOURCES
         src/utils/base64_utils.cpp
         include/mpeg_processor.hpp
         src/processors/mpeg_processor.cpp
-        include/wav_processor.hpp
-        src/processors/wav_processor.cpp
-        include/mp4_processor.hpp
         include/ogg_processor.hpp
-        src/processors/mp4_processor.cpp
         src/processors/ogg_processor.cpp
-        include/aiff_processor.hpp
-        src/processors/aiff_processor.cpp
+        include/tag_processor.hpp
+        src/processors/tag_processor.cpp
         include/bmp_processor.hpp
         src/processors/bmp_processor.cpp
         include/pnm_processor.hpp
@@ -102,16 +98,6 @@ set(LIBCHISEL_SOURCES
         src/processors/woff2_processor.cpp
         include/brotli_processor.hpp
         src/processors/brotli_processor.cpp
-        include/asf_processor.hpp
-        src/processors/asf_processor.cpp
-        include/dsdiff_processor.hpp
-        src/processors/dsdiff_processor.cpp
-        include/dsf_processor.hpp
-        src/processors/dsf_processor.cpp
-        include/mpc_processor.hpp
-        src/processors/mpc_processor.cpp
-        include/tta_processor.hpp
-        src/processors/tta_processor.cpp
         include/cfbf_processor.hpp
         src/processors/cfbf_processor.cpp
         include/lzma_processor.hpp

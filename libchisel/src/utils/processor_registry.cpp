@@ -3,7 +3,6 @@
 //
 
 #include "processor_registry.hpp"
-#include "aiff_processor.hpp"
 #include "ape_processor.hpp"
 #include "archive_processor.hpp"
 #include "bmp_processor.hpp"
@@ -13,7 +12,6 @@
 #include "jpeg_processor.hpp"
 #include "jxl_processor.hpp"
 #include "mkv_processor.hpp"
-#include "mp4_processor.hpp"
 #include "mpeg_processor.hpp"
 #include "mseed_processor.hpp"
 #include "odf_processor.hpp"
@@ -26,17 +24,12 @@
 #include "tiff_processor.hpp"
 #include "tga_processor.hpp"
 #include "xml_processor.hpp"
-#include "wav_processor.hpp"
+#include "tag_processor.hpp"
 #include "wavpack_processor.hpp"
 #include "webp_processor.hpp"
 #include "zopflipng_processor.hpp"
 #include "woff2_processor.hpp"
 #include "brotli_processor.hpp"
-#include "asf_processor.hpp"
-#include "dsdiff_processor.hpp"
-#include "dsf_processor.hpp"
-#include "mpc_processor.hpp"
-#include "tta_processor.hpp"
 #include "cfbf_processor.hpp"
 #include "lzma_processor.hpp"
 #include "zstd_processor.hpp"
@@ -87,20 +80,13 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MseedProcessor>());
     processors_.push_back(std::make_unique<MkvProcessor>());
     processors_.push_back(std::make_unique<MpegProcessor>());
-    processors_.push_back(std::make_unique<WavProcessor>());
-    processors_.push_back(std::make_unique<Mp4Processor>());
+    processors_.push_back(std::make_unique<TagProcessor>());
     processors_.push_back(std::make_unique<OggProcessor>());
-    processors_.push_back(std::make_unique<AiffProcessor>());
     processors_.push_back(std::make_unique<BmpProcessor>());
     processors_.push_back(std::make_unique<PnmProcessor>());
     processors_.push_back(std::make_unique<XmlProcessor>());
     processors_.push_back(std::make_unique<Woff2Processor>());
     processors_.push_back(std::make_unique<BrotliProcessor>());
-    processors_.push_back(std::make_unique<AsfProcessor>());
-    processors_.push_back(std::make_unique<DsdiffProcessor>());
-    processors_.push_back(std::make_unique<DsfProcessor>());
-    processors_.push_back(std::make_unique<MpcProcessor>());
-    processors_.push_back(std::make_unique<TtaProcessor>());
     processors_.push_back(std::make_unique<CfbfProcessor>());
     processors_.push_back(std::make_unique<LzmaProcessor>());
     processors_.push_back(std::make_unique<ZstdProcessor>());
