@@ -12,13 +12,8 @@
 
 namespace {
 
-// helper: copy metadata and set compression tags
-void copy_tags_with_metadata(TIFF* in, TIFF* out, const bool preserve_metadata) {
-    // set max compression
-    TIFFSetField(out, TIFFTAG_COMPRESSION, COMPRESSION_ADOBE_DEFLATE);
-    TIFFSetField(out, TIFFTAG_PREDICTOR, 2);
-    TIFFSetField(out, TIFFTAG_ZIPQUALITY, 9); // max zlib level
-
+// helper: copy metadata tags only (compression is set separately per recompress strategy)
+void copy_metadata_tags(TIFF* in, TIFF* out, const bool preserve_metadata) {
     if (preserve_metadata) {
         float xres, yres;
         unsigned short resunit;
@@ -43,7 +38,6 @@ void copy_tags_with_metadata(TIFF* in, TIFF* out, const bool preserve_metadata) 
         if (TIFFGetField(in, TIFFTAG_XMLPACKET, &xmp_len, &xmp_data))
             TIFFSetField(out, TIFFTAG_XMLPACKET, xmp_len, xmp_data);
     }
-    // note: color map is intentionally skipped as we convert to rgba
 }
 
 /**
@@ -70,6 +64,45 @@ bool directory_is_safe_for_rgba_conversion(TIFF* tif) {
     return true;
 }
 
+/**
+ * @brief Checks whether a directory is a low-bit-depth (1/2/4-bit) palette image.
+ *
+ * TIFFReadRGBAImageOriented() would decode these correctly too (colormap lookup
+ * is exact), but forcing a ~8x/4x/2x larger RGBA buffer for what's fundamentally
+ * a small-palette indexed image is wasteful. These are re-encoded keeping their
+ * original bit depth, sample layout, and colormap -- only the compression scheme
+ * changes -- which is both cheaper and losslessly exact by construction.
+ */
+bool directory_is_indexed_palette(TIFF* tif) {
+    uint16_t bits_per_sample = 0;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+    if (bits_per_sample != 1 && bits_per_sample != 2 && bits_per_sample != 4) return false;
+
+    uint16_t photometric = 0;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_PHOTOMETRIC, &photometric);
+    if (photometric != PHOTOMETRIC_PALETTE) return false;
+
+    uint16_t samples_per_pixel = 1;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &samples_per_pixel);
+    if (samples_per_pixel != 1) return false;
+
+    uint16_t planar_config = PLANARCONFIG_CONTIG;
+    TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG, &planar_config);
+    if (planar_config != PLANARCONFIG_CONTIG) return false;
+
+    return true;
+}
+
+/**
+ * @brief Whether a directory can be pixel-compared via TIFFReadRGBAImageOriented()
+ * without the comparison itself being blind to real differences -- true for both
+ * the forced-RGBA recompress path and the indexed-palette recompress path, since
+ * both decode exactly through this same function.
+ */
+bool directory_is_pixel_comparable(TIFF* tif) {
+    return directory_is_safe_for_rgba_conversion(tif) || directory_is_indexed_palette(tif);
+}
+
 } // namespace
 
 namespace chisel {
@@ -84,24 +117,42 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("TiffProcessor: cannot open input");
     }
 
-    // check every directory upfront: TIFFReadRGBAImageOriented() always collapses
-    // to 8-bit RGBA, which would silently destroy 16/32-bit samples, floating point
-    // data, or CMYK color data. If any page can't survive that round-trip losslessly,
-    // copy the whole file through unchanged rather than corrupt it.
-    bool all_pages_safe = true;
+    // check every directory upfront and pick one uniform strategy for the whole file:
+    // - Rgba: TIFFReadRGBAImageOriented() always collapses to 8-bit RGBA, bit-exact
+    //   only for already-8-bit-per-sample integer, non-CMYK data.
+    // - IndexedPalette: 1/2/4-bit palette images -- re-encoded keeping their native
+    //   indexed layout and colormap (cheaper and just as exact as forcing RGBA).
+    // - Verbatim: anything else (16/32-bit, floating point, CMYK, mixed pages) is
+    //   copied through unchanged rather than risking silent corruption.
+    enum class Strategy { Rgba, IndexedPalette, Verbatim };
+
+    Strategy strategy = Strategy::Rgba;
     do {
         if (!directory_is_safe_for_rgba_conversion(in)) {
-            all_pages_safe = false;
+            strategy = Strategy::Verbatim;
             break;
         }
     } while (TIFFReadDirectory(in));
 
-    if (!all_pages_safe) {
+    if (strategy == Strategy::Verbatim) {
+        TIFFSetDirectory(in, 0);
+        bool all_indexed_palette = true;
+        do {
+            if (!directory_is_indexed_palette(in)) {
+                all_indexed_palette = false;
+                break;
+            }
+        } while (TIFFReadDirectory(in));
+        if (all_indexed_palette) strategy = Strategy::IndexedPalette;
+    }
+
+    if (strategy == Strategy::Verbatim) {
         TIFFClose(in);
         Logger::log(LogLevel::Info,
             "Skipping " + input.filename().string() +
             ": contains samples that can't be losslessly represented as 8-bit RGBA "
-            "(16/32-bit depth, floating point, or CMYK)", get_name());
+            "or as a low-bit-depth palette image (16/32-bit depth, floating point, "
+            "CMYK, or mixed page types)", get_name());
         std::vector<uint8_t> data;
         if (!read_file(input, data) || !write_file(output, data))
             throw std::runtime_error("TiffProcessor: failed to copy input to output");
@@ -122,42 +173,94 @@ void TiffProcessor::recompress(const std::filesystem::path& input,
         TIFFGetField(in, TIFFTAG_IMAGEWIDTH, &width);
         TIFFGetField(in, TIFFTAG_IMAGELENGTH, &height);
 
-        std::vector<uint32_t> raster(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
-        if (raster.empty()) {
+        if (width == 0 || height == 0) {
             Logger::log(LogLevel::Debug, "Skipping empty tiff directory", get_name());
             continue;
         }
 
-        // read full image into raw rgba buffer, handles decompression
-        if (!TIFFReadRGBAImageOriented(in, width, height, raster.data(), ORIENTATION_TOPLEFT, 0)) {
-            TIFFClose(in);
-            TIFFClose(out);
-            Logger::log(LogLevel::Error, "Failed to read tiff image data: " + input.string(), get_name());
-            throw std::runtime_error("TiffProcessor: TIFFReadRGBAImageOriented failed");
-        }
+        if (strategy == Strategy::Rgba) {
+            std::vector<uint32_t> raster(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
 
-        TIFFCreateDirectory(out);
-        copy_tags_with_metadata(in, out, options.preserve_metadata);
-
-        // override tags for rgba output
-        TIFFSetField(out, TIFFTAG_IMAGEWIDTH, width);
-        TIFFSetField(out, TIFFTAG_IMAGELENGTH, height);
-        TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 4);
-        TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8);
-        TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-        TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-
-        // specify alpha channel
-        unsigned short extra_samples = 1;
-        TIFFSetField(out, TIFFTAG_EXTRASAMPLES, 1, &extra_samples);
-
-        for (uint32_t row = 0; row < height; ++row) {
-            const tdata_t row_data = &raster[static_cast<std::size_t>(row) * width];
-            if (TIFFWriteScanline(out, row_data, row) < 0) {
+            // read full image into raw rgba buffer, handles decompression
+            if (!TIFFReadRGBAImageOriented(in, width, height, raster.data(), ORIENTATION_TOPLEFT, 0)) {
                 TIFFClose(in);
                 TIFFClose(out);
-                Logger::log(LogLevel::Error, "Failed to write tiff scanline for: " + output.string(), get_name());
-                throw std::runtime_error("TiffProcessor: write scanline failed");
+                Logger::log(LogLevel::Error, "Failed to read tiff image data: " + input.string(), get_name());
+                throw std::runtime_error("TiffProcessor: TIFFReadRGBAImageOriented failed");
+            }
+
+            TIFFCreateDirectory(out);
+            copy_metadata_tags(in, out, options.preserve_metadata);
+
+            // override tags for rgba output
+            TIFFSetField(out, TIFFTAG_IMAGEWIDTH, width);
+            TIFFSetField(out, TIFFTAG_IMAGELENGTH, height);
+            TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 4);
+            TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, 8);
+            TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+            TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+            TIFFSetField(out, TIFFTAG_COMPRESSION, COMPRESSION_ADOBE_DEFLATE);
+            TIFFSetField(out, TIFFTAG_PREDICTOR, 2); // horizontal differencing helps continuous-tone RGB
+            TIFFSetField(out, TIFFTAG_ZIPQUALITY, 9);
+
+            // specify alpha channel
+            unsigned short extra_samples = 1;
+            TIFFSetField(out, TIFFTAG_EXTRASAMPLES, 1, &extra_samples);
+
+            for (uint32_t row = 0; row < height; ++row) {
+                const tdata_t row_data = &raster[static_cast<std::size_t>(row) * width];
+                if (TIFFWriteScanline(out, row_data, row) < 0) {
+                    TIFFClose(in);
+                    TIFFClose(out);
+                    Logger::log(LogLevel::Error, "Failed to write tiff scanline for: " + output.string(), get_name());
+                    throw std::runtime_error("TiffProcessor: write scanline failed");
+                }
+            }
+        } else { // Strategy::IndexedPalette
+            uint16_t bits_per_sample = 0;
+            TIFFGetFieldDefaulted(in, TIFFTAG_BITSPERSAMPLE, &bits_per_sample);
+
+            uint16_t* colormap_r = nullptr;
+            uint16_t* colormap_g = nullptr;
+            uint16_t* colormap_b = nullptr;
+            if (!TIFFGetField(in, TIFFTAG_COLORMAP, &colormap_r, &colormap_g, &colormap_b)) {
+                TIFFClose(in);
+                TIFFClose(out);
+                Logger::log(LogLevel::Error, "Missing colormap for palette tiff: " + input.string(), get_name());
+                throw std::runtime_error("TiffProcessor: missing colormap");
+            }
+
+            TIFFCreateDirectory(out);
+            copy_metadata_tags(in, out, options.preserve_metadata);
+
+            TIFFSetField(out, TIFFTAG_IMAGEWIDTH, width);
+            TIFFSetField(out, TIFFTAG_IMAGELENGTH, height);
+            TIFFSetField(out, TIFFTAG_SAMPLESPERPIXEL, 1);
+            TIFFSetField(out, TIFFTAG_BITSPERSAMPLE, bits_per_sample);
+            TIFFSetField(out, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_PALETTE);
+            TIFFSetField(out, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+            TIFFSetField(out, TIFFTAG_COLORMAP, colormap_r, colormap_g, colormap_b);
+            TIFFSetField(out, TIFFTAG_COMPRESSION, COMPRESSION_ADOBE_DEFLATE);
+            // no predictor: horizontal differencing on arbitrary palette indices
+            // (not continuous-tone samples) doesn't reflect real pixel-to-pixel
+            // similarity and isn't a spec-recommended combination for this photometric
+            TIFFSetField(out, TIFFTAG_ZIPQUALITY, 9);
+
+            const tsize_t scanline_size = TIFFScanlineSize(in);
+            std::vector<uint8_t> row_buf(static_cast<std::size_t>(scanline_size));
+            for (uint32_t row = 0; row < height; ++row) {
+                if (TIFFReadScanline(in, row_buf.data(), row) < 0) {
+                    TIFFClose(in);
+                    TIFFClose(out);
+                    Logger::log(LogLevel::Error, "Failed to read tiff scanline: " + input.string(), get_name());
+                    throw std::runtime_error("TiffProcessor: read scanline failed");
+                }
+                if (TIFFWriteScanline(out, row_buf.data(), row) < 0) {
+                    TIFFClose(in);
+                    TIFFClose(out);
+                    Logger::log(LogLevel::Error, "Failed to write tiff scanline for: " + output.string(), get_name());
+                    throw std::runtime_error("TiffProcessor: write scanline failed");
+                }
             }
         }
 
@@ -198,13 +301,15 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     // would make this comparison blind to real differences in 16/32-bit, floating
     // point, or CMYK samples (both files would decode to the same lossy projection
     // even if their true sample data differs). Fall back to a byte compare instead.
+    // Low-bit-depth palette images decode exactly through the same function (colormap
+    // lookup is exact regardless of index bit width), so they're fine to pixel-compare.
     bool any_unsafe = false;
     do {
-        if (!directory_is_safe_for_rgba_conversion(in_a)) { any_unsafe = true; break; }
+        if (!directory_is_pixel_comparable(in_a)) { any_unsafe = true; break; }
     } while (TIFFReadDirectory(in_a));
     if (!any_unsafe) {
         do {
-            if (!directory_is_safe_for_rgba_conversion(in_b)) { any_unsafe = true; break; }
+            if (!directory_is_pixel_comparable(in_b)) { any_unsafe = true; break; }
         } while (TIFFReadDirectory(in_b));
     }
     if (any_unsafe) {

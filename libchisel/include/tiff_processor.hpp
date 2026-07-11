@@ -23,10 +23,12 @@ namespace chisel {
      * @details This processor standardizes TIFF files by decoding them
      * to a raw RGBA8 pixel buffer and re-encoding them using
      * maximum Deflate (Zip) compression. Since that conversion is only
-     * bit-exact for already-8-bit-per-sample integer data, files with
-     * 16/32-bit samples, floating point data, or CMYK color (which would
-     * be silently destroyed by the forced RGBA8 round-trip) are detected
-     * upfront and copied through unchanged instead.
+     * bit-exact for already-8-bit-per-sample integer data, low-bit-depth
+     * (1/2/4-bit) palette images are instead re-encoded keeping their
+     * original indexed layout and colormap. Files with 16/32-bit samples,
+     * floating point data, or CMYK color (which would be silently destroyed
+     * by the forced RGBA8 round-trip) are detected upfront and copied
+     * through unchanged instead.
      */
     class TiffProcessor final : public IProcessor {
     public:
