@@ -208,16 +208,8 @@ void BmpProcessor::recompress(const std::filesystem::path& input,
         bmpwrite_set_rle(out.h, BMP_RLE_AUTO);
         Logger::log(LogLevel::Debug, "Encoding as indexed with auto RLE/Huffman", get_name());
     } else {
-        // RGB
-        if (!is_64bit && channels == 3 && bits == 8) {
-            // RLE24 is an option for standard 24-bit RGB (OS/2 extension)
-            // We enable it to allow maximum compression.
-            bmpwrite_allow_rle24(out.h);
-            bmpwrite_set_rle(out.h, BMP_RLE_AUTO);
-            Logger::log(LogLevel::Debug, "Allowed RLE24 compression for RGB image", get_name());
-        } else {
-            Logger::log(LogLevel::Debug, "Encoding as uncompressed RGB/RGBA", get_name());
-        }
+        // RGB: RLE24 deliberately not enabled, its compression code collides with BI_JPEG (see TODO.md)
+        Logger::log(LogLevel::Debug, "Encoding as uncompressed RGB/RGBA", get_name());
     }
 
     // Save
@@ -238,13 +230,24 @@ std::string BmpProcessor::get_raw_checksum(const std::filesystem::path& /*file_p
 
 bool BmpProcessor::raw_equal(const std::filesystem::path& a,
                              const std::filesystem::path& b) const {
-    auto load_bytes = [](const std::filesystem::path& path, std::vector<unsigned char>& buf) -> bool {
+    // indexed images must be loaded via bmpread_load_palette() before bmpread_load_image(), same as
+    // recompress(): bmplib's auto-expand-to-RGB(A) path reports a different channel count depending on
+    // whether the source was RLE-compressed, which would make an otherwise-identical image compare unequal
+    auto load_bytes = [](const std::filesystem::path& path, std::vector<unsigned char>& buf,
+                          std::vector<unsigned char>& palette) -> bool {
         ScopedBmp sb(path, "rb");
         if (!sb.f) return false;
         sb.h = bmpread_new(sb.f);
         if (!sb.h) return false;
 
         if (bmpread_load_info(sb.h) != BMP_RESULT_OK) return false;
+
+        const int num_colors = bmpread_num_palette_colors(sb.h);
+        if (num_colors > 0) {
+            unsigned char* pal_ptr = nullptr;
+            if (bmpread_load_palette(sb.h, &pal_ptr) != BMP_RESULT_OK) return false;
+            palette.assign(pal_ptr, pal_ptr + static_cast<size_t>(num_colors) * 4);
+        }
 
         const size_t sz = bmpread_buffersize(sb.h);
         if (sz == 0) return false;
@@ -254,14 +257,12 @@ bool BmpProcessor::raw_equal(const std::filesystem::path& a,
         return bmpread_load_image(sb.h, &ptr) == BMP_RESULT_OK;
     };
 
-    std::vector<unsigned char> buf_a, buf_b;
-    // Note: raw_equal compares decoded pixel data. It ignores compression differences (RLE vs Raw)
-    // and metadata differences, verifying only visual identity.
-    if (!load_bytes(a, buf_a) || !load_bytes(b, buf_b)) {
+    std::vector<unsigned char> buf_a, buf_b, pal_a, pal_b;
+    if (!load_bytes(a, buf_a, pal_a) || !load_bytes(b, buf_b, pal_b)) {
         return false;
     }
 
-    return buf_a == buf_b;
+    return buf_a == buf_b && pal_a == pal_b;
 }
 
 } // namespace chisel
