@@ -50,9 +50,13 @@ namespace chisel {
         /**
          * @brief Recompresses (optimizes) an SQLite database file.
          *
-         * First, copies the input file to the output path.
-         * Then, opens the output file and executes the `VACUUM;`
-         * and `ANALYZE;` commands to rebuild the file and optimize indices.
+         * Runs `VACUUM INTO` directly on the input database to produce the
+         * optimized output in one step, then opens that output and runs
+         * `ANALYZE` on it. `VACUUM INTO` is used instead of a plain filesystem
+         * copy because it reads through SQLite's normal (WAL-aware) query
+         * path: a database with an active, uncheckpointed `-wal` journal
+         * would otherwise have all not-yet-checkpointed data silently
+         * dropped by a naive file copy of just the main `.db` file.
          *
          * @param input Path to the source SQLite file.
          * @param output Path to write the optimized SQLite file.
