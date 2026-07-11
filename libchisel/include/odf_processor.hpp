@@ -35,18 +35,19 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 5> kMimes = {
+            static constexpr std::array<std::string_view, 6> kMimes = {
                 "application/vnd.oasis.opendocument.text",
                 "application/vnd.oasis.opendocument.spreadsheet",
                 "application/vnd.oasis.opendocument.presentation",
                 "application/vnd.oasis.opendocument.graphics",
+                "application/vnd.oasis.opendocument.formula",
                 "application/vnd.oasis.opendocument.database"
             };
             return {kMimes.data(), kMimes.size()};
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 5> kExts = { ".odt", ".ods", ".odp", ".odg", ".odb" };
+            static constexpr std::array<std::string_view, 6> kExts = { ".odt", ".ods", ".odp", ".odg", ".odf", ".odb" };
             return {kExts.data(), kExts.size()};
         }
 

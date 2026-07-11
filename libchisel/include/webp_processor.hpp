@@ -33,7 +33,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 1> kMimes = { "image/webp" };
+            static constexpr std::array<std::string_view, 2> kMimes = { "image/webp", "image/x-webp" };
             return {kMimes.data(), kMimes.size()};
         }
 

@@ -32,7 +32,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 1> kMimes = { "application/x-sqlite3" };
+            static constexpr std::array<std::string_view, 2> kMimes = { "application/x-sqlite3", "application/vnd.sqlite3" };
             return {kMimes.data(), kMimes.size()};
         }
 

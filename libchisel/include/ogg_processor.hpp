@@ -33,8 +33,8 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kMimes = {
-                "audio/ogg", "audio/vorbis", "audio/opus"
+            static constexpr std::array<std::string_view, 4> kMimes = {
+                "audio/ogg", "audio/vorbis", "audio/opus", "audio/oga"
             };
             return {kMimes.data(), kMimes.size()};
         }

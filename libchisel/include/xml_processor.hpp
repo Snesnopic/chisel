@@ -44,9 +44,10 @@ public:
 
     [[nodiscard]] std::span<const std::string_view, std::dynamic_extent>
     get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 11> mimes = {
+        static constexpr std::array<std::string_view, 12> mimes = {
             "application/xml",
             "text/xml",
+            "text/xsl",
             "application/xhtml+xml",
             "image/svg+xml",
             "application/vnd.google-earth.kml+xml",
