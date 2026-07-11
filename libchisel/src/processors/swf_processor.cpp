@@ -125,7 +125,8 @@ bool SwfProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
             if (data.size() < 8) return {};
             if (data[0] == 'F') return {data.begin() + 8, data.end()};
             if (data[0] == 'C') {
-                const std::size_t expected = read_le32(data.data() + 4) - 8;
+                const uint32_t declared_size = read_le32(data.data() + 4);
+                const std::size_t expected = declared_size > 8 ? declared_size - 8 : 0;
                 return inflate_swf(data.data() + 8, data.size() - 8, expected);
             }
             return {};
