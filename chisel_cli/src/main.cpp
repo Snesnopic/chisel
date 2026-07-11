@@ -7,6 +7,7 @@
 #include <csignal>
 #include <atomic>
 #include <chrono>
+#include <thread>
 #include <iomanip>
 #include <fstream>
 #include "utils/color.hpp"
@@ -79,19 +80,28 @@ using namespace chisel;
 namespace fs = std::filesystem;
 
 static std::atomic<chisel::ProcessorExecutor*> g_executor{nullptr};
+static std::atomic<bool> g_stop_requested{false};
 
-// handle ctrl+c or termination signals
+// async-signal-safe: only sets a flag, a watcher thread does the real work
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        // Protect interrupt message so it doesn't mix with progress bar
-        std::scoped_lock lock(g_console_mtx);
-        std::cerr << CYAN
-                  << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
-                  << RESET << std::endl;
-        auto* executor_ptr = g_executor.load(std::memory_order_relaxed);
-        if (executor_ptr != nullptr) {
-            executor_ptr->request_stop();
-        }
+        g_stop_requested.store(true, std::memory_order_relaxed);
+    }
+}
+
+// polls the flag set by signal_handler and runs the actual stop logic on a
+// normal thread, since mutexes/iostreams aren't safe to touch from a handler
+void stop_watcher_loop() {
+    while (!g_stop_requested.load(std::memory_order_relaxed)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    std::scoped_lock lock(g_console_mtx);
+    std::cerr << CYAN
+              << "\n[INTERRUPT] Stop detected. Waiting for threads to finish..."
+              << RESET << std::endl;
+    auto* executor_ptr = g_executor.load(std::memory_order_relaxed);
+    if (executor_ptr != nullptr) {
+        executor_ptr->request_stop();
     }
 }
 
@@ -165,6 +175,7 @@ int main(int argc, char* argv[]) {
 
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
+    std::thread(stop_watcher_loop).detach();
     init_utf8_locale();
 
     // registry of processors and event bus
