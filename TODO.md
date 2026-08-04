@@ -45,6 +45,14 @@
 
 - [ ] Investigate extracting and re-optimizing embedded audio tracks (not just attachments/cover art, already handled) and reinserting them correctly.
 
+## CFBF
+
+- [ ] `.mdt`/`.mpd` are still listed in `get_supported_extensions()` but likely belong to the same Jet/ACE
+  database engine family as `.mdb` (already removed after confirming via magic bytes that `.mdb` is never
+  actual CFBF -- "Standard ACE DB" signature instead of `D0CF11E0`). No real `.mdt` file and no genuine
+  MS-Project `.mpd` were available on this machine to verify the same way -- needs a real sample before
+  removing them too.
+
 ## New MIME types / Codecs
 
 - [ ] ALAC – investigate integration via libavcodec or standalone decoder.

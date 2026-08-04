@@ -41,11 +41,11 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 33> kExts = {
+            static constexpr std::array<std::string_view, 31> kExts = {
                 ".doc", ".xls", ".ppt", ".msi", ".msp", ".mst", ".pub", ".vsd",
-                ".vss", ".vst", ".adp", ".mdb", ".mdt", ".mpd", ".mpp", ".mpt",
+                ".vss", ".vst", ".adp", ".mdt", ".mpd", ".mpp", ".mpt",
                 ".rvt", ".sldasm", ".slddrw", ".sldprt", ".snt", ".thumbs.db",
-                ".spl", ".dot", ".xlt", ".pps", ".chm", ".fla", ".one", ".ost",
+                ".spl", ".dot", ".xlt", ".pps", ".fla", ".one", ".ost",
                 ".rfa", ".rte", ".wps"
             };
             return {kExts.data(), kExts.size()};
