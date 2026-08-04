@@ -267,7 +267,12 @@ namespace {
         std::error_code ec;
         auto abs_path = std::filesystem::absolute(p, ec);
         if (ec) return p.wstring();
-        return L"\\\\?\\" + abs_path.wstring();
+        std::wstring native = abs_path.wstring();
+        // UNC paths (\\server\share\...) need the \\?\UNC\ prefix, not a plain \\?\ prefix
+        if (native.size() >= 2 && native[0] == L'\\' && native[1] == L'\\') {
+            return L"\\\\?\\UNC\\" + native.substr(2);
+        }
+        return L"\\\\?\\" + native;
     }
 
     void optimizeCFBF(const std::filesystem::path& source_path, const std::filesystem::path& dest_path, bool largeSectors) {
