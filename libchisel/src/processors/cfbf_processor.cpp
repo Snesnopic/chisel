@@ -26,11 +26,20 @@ namespace {
         IStorage* destParent;
     };
 
+    // mtime gets bumped back to "now" by writes, so defer SetElementTimes until just before commit
+    struct PendingStorageTimes {
+        IStorage* storage;
+        FILETIME ctime;
+        FILETIME atime;
+        FILETIME mtime;
+    };
+
     // recursively copy topology from one storage to another
     void copyTopology(IStorage& source,
                       IStorage& dest,
                       std::vector<CfbfStream>& streamsToCopy,
-                      std::vector<IStorage*>& storagesToClose) {
+                      std::vector<IStorage*>& storagesToClose,
+                      std::vector<PendingStorageTimes>& pendingTimes) {
         IEnumSTATSTG* childs;
         if (FAILED(source.EnumElements(0, nullptr, 0, &childs))) {
             throw std::runtime_error("cfbf: cannot enumerate storage elements");
@@ -59,6 +68,8 @@ namespace {
                 stream.destParent = &dest;
                 dest.AddRef();
 
+                // streams have no SetElementTimes support (IStream lacks it, parent call returns STG_E_ACCESSDENIED)
+
                 streamsToCopy.push_back(stream);
 
             } else if (STGTY_STORAGE == child.type) {
@@ -75,7 +86,16 @@ namespace {
                     throw std::runtime_error("cfbf: cannot create storage");
                 }
 
-                copyTopology(*sourceStorage, *destinationStorage, streamsToCopy, storagesToClose);
+                // preserve the sub-storage's class id; its times are queued in pendingTimes for later
+                if (FAILED(destinationStorage->SetClass(child.clsid))) {
+                    sourceStorage->Release();
+                    destinationStorage->Release();
+                    CoTaskMemFree(child.pwcsName);
+                    throw std::runtime_error("cfbf: cannot set storage class id");
+                }
+                pendingTimes.push_back({destinationStorage, child.ctime, child.atime, child.mtime});
+
+                copyTopology(*sourceStorage, *destinationStorage, streamsToCopy, storagesToClose, pendingTimes);
 
                 // keep the storage open until all data is written
                 storagesToClose.push_back(destinationStorage);
@@ -148,6 +168,25 @@ namespace {
                     return false;
                 }
 
+                STATSTG rightStat;
+                if (FAILED(rightStorage->Stat(&rightStat, STATFLAG_NONAME))) {
+                    leftStorage->Release();
+                    rightStorage->Release();
+                    CoTaskMemFree(child.pwcsName);
+                    return false;
+                }
+
+                if (child.clsid != rightStat.clsid ||
+                    child.ctime.dwHighDateTime != rightStat.ctime.dwHighDateTime ||
+                    child.ctime.dwLowDateTime != rightStat.ctime.dwLowDateTime ||
+                    child.mtime.dwHighDateTime != rightStat.mtime.dwHighDateTime ||
+                    child.mtime.dwLowDateTime != rightStat.mtime.dwLowDateTime) {
+                    leftStorage->Release();
+                    rightStorage->Release();
+                    CoTaskMemFree(child.pwcsName);
+                    return false;
+                }
+
                 if (!verifyIdentical(*leftStorage, *rightStorage)) {
                     leftStorage->Release();
                     rightStorage->Release();
@@ -190,17 +229,26 @@ namespace {
             throw std::runtime_error("cfbf: cannot create target file");
         }
 
-        // copy class id
+        // copy class id (element times are queued and applied later, see PendingStorageTimes)
         STATSTG statStg;
-        source->Stat(&statStg, 0);
-        destination->SetClass(statStg.clsid);
+        if (FAILED(source->Stat(&statStg, 0))) {
+            destination->Release();
+            source->Release();
+            throw std::runtime_error("cfbf: cannot stat source root storage");
+        }
+        if (FAILED(destination->SetClass(statStg.clsid))) {
+            destination->Release();
+            source->Release();
+            throw std::runtime_error("cfbf: cannot set root class id");
+        }
 
         std::vector<CfbfStream> streams;
         std::vector<IStorage*> storagesToClose;
+        std::vector<PendingStorageTimes> pendingTimes;
 
         try {
             // 1. copy topology
-            copyTopology(*source, *destination, streams, storagesToClose);
+            copyTopology(*source, *destination, streams, storagesToClose, pendingTimes);
 
             // 2. copy small streams first (less than 4096 B)
             for (auto& stream : streams) {
@@ -222,6 +270,21 @@ namespace {
                         throw std::runtime_error("cfbf: cannot copy large stream");
                     }
                 }
+            }
+
+            // 4. commit first: Commit() itself stamps mtime, which would overwrite an earlier SetElementTimes
+            if (FAILED(destination->Commit(STGC_OVERWRITE | STGC_CONSOLIDATE))) {
+                throw std::runtime_error("cfbf: cannot commit target storage");
+            }
+
+            // 5. apply element times now that commit won't touch mtime again
+            for (auto& pt : pendingTimes) {
+                if (FAILED(pt.storage->SetElementTimes(nullptr, &pt.ctime, &pt.atime, &pt.mtime))) {
+                    throw std::runtime_error("cfbf: cannot set storage element times");
+                }
+            }
+            if (FAILED(destination->SetElementTimes(nullptr, &statStg.ctime, &statStg.atime, &statStg.mtime))) {
+                throw std::runtime_error("cfbf: cannot set root element times");
             }
 
         } catch (...) {
@@ -251,12 +314,10 @@ namespace {
             storage->Release();
         }
 
-        // 4. commit changes with STGC_OVERWRITE | STGC_CONSOLIDATE
-        destination->Commit(STGC_OVERWRITE | STGC_CONSOLIDATE);
         destination->Release();
         source->Release();
 
-        // 5. verify identical
+        // 6. verify identical
         IStorage* l;
         if (FAILED(StgOpenStorage(sourcePath.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &l))) {
             throw std::runtime_error("cfbf: cannot re-open source stream for verification");
@@ -268,7 +329,17 @@ namespace {
         }
 
 
-        bool isIdentical = verifyIdentical(*l, *r);
+        // root storage has no parent entry to compare against, so check its own class id/times first
+        STATSTG lStat, rStat;
+        bool rootIdentical = SUCCEEDED(l->Stat(&lStat, STATFLAG_NONAME)) &&
+                              SUCCEEDED(r->Stat(&rStat, STATFLAG_NONAME)) &&
+                              lStat.clsid == rStat.clsid &&
+                              lStat.ctime.dwHighDateTime == rStat.ctime.dwHighDateTime &&
+                              lStat.ctime.dwLowDateTime == rStat.ctime.dwLowDateTime &&
+                              lStat.mtime.dwHighDateTime == rStat.mtime.dwHighDateTime &&
+                              lStat.mtime.dwLowDateTime == rStat.mtime.dwLowDateTime;
+
+        bool isIdentical = rootIdentical && verifyIdentical(*l, *r);
         l->Release();
         r->Release();
 
