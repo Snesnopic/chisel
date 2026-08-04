@@ -204,6 +204,64 @@ namespace {
         return true;
     }
 
+    // deep byte-for-byte comparison for raw_equal(), unlike verifyIdentical()'s fast metadata-only check
+    bool compareContentIdentical(IStorage& l, IStorage& r) {
+        IEnumSTATSTG* childs;
+        if (FAILED(l.EnumElements(0, nullptr, 0, &childs))) {
+            return false;
+        }
+
+        bool identical = true;
+        ULONG childrenActuallyFetched;
+        STATSTG child;
+        while (identical && S_OK == childs->Next(1, &child, &childrenActuallyFetched)) {
+            if (STGTY_STREAM == child.type) {
+                IStream* leftStream;
+                IStream* rightStream;
+                if (FAILED(l.OpenStream(child.pwcsName, nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &leftStream))) {
+                    identical = false;
+                } else if (FAILED(r.OpenStream(child.pwcsName, nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &rightStream))) {
+                    leftStream->Release();
+                    identical = false;
+                } else {
+                    STATSTG rightStat;
+                    std::vector<uint8_t> leftData(static_cast<size_t>(child.cbSize.QuadPart));
+                    std::vector<uint8_t> rightData;
+                    ULONG leftRead = 0, rightRead = 0;
+                    if (FAILED(rightStream->Stat(&rightStat, STATFLAG_NONAME)) || rightStat.cbSize.QuadPart != child.cbSize.QuadPart) {
+                        identical = false;
+                    } else {
+                        rightData.resize(static_cast<size_t>(rightStat.cbSize.QuadPart));
+                        identical = SUCCEEDED(leftStream->Read(leftData.data(), static_cast<ULONG>(leftData.size()), &leftRead)) && leftRead == leftData.size() &&
+                                    SUCCEEDED(rightStream->Read(rightData.data(), static_cast<ULONG>(rightData.size()), &rightRead)) && rightRead == rightData.size() &&
+                                    leftData == rightData;
+                    }
+                    leftStream->Release();
+                    rightStream->Release();
+                }
+            } else if (STGTY_STORAGE == child.type) {
+                IStorage* leftStorage;
+                IStorage* rightStorage;
+                if (FAILED(l.OpenStorage(child.pwcsName, nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, nullptr, 0, &leftStorage))) {
+                    identical = false;
+                } else if (FAILED(r.OpenStorage(child.pwcsName, nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, nullptr, 0, &rightStorage))) {
+                    leftStorage->Release();
+                    identical = false;
+                } else {
+                    STATSTG rightStat;
+                    identical = SUCCEEDED(rightStorage->Stat(&rightStat, STATFLAG_NONAME)) &&
+                                child.clsid == rightStat.clsid &&
+                                compareContentIdentical(*leftStorage, *rightStorage);
+                    leftStorage->Release();
+                    rightStorage->Release();
+                }
+            }
+            CoTaskMemFree(child.pwcsName);
+        }
+        childs->Release();
+        return identical;
+    }
+
     // helper to get a long-path compatible wstring for Windows
     std::wstring getLongPath(const std::filesystem::path& p) {
         std::error_code ec;
@@ -389,6 +447,45 @@ std::optional<ExtractedContent> CfbfProcessor::prepare_extraction(const std::fil
 
 std::filesystem::path CfbfProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     return {};
+}
+
+bool CfbfProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+#ifdef _WIN32
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    bool coInit = SUCCEEDED(hr) || hr == S_FALSE;
+
+    bool result = false;
+    try {
+        std::wstring pathA = getLongPath(a);
+        std::wstring pathB = getLongPath(b);
+
+        IStorage* storageA;
+        if (FAILED(StgOpenStorage(pathA.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &storageA)))
+            throw std::runtime_error("cfbf: cannot open first file for verification");
+
+        IStorage* storageB;
+        if (FAILED(StgOpenStorage(pathB.c_str(), nullptr, STGM_DIRECT | STGM_READ | STGM_SHARE_DENY_WRITE, nullptr, 0, &storageB))) {
+            storageA->Release();
+            throw std::runtime_error("cfbf: cannot open second file for verification");
+        }
+
+        STATSTG statA, statB;
+        result = SUCCEEDED(storageA->Stat(&statA, STATFLAG_NONAME)) &&
+                 SUCCEEDED(storageB->Stat(&statB, STATFLAG_NONAME)) &&
+                 statA.clsid == statB.clsid &&
+                 compareContentIdentical(*storageA, *storageB);
+
+        storageA->Release();
+        storageB->Release();
+    } catch (const std::exception&) {
+        result = false;
+    }
+
+    if (coInit) CoUninitialize();
+    return result;
+#else
+    return true;
+#endif
 }
 
 } // namespace chisel
