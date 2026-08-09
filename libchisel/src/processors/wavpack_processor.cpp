@@ -81,6 +81,7 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     config.bits_per_sample  = WavpackGetBitsPerSample(ctx_in);
     config.num_channels     = WavpackGetNumChannels(ctx_in);
     config.sample_rate      = static_cast<int32_t>(WavpackGetSampleRate(ctx_in));
+    config.channel_mask     = WavpackGetChannelMask(ctx_in);
     config.qmode            = 0;
     config.block_samples    = 0;
     config.flags            = CONFIG_VERY_HIGH_FLAG | CONFIG_EXTRA_MODE;
