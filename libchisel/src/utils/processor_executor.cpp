@@ -392,6 +392,7 @@ namespace chisel {
                                 if (!checksum_ok) {
                                     event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected", item.is_container});
                                 } else {
+                                    Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
                                     event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
                                 }
                             }
@@ -463,6 +464,7 @@ namespace chisel {
                                 fs::remove(r.tmp, ec);
                             }
                             if (!st.stop_requested()) {
+                                Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
                                 event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
                             }
                         }
