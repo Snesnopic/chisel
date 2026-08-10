@@ -5,6 +5,7 @@ set(LIBCHISEL_SOURCES
         include/events.hpp
         include/file_type.hpp
         include/flac_processor.hpp
+        include/flacout_processor.hpp
         include/flexigif_processor.hpp
         include/gif_processor.hpp
         include/jpeg_processor.hpp
@@ -40,6 +41,7 @@ set(LIBCHISEL_SOURCES
         src/processors/ape_processor.cpp
         src/processors/archive_processor.cpp
         src/processors/flac_processor.cpp
+        src/processors/flacout_processor.cpp
         src/processors/flexigif_processor.cpp
         src/processors/gif_processor.cpp
         src/processors/jpeg_processor.cpp
@@ -152,6 +154,7 @@ target_include_directories(libchisel
         SYSTEM PRIVATE
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
+        ${CMAKE_SOURCE_DIR}/third_party/flacoutcpp/include
         ${libpng_SOURCE_DIR}
         ${libpng_BINARY_DIR}
         ${JPEG_INCLUDE_DIR}

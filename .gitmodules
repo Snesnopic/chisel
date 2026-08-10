@@ -111,3 +111,6 @@
 [submodule "third_party/mseedout"]
 	path = third_party/mseedout
 	url = https://github.com/Snesnopic/mseedout
+[submodule "third_party/flacoutcpp"]
+	path = third_party/flacoutcpp
+	url = https://github.com/Snesnopic/flacoutcpp

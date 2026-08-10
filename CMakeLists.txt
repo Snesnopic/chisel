@@ -271,6 +271,11 @@ if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
+# flacoutcpp: reuses the FLAC target just defined above instead of vendoring
+# its own copy (see the if(NOT TARGET FLAC) guard in its own CMakeLists.txt)
+set(FLACOUT_NATIVE OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/flacoutcpp EXCLUDE_FROM_ALL)
+
 # flexiGIF
 add_subdirectory(third_party/flexigif EXCLUDE_FROM_ALL)
 
@@ -619,6 +624,7 @@ add_subdirectory(third_party/openjpeg EXCLUDE_FROM_ALL)
 # common libraries for all platforms (exposed to libchisel/chisel_cli)
 set(CHISEL_LIBS
         FLAC
+        flacout_lib
         MAC
         png_static
         archive_static
@@ -693,7 +699,7 @@ set(NON_UNITY_TARGETS
         FLAC sharpyuv hwy libzstd_static brotlienc libqpdf_object
         jxl_dec-obj jxl_enc-obj png_static archive_static wavpack
         libdeflate_static zlibstatic tag liblzma lz4_static libkanzi
-        openjp2
+        openjp2 flacout_lib
 )
 
 if(WIN32)
