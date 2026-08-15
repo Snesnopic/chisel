@@ -279,6 +279,10 @@ add_subdirectory(third_party/flacoutcpp EXCLUDE_FROM_ALL)
 # flexiGIF
 add_subdirectory(third_party/flexigif EXCLUDE_FROM_ALL)
 
+# optigif
+set(OPTIGIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/optigif EXCLUDE_FROM_ALL)
+
 # wavpack
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 set(WAVPACK_BUILD_CLI OFF CACHE BOOL "Build command line programs" FORCE)
@@ -631,6 +635,7 @@ set(CHISEL_LIBS
         mozjpeg_static
         wavpack
         flexigif_core
+        optigif_core
         thirdparty_webp
         thirdparty_webpdemux
         thirdparty_webpmux

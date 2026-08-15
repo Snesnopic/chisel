@@ -17,6 +17,7 @@ set(LIBCHISEL_SOURCES
         include/vcf_processor.hpp
         include/json_processor.hpp
         include/mng_processor.hpp
+        include/optigif_processor.hpp
         include/pcx_processor.hpp
         include/jp2_processor.hpp
         include/log_sink.hpp
@@ -48,6 +49,7 @@ set(LIBCHISEL_SOURCES
         src/processors/jxl_processor.cpp
         src/processors/kanzi_processor.cpp
         src/processors/mkv_processor.cpp
+        src/processors/optigif_processor.cpp
         src/processors/mseed_processor.cpp
         src/processors/odf_processor.cpp
         src/processors/ooxml_processor.cpp
@@ -155,6 +157,7 @@ target_include_directories(libchisel
         ${libflac_SOURCE_DIR}/include
         ${libflac_BINARY_DIR}/include
         ${CMAKE_SOURCE_DIR}/third_party/flacoutcpp/include
+        ${CMAKE_SOURCE_DIR}/third_party/optigif/include
         ${libpng_SOURCE_DIR}
         ${libpng_BINARY_DIR}
         ${JPEG_INCLUDE_DIR}

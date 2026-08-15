@@ -110,3 +110,6 @@
 [submodule "third_party/flacoutcpp"]
 	path = third_party/flacoutcpp
 	url = https://github.com/Snesnopic/flacoutcpp
+[submodule "third_party/optigif"]
+	path = third_party/optigif
+	url = https://github.com/Snesnopic/optigif
