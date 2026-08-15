@@ -359,12 +359,35 @@ namespace chisel {
                                 }
                             } tmp_guard{tmp, false};
 
-                            candidates[i]->recompress(current, tmp, m_options);
-                            auto sz = safe_size(tmp);
-                            if (sz == 0) {
-                                pipeline_ok = false;
+                            bool stage_ok;
+                            try {
+                                candidates[i]->recompress(current, tmp, m_options);
+                                stage_ok = safe_size(tmp) > 0;
+                            } catch (const std::exception& e) {
+                                Logger::log(LogLevel::Warning, "Pipeline stage " + std::to_string(i) + " (" +
+                                            std::string(candidates[i]->get_name()) + ") failed for " + file.string() +
+                                            ": " + e.what(), "Executor");
+                                stage_ok = false;
+                            } catch (...) {
+                                Logger::log(LogLevel::Warning, "Pipeline stage " + std::to_string(i) + " (" +
+                                            std::string(candidates[i]->get_name()) + ") failed for " + file.string() +
+                                            " with a non-standard exception", "Executor");
+                                stage_ok = false;
+                            }
+
+                            if (!stage_ok) {
+                                // a later stage failing still leaves the previous stage's
+                                // (already smaller) output usable; only bail out entirely
+                                // if nothing has succeeded yet
+                                if (last_tmp.empty()) {
+                                    pipeline_ok = false;
+                                } else {
+                                    Logger::log(LogLevel::Debug, "Falling back to stage " + std::to_string(i - 1) +
+                                                "'s output for " + file.string(), "Executor");
+                                }
                                 break;
                             }
+
                             tmp_guard.release = true; // file is good, don't delete yet
                             if (current != file) {
                                 std::error_code ec;
