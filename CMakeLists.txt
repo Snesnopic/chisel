@@ -575,7 +575,6 @@ target_include_directories(zopflipng PUBLIC
 # mp3packercpp
 set(USE_OPENMP OFF CACHE BOOL "Enable OpenMP for mp3packercpp" FORCE)
 add_subdirectory(third_party/mp3packercpp EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/vbrfix EXCLUDE_FROM_ALL)
 
 # brotli
 set(BROTLIDEC_FOUND TRUE CACHE BOOL "" FORCE)
@@ -660,7 +659,6 @@ set(CHISEL_LIBS
         lz4_static
         libkanzi
         mp3packercpp_core
-        vbrfix_lib
         openjp2
         qadmimes-core
 )

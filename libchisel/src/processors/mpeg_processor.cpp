@@ -9,8 +9,6 @@
 #include "../../include/random_utils.hpp"
 #include <stdexcept>
 #include <filesystem>
-#include <fstream>
-#include "../../../third_party/vbrfix/include/vbrfix/vbrfix.hpp"
 #include "packer.hpp"
 #include "decoder.hpp"
 #include "file_type.hpp"
@@ -37,27 +35,6 @@ void MpegProcessor::recompress(const fs::path& input,
     }
 
     Logger::log(LogLevel::Debug, "Compression successful.", get_name());
-    /*
-    try {
-        vbrfix::FixParams params;
-        params.always_skip = false;
-
-        const std::vector<uint8_t> fixed_data = vbrfix::fix_mp3(output, params);
-
-        std::ofstream ofs(output, std::ios::binary | std::ios::trunc);
-        if (!ofs.is_open()) {
-            throw std::runtime_error("Failed to open output file for writing VBR fix data.");
-        }
-
-        ofs.write(reinterpret_cast<const char*>(fixed_data.data()), static_cast<std::streamsize>(fixed_data.size()));
-        ofs.close();
-
-    } catch (const std::exception& e) {
-        throw std::runtime_error("Exception during VBR fix processing: " + std::string(e.what()));
-    }
-
-    Logger::log(LogLevel::Debug, "Compression and vbr fix successful.", get_name());
-    */
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
