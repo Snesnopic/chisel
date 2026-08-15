@@ -20,16 +20,18 @@ void OptigifProcessor::recompress(const std::filesystem::path& input,
 
     optigif::Options opts;
     opts.restructure = true;
-    // search_restarts (-s) is O(n^2/alignment) per frame and single-threaded
-    // here (see below); on this project's own bench corpus it was still
-    // running after 30+ minutes of CPU time on a handful of large animations.
-    // restructure alone gets most of the size win (-8.22% on that corpus,
-    // seconds not minutes) and stays predictable across arbitrary input.
-    opts.search_restarts = false;
+    opts.search_restarts = true;
     opts.strip_metadata = !options.preserve_metadata;
     // chisel already parallelizes across files via its own ThreadPool; running
     // optigif's own search/restructure threads on top would oversubscribe.
     opts.search.threads = 1;
+    // search_restarts is O(n^2/alignment) per frame; the library default (160)
+    // took 30+ min of single-thread CPU on this project's bench corpus without
+    // finishing. 640 was measured on the same corpus (single thread, 51 files,
+    // --strip) at -11.48% in 161s -- beating chisel's old gifsicle->flexigif
+    // pipeline on both size (-11.43%) and time (737s, and only on 29/51 files
+    // -- flexiGIF never finishes on the rest) with a 4.5x time margin.
+    opts.search.alignment = 640;
 
     const auto result = optigif::recompress_file(input, output, opts);
     if (!result.ok) {
