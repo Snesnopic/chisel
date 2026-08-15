@@ -80,10 +80,6 @@
 [submodule "third_party/corrosion"]
 	path = third_party/corrosion
 	url = https://github.com/corrosion-rs/corrosion.git
-[submodule "third_party/vbrfix"]
-	path = third_party/vbrfix
-	url = https://github.com/Snesnopic/vbrfix
-	branch = development
 [submodule "third_party/pugixml"]
 	path = third_party/pugixml
 	url = https://github.com/zeux/pugixml.git
