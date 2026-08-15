@@ -53,6 +53,8 @@
 #include "cab_processor.hpp"
 #include "gz_processor.hpp"
 #include "lz4_processor.hpp"
+#include "flacout_processor.hpp"
+#include "optigif_processor.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -60,16 +62,16 @@
 namespace chisel {
 
 ProcessorRegistry::ProcessorRegistry() {
-    processors_.push_back(std::make_unique<FlacProcessor>());
+    //processors_.push_back(std::make_unique<FlacProcessor>());
     processors_.push_back(std::make_unique<WavPackProcessor>());
     processors_.push_back(std::make_unique<ApeProcessor>());
     processors_.push_back(std::make_unique<JpegProcessor>());
     processors_.push_back(std::make_unique<PngProcessor>());
     processors_.push_back(std::make_unique<ZopfliPngProcessor>());
     processors_.push_back(std::make_unique<WebpProcessor>());
-    processors_.push_back(std::make_unique<GifProcessor>());
+    //processors_.push_back(std::make_unique<GifProcessor>());
     processors_.push_back(std::make_unique<TgaProcessor>());
-    processors_.push_back(std::make_unique<FlexiGifProcessor>());
+    //processors_.push_back(std::make_unique<FlexiGifProcessor>());
     processors_.push_back(std::make_unique<TiffProcessor>());
     processors_.push_back(std::make_unique<JxlProcessor>());
     processors_.push_back(std::make_unique<PdfProcessor>());
@@ -110,6 +112,8 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<LuaProcessor>());
     processors_.push_back(std::make_unique<StlProcessor>());
     processors_.push_back(std::make_unique<CabProcessor>());
+    processors_.push_back(std::make_unique<FlacoutProcessor>());
+    processors_.push_back(std::make_unique<OptigifProcessor>());
 }
 
 std::vector<IProcessor*> ProcessorRegistry::find_by_mime(const std::string& mime) const {
