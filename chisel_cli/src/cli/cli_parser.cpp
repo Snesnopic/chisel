@@ -46,10 +46,6 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
                    "Number of iterations for Zopfli on large images.")
                    ->default_val(settings.options.iterations_large);
 
-    //app.add_option("--max-tokens", settings.options.maxTokens,
-    //               "Number of tokens for FlexiGif compression.")
-    //               ->default_val(settings.options.maxTokens);
-
     // calculate default thread count
     settings.num_threads = std::max(1U, std::thread::hardware_concurrency() / 2);
     app.add_option("--threads", settings.num_threads,

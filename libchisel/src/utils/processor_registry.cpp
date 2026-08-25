@@ -7,8 +7,6 @@
 #include "archive_processor.hpp"
 #include "bmp_processor.hpp"
 #include "flac_processor.hpp"
-#include "flexigif_processor.hpp"
-#include "gif_processor.hpp"
 #include "jpeg_processor.hpp"
 #include "jxl_processor.hpp"
 #include "mkv_processor.hpp"
@@ -69,9 +67,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<PngProcessor>());
     processors_.push_back(std::make_unique<ZopfliPngProcessor>());
     processors_.push_back(std::make_unique<WebpProcessor>());
-    //processors_.push_back(std::make_unique<GifProcessor>());
     processors_.push_back(std::make_unique<TgaProcessor>());
-    //processors_.push_back(std::make_unique<FlexiGifProcessor>());
     processors_.push_back(std::make_unique<TiffProcessor>());
     processors_.push_back(std::make_unique<JxlProcessor>());
     processors_.push_back(std::make_unique<PdfProcessor>());

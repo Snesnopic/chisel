@@ -52,9 +52,6 @@
 [submodule "third_party/MACLib"]
 	path = third_party/MACLib
 	url = https://github.com/Snesnopic/MACLib
-[submodule "third_party/flexigif"]
-	path = third_party/flexigif
-	url = https://github.com/Snesnopic/flexigif.git
 [submodule "third_party/libmkclean"]
 	path = third_party/libmkclean
 	url = https://github.com/Snesnopic/libmkclean.git
@@ -68,9 +65,6 @@
 [submodule "third_party/bmplib"]
 	path = third_party/bmplib
 	url = https://github.com/Snesnopic/bmplib.git
-[submodule "third_party/gifsicle"]
-	path = third_party/gifsicle
-	url = https://github.com/Snesnopic/gifsicle.git
 [submodule "third_party/bzip2"]
 	path = third_party/bzip2
 	url = https://github.com/libarchive/bzip2.git

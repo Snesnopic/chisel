@@ -20,7 +20,6 @@ namespace chisel {
     struct ProcessingOptions {
         size_t iterations = 15;                  /// Iteration count (Zopfli)
         size_t iterations_large = iterations / 3;/// Iteration count on large images (Zopfli)
-        size_t maxTokens = 10000;                /// Maximum tokens for dictionary (FlexiGif)
         bool verify_checksums = false;           /// Verify original files are semantically equal to processed files
         bool preserve_metadata = true;           /// Don't discard metadata during recompression
     };

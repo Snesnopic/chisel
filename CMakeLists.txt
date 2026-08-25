@@ -276,9 +276,6 @@ endif()
 set(FLACOUT_NATIVE OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/flacoutcpp EXCLUDE_FROM_ALL)
 
-# flexiGIF
-add_subdirectory(third_party/flexigif EXCLUDE_FROM_ALL)
-
 # optigif
 set(OPTIGIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/optigif EXCLUDE_FROM_ALL)
@@ -558,13 +555,6 @@ add_subdirectory(${sqlite3_SOURCE_DIR} ${sqlite3_BINARY_DIR} EXCLUDE_FROM_ALL)
 # mseedout
 add_subdirectory(third_party/mseedout EXCLUDE_FROM_ALL)
 
-# gifsicle
-set(BUILD_GIFSICLE_CLI OFF CACHE BOOL "" FORCE)
-set(BUILD_GIFDIFF OFF CACHE BOOL "" FORCE)
-set(BUILD_GIFVIEW OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(third_party/gifsicle EXCLUDE_FROM_ALL)
-
 # Monkey's Audio
 set(BUILD_UTIL OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -634,7 +624,6 @@ set(CHISEL_LIBS
         ogg
         mozjpeg_static
         wavpack
-        flexigif_core
         optigif_core
         thirdparty_webp
         thirdparty_webpdemux
@@ -649,7 +638,6 @@ set(CHISEL_LIBS
         sqlite3-static
         zlibstatic
         tag
-        libgifsicle
         pugixml
         mseedout_lib
         mseed_static
@@ -688,8 +676,6 @@ add_subdirectory(libchisel)
 add_dependencies(libchisel copy_mozjpeg_jconfig)
 
 target_include_directories(libchisel SYSTEM PRIVATE
-        "${CMAKE_SOURCE_DIR}/third_party/gifsicle/include"
-        "${CMAKE_SOURCE_DIR}/third_party/gifsicle/src"
         "${CMAKE_SOURCE_DIR}/third_party/mseedout/include"
         "${CMAKE_SOURCE_DIR}/third_party/mseedout/third_party/libmseed"
 )
@@ -704,10 +690,6 @@ set(NON_UNITY_TARGETS
         libdeflate_static zlibstatic tag liblzma lz4_static libkanzi
         openjp2 flacout_lib
 )
-
-if(WIN32)
-    list(APPEND NON_UNITY_TARGETS libgifsicle)
-endif()
 
 if(ENABLE_MATROSKA)
     list(APPEND NON_UNITY_TARGETS

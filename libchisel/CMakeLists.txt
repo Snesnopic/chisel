@@ -6,8 +6,6 @@ set(LIBCHISEL_SOURCES
         include/file_type.hpp
         include/flac_processor.hpp
         include/flacout_processor.hpp
-        include/flexigif_processor.hpp
-        include/gif_processor.hpp
         include/jpeg_processor.hpp
         include/mime_processor.hpp
         src/processors/mime_processor.cpp
@@ -43,8 +41,6 @@ set(LIBCHISEL_SOURCES
         src/processors/archive_processor.cpp
         src/processors/flac_processor.cpp
         src/processors/flacout_processor.cpp
-        src/processors/flexigif_processor.cpp
-        src/processors/gif_processor.cpp
         src/processors/jpeg_processor.cpp
         src/processors/jxl_processor.cpp
         src/processors/kanzi_processor.cpp
@@ -173,7 +169,6 @@ target_include_directories(libchisel
         ${zopfli_SOURCE_DIR}/src/zopfli
         ${libmseed_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/third_party/MACLib/Shared
-        ${CMAKE_SOURCE_DIR}/third_party/flexigif/core
         ${CMAKE_SOURCE_DIR}/third_party/stb
         ${taglib_SOURCE_DIR}
         ${taglib_BINARY_DIR}
@@ -192,12 +187,6 @@ target_include_directories(libchisel
         ${CMAKE_SOURCE_DIR}/third_party/lz4/lib
 )
 
-if(NOT WIN32)
-    target_include_directories(libchisel SYSTEM PRIVATE
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/include
-            ${CMAKE_SOURCE_DIR}/third_party/gifsicle/src
-    )
-endif()
 if(ENABLE_MATROSKA)
     target_include_directories(libchisel PRIVATE ${libebml_SOURCE_DIR}
             ${libmatroska_SOURCE_DIR}
@@ -233,7 +222,6 @@ add_dependencies(libchisel libzstd_static)
 add_dependencies(libchisel png_static)
 add_dependencies(libchisel ogg)
 add_dependencies(libchisel FLAC)
-add_dependencies(libchisel flexigif_core)
 add_dependencies(libchisel wavpack)
 add_dependencies(libchisel archive_static)
 if(ENABLE_MATROSKA)
@@ -249,7 +237,6 @@ add_dependencies(libchisel MAC)
 add_dependencies(libchisel tag)
 add_dependencies(libchisel pugixml)
 add_dependencies(libchisel libdeflate_static)
-add_dependencies(libchisel libgifsicle)
 add_dependencies(libchisel mseed_static)
 add_dependencies(libchisel brotlicommon brotlidec brotlienc)
 add_dependencies(libchisel woff2common woff2dec woff2enc)
