@@ -21,16 +21,13 @@ namespace chisel {
  * @brief Implements IProcessor for FLAC files using flacoutcpp.
  *
  * flacoutcpp searches a much larger part of the LPC/apodization/block-size
- * parameter space than libFLAC's own encoder (used by FlacProcessor), at the
- * cost of a from-scratch decode/encode pass. Cover art is intentionally left
- * to FlacProcessor (can_extract_contents() is false here) so the two never
- * fight over the same PICTURE metadata block.
+ * parameter space than libFLAC's own encoder, at the cost of a from-scratch
+ * decode/encode pass. Registered in ProcessorRegistry in place of the old
+ * libFLAC-based FlacProcessor, which is no longer instantiated.
  *
- * @note Not yet registered in ProcessorRegistry: FlacProcessor and this class
- * are alternative full re-encoders of the same source, not a chain where one
- * improves on the other's output, so PIPE-mode registration would just waste
- * one of the two encodes rather than pick the smaller result. See the
- * registration TODO in processor_registry.cpp for the resolution plan.
+ * @note can_extract_contents() is false: this processor doesn't touch cover
+ * art. FlacProcessor used to handle that, but with it retired, FLAC cover
+ * art extraction is currently unhandled.
  */
 class FlacoutProcessor final : public IProcessor {
 public:

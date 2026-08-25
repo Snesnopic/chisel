@@ -21,12 +21,11 @@ namespace chisel {
  * @brief Implements IProcessor for GIF files using optigif.
  *
  * optigif rebuilds frame structure (crop, disposal, transparency, palettes)
- * and searches LZW dictionary restart points on the same in-memory model,
- * where GifProcessor (gifsicle) and FlexiGifProcessor each only do one half
- * of that job and hand the file back and forth. This processor supersedes
- * both -- it is not meant to be chained with them.
- *
- * @note Not yet registered in ProcessorRegistry.
+ * and searches LZW dictionary restart points on the same in-memory model.
+ * Registered in ProcessorRegistry in place of the old gifsicle-based
+ * GifProcessor and flexiGIF-based FlexiGifProcessor, which each only did one
+ * half of that job and handed the file back and forth; both have since been
+ * removed.
  */
 class OptigifProcessor final : public IProcessor {
 public:
