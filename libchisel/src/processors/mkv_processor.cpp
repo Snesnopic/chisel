@@ -26,14 +26,14 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
 #ifdef HAVE_MATROSKA
     std::vector<std::string> args;
     args.emplace_back("mkclean");
+    args.emplace_back("--optimize");
 
-    if (options.preserve_metadata) {
-        args.emplace_back("--optimize");
-        args.emplace_back("--keep-cues");
-    } else {
-        args.emplace_back("--optimize");
-        args.emplace_back("--unsafe");
-    }
+    // --unsafe drops elements that only help recover a *later corrupted*
+    // file (redundant recovery aids), not decorative metadata -- title/tags
+    // survive either way. It's unrelated to preserve_metadata; chisel has no
+    // separate "resilience to future corruption" option, so always take the
+    // smaller output here, consistent with every other processor's default.
+    args.emplace_back("--unsafe");
 
     args.emplace_back("--quiet");
     
