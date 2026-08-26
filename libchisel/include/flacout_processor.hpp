@@ -25,9 +25,9 @@ namespace chisel {
  * decode/encode pass. Registered in ProcessorRegistry in place of the old
  * libFLAC-based FlacProcessor, which is no longer instantiated.
  *
- * @note can_extract_contents() is false: this processor doesn't touch cover
- * art. FlacProcessor used to handle that, but with it retired, FLAC cover
- * art extraction is currently unhandled.
+ * Cover art extraction/reinsertion uses the same shared AudioMetadataUtil
+ * logic every other cover-art-only container uses; FlacProcessor used to
+ * handle this and it was left unwired when it was retired.
  */
 class FlacoutProcessor final : public IProcessor {
 public:
@@ -48,13 +48,28 @@ public:
 
     // --- capabilities ---
     [[nodiscard]] bool can_recompress() const noexcept override { return true; }
-    // cover art stays FlacProcessor's job; see class doc comment
-    [[nodiscard]] bool can_extract_contents() const noexcept override { return false; }
 
+    /**
+     * @brief This processor also extracts cover art using AudioMetadataUtil.
+     * @return true
+     */
+    [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
+
+    /**
+     * @brief Extracts embedded cover art via AudioMetadataUtil.
+     * @param input_path Path to the source file.
+     * @return ExtractedContent with cover art files, or std::nullopt.
+     */
     std::optional<ExtractedContent> prepare_extraction(
-        [[maybe_unused]] const std::filesystem::path& input_path) override { return std::nullopt; }
+        const std::filesystem::path& input_path) override;
 
-    std::filesystem::path finalize_extraction(const ExtractedContent &, const ProcessingOptions &options) override { return {}; }
+    /**
+     * @brief Re-inserts optimized cover art via AudioMetadataUtil.
+     * @param content Content descriptor from prepare_extraction.
+     * @param options Processing options.
+     * @return Path to the finalized file.
+     */
+    std::filesystem::path finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) override;
 
     /**
      * @brief Recompresses a FLAC file using flacoutcpp's DP-based optimizer.

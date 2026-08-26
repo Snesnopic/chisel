@@ -4,6 +4,7 @@
 
 #include "../../include/flacout_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/audio_metadata_util.hpp"
 #include <flacoutcpp.hpp>
 #include <FLAC/all.h>
 #include <sstream>
@@ -32,6 +33,14 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+}
+
+std::optional<ExtractedContent> FlacoutProcessor::prepare_extraction(const std::filesystem::path& input_path) {
+    return AudioMetadataUtil::prepareCoverExtraction(input_path, "flacout-processor", get_name());
+}
+
+std::filesystem::path FlacoutProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
+    return AudioMetadataUtil::finalizeCoverExtraction(content, get_name());
 }
 
 std::string FlacoutProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
