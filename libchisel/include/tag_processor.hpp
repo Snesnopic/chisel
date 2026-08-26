@@ -22,13 +22,17 @@ namespace chisel {
      * extracts and re-optimizes embedded cover art -- the underlying audio/video
      * stream itself is never recompressed.
      *
-     * @details Covers AIFF, ASF/WMA/WMV, DSDIFF, DSF, MP4/M4A/MOV/3GP, WAV,
-     * Musepack, and TrueAudio. All of these delegate to the same TagLib-based
-     * AudioMetadataUtil extraction/reinsertion logic, which already dispatches
-     * internally by the concrete TagLib::File subtype -- so one processor
-     * covering every one of these formats is exactly as correct as maintaining
-     * eight separate near-identical classes, just with one shared integrity
-     * check instead of eight copies that never checked anything at all.
+     * @details Covers AIFF, DSDIFF, DSF, WAV, Musepack, and TrueAudio. All of
+     * these delegate to the same TagLib-based AudioMetadataUtil
+     * extraction/reinsertion logic, which already dispatches internally by
+     * the concrete TagLib::File subtype -- so one processor covering every
+     * one of these formats is exactly as correct as maintaining six separate
+     * near-identical classes, just with one shared integrity check instead
+     * of six copies that never checked anything at all.
+     *
+     * MP4/M4A/MOV/3GP and ASF/WMA/WMV used to be covered here too; those
+     * families now have their own Mp4Processor and AsfProcessor, which also
+     * clean up the container structure instead of only handling cover art.
      */
     class TagProcessor final : public IProcessor {
     public:
@@ -38,17 +42,13 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 23> kMimes = {
+            static constexpr std::array<std::string_view, 14> kMimes = {
                 // AIFF
                 "audio/x-aiff", "audio/aiff",
-                // ASF / WMA / WMV
-                "audio/x-ms-wma", "video/x-ms-wmv", "video/x-ms-asf",
                 // DSDIFF
                 "audio/dff", "audio/x-dff",
                 // DSF
                 "audio/dsf", "audio/x-dsf",
-                // MP4 / M4A / MOV / 3GP
-                "audio/mp4", "audio/x-m4a", "video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2",
                 // WAV
                 "audio/wav", "audio/x-wav", "audio/vnd.wave", "audio/wave",
                 // Musepack
@@ -60,12 +60,10 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 21> kExts = {
+            static constexpr std::array<std::string_view, 10> kExts = {
                 ".aif", ".aiff", ".aifc",                                          // AIFF
-                ".wma", ".wmv", ".asf",                                            // ASF / WMA / WMV
                 ".dff",                                                            // DSDIFF
                 ".dsf",                                                            // DSF
-                ".mp4", ".m4a", ".m4b", ".m4v", ".mov", ".qt", ".3gp", ".3g2",     // MP4 family
                 ".wav",                                                            // WAV
                 ".mpc", ".mp+", ".mpp",                                            // Musepack
                 ".tta"                                                             // TrueAudio

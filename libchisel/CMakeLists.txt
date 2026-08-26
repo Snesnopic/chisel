@@ -1,6 +1,8 @@
 set(LIBCHISEL_SOURCES
         include/ape_processor.hpp
         include/archive_processor.hpp
+        include/asf_processor.hpp
+        include/avi_processor.hpp
         include/event_bus.hpp
         include/events.hpp
         include/file_type.hpp
@@ -15,6 +17,7 @@ set(LIBCHISEL_SOURCES
         include/vcf_processor.hpp
         include/json_processor.hpp
         include/mng_processor.hpp
+        include/mp4_processor.hpp
         include/optigif_processor.hpp
         include/pcx_processor.hpp
         include/jp2_processor.hpp
@@ -31,6 +34,7 @@ set(LIBCHISEL_SOURCES
         include/processor_executor.hpp
         include/processor_registry.hpp
         include/random_utils.hpp
+        include/sparse_rewrite_util.hpp
         include/sqlite_processor.hpp
         include/thread_pool.hpp
         include/tiff_processor.hpp
@@ -39,12 +43,15 @@ set(LIBCHISEL_SOURCES
         include/zopflipng_processor.hpp
         src/processors/ape_processor.cpp
         src/processors/archive_processor.cpp
+        src/processors/asf_processor.cpp
+        src/processors/avi_processor.cpp
         src/processors/flac_processor.cpp
         src/processors/flacout_processor.cpp
         src/processors/jpeg_processor.cpp
         src/processors/jxl_processor.cpp
         src/processors/kanzi_processor.cpp
         src/processors/mkv_processor.cpp
+        src/processors/mp4_processor.cpp
         src/processors/optigif_processor.cpp
         src/processors/mseed_processor.cpp
         src/processors/odf_processor.cpp
@@ -67,6 +74,7 @@ set(LIBCHISEL_SOURCES
         src/utils/processor_executor.cpp
         src/utils/processor_registry.cpp
         src/utils/random_utils.cpp
+        src/utils/sparse_rewrite_util.cpp
         src/utils/thread_pool.cpp
         include/tga_processor.hpp
         src/processors/tga_processor.cpp

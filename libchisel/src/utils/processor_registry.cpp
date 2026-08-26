@@ -5,11 +5,14 @@
 #include "processor_registry.hpp"
 #include "ape_processor.hpp"
 #include "archive_processor.hpp"
+#include "asf_processor.hpp"
+#include "avi_processor.hpp"
 #include "bmp_processor.hpp"
 #include "flac_processor.hpp"
 #include "jpeg_processor.hpp"
 #include "jxl_processor.hpp"
 #include "mkv_processor.hpp"
+#include "mp4_processor.hpp"
 #include "mpeg_processor.hpp"
 #include "mseed_processor.hpp"
 #include "odf_processor.hpp"
@@ -78,6 +81,9 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<MseedProcessor>());
     processors_.push_back(std::make_unique<MkvProcessor>());
     processors_.push_back(std::make_unique<MpegProcessor>());
+    processors_.push_back(std::make_unique<Mp4Processor>());
+    processors_.push_back(std::make_unique<AsfProcessor>());
+    processors_.push_back(std::make_unique<AviProcessor>());
     processors_.push_back(std::make_unique<TagProcessor>());
     processors_.push_back(std::make_unique<OggProcessor>());
     processors_.push_back(std::make_unique<BmpProcessor>());

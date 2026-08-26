@@ -55,6 +55,15 @@ namespace chisel {
         p[0] = (v >> 24) & 0xFF; p[1] = (v >> 16) & 0xFF; p[2] = (v >> 8) & 0xFF; p[3] = v & 0xFF;
     }
 
+    uint64_t read_be64(const uint8_t* p) {
+        return (static_cast<uint64_t>(read_be32(p)) << 32) | read_be32(p + 4);
+    }
+
+    void write_be64(uint8_t* p, const uint64_t v) {
+        write_be32(p, static_cast<uint32_t>(v >> 32));
+        write_be32(p + 4, static_cast<uint32_t>(v & 0xFFFFFFFFu));
+    }
+
     uint32_t align4(const uint32_t v) {
         return (v + 3) & ~3;
     }
