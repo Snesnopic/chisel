@@ -8,6 +8,7 @@ set(LIBCHISEL_SOURCES
         include/file_type.hpp
         include/flac_processor.hpp
         include/flacout_processor.hpp
+        include/gif_animation_compare.hpp
         include/jpeg_processor.hpp
         include/mime_processor.hpp
         src/processors/mime_processor.cpp
@@ -75,6 +76,7 @@ set(LIBCHISEL_SOURCES
         src/utils/processor_registry.cpp
         src/utils/random_utils.cpp
         src/utils/sparse_rewrite_util.cpp
+        src/utils/stb_image_impl.cpp
         src/utils/thread_pool.cpp
         include/tga_processor.hpp
         src/processors/tga_processor.cpp

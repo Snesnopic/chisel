@@ -4,11 +4,10 @@
 
 #include "../../include/optigif_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/gif_animation_compare.hpp"
 #include "file_utils.hpp"
-#include "stb_image.h"
 #include <optigif/optigif.hpp>
 #include <cstdio>
-#include <cstring>
 #include <stdexcept>
 #include <vector>
 
@@ -71,62 +70,11 @@ bool OptigifProcessor::raw_equal(const std::filesystem::path& a, const std::file
         return false;
     }
 
-    int wA, hA, framesA;
-    int* delaysA = nullptr;
-    unsigned char* dataA = stbi_load_gif_from_memory(
-        bufA.data(), static_cast<int>(bufA.size()),
-        &delaysA, &wA, &hA, &framesA, nullptr, 4
-    );
-
-    if (!dataA) {
-        Logger::log(LogLevel::Warning, "Raw_equal: failed to decode gif a", get_name());
-        return false;
+    const auto result = gif_animations_equal(bufA, bufB);
+    if (!result.equal) {
+        Logger::log(LogLevel::Debug, "Raw_equal: " + result.reason, get_name());
     }
-
-    int wB, hB, framesB;
-    int* delaysB = nullptr;
-    unsigned char* dataB = stbi_load_gif_from_memory(
-        bufB.data(), static_cast<int>(bufB.size()),
-        &delaysB, &wB, &hB, &framesB, nullptr, 4
-    );
-
-    if (!dataB) {
-        Logger::log(LogLevel::Warning, "Raw_equal: failed to decode gif b", get_name());
-        stbi_image_free(dataA);
-        if (delaysA) stbi_image_free(delaysA);
-        return false;
-    }
-
-    bool equal = true;
-
-    if (wA != wB || hA != hB || framesA != framesB) {
-        Logger::log(LogLevel::Debug, "Raw_equal: dimension/frame count mismatch", get_name());
-        equal = false;
-    } else {
-        const std::size_t totalBytes = static_cast<std::size_t>(wA) * hA * 4 * framesA;
-        if (std::memcmp(dataA, dataB, totalBytes) != 0) {
-            Logger::log(LogLevel::Debug, "Raw_equal: pixel mismatch", get_name());
-            equal = false;
-        }
-        // pixel data alone doesn't capture animation timing: compare per-frame
-        // delays too, since a recompressor could reproduce identical frames
-        // while still corrupting playback speed
-        if (equal && (delaysA == nullptr) != (delaysB == nullptr)) {
-            Logger::log(LogLevel::Debug, "Raw_equal: delay array presence mismatch", get_name());
-            equal = false;
-        } else if (equal && delaysA && delaysB &&
-                   std::memcmp(delaysA, delaysB, static_cast<std::size_t>(framesA) * sizeof(int)) != 0) {
-            Logger::log(LogLevel::Debug, "Raw_equal: delay mismatch", get_name());
-            equal = false;
-        }
-    }
-
-    stbi_image_free(dataA);
-    if (delaysA) stbi_image_free(delaysA);
-    stbi_image_free(dataB);
-    if (delaysB) stbi_image_free(delaysB);
-
-    return equal;
+    return result.equal;
 }
 
 std::string OptigifProcessor::get_raw_checksum(const std::filesystem::path&) const {

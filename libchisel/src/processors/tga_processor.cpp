@@ -13,9 +13,9 @@
 #include <fstream>
 #include <algorithm>
 
-#define STB_IMAGE_IMPLEMENTATION
+// stb_image / stb_image_write's implementation lives in stb_image_impl.cpp,
+// the one translation unit that defines it for the whole library
 #include "../../third_party/stb/stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "file_utils.hpp"
 #include "../../third_party/stb/stb_image_write.h"
 
