@@ -42,8 +42,8 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 6> kMimes = {
-            "audio/mp4", "audio/x-m4a", "video/mp4", "video/quicktime", "video/3gpp", "video/3gpp2"
+        static constexpr std::array<std::string_view, 7> kMimes = {
+            "audio/mp4", "audio/x-m4a", "video/mp4", "video/x-m4v", "video/quicktime", "video/3gpp", "video/3gpp2"
         };
         return {kMimes.data(), kMimes.size()};
     }
