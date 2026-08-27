@@ -117,21 +117,47 @@ std::string guess_extension(QPDFObjectHandle const& stream,
 }
 
 /**
- * @brief Checks if a PDF stream is compressed only with FlateDecode.
- * @param stream The QPDFObjectHandle for the stream.
- * @return True if the stream uses a single /FlateDecode filter, false otherwise.
+ * @brief Which single, lossless, general-purpose filter (if any) a PDF
+ * stream uses. LZWDecode/ASCII85Decode/ASCIIHexDecode are filters qpdf's own
+ * CLI would recompress under --decode-level=generalized; chisel doesn't call
+ * that CLI, so this exists to single them out from image-specific filters
+ * (DCTDecode/JPXDecode, which are lossy to re-encode) and multi-filter or
+ * unrecognized cases, which this code doesn't attempt to handle.
  */
-bool stream_is_single_flate(QPDFObjectHandle const& stream) {
-    if (!stream.isStream()) return false;
+enum class SingleFilterKind { None, Flate, Lzw, Ascii85, AsciiHex };
+
+/**
+ * @brief Classifies a PDF stream's filter, if it has exactly one.
+ * @param stream The QPDFObjectHandle for the stream.
+ * @return The filter kind, or SingleFilterKind::None if the stream has zero,
+ * more than one, or an unrecognized filter.
+ */
+SingleFilterKind classify_single_filter(QPDFObjectHandle const& stream) {
+    if (!stream.isStream()) return SingleFilterKind::None;
     const QPDFObjectHandle dict = stream.getDict();
-    if (!dict.isDictionary()) return false;
-    const QPDFObjectHandle filter = dict.getKey("/Filter");
-    if (filter.isName()) return (filter.getName() == "/FlateDecode");
-    if (filter.isArray() && filter.getArrayNItems() == 1) {
-        const QPDFObjectHandle item = filter.getArrayItem(0);
-        return (item.isName() && item.getName() == "/FlateDecode");
+    if (!dict.isDictionary()) return SingleFilterKind::None;
+    QPDFObjectHandle filter = dict.getKey("/Filter");
+    if (filter.isArray()) {
+        if (filter.getArrayNItems() != 1) return SingleFilterKind::None;
+        filter = filter.getArrayItem(0);
     }
-    return false;
+    if (!filter.isName()) return SingleFilterKind::None;
+    const std::string name = filter.getName();
+    if (name == "/FlateDecode") return SingleFilterKind::Flate;
+    if (name == "/LZWDecode") return SingleFilterKind::Lzw;
+    if (name == "/ASCII85Decode") return SingleFilterKind::Ascii85;
+    if (name == "/ASCIIHexDecode") return SingleFilterKind::AsciiHex;
+    return SingleFilterKind::None;
+}
+
+// zopflipng's own established convention for splitting effort between the
+// "iterations" and "iterations_large" budgets; reused here for the same
+// reason it exists there -- full effort on small streams is cheap, but
+// unbounded effort on a multi-megabyte one is not.
+constexpr size_t kLargeStreamThreshold = 200000;
+
+unsigned pick_iterations(const size_t data_size, const ProcessingOptions& options) {
+    return static_cast<unsigned>(data_size < kLargeStreamThreshold ? options.iterations : options.iterations_large);
 }
 
 void set_env_var(const char* name, const char* value) {
@@ -290,7 +316,18 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             auto& info = st.streams[obj_id];
 
             const QPDFObjectHandle dict = obj.getDict();
-            bool is_flate = stream_is_single_flate(obj);
+            const SingleFilterKind filter_kind = classify_single_filter(obj);
+            bool is_flate = (filter_kind == SingleFilterKind::Flate);
+            // LZWDecode/ASCII85Decode/ASCIIHexDecode all decode to plain,
+            // uncompressed-or-text-encoded bytes with the same shape Flate
+            // streams have; recompressing them means re-encoding as Flate
+            // (there's no "LZW but smaller" -- Flate+zopfli is strictly the
+            // better lossless choice), so the stream's /Filter has to change
+            // along with its data, unlike the flate-stays-flate case below.
+            bool is_convertible_to_flate =
+                (filter_kind == SingleFilterKind::Lzw ||
+                 filter_kind == SingleFilterKind::Ascii85 ||
+                 filter_kind == SingleFilterKind::AsciiHex);
             bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
 
             std::error_code ec;
@@ -300,6 +337,11 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             std::vector<unsigned char> raw_data_to_inject;
 
             bool replace_stream = false;
+            // only set when the injected data needs a different /Filter than
+            // the stream originally declared (the Lzw/Ascii85/AsciiHex ->
+            // Flate conversion below); left unset (empty) otherwise, meaning
+            // "keep the dict's own /Filter and /DecodeParms as they are"
+            QPDFObjectHandle new_filter;
 
             // read externally optimized file if it exists (e.g. jpg optimized by Phase 2)
             if (file_was_optimized) {
@@ -317,7 +359,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                     if (is_flate) {
                         try {
                             raw_data_to_inject = ZopfliCompressor::compress(
-                                raw_data_to_inject, options.iterations, ZopfliFormat::ZLIB);
+                                raw_data_to_inject, pick_iterations(raw_data_to_inject.size(), options),
+                                ZopfliFormat::ZLIB);
                         } catch (const std::exception& e) {
                             Logger::log(LogLevel::Warning,
                                         "Failed to re-compress optimized stream for obj " +
@@ -330,26 +373,36 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                     replace_stream = !raw_data_to_inject.empty();
                 }
             }
-            // if no external file, but it's an internal flate stream, optimize with zopfli
-            else if (is_flate && !has_decode_parms && info.decodable) {
+            // if no external file, but it's a plain flate/LZW/ASCII85/ASCIIHex stream
+            // with no Predictor complications, optimize with zopfli
+            else if ((is_flate || is_convertible_to_flate) && !has_decode_parms && info.decodable) {
                 try {
                     const std::shared_ptr<Buffer> buf = obj.getStreamData(qpdf_dl_specialized);
                     std::vector<unsigned char> decoded(buf->getBuffer(), buf->getBuffer() + buf->getSize());
-                    auto recompressed = ZopfliCompressor::compress(decoded, options.iterations, ZopfliFormat::ZLIB);
+                    auto recompressed = ZopfliCompressor::compress(
+                        decoded, pick_iterations(decoded.size(), options), ZopfliFormat::ZLIB);
 
                     if (recompressed.size() < obj.getRawStreamData()->getSize()) {
                         raw_data_to_inject = std::move(recompressed);
                         replace_stream = true;
+                        if (is_convertible_to_flate) {
+                            new_filter = QPDFObjectHandle::newName("/FlateDecode");
+                        }
                     }
                 } catch (const std::exception& e) {
                     Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
                 }
             }
 
-            // inject the raw data keeping the original dictionary filters intact
+            // inject the raw data, keeping the original dictionary filters
+            // intact unless new_filter says otherwise
             if (replace_stream) {
                 auto provider = std::make_shared<raw_stream_provider>(std::move(raw_data_to_inject));
-                obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+                if (new_filter.isInitialized()) {
+                    obj.replaceStreamData(provider, new_filter, QPDFObjectHandle::newNull());
+                } else {
+                    obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+                }
             }
         }
 
