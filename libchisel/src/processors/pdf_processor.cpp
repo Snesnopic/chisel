@@ -11,12 +11,15 @@
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDFLogger.hh>
+#include <qpdf/Pl_Flate.hh>
 #include <fstream>
 #include <sstream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
 #include "zlib_container.h"
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
@@ -131,6 +134,45 @@ bool stream_is_single_flate(QPDFObjectHandle const& stream) {
     return false;
 }
 
+void set_env_var(const char* name, const char* value) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+}
+
+/**
+ * @brief Turns on qpdf's own internal zopfli use, for the object/xref
+ * streams QPDFWriter generates itself (chisel's own stream recompression
+ * bypasses qpdf's compressor entirely via raw_stream_provider, so this
+ * doesn't affect those).
+ *
+ * @details qpdf's Pl_Flate::zopfli_enabled() caches its QPDF_ZOPFLI check in
+ * a function-local static the first time it's asked, during the first
+ * a_deflate use in the whole process -- so this must run before the first
+ * QPDFWriter::write() call anywhere in the process, and setting the
+ * environment variable again later has no effect. PdfProcessor is a single
+ * shared instance across every PDF in a run (see ProcessorRegistry), so this
+ * runs at most once, on whichever PDF's finalize_extraction() reaches it
+ * first; iterations is a run-wide setting, so using the first file's value
+ * for the whole run is correct, not just convenient.
+ */
+void enable_qpdf_zopfli_once(const ProcessingOptions& options) {
+    static std::once_flag flag;
+    std::call_once(flag, [&options]() {
+        if (Pl_Flate::zopfli_supported()) {
+            set_env_var("QPDF_ZOPFLI", "force");
+            // qpdf's own streams (object/xref streams) are structural
+            // bookkeeping, not big embedded content, so the full iterations
+            // budget is always appropriate here -- unlike the per-stream
+            // choice in finalize_extraction() for the streams chisel
+            // compresses itself.
+            Pl_Flate::setZopfliIterations(static_cast<int>(options.iterations));
+        }
+    });
+}
+
 /**
  * @brief Removes common metadata objects from a PDF.
  * @param pdf The QPDF instance to modify.
@@ -215,6 +257,8 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
 
 std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction for " + content.original_path.string(), get_name());
+
+    enable_qpdf_zopfli_once(options);
 
     try {
         PdfState st;

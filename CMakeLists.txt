@@ -462,9 +462,17 @@ add_library(thirdparty_webp ALIAS webp)
 add_library(thirdparty_webpdemux ALIAS webpdemux)
 add_library(thirdparty_webpmux ALIAS libwebpmux)
 
+# zopfli (built before qpdf below, which links against the libzopfli target
+# directly -- see the if(TARGET libzopfli) guard in its own CMakeLists.txt --
+# instead of searching the system for a zopfli install)
+set(ZOPFLI_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
+set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
+set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
+add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR} EXCLUDE_FROM_ALL)
+
 # qpdf
 add_definitions(-DSKIP_OS_SECURE_RANDOM)
-set(ZOPFLI OFF CACHE BOOL "" FORCE)
+set(ZOPFLI ON CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(qpdf_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/qpdf")
 set(qpdf_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/qpdf-build")
@@ -483,12 +491,6 @@ endif()
 if(TARGET libqpdf)
     add_dependencies(libqpdf copy_mozjpeg_jconfig)
 endif()
-
-# zopfli
-set(ZOPFLI_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
-set(zopfli_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/zopfli")
-set(zopfli_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/zopfli-build")
-add_subdirectory(${zopfli_SOURCE_DIR} ${zopfli_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # libjxl
 set(HWY_ENABLE_CONTRIB OFF CACHE BOOL "" FORCE)
