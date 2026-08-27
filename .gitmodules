@@ -107,3 +107,6 @@
 [submodule "third_party/optigif"]
 	path = third_party/optigif
 	url = https://github.com/Snesnopic/optigif
+[submodule "third_party/rehuff_theora"]
+	path = third_party/rehuff_theora
+	url = https://github.com/Snesnopic/rehuff_theora

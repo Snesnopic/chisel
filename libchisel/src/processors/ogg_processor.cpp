@@ -14,6 +14,8 @@
 #include <fstream>
 #include <algorithm>
 #include <FLAC/all.h>
+#include <rehuff_theora.hpp>
+#include <map>
 
 #ifdef HAVE_OPTIVORBIS
 extern "C" {
@@ -24,76 +26,143 @@ namespace chisel {
 namespace fs = std::filesystem;
 
 namespace {
-    bool is_vorbis_stream(FILE* f) {
-        if (f == nullptr) return false;
+    /// Codecs an Ogg file carries, from a pass over its BOS pages.
+    ///
+    /// This replaces a pair of checks that only ever read page zero. That is
+    /// enough for a plain audio file and wrong for a multiplexed one: the Ogg
+    /// spec puts every stream's BOS page at the head of the file, in any order,
+    /// so a file whose first BOS happens to be Vorbis can still carry video
+    /// behind it, and handing that to OptiVorbis loses the video.
+    struct OggCodecs {
+        bool parsed = false;   ///< the file is Ogg at all
+        int  streams = 0;      ///< BOS pages seen
+        bool vorbis = false;
+        bool opus = false;
+        bool theora = false;
+        bool flac = false;
+        bool skeleton = false;
+        bool unknown = false;  ///< a BOS whose codec we do not recognise
+    };
+
+    /// Walks the BOS pages at the head of an Ogg file and reports what is in it.
+    ///
+    /// Leaves the stream position where it found it. A file that does not parse
+    /// comes back with parsed false, and callers should treat that as "do not
+    /// touch it".
+    OggCodecs scan_ogg_codecs(FILE* f) {
+        OggCodecs codecs;
+        if (f == nullptr) return codecs;
 
         const long start_pos = ftell(f);
         fseek(f, 0, SEEK_SET);
 
-        unsigned char header[27];
-        if (fread(header, 1, 27, f) != 27) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
+        // every BOS page sits at the head of the file, so this stops at the
+        // first page that is not one. the cap is only there so a malformed file
+        // cannot keep us here.
+        for (int page = 0; page < 64; ++page) {
+            unsigned char header[27];
+            if (fread(header, 1, sizeof(header), f) != sizeof(header)) break;
+            if (std::memcmp(header, "OggS", 4) != 0) break;
+            if (header[4] != 0) break;  // an Ogg version we do not know
+
+            codecs.parsed = true;
+
+            const int num_segments = header[26];
+            unsigned char segments[255];
+            if (num_segments > 0 &&
+                fread(segments, 1, static_cast<size_t>(num_segments), f)
+                    != static_cast<size_t>(num_segments)) {
+                break;
+            }
+            long body_len = 0;
+            for (int i = 0; i < num_segments; ++i) body_len += segments[i];
+
+            // the beginning-of-stream bit
+            if ((header[5] & 0x02) == 0) break;
+            codecs.streams++;
+
+            unsigned char sig[8] = {};
+            const size_t want = body_len < 8 ? static_cast<size_t>(body_len) : 8;
+            if (want > 0 && fread(sig, 1, want, f) != want) break;
+
+            if (want >= 7 && std::memcmp(sig, "\x01vorbis", 7) == 0) codecs.vorbis = true;
+            else if (want >= 8 && std::memcmp(sig, "OpusHead", 8) == 0) codecs.opus = true;
+            else if (want >= 7 && std::memcmp(sig, "\x80theora", 7) == 0) codecs.theora = true;
+            else if (want >= 5 && std::memcmp(sig, "\x7f" "FLAC", 5) == 0) codecs.flac = true;
+            else if (want >= 8 && std::memcmp(sig, "fishead", 7) == 0) codecs.skeleton = true;
+            else codecs.unknown = true;
+
+            // on to the next page
+            if (fseek(f, body_len - static_cast<long>(want), SEEK_CUR) != 0) break;
         }
-
-        if (std::memcmp(header, "OggS", 4) != 0) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        const int num_segments = header[26];
-
-        if (fseek(f, num_segments, SEEK_CUR) != 0) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        unsigned char signature[7];
-        if (fread(signature, 1, 7, f) != 7) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        const bool is_vorbis = (std::memcmp(signature, "\x01vorbis", 7) == 0);
 
         fseek(f, start_pos, SEEK_SET);
-        return is_vorbis;
+        return codecs;
     }
-    bool is_opus_stream(FILE* f) {
-        if (f == nullptr) return false;
 
-        const long start_pos = ftell(f);
-        fseek(f, 0, SEEK_SET);
+    /// Hashes the payload of every logical stream except the Theora ones, keyed
+    /// by serial number.
+    ///
+    /// rehuff_theora rewrites only the video and forwards the rest page for
+    /// page, so those streams have to come out identical. Checking them here is
+    /// what makes raw_equal complete for a multiplexed file: decode_digest
+    /// covers the video, this covers everything around it.
+    std::map<unsigned long, unsigned long long> hash_non_theora_streams(const fs::path& p) {
+        std::map<unsigned long, unsigned long long> hashes;
+        std::vector<unsigned long> theora_serials;
+        FILE* f = fopen(p.string().c_str(), "rb");
+        if (f == nullptr) return hashes;
 
-        unsigned char header[27];
-        if (fread(header, 1, 27, f) != 27) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
+        for (;;) {
+            unsigned char header[27];
+            if (fread(header, 1, sizeof(header), f) != sizeof(header)) break;
+            if (std::memcmp(header, "OggS", 4) != 0) break;
+
+            const unsigned long serial =
+                static_cast<unsigned long>(header[14]) |
+                static_cast<unsigned long>(header[15]) << 8 |
+                static_cast<unsigned long>(header[16]) << 16 |
+                static_cast<unsigned long>(header[17]) << 24;
+
+            const int num_segments = header[26];
+            unsigned char segments[255];
+            if (num_segments > 0 &&
+                fread(segments, 1, static_cast<size_t>(num_segments), f)
+                    != static_cast<size_t>(num_segments)) {
+                break;
+            }
+            long body_len = 0;
+            for (int i = 0; i < num_segments; ++i) body_len += segments[i];
+
+            std::vector<unsigned char> body(static_cast<size_t>(body_len));
+            if (body_len > 0 &&
+                fread(body.data(), 1, static_cast<size_t>(body_len), f)
+                    != static_cast<size_t>(body_len)) {
+                break;
+            }
+
+            if ((header[5] & 0x02) != 0 && body_len >= 7 &&
+                std::memcmp(body.data(), "\x80theora", 7) == 0) {
+                theora_serials.push_back(serial);
+            }
+            if (std::find(theora_serials.begin(), theora_serials.end(), serial)
+                != theora_serials.end()) {
+                continue;
+            }
+
+            // FNV-1a over the page payload
+            unsigned long long h = hashes.count(serial) ? hashes[serial] : 1469598103934665603ULL;
+            for (const unsigned char byte : body) {
+                h ^= byte;
+                h *= 1099511628211ULL;
+            }
+            hashes[serial] = h;
         }
 
-        if (std::memcmp(header, "OggS", 4) != 0) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        const int num_segments = header[26];
-
-        if (fseek(f, num_segments, SEEK_CUR) != 0) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        unsigned char signature[8];
-        if (fread(signature, 1, 8, f) != 8) {
-            fseek(f, start_pos, SEEK_SET);
-            return false;
-        }
-
-        const bool is_opus = (std::memcmp(signature, "OpusHead", 8) == 0);
-
-        fseek(f, start_pos, SEEK_SET);
-        return is_opus;
+        fclose(f);
+        return hashes;
     }
+
     struct OggIO {
         FILE* f_in = nullptr;
     };
@@ -334,9 +403,54 @@ void OggProcessor::recompress(const fs::path& input,
     FILE* f_in = chisel::open_file(input, "rb");
     if (f_in == nullptr) throw std::runtime_error("OggProcessor: cannot open input");
 
-    // check vorbis early to prevent flac decoder init failures
-    if (is_vorbis_stream(f_in)) {
+    const OggCodecs codecs = scan_ogg_codecs(f_in);
+
+    // theora comes first: an Ogg video usually carries a Vorbis track as well,
+    // and rehuff_theora is the one branch that keeps both. It re-derives the
+    // huffman tables of the video and forwards every other logical stream
+    // untouched, page for page.
+    if (codecs.theora) {
+        FILE* f_out = chisel::open_file(output, "wb");
+        if (f_out == nullptr) {
+            fclose(f_in);
+            throw std::runtime_error("OggProcessor: cannot open output");
+        }
+        const rehuff_theora::Status st =
+            rehuff_theora::recompress(f_in, f_out, rehuff_theora::Options{});
+        fclose(f_out);
         fclose(f_in);
+        if (st != rehuff_theora::Status::ok) {
+            const std::string msg = "rehuff_theora failed with status " +
+                std::to_string(static_cast<int>(st)) + " for " + input.string();
+            Logger::log(LogLevel::Error, msg, get_name());
+            throw std::runtime_error(msg);
+        }
+        Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+        return;
+    }
+
+    // check vorbis early to prevent flac decoder init failures
+    if (codecs.vorbis) {
+        fclose(f_in);
+
+        // OptiVorbis rewrites the whole container and keeps only the Vorbis
+        // stream: fed a multiplexed file it exits successfully having thrown the
+        // other streams away. Measured on a Theora+Vorbis+Skeleton file, 20.6 MB
+        // in and 3.5 MB of audio out. So it only gets files that are nothing but
+        // Vorbis.
+        if (codecs.streams != 1) {
+            Logger::log(LogLevel::Warning,
+                        "Multiplexed Ogg carrying Vorbis; OptiVorbis would discard the other "
+                        "streams, falling back to direct copy for " + input.string(),
+                        get_name());
+            try {
+                fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+            } catch (const fs::filesystem_error&) {
+                throw std::runtime_error("OggProcessor: direct copy for multiplexed Ogg failed");
+            }
+            Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+            return;
+        }
 
 #ifdef HAVE_OPTIVORBIS
         const std::string input_str = input.string();
@@ -354,7 +468,7 @@ void OggProcessor::recompress(const fs::path& input,
     }
 
     // handle opus with direct copy
-    if (is_opus_stream(f_in)) {
+    if (codecs.opus) {
         fclose(f_in);
         Logger::log(LogLevel::Warning, "Unsupported opus stream, falling back to direct copy", get_name());
         try {
@@ -463,23 +577,52 @@ bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
     FILE* fA = fopen(a.string().c_str(), "rb");
     FILE* fB = fopen(b.string().c_str(), "rb");
 
-    const bool opus_a = is_opus_stream(fA);
-    const bool opus_b = is_opus_stream(fB);
-    const bool vorbis_a = is_vorbis_stream(fA);
-    const bool vorbis_b = is_vorbis_stream(fB);
+    const OggCodecs codecs_a = scan_ogg_codecs(fA);
+    const OggCodecs codecs_b = scan_ogg_codecs(fB);
 
     if (fA != nullptr) fclose(fA);
     if (fB != nullptr) fclose(fB);
 
-    if (opus_a && opus_b) {
+    // video: decode both and compare the pictures, then check that everything
+    // wrapped around the video came through untouched
+    if (codecs_a.theora || codecs_b.theora) {
+        if (codecs_a.theora != codecs_b.theora) return false;
+        if (codecs_a.streams != codecs_b.streams) return false;
+
+        FILE* va = fopen(a.string().c_str(), "rb");
+        FILE* vb = fopen(b.string().c_str(), "rb");
+        if (va == nullptr || vb == nullptr) {
+            if (va != nullptr) fclose(va);
+            if (vb != nullptr) fclose(vb);
+            return false;
+        }
+        rehuff_theora::VideoDigest digest_a;
+        rehuff_theora::VideoDigest digest_b;
+        const rehuff_theora::Status sa = rehuff_theora::decode_digest(va, digest_a);
+        const rehuff_theora::Status sb = rehuff_theora::decode_digest(vb, digest_b);
+        fclose(va);
+        fclose(vb);
+        if (sa != rehuff_theora::Status::ok || sb != rehuff_theora::Status::ok) return false;
+        if (!(digest_a == digest_b)) return false;
+
+        return hash_non_theora_streams(a) == hash_non_theora_streams(b);
+    }
+
+    if (codecs_a.opus && codecs_b.opus) {
         // recompress() always falls back to a direct copy for opus, so bytes must match exactly
         return files_byte_equal(a, b);
     }
 
-    if (vorbis_a && vorbis_b) {
-        // OptiVorbis is documented to losslessly preserve the audio stream; no vorbis decoder
-        // is vendored here to verify that independently, so this trusts that guarantee
-        return true;
+    if (codecs_a.vorbis && codecs_b.vorbis) {
+        if (codecs_a.streams == 1 && codecs_b.streams == 1) {
+            // OptiVorbis is documented to losslessly preserve the audio stream; no vorbis decoder
+            // is vendored here to verify that independently, so this trusts that guarantee
+            return true;
+        }
+        // a multiplexed file was copied rather than optimised, so it has to be
+        // untouched. trusting OptiVorbis here would be trusting it about streams
+        // it does not even keep.
+        return files_byte_equal(a, b);
     }
 
     return false;

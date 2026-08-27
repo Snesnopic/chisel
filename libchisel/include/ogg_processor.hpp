@@ -33,14 +33,19 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-            static constexpr std::array<std::string_view, 4> kMimes = {
-                "audio/ogg", "audio/vorbis", "audio/opus", "audio/oga"
+            // video/ogg is listed for completeness; qadmimes maps every "OggS"
+            // file to audio/ogg today, video included, so that is the mime this
+            // processor actually receives .ogv files under
+            static constexpr std::array<std::string_view, 5> kMimes = {
+                "audio/ogg", "audio/vorbis", "audio/opus", "audio/oga", "video/ogg"
             };
             return {kMimes.data(), kMimes.size()};
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 3> kExts = { ".ogg", ".opus", ".oga" };
+            static constexpr std::array<std::string_view, 5> kExts = {
+                ".ogg", ".opus", ".oga", ".ogv", ".ogx"
+            };
             return {kExts.data(), kExts.size()};
         }
 

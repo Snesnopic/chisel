@@ -271,6 +271,12 @@ if(TARGET man)
     set_target_properties(man PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
+# rehuff_theora: reuses the libogg target added above rather than vendoring its
+# own copy (see the if(NOT TARGET Ogg::ogg) guard in its own CMakeLists.txt).
+# Its CLI and api test are not wanted here, only the library.
+set(REHUFF_THEORA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/rehuff_theora EXCLUDE_FROM_ALL)
+
 # flacoutcpp: reuses the FLAC target just defined above instead of vendoring
 # its own copy (see the if(NOT TARGET FLAC) guard in its own CMakeLists.txt)
 set(FLACOUT_NATIVE OFF CACHE BOOL "" FORCE)
@@ -641,6 +647,7 @@ set(CHISEL_LIBS
         pugixml
         mseedout_lib
         mseed_static
+        rehuff_theora_core
         bmplib
         brotlicommon
         brotlidec
