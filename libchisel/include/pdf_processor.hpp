@@ -107,18 +107,22 @@ public:
      *
      * Iterates through all objects in both PDF files using qpdf, extracts
      * the *decoded* data for each stream (falling back to raw data for
-     * non-decodable streams), sorts each file's collection, and compares
-     * them. Decoded content is compared rather than raw bytes since
-     * recompression legitimately changes a stream's raw bytes (e.g.
-     * re-flating with zopfli) without changing its content; streams are
-     * compared as an order-independent collection rather than keyed by
-     * object ID, since operations like linearization freely renumber
-     * objects between the original and finalized file.
+     * non-decodable streams), sorts each file's collection, and checks that
+     * every stream in a survives in b. Decoded content is compared rather
+     * than raw bytes since recompression legitimately changes a stream's raw
+     * bytes (e.g. re-flating with zopfli) without changing its content;
+     * streams are compared as an order-independent collection rather than
+     * keyed by object ID, since operations like linearization freely
+     * renumber objects between the original and finalized file. b may
+     * contain streams a doesn't (as a multiset-subset, not exact equality):
+     * QPDFWriter's own linearization unconditionally adds a hint stream that
+     * isn't real document content, so requiring exact equality would reject
+     * every successfully linearized file.
      *
      * @param a Path to the first PDF file.
      * @param b Path to the second PDF file.
-     * @return true if both files contain the same multiset of decoded
-     * stream contents, false otherwise.
+     * @return true if every decoded stream in a is present (with at least
+     * the same multiplicity) in b, false otherwise.
      */
     [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 

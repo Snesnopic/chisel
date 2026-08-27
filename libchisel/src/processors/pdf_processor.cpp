@@ -400,12 +400,16 @@ static bool get_all_decoded_streams(const std::filesystem::path& path,
         return false; // failed to read one or both
     }
 
-    if (streamsA.size() != streamsB.size()) {
-        return false; // different number of streams
-    }
-
-    // compare map contents (obj-id -> raw_stream_bytes)
-    return streamsA == streamsB;
+    // every stream a's own content had must still be present in b, but b is
+    // allowed extra streams a didn't have: QPDFWriter's own linearization
+    // (always on) synthesizes a hint stream that has neither /ObjStm nor
+    // /XRef as its /Type -- in fact no /Type at all -- so it isn't caught by
+    // get_all_decoded_streams's exclusion above, and requiring exact
+    // equality made this reject every successfully linearized file. Both
+    // sides are already sorted, so this is a multiset-subset check: it still
+    // catches real content loss (a stream vanishing) or corruption (a
+    // stream's bytes changing), just not qpdf's own added bookkeeping.
+    return std::includes(streamsB.begin(), streamsB.end(), streamsA.begin(), streamsA.end());
 }
 std::string PdfProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw PDF data
