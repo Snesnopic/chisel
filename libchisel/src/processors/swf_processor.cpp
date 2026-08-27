@@ -5,6 +5,7 @@
 #include "../../include/swf_processor.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
+#include "../../include/zopfli_compressor.hpp"
 #include "file_utils.hpp"
 #include <zlib.h>
 #include <fstream>
@@ -14,6 +15,16 @@
 
 namespace chisel {
 
+namespace {
+
+// matches pdf_processor's own threshold for switching to the (usually lower) large-payload iteration count
+constexpr size_t kLargeSwfPayloadThreshold = 200000;
+
+unsigned pick_iterations(const size_t data_size, const ProcessingOptions& options) {
+    return static_cast<unsigned>(data_size < kLargeSwfPayloadThreshold ? options.iterations : options.iterations_large);
+}
+
+} // namespace
 
 // inflate zlib payload
 static std::vector<uint8_t> inflate_swf(const uint8_t* src, const std::size_t src_len, const std::size_t expected_len) {
@@ -28,42 +39,8 @@ static std::vector<uint8_t> inflate_swf(const uint8_t* src, const std::size_t sr
     return uncompressed;
 }
 
-// deflate with max compression (level 9)
-static std::vector<uint8_t> deflate_swf(const std::vector<uint8_t>& uncompressed) {
-    z_stream strm{};
-    if (deflateInit(&strm, Z_BEST_COMPRESSION) != Z_OK) {
-        throw std::runtime_error("failed to init zlib");
-    }
-
-    std::vector<uint8_t> compressed;
-    constexpr std::size_t chunk_size = 65536;
-    std::vector<uint8_t> out_buf(chunk_size);
-
-    strm.next_in = const_cast<uint8_t*>(uncompressed.data());
-    strm.avail_in = static_cast<uInt>(uncompressed.size());
-
-    do {
-        strm.next_out = out_buf.data();
-        strm.avail_out = static_cast<uInt>(out_buf.size());
-
-        const int ret = deflate(&strm, Z_FINISH);
-        if (ret == Z_STREAM_ERROR) {
-            deflateEnd(&strm);
-            throw std::runtime_error("zlib compression failed");
-        }
-
-        const std::size_t written = out_buf.size() - strm.avail_out;
-        if (written > 0) {
-            compressed.insert(compressed.end(), out_buf.data(), out_buf.data() + written);
-        }
-    } while (strm.avail_out == 0);
-
-    deflateEnd(&strm);
-    return compressed;
-}
-
 void SwfProcessor::recompress(const std::filesystem::path& input_path,
-                              const std::filesystem::path& output_path, const ProcessingOptions&) {
+                              const std::filesystem::path& output_path, const ProcessingOptions& options) {
     Logger::log(LogLevel::Debug, "starting swf recompression for " + input_path.string(), get_name());
 
     const auto data = read_file(input_path);
@@ -94,7 +71,8 @@ void SwfProcessor::recompress(const std::filesystem::path& input_path,
             return;
         }
 
-        const auto compressed_payload = deflate_swf(uncompressed_payload);
+        const auto compressed_payload = ZopfliCompressor::compress(
+            uncompressed_payload, pick_iterations(uncompressed_payload.size(), options), ZopfliFormat::ZLIB);
 
         std::ofstream out(output_path, std::ios::binary);
         if (!out) {
