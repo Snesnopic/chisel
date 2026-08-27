@@ -6,6 +6,7 @@
 #include "../../include/logger.hpp"
 #include "zopflipng_lib.h"
 #include "zlib_container.h"
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -113,6 +114,22 @@ namespace {
         return false;
     }
 
+    // kStrategyBruteForce excluded, same as zopflipng's own heuristic search
+    constexpr std::array<ZopfliPNGFilterStrategy, 8> kAllFilterStrategies = {
+        kStrategyZero, kStrategyOne, kStrategyTwo, kStrategyThree, kStrategyFour,
+        kStrategyMinSum, kStrategyEntropy, kStrategyPredefined
+    };
+
+    // matches ProcessingOptions' own default; above it the user already asked for slower/better
+    constexpr size_t kIterationsThreshold = 15;
+
+    // above the threshold, tries every strategy at full zopfli effort instead of zopflipng's single cheap-estimate pick
+    void apply_filter_strategy_search(const ProcessingOptions& options, ZopfliPNGOptions& opts) {
+        if (options.iterations <= kIterationsThreshold) return;
+        opts.auto_filter_strategy = false;
+        opts.filter_strategies.assign(kAllFilterStrategies.begin(), kAllFilterStrategies.end());
+    }
+
 } // namespace
 
 void ZopfliPngProcessor::recompress(const fs::path& input,
@@ -135,6 +152,7 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.use_zopfli = true;
         opts.num_iterations = options.iterations;
         opts.num_iterations_large = options.iterations_large;
+        apply_filter_strategy_search(options, opts);
 
         // fdAT frames are only ever copied byte-for-byte, never re-encoded, so a new color type would desync them
         if (has_actl_chunk(origpng)) {
