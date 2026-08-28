@@ -354,6 +354,14 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
             break;
 
+        case ContainerFormat::SevenZip:
+            r = archive_write_set_format_7zip(a);
+            if (r == ARCHIVE_OK) {
+                archive_write_set_format_option(a, "7zip", "compression", "LZMA2");
+                archive_write_set_format_option(a, "7zip", "compression-level", "9");
+            }
+            break;
+
         case ContainerFormat::Iso:
             r = archive_write_set_format_iso9660(a);
             if (r == ARCHIVE_OK) {

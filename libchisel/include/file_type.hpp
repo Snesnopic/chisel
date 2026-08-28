@@ -247,9 +247,10 @@ inline bool can_read_format(const ContainerFormat fmt) {
  * @return true if libarchive supports writing this format.
  */
 inline bool can_write_format(const ContainerFormat fmt) {
-    // libarchive doesn't write on RAR, WIM, 7z is limited
+    // libarchive doesn't write on RAR, WIM
     switch (fmt) {
         case ContainerFormat::Zip:
+        case ContainerFormat::SevenZip:
         case ContainerFormat::Tar:
         case ContainerFormat::GZip:
         case ContainerFormat::BZip2:
