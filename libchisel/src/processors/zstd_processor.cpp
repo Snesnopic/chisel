@@ -27,10 +27,10 @@ static std::vector<uint8_t> decode_zstd(const std::vector<uint8_t>& compressed) 
 
     std::vector<uint8_t> decompressed;
     std::vector<uint8_t> out_buf(ZSTD_DStreamOutSize());
-    ZSTD_inBuffer in = { compressed.data(), compressed.size(), 0 };
+    ZSTD_inBuffer in = { .src=compressed.data(), .size=compressed.size(), .pos=0 };
 
     while (in.pos < in.size) {
-        ZSTD_outBuffer out = { out_buf.data(), out_buf.size(), 0 };
+        ZSTD_outBuffer out = { .dst=out_buf.data(), .size=out_buf.size(), .pos=0 };
         size_t const result = ZSTD_decompressStream(dstream, &out, &in);
         if (ZSTD_isError(result)) {
             ZSTD_freeDStream(dstream);

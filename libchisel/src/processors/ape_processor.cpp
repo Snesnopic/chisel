@@ -135,9 +135,9 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("ApeProcessor: cannot create APE decompress (err: " + std::to_string(err) + ")");
     }
 
-    const unsigned sample_rate     = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_SAMPLE_RATE));
-    const unsigned channels        = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_CHANNELS));
-    const unsigned bits_per_sample = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_BITS_PER_SAMPLE));
+    const auto sample_rate     = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_SAMPLE_RATE));
+    const auto channels        = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_CHANNELS));
+    const auto bits_per_sample = static_cast<unsigned>(pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_BITS_PER_SAMPLE));
     const int64_t total_frames     = pDecompress->GetInfo(APE::IAPEDecompress::APE_INFO_TOTAL_BLOCKS);
 
     if (channels == 0 || sample_rate == 0 || bits_per_sample == 0) {

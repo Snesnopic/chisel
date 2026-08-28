@@ -10,6 +10,7 @@
 #include <zlib.h>
 #include <filesystem>
 #include <fstream>
+#include <utility>
 #include <vector>
 #include <stdexcept>
 #include <iostream>
@@ -217,7 +218,7 @@ static std::vector<uint8_t> decode_jpeg_to_pixels(const std::vector<uint8_t>& in
     int h = cinfo.output_height;
     int c = cinfo.output_components;
     std::vector<uint8_t> buffer(static_cast<size_t>(w) * h * c);
-    while (cinfo.output_scanline < h) {
+    while (std::cmp_less(cinfo.output_scanline, h)) {
         uint8_t* row_ptr = buffer.data() + (cinfo.output_scanline * w * c);
         jpeg_read_scanlines(&cinfo, &row_ptr, 1);
     }

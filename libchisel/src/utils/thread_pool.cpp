@@ -43,7 +43,7 @@ ThreadPool::ThreadPool(unsigned threads) {
                         if (pending > 0) --pending;
                         cv.notify_all();
                     }
-                } guard{pending_, queue_mutex_, idle_cv_};
+                } guard{.pending=pending_, .mtx=queue_mutex_, .cv=idle_cv_};
 
                 try {
                     task(st);

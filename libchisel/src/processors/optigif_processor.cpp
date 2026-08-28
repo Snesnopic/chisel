@@ -9,6 +9,7 @@
 #include <optigif/optigif.hpp>
 #include <cstdio>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace chisel {
@@ -55,7 +56,7 @@ static std::vector<unsigned char> read_file_to_buffer_optigif(const std::filesys
     const std::size_t read_count = fread(buf.data(), 1, size, f);
     fclose(f);
 
-    if (read_count != static_cast<std::size_t>(size)) {
+    if (std::cmp_not_equal(read_count, size)) {
         return {};
     }
     return buf;

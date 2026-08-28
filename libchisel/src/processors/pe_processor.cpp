@@ -358,7 +358,7 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
             const uint32_t dest_raw = rsrc_raw_offset + (write_cursor_rva - rsrc_virtual_address);
             std::memcpy(raw_data.data() + dest_raw, p.data.data(), p.data.size());
 
-            const uint32_t new_size = static_cast<uint32_t>(p.data.size());
+            const auto new_size = static_cast<uint32_t>(p.data.size());
             std::memcpy(raw_data.data() + p.data_entry_offset, &write_cursor_rva, 4);
             std::memcpy(raw_data.data() + p.data_entry_offset + 4, &new_size, 4);
 
@@ -438,7 +438,7 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
             if (off == 0 || static_cast<uint64_t>(off) + p.data.size() > raw_data.size()) continue;
 
             std::memcpy(raw_data.data() + off, p.data.data(), p.data.size());
-            const uint32_t new_size = static_cast<uint32_t>(p.data.size());
+            const auto new_size = static_cast<uint32_t>(p.data.size());
             std::memcpy(raw_data.data() + p.data_entry_offset + 4, &new_size, 4);
             if (new_size != p.original_size) modified = true;
         }

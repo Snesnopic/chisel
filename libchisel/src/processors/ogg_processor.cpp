@@ -180,7 +180,7 @@ namespace {
 
     FLAC__StreamDecoderSeekStatus seek_cb(const FLAC__StreamDecoder*, const FLAC__uint64 absolute_byte_offset, void *client_data) {
         const auto* io = static_cast<OggIO*>(client_data);
-        if (fseek(io->f_in, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
+        if (fseek(io->f_in, static_cast<long>(absolute_byte_offset), SEEK_SET) < 0) return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
         return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
     }
 
@@ -230,7 +230,7 @@ namespace {
 
     FLAC__StreamEncoderSeekStatus enc_seek_cb(const FLAC__StreamEncoder*, const FLAC__uint64 absolute_byte_offset, void *client_data) {
        const auto f = static_cast<FILE*>(client_data);
-        if (fseek(f, (long)absolute_byte_offset, SEEK_SET) < 0) return FLAC__STREAM_ENCODER_SEEK_STATUS_ERROR;
+        if (fseek(f, static_cast<long>(absolute_byte_offset), SEEK_SET) < 0) return FLAC__STREAM_ENCODER_SEEK_STATUS_ERROR;
         return FLAC__STREAM_ENCODER_SEEK_STATUS_OK;
     }
 

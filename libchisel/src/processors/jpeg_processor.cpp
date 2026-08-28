@@ -70,7 +70,7 @@ void copy_saved_markers(const j_decompress_ptr srcinfo,
         if ((m->marker >= JPEG_APP0 && m->marker <= JPEG_APP0 + 15) ||
             m->marker == JPEG_COM) {
             if (m->data && m->data_length > 0) {
-                markers.push_back({m->marker, {m->data, m->data + m->data_length}});
+                markers.push_back({.marker=m->marker, .data={m->data, m->data + m->data_length}});
             }
         }
     }

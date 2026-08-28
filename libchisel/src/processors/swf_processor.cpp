@@ -29,7 +29,7 @@ unsigned pick_iterations(const size_t data_size, const ProcessingOptions& option
 // inflate zlib payload
 static std::vector<uint8_t> inflate_swf(const uint8_t* src, const std::size_t src_len, const std::size_t expected_len) {
     std::vector<uint8_t> uncompressed(expected_len);
-    uLongf dest_len = static_cast<uLongf>(expected_len);
+    auto dest_len = static_cast<uLongf>(expected_len);
 
     if (uncompress(uncompressed.data(), &dest_len, src, static_cast<uLong>(src_len)) != Z_OK) {
         throw std::runtime_error("zlib decompression failed");

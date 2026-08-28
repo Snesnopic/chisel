@@ -121,8 +121,8 @@ struct Reader {
         return s;
     }
 
-    const uint8_t* cur() const { return data + pos; }
-    std::size_t remaining() const { return size - pos; }
+    [[nodiscard]] const uint8_t* cur() const { return data + pos; }
+    [[nodiscard]] std::size_t remaining() const { return size - pos; }
 };
 
 struct Writer {
@@ -339,7 +339,7 @@ bool process_member(Reader& r, Writer& w, const bool preserve_meta,
  * @brief Decompress all members of a gzip file and concatenate the raw data.
  */
 std::vector<uint8_t> decompress_all(const std::vector<uint8_t>& gz_data) {
-    Reader r{ gz_data.data(), gz_data.size() };
+    Reader r{ .data=gz_data.data(), .size=gz_data.size() };
     std::vector<uint8_t> result;
 
     while (r.remaining() >= 10 && r.data[r.pos] == kGzId1 && r.data[r.pos+1] == kGzId2) {
@@ -385,7 +385,7 @@ void GzProcessor::recompress(const std::filesystem::path& input_path,
     libdeflate_compressor* comp = libdeflate_alloc_compressor(kGzDeflateLevel);
     if (!comp) throw std::runtime_error("GzProcessor: libdeflate_alloc_compressor failed");
 
-    Reader r{ in_data.data(), in_data.size() };
+    Reader r{ .data=in_data.data(), .size=in_data.size() };
     Writer w;
     w.buf.reserve(in_data.size());
 

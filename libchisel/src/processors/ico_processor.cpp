@@ -225,7 +225,7 @@ std::filesystem::path IcoProcessor::finalize_extraction(const ExtractedContent& 
     const size_t dir_start = new_ico.size();
     new_ico.resize(new_ico.size() + count * 16);
 
-    uint32_t current_offset = static_cast<uint32_t>(new_ico.size());
+    auto current_offset = static_cast<uint32_t>(new_ico.size());
 
     for (uint16_t i = 0; i < count; ++i) {
         const IcoEntryMeta& meta = (*metas)[i];

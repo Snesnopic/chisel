@@ -200,7 +200,7 @@ namespace chisel {
                         "Maximum container nesting depth (" + std::to_string(kMaxNestingDepth) +
                         ") exceeded, refusing to descend further into: " + path.string(),
                         "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Maximum nesting depth exceeded"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Maximum nesting depth exceeded"});
             return;
         }
 
@@ -208,7 +208,7 @@ namespace chisel {
 
         std::transform(name.begin(), name.end(), name.begin(), ::tolower);
         if (name == ".ds_store" || name == "desktop.ini" || name.starts_with("._")) {
-            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Junk file"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Junk file"});
 
             return;
         }
@@ -223,7 +223,7 @@ namespace chisel {
 
         if (procs.empty()) {
             Logger::log(LogLevel::Warning, "No processor for " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{path, "Unsupported format"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Unsupported format"});
             return;
         }
 
@@ -255,26 +255,26 @@ namespace chisel {
             } else {
                 if (processor->can_recompress()) {
                     Logger::log(LogLevel::Warning, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeSkippedEvent{path, "Extraction resulted in no elements"});
+                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Extraction resulted in no elements"});
                 } else {
                     Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeErrorEvent{path, "Extraction failed or skipped"});
+                    event_bus_.publish(FileAnalyzeErrorEvent{.path=path, .error_message="Extraction failed or skipped"});
                 }
             }
         }
         if (processor->can_recompress()) {
-            work_list_.push_back({current_path, parent, scheduled_for_extraction});
+            work_list_.push_back({.path=current_path, .parent_container=parent, .is_container=scheduled_for_extraction});
             scheduled_for_recompression = true;
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
             if (scheduled_for_extraction) {
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, true, scheduled_for_recompression, content->extracted_files.size(), depth});
+                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=true, .scheduled=scheduled_for_recompression, .num_children=content->extracted_files.size(), .depth=depth});
             } else {
-                event_bus_.publish(FileAnalyzeCompleteEvent{path, false, scheduled_for_recompression, 0, depth});
+                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=false, .scheduled=scheduled_for_recompression, .num_children=0, .depth=depth});
             }
         } else {
             Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{path, "No operations available"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="No operations available"});
         }
     }
 
@@ -285,10 +285,10 @@ namespace chisel {
                 const auto& file = item.path;
                 const auto& parent_container = item.parent_container;
                 if (st.stop_requested()) {
-                    event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted", item.is_container});
+                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                     return;
                 }
-                event_bus_.publish(FileProcessStartEvent{file, parent_container, item.is_container});
+                event_bus_.publish(FileProcessStartEvent{.path=file, .parent_container=parent_container, .is_container=item.is_container});
 
                 // collect all candidates
                 auto candidates = registry_.find_by_mime(MimeDetector::detect(file));
@@ -297,7 +297,7 @@ namespace chisel {
                 }
                 if (candidates.empty()) {
                     Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeSkippedEvent{file, "Unsupported format"});
+                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=file, .reason="Unsupported format"});
                     return;
                 }
 
@@ -329,7 +329,7 @@ namespace chisel {
                                     fs::remove(path, ec);
                                 }
                             }
-                        } last_tmp_guard{last_tmp, false};
+                        } last_tmp_guard{.path=last_tmp, .release=false};
 
                         for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) {
@@ -357,7 +357,7 @@ namespace chisel {
                                         fs::remove(path, ec);
                                     }
                                 }
-                            } tmp_guard{tmp, false};
+                            } tmp_guard{.path=tmp, .release=false};
 
                             bool stage_ok;
                             try {
@@ -413,16 +413,16 @@ namespace chisel {
                                 std::error_code ec;
                                 fs::remove(last_tmp, ec);
                                 if (!checksum_ok) {
-                                    event_bus_.publish(FileProcessErrorEvent{file, "INTEGRITY CHECK FAILED: Data corruption detected", item.is_container});
+                                    event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message="INTEGRITY CHECK FAILED: Data corruption detected", .is_container=item.is_container});
                                 } else {
                                     Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
-                                    event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
+                                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="No size improvement", .is_container=item.is_container});
                                 }
                             }
                         } else if (!st.stop_requested()) {
                             auto err = std::error_code{};
                             if (!last_tmp.empty()) fs::remove(last_tmp, err);
-                            event_bus_.publish(FileProcessErrorEvent{file, "Pipeline failed", item.is_container});
+                            event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message="Pipeline failed", .is_container=item.is_container});
                         }
                     } else {
                         // parallel
@@ -447,7 +447,7 @@ namespace chisel {
 #endif
 
                             fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
-                            Result r{tmp, 0, false};
+                            Result r{.tmp=tmp, .size=0, .success=false};
                             try {
                                 candidates[i]->recompress(file, tmp, m_options);
                                 auto sz = safe_size(tmp);
@@ -488,7 +488,7 @@ namespace chisel {
                             }
                             if (!st.stop_requested()) {
                                 Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
-                                event_bus_.publish(FileProcessSkippedEvent{file, "No size improvement", item.is_container});
+                                event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="No size improvement", .is_container=item.is_container});
                             }
                         }
                     }
@@ -504,27 +504,27 @@ namespace chisel {
                                 recompressed_paths_[file.string()] = move_result->first;
                             }
                             event_bus_.publish(FileProcessCompleteEvent{
-                                file,
-                                move_result->first,
-                                orig_size,
-                                new_size,
-                                move_result->second,
-                                duration,
-                                parent_container,
-                                item.is_container
+                                .path=file,
+                                .destination=move_result->first,
+                                .original_size=orig_size,
+                                .new_size=new_size,
+                                .replaced=move_result->second,
+                                .duration=duration,
+                                .parent_container=parent_container,
+                                .is_container=item.is_container
                             });
                         } else {
-                            event_bus_.publish(FileProcessErrorEvent{file, "Failed to move optimized file", item.is_container});
+                            event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message="Failed to move optimized file", .is_container=item.is_container});
                         }
                     } else if (st.stop_requested()) {
-                        event_bus_.publish(FileProcessSkippedEvent{file, "Interrupted", item.is_container});
+                        event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                     }
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
-                    event_bus_.publish(FileProcessErrorEvent{file, e.what(), item.is_container});
+                    event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message=e.what(), .is_container=item.is_container});
                 } catch (...) {
                     Logger::log(LogLevel::Error, "Unknown error on " + file.string(), "Executor");
-                    event_bus_.publish(FileProcessErrorEvent{file, "Unknown non-standard exception", item.is_container});
+                    event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message="Unknown non-standard exception", .is_container=item.is_container});
                 }
             });
         }
@@ -544,7 +544,7 @@ namespace chisel {
             }
             if (procs.empty()) {
                 Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(), "Executor");
-                event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Unsupported format"});
+                event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Unsupported format"});
                 continue;
             }
 
@@ -571,7 +571,7 @@ namespace chisel {
                 if (new_temp_file.empty()) {
                     Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
                     // publish explicit Phase 3 complete event even if skipped
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, content.original_path, orig_size, orig_size, false, duration});
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
                     continue;
                 }
 
@@ -594,7 +594,7 @@ namespace chisel {
                                 "Container finalize discarded (no size improvement): " + content.original_path.string(),
                                 "Executor");
                     std::filesystem::remove(new_temp_file, ec);
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{content.original_path, content.original_path, orig_size, orig_size, false, duration});
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
                     continue;
                 }
 
@@ -602,20 +602,20 @@ namespace chisel {
                 auto move_result = move_to_destination(content.original_path, new_temp_file);
                 if (move_result) {
                     event_bus_.publish(ContainerFinalizeCompleteEvent{
-                        content.original_path,
-                        move_result->first,
-                        orig_size,
-                        ec ? 0 : new_size,
-                        move_result->second,
-                        duration
+                        .path=content.original_path,
+                        .destination=move_result->first,
+                        .original_size=orig_size,
+                        .final_size=ec ? 0 : new_size,
+                        .replaced=move_result->second,
+                        .duration=duration
                     });
                 } else {
-                    event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, "Failed to finalize container file"});
+                    event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Failed to finalize container file"});
                 }
 
             } catch (const std::exception &e) {
                 Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
-                event_bus_.publish(ContainerFinalizeErrorEvent{content.original_path, e.what()});
+                event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message=e.what()});
             }
         }
     }

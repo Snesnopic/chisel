@@ -52,7 +52,7 @@ inline void print_progress_bar_internal(const std::size_t done, const std::size_
     else if (available_width < 60) bar_width = 10;
 
     const double progress = (total != 0U) ? static_cast<double>(done) / static_cast<double>(total) : 0.0;
-    const unsigned pos = static_cast<unsigned>(bar_width * progress);
+    const auto pos = static_cast<unsigned>(bar_width * progress);
 
     double percent = progress * 100.0;
     if (done < total && percent >= 99.95) percent = 99.9;

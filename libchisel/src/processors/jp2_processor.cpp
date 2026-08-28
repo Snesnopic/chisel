@@ -60,10 +60,10 @@ static std::optional<std::string> extract_com_comment(const std::filesystem::pat
     if (data.size() < 4) return std::nullopt;
 
     auto read_be16 = [](const uint8_t* p) -> uint16_t {
-        return static_cast<uint16_t>((uint32_t(p[0]) << 8) | p[1]);
+        return static_cast<uint16_t>((static_cast<uint32_t>(p[0]) << 8) | p[1]);
     };
     auto read_be32 = [](const uint8_t* p) -> uint32_t {
-        return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+        return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) | (static_cast<uint32_t>(p[2]) << 8) | p[3];
     };
 
     const uint8_t* codestream = nullptr;
@@ -83,7 +83,7 @@ static std::optional<std::string> extract_com_comment(const std::filesystem::pat
 
             if (box_len == 1) {
                 if (pos + 16 > data.size()) break;
-                box_len = (uint64_t(read_be32(data.data() + pos + 8)) << 32) |
+                box_len = (static_cast<uint64_t>(read_be32(data.data() + pos + 8)) << 32) |
                           read_be32(data.data() + pos + 12);
                 header_size = 16;
             } else if (box_len == 0) {

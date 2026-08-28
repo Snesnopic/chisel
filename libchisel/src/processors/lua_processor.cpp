@@ -138,9 +138,9 @@ public:
         return p;
     }
 
-    const uint8_t* ptr() const { return buf_.data() + pos_; }
-    std::size_t remaining() const { return buf_.size() - pos_; }
-    std::size_t pos() const { return pos_; }
+    [[nodiscard]] const uint8_t* ptr() const { return buf_.data() + pos_; }
+    [[nodiscard]] std::size_t remaining() const { return buf_.size() - pos_; }
+    [[nodiscard]] std::size_t pos() const { return pos_; }
 
 private:
     const std::vector<uint8_t>& buf_;

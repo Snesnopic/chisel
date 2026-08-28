@@ -59,7 +59,7 @@ std::filesystem::path GftProcessor::finalize_extraction(const ExtractedContent& 
     Logger::log(LogLevel::Debug, "starting gft finalization for " + content.original_path.string(), get_name());
 
     const auto orig_data = read_file(content.original_path);
-    const std::size_t header_size = std::any_cast<std::size_t>(content.extras);
+    const auto header_size = std::any_cast<std::size_t>(content.extras);
     const auto opt_payload = read_file(content.extracted_files.front());
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /

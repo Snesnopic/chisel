@@ -109,7 +109,7 @@ private:
 GifCompareResult gif_animations_equal(const std::span<const unsigned char> a, const std::span<const unsigned char> b) {
     GifMoments ma(a), mb(b);
     if (!ma.ok() || !mb.ok()) {
-        return {false, "not a valid gif"};
+        return {.equal=false, .reason="not a valid gif"};
     }
 
     std::vector<unsigned char> ca, cb;
@@ -118,25 +118,25 @@ GifCompareResult gif_animations_equal(const std::span<const unsigned char> a, co
         const bool ha = ma.next(ca, da);
         const bool hb = mb.next(cb, db);
         if (!ha || !hb) {
-            if (ha != hb) return {false, "moment count mismatch"};
+            if (ha != hb) return {.equal=false, .reason="moment count mismatch"};
             break;
         }
-        if (da != db) return {false, "delay mismatch"};
+        if (da != db) return {.equal=false, .reason="delay mismatch"};
         if (ca.size() != cb.size() || std::memcmp(ca.data(), cb.data(), ca.size()) != 0) {
-            return {false, "pixel mismatch"};
+            return {.equal=false, .reason="pixel mismatch"};
         }
     }
 
     // a stream that fails to decode isn't legitimate end-of-animation --
     // never call it equal just because it failed the same way on both sides
     if (ma.decode_failed() || mb.decode_failed()) {
-        return {false, "decode error"};
+        return {.equal=false, .reason="decode error"};
     }
     if (ma.width() != mb.width() || ma.height() != mb.height()) {
-        return {false, "dimension mismatch"};
+        return {.equal=false, .reason="dimension mismatch"};
     }
 
-    return {true, ""};
+    return {.equal=true, .reason=""};
 }
 
 } // namespace chisel

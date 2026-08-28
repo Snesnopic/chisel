@@ -24,7 +24,7 @@ static std::vector<uint8_t> decode_bzip2(const std::vector<uint8_t>& compressed)
 
     // bzlib expects char* instead of uint8_t*
     char* next_in = reinterpret_cast<char*>(const_cast<uint8_t*>(compressed.data()));
-    unsigned int avail_in = static_cast<unsigned int>(compressed.size());
+    auto avail_in = static_cast<unsigned int>(compressed.size());
 
     while (avail_in > 0) {
         bz_stream strm{};

@@ -101,7 +101,7 @@ std::filesystem::path IcnsProcessor::finalize_extraction(const ExtractedContent&
 
     for (size_t i = 0; i < optimized_files.size(); ++i) {
         auto payload = read_file(optimized_files[i]);
-        uint32_t block_size = static_cast<uint32_t>(payload.size() + 8);
+        auto block_size = static_cast<uint32_t>(payload.size() + 8);
 
         uint8_t block_header[8];
         write_be32(block_header, ostypes[i]);
@@ -148,7 +148,7 @@ std::optional<std::vector<IcnsBlock>> parse_icns_blocks(const std::filesystem::p
         const uint32_t block_size = read_be32(data.data() + offset + 4);
         if (block_size < 8 || offset + block_size > data.size()) break;
 
-        blocks.push_back({ostype, std::vector<uint8_t>(data.data() + offset + 8, data.data() + offset + block_size)});
+        blocks.push_back({.ostype=ostype, .payload=std::vector<uint8_t>(data.data() + offset + 8, data.data() + offset + block_size)});
         offset += block_size;
     }
     return blocks;

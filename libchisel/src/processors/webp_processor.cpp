@@ -37,7 +37,7 @@ void write_webp_data(const std::filesystem::path& output, const WebPData& data) 
 
 // copies EXIF/XMP/ICCP chunks from the original bytes into the freshly-assembled mux
 void copy_webp_metadata(WebPMux* mux, const std::vector<uint8_t>& original, std::string_view processor_name) {
-    WebPData input_webp{ original.data(), original.size() };
+    WebPData input_webp{ .bytes=original.data(), .size=original.size() };
     WebPMux* mux_in = WebPMuxCreate(&input_webp, 0);
     if (!mux_in) {
         Logger::log(LogLevel::Error, "WebPMuxCreate(mux_in) failed while preserving metadata", processor_name);
@@ -113,7 +113,7 @@ void recompress_static(const std::vector<uint8_t>& input_data,
     }
     WebPPictureFree(&picture);
 
-    WebPData output_image{ writer.mem, writer.size };
+    WebPData output_image{ .bytes=writer.mem, .size=writer.size };
     WebPMux* mux = WebPMuxCreate(&output_image, 1);
     if (!mux) {
         WebPMemoryWriterClear(&writer);
@@ -157,7 +157,7 @@ void recompress_animated(const std::vector<uint8_t>& input_data,
                          const std::filesystem::path& output,
                          const ProcessingOptions& options,
                          std::string_view processor_name) {
-    WebPData webp_data{ input_data.data(), input_data.size() };
+    WebPData webp_data{ .bytes=input_data.data(), .size=input_data.size() };
 
     // durations come from the container since WebPAnimDecoder only exposes cumulative timestamps
     std::vector<int> durations;
@@ -301,8 +301,8 @@ bool decode_webp_rgba8(const std::filesystem::path& path,
 
 // compares two animated webps by their fully-composited, decoded frame sequence
 bool animated_frames_equal(const std::vector<uint8_t>& data_a, const std::vector<uint8_t>& data_b) {
-    WebPData wa{ data_a.data(), data_a.size() };
-    WebPData wb{ data_b.data(), data_b.size() };
+    WebPData wa{ .bytes=data_a.data(), .size=data_a.size() };
+    WebPData wb{ .bytes=data_b.data(), .size=data_b.size() };
 
     WebPAnimDecoderOptions opts;
     WebPAnimDecoderOptionsInit(&opts);
@@ -369,7 +369,7 @@ void WebpProcessor::recompress(const std::filesystem::path& input,
 
     try {
         if (features.has_animation) {
-            WebPData webp_data{ input_data.data(), input_data.size() };
+            WebPData webp_data{ .bytes=input_data.data(), .size=input_data.size() };
             if (!all_frames_lossless(webp_data)) {
                 skip_copy("Animated webp has one or more lossy frames, skipping recompression");
             } else {

@@ -110,7 +110,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
                 data_type = JXL_TYPE_UINT8;
             }
 
-            format = {num_channels, data_type, JXL_NATIVE_ENDIAN, 0};
+            format = {.num_channels=num_channels, .data_type=data_type, .endianness=JXL_NATIVE_ENDIAN, .align=0};
 
             stride = info.xsize * num_channels * get_bytes_per_channel(data_type);
         }
@@ -297,7 +297,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     JxlDecoderCloseInput(dec);
 
     JxlBasicInfo info{};
-    constexpr JxlPixelFormat format = {4, JXL_TYPE_UINT8, JXL_NATIVE_ENDIAN, 0}; // force rgba8 output
+    constexpr JxlPixelFormat format = {.num_channels=4, .data_type=JXL_TYPE_UINT8, .endianness=JXL_NATIVE_ENDIAN, .align=0}; // force rgba8 output
 
     for (;;) {
         const JxlDecoderStatus status = JxlDecoderProcessInput(dec);

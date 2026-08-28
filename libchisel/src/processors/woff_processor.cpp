@@ -12,7 +12,7 @@ namespace chisel {
 
 static std::vector<uint8_t> inflate_zlib(const uint8_t* src, const std::size_t src_len, const std::size_t expected_len) {
     std::vector<uint8_t> uncompressed(expected_len);
-    uLongf dest_len = static_cast<uLongf>(expected_len);
+    auto dest_len = static_cast<uLongf>(expected_len);
     
     const int res = uncompress(uncompressed.data(), &dest_len, src, static_cast<uLong>(src_len));
     if (res != Z_OK) {
@@ -80,7 +80,7 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
     constexpr std::size_t dir_offset = 44;
     new_woff.resize(44 + num_tables * 20);
 
-    uint32_t current_offset = static_cast<uint32_t>(new_woff.size());
+    auto current_offset = static_cast<uint32_t>(new_woff.size());
 
     try {
         for (uint16_t i = 0; i < num_tables; ++i) {
@@ -107,7 +107,7 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
                 compressed = std::move(table_data);
             }
 
-            uint32_t final_comp_len = static_cast<uint32_t>(compressed.size());
+            auto final_comp_len = static_cast<uint32_t>(compressed.size());
             uint32_t padded_len = align4(final_comp_len);
 
             // write exact sizes to directory

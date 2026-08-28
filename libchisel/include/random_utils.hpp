@@ -13,7 +13,7 @@
 #include <random>
 #include <string>
 
-namespace chisel {
+
 
 /**
  * @brief Provides simple, thread-local random number utilities.
@@ -23,7 +23,7 @@ namespace chisel {
  * temporary file or directory names. The underlying generator
  * (std::mt19937_64) is thread-local for safety.
  */
-namespace RandomUtils {
+namespace chisel::RandomUtils {
 
     /**
      * @brief Generates a random 64-bit unsigned integer.
@@ -39,8 +39,8 @@ namespace RandomUtils {
      */
     std::string random_suffix();
 
-} // namespace RandomUtils
+} // namespace chisel::RandomUtils
 
-} // namespace chisel
+
 
 #endif //CHISEL_RANDOM_UTILS_H

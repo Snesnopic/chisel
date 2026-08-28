@@ -324,9 +324,9 @@ namespace chisel {
                             if (color_to_index_map.size() >= 256) {
                                 can_use_palette = false;
                             } else {
-                                uint8_t index = static_cast<uint8_t>(color_to_index_map.size());
+                                auto index = static_cast<uint8_t>(color_to_index_map.size());
                                 color_to_index_map[color] = index;
-                                palette.push_back({r, g, b});
+                                palette.push_back({.red=r, .green=g, .blue=b});
                                 transparency.push_back(a);
                             }
                         }
