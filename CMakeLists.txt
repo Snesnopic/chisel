@@ -334,14 +334,31 @@ set(ENABLE_UNZIP_SHARED OFF CACHE BOOL "" FORCE)
 set(ENABLE_COVERAGE OFF CACHE BOOL "" FORCE)
 set(libarchive_SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libarchive")
 set(libarchive_BINARY_DIR "${CMAKE_BINARY_DIR}/third_party/libarchive-build")
-# set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma found")
 set(LZ4_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/lz4/lib" CACHE PATH "LZ4 header dir" FORCE)
 set(LZ4_LIBRARY lz4_static CACHE FILEPATH "LZ4 static library" FORCE)
 set(LZ4_FOUND TRUE CACHE BOOL "Force LZ4 found" FORCE)
 set(HAVE_LIBLZ4 1 CACHE INTERNAL "Force liblz4 macros")
 set(HAVE_LZ4_H 1 CACHE INTERNAL "Force liblz4 macros")
 
-# liblzma
+# liblzma -- these hints must be set *before* add_subdirectory(libarchive) below,
+# since that's where libarchive's own FIND_PACKAGE(LibLZMA) runs; setting them
+# afterwards (as before) meant it never saw them and silently fell back to no
+# LZMA support on any CI runner without a system liblzma-dev (macOS/Homebrew
+# happens to have one, which is why this only ever built correctly there).
+# FIND_PACKAGE(LibLZMA) also runs its own CHECK_LIBRARY_EXISTS probes against
+# LIBLZMA_LIBRARY, which fail since it's a CMake target name, not a real path --
+# that sets a *local* LIBLZMA_FOUND=FALSE shadowing the cache one below, so the
+# IF(LIBLZMA_FOUND) block in libarchive's CMakeLists.txt that would otherwise
+# set HAVE_LIBLZMA/HAVE_LZMA_H never runs. Force those two directly too, same
+# as HAVE_LIBLZ4/HAVE_LZ4_H are forced for LZ4 just above: since nothing then
+# writes over them when that block gets skipped, the forced values survive.
+set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "" FORCE)
+set(LIBLZMA_LIBRARY liblzma CACHE STRING "" FORCE)
+set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
+set(LIBLZMA_FOUND TRUE CACHE BOOL "Force liblzma found" FORCE)
+set(HAVE_LIBLZMA 1 CACHE INTERNAL "Force liblzma macros")
+set(HAVE_LZMA_H 1 CACHE INTERNAL "Force liblzma macros")
+
 add_subdirectory(${libarchive_SOURCE_DIR} ${libarchive_BINARY_DIR} EXCLUDE_FROM_ALL)
 target_include_directories(archive_static PRIVATE
         ${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api
@@ -352,10 +369,6 @@ set(BZIP2_INCLUDE_DIR "${BZIP2_DIR}" CACHE PATH "" FORCE)
 set(BZIP2_LIBRARY_RELEASE bz2_static CACHE STRING "" FORCE)
 set(BZIP2_LIBRARY bz2_static CACHE STRING "" FORCE)
 set(BZIP2_LIBRARIES bz2_static CACHE STRING "" FORCE)
-
-set(LIBLZMA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/third_party/xz/src/liblzma/api" CACHE PATH "" FORCE)
-set(LIBLZMA_LIBRARY liblzma CACHE STRING "" FORCE)
-set(LIBLZMA_LIBRARIES liblzma CACHE STRING "" FORCE)
 
 # bmplib
 set(insanity_limit_mb 1024 CACHE STRING "Insanity limit for bmp in MBs" FORCE)
