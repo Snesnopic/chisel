@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...4.1.2)
 
-project(chisel VERSION 1.10.0 LANGUAGES CXX C)
+project(chisel VERSION 1.11.0 LANGUAGES CXX C)
 
 if(MSVC)
     # force static msvc runtime linkage (/mt for release, /mtd for debug)
