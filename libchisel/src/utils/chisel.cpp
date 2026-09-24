@@ -52,28 +52,45 @@ struct Chisel::Impl {
         }
     }
 
-    void setupEventBridging() {
-        if (observer == nullptr) return;
+    bool bridged = false;
 
+    void setupEventBridging() {
+        // the bus outlives each run: subscribing again would repeat every callback
+        if (bridged) return;
+        bridged = true;
+
+        // a container reports its start and its final result from its finalization
         eventBus.subscribe<FileProcessStartEvent>([this](const FileProcessStartEvent& e) {
-            observer->onFileStart(e.path);
+            if (observer != nullptr && !e.is_container) observer->onFileStart(e.path);
         });
 
         eventBus.subscribe<FileProcessCompleteEvent>([this](const FileProcessCompleteEvent& e) {
-            observer->onFileFinish(e.path, e.original_size, e.new_size, e.replaced);
+            if (observer != nullptr && !e.is_container) observer->onFileFinish(e.path, e.original_size, e.new_size, e.replaced);
         });
 
         eventBus.subscribe<FileProcessErrorEvent>([this](const FileProcessErrorEvent& e) {
-            observer->onFileError(e.path, e.error_message);
+            if (observer != nullptr) observer->onFileError(e.path, e.error_message);
         });
 
         eventBus.subscribe<FileProcessSkippedEvent>([this](const FileProcessSkippedEvent& e) {
             // skipped implies success but no replacement
-            observer->onFileFinish(e.path, 0, 0, false);
+            if (observer != nullptr && !e.is_container) observer->onFileFinish(e.path, 0, 0, false);
+        });
+
+        eventBus.subscribe<FileAnalyzeSkippedEvent>([this](const FileAnalyzeSkippedEvent& e) {
+            if (observer != nullptr) observer->onFileSkipped(e.path, e.reason);
+        });
+
+        eventBus.subscribe<ContainerFinalizeStartEvent>([this](const ContainerFinalizeStartEvent& e) {
+            if (observer != nullptr) observer->onFileStart(e.path);
+        });
+
+        eventBus.subscribe<ContainerFinalizeCompleteEvent>([this](const ContainerFinalizeCompleteEvent& e) {
+            if (observer != nullptr) observer->onFileFinish(e.path, e.original_size, e.final_size, e.replaced);
         });
 
         eventBus.subscribe<ContainerFinalizeErrorEvent>([this](const ContainerFinalizeErrorEvent& e) {
-            observer->onFileError(e.path, "Container finalize error: " + e.error_message);
+            if (observer != nullptr) observer->onFileError(e.path, "Container finalize error: " + e.error_message);
         });
     }
 };

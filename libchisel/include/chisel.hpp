@@ -68,6 +68,14 @@ struct ChiselObserver {
                              const std::string& error) {}
 
     /**
+     * @brief Called when a file is left untouched without being processed.
+     * @param path Path to the file.
+     * @param reason Why, e.g. "Digitally signed", "Empty file" or "Unsupported format".
+     */
+    virtual void onFileSkipped(const std::filesystem::path& path,
+                               const std::string& reason) {}
+
+    /**
      * @brief Called to log a message.
      * @param level Log level.
      * @param msg Log message.
