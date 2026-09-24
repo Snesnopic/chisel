@@ -109,8 +109,10 @@ bool is_signature_entry(std::string name) {
         }
         return leaf.starts_with("sig-");
     }
-    return name == "appxsignature.p7x" || name == ".signature.p7s" || name.starts_with("_xmlsignatures/") ||
-           name.starts_with("package/services/digital-signature/") || name.find("/_codesignature/") != std::string::npos;
+    // appx/msix packages fail to install once their block map is stale, even when unsigned
+    return name == "appxsignature.p7x" || name == "appxblockmap.xml" || name == ".signature.p7s" ||
+           name.starts_with("_xmlsignatures/") || name.starts_with("package/services/digital-signature/") ||
+           name.find("/_codesignature/") != std::string::npos;
 }
 
 // apk signature scheme v2 and later put a block ending with this magic right before the central directory
