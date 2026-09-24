@@ -51,7 +51,7 @@ struct AudioCoverInfo {
     // semantic role (normalized)
     int picture_type = 0;      // map container-specific types to an agreed integer domain
 
-    // image technical metadata (computed at reinsertion when required)
+    // flac picture fields as read, recomputed at reinsertion when the image can be read
     int width = 0;             // pixels
     int height = 0;            // pixels
     int depth = 0;             // bits per pixel/channel configuration

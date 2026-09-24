@@ -8,6 +8,7 @@
 #include <setjmp.h>
 #include <vector>
 #include <map>
+#include <span>
 #include <cstring>
 #include <taglib/fileref.h>
 #include "flac/flacfile.h"
@@ -21,6 +22,7 @@
 #include "ogg/opus/opusfile.h"
 #include "ogg/vorbis/vorbisfile.h"
 #include "../../include/logger.hpp"
+#include "../../include/mime_detector.hpp"
 #include "../../include/file_utils.hpp"
 #include "../../include/random_utils.hpp"
 #include <png.h>
@@ -74,19 +76,13 @@ const char* extFromMime(const std::string &mime) {
     return ".bin";
 }
 
-// guess image mime type from magic bytes, for containers (APEv2) that don't
-// store an explicit mime type alongside the cover art binary; falls back to
-// "image/jpeg" since that's the overwhelmingly common case in the wild
-std::string guessImageMimeFromMagic(const TagLib::ByteVector &data) {
-    const auto *bytes = reinterpret_cast<const unsigned char *>(data.data());
-    const auto size = data.size();
+std::string detectMime(const TagLib::ByteVector &data) {
+    return MimeDetector::detect(std::span(reinterpret_cast<const uint8_t *>(data.data()), data.size()));
+}
 
-    if (size >= 8 && !png_sig_cmp(bytes, 0, 8)) return "image/png";
-    if (size >= 6 && (std::memcmp(bytes, "GIF87a", 6) == 0 || std::memcmp(bytes, "GIF89a", 6) == 0)) return "image/gif";
-    if (size >= 2 && bytes[0] == 'B' && bytes[1] == 'M') return "image/bmp";
-    if (size >= 12 && std::memcmp(bytes, "RIFF", 4) == 0 && std::memcmp(bytes + 8, "WEBP", 4) == 0) return "image/webp";
-    if (size >= 4 && (std::memcmp(bytes, "II*\0", 4) == 0 || std::memcmp(bytes, "MM\0*", 4) == 0)) return "image/tiff";
-    return "image/jpeg";
+// extracted covers are named after their content, not after the type their tag claims
+std::filesystem::path coverPath(const std::filesystem::path &temp_dir, const int idx, const TagLib::ByteVector &data) {
+    return temp_dir / ("cover_" + std::to_string(idx) + extFromMime(detectMime(data)));
 }
 
 // infer mp4 format from mime
@@ -137,12 +133,10 @@ void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     longjmp(err->setjmp_buffer, 1);
 }
 
-// compute image props
+// compute image props from the image's content; outputs are left untouched if it can't be read
 void computeImageProps(const std::filesystem::path &imagePath,
-                              const std::string& mime_type,
-                              int &width, int &height, int &depth, int &colors) {
-    // default to 0
-    width = 0; height = 0; depth = 0; colors = 0;
+                       int &width, int &height, int &depth, int &colors) {
+    const std::string mime_type = MimeDetector::detect(imagePath);
 
     if (mime_type == "image/png") {
         try {
@@ -232,7 +226,11 @@ void computeImageProps(const std::filesystem::path &imagePath,
         uint8_t header[32];
         if (fread(header, 1, 30, fp.get()) < 30) return;
 
-        if (WebPGetInfo(header, 30, &width, &height)) {
+        int w = 0;
+        int h = 0;
+        if (WebPGetInfo(header, 30, &w, &h)) {
+            width = w;
+            height = h;
             depth = 32; // webp is generally RGBA 8888 internally or similar
             colors = 0;
         }
@@ -241,6 +239,26 @@ void computeImageProps(const std::filesystem::path &imagePath,
 
     // TODO: implement for jxl, etc. if needed
     Logger::log(LogLevel::Debug, "Computeimageprops: unsupported mime type: " + mime_type, "AudioMetadataUtil");
+}
+
+// flac picture fields as they were, recomputed at reinsertion when the image can be read
+void keepPictureProps(AudioCoverInfo &info, const TagLib::FLAC::Picture &pic) {
+    info.width = pic.width();
+    info.height = pic.height();
+    info.depth = pic.colorDepth();
+    info.colors = pic.numColors();
+}
+
+void setPictureProps(TagLib::FLAC::Picture &pic, const AudioCoverInfo &info) {
+    int w = info.width;
+    int h = info.height;
+    int d = info.depth;
+    int c = info.colors;
+    computeImageProps(info.temp_file_path, w, h, d, c);
+    pic.setWidth(w);
+    pic.setHeight(h);
+    pic.setColorDepth(d);
+    pic.setNumColors(c);
 }
 
 // normalize picture type flac
@@ -265,8 +283,7 @@ void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
     for (auto frame : frames) {
         auto *apic = static_cast<TagLib::ID3v2::AttachedPictureFrame*>(frame);
 
-        const char *ext = extFromMime(apic->mimeType().to8Bit(true));
-        std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+        const std::filesystem::path outPath = coverPath(temp_dir, idx, apic->picture());
 
         std::ofstream out(outPath, std::ios::binary);
         out.write(apic->picture().data(), apic->picture().size());
@@ -341,9 +358,9 @@ void extractApeV2Covers(TagLib::APE::Tag* tag,
             TagLib::ByteVector imgData = val.mid(nullPos + 1);
             TagLib::String desc = TagLib::String(val.mid(0, nullPos), TagLib::String::UTF8);
 
-            std::string mime = guessImageMimeFromMagic(imgData);
-            const char *ext = extFromMime(mime);
-            std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+            // apev2 stores no mime type
+            const std::string mime = detectMime(imgData);
+            const std::filesystem::path outPath = coverPath(temp_dir, idx, imgData);
 
             std::ofstream out(outPath, std::ios::binary);
             out.write(imgData.data(), imgData.size());
@@ -404,8 +421,7 @@ void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
 
     int idx = static_cast<int>(extracted_covers.size());
     for (auto *pic : tag->pictureList()) {
-        const char *ext = extFromMime(pic->mimeType().to8Bit(true));
-        std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+        const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
         std::ofstream out(outPath, std::ios::binary);
         out.write(pic->data().data(), pic->data().size());
@@ -416,6 +432,7 @@ void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
         info.mime_type = pic->mimeType().to8Bit(true);
         info.description = pic->description().to8Bit(true);
         info.picture_type = normalizePictureTypeFromFlac(pic->type());
+        keepPictureProps(info, *pic);
 
         extracted_covers.push_back(std::move(info));
         ++idx;
@@ -439,15 +456,7 @@ bool rebuildXiphCovers(TagLib::Ogg::XiphComment* tag,
         pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
         pic->setData(data);
 
-        int w=0;
-        int h=0;
-        int d=0;
-        int c=0;
-        computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
-        if (w > 0) pic->setWidth(w);
-        if (h > 0) pic->setHeight(h);
-        if (d > 0) pic->setColorDepth(d);
-        if (c > 0) pic->setNumColors(c);
+        setPictureProps(*pic, info);
 
         tag->addPicture(pic);
     }
@@ -478,8 +487,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
     if (auto *flacFile = dynamic_cast<TagLib::FLAC::File*>(file_ref)) {
         int idx = 0;
         for (auto *pic : flacFile->pictureList()) {
-            const char *ext = extFromMime(pic->mimeType().to8Bit(true));
-            std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+            const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
             std::ofstream out(outPath, std::ios::binary);
             out.write(pic->data().data(), pic->data().size());
@@ -490,7 +498,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
             info.mime_type = pic->mimeType().to8Bit(true);
             info.description = pic->description().to8Bit(true);
             info.picture_type = normalizePictureTypeFromFlac(pic->type());
-            // note: flac picture fields (w, h, etc.) will be computed on reinsertion
+            keepPictureProps(info, *pic);
 
             state.extracted_covers.push_back(std::move(info));
             ++idx;
@@ -533,8 +541,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 const TagLib::MP4::CoverArtList &covers = it->second.toCoverArtList();
 
                 for (const auto &cover : covers) {
-                    const char *ext = (cover.format() == TagLib::MP4::CoverArt::PNG) ? ".png" : ".jpg";
-                    std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+                    const std::filesystem::path outPath = coverPath(temp_dir, idx, cover.data());
 
                     std::ofstream out(outPath, std::ios::binary);
                     out.write(cover.data().data(), cover.data().size());
@@ -562,8 +569,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
             int idx = 0;
             auto pics = xc->pictureList();
             for (auto *pic : pics) {
-                const char *ext = extFromMime(pic->mimeType().to8Bit(true));
-                std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+                const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
                 std::ofstream out(outPath, std::ios::binary);
                 out.write(pic->data().data(), pic->data().size());
@@ -574,6 +580,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 info.mime_type = pic->mimeType().to8Bit(true);
                 info.description = pic->description().to8Bit(true);
                 info.picture_type = normalizePictureTypeFromFlac(pic->type());
+                keepPictureProps(info, *pic);
 
                 state.extracted_covers.push_back(std::move(info));
                 ++idx;
@@ -589,8 +596,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
             int idx = 0;
             auto pics = xc->pictureList();
             for (auto *pic : pics) {
-                const char *ext = extFromMime(pic->mimeType().to8Bit(true));
-                std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+                const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
                 std::ofstream out(outPath, std::ios::binary);
                 out.write(pic->data().data(), pic->data().size());
@@ -601,6 +607,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 info.mime_type = pic->mimeType().to8Bit(true);
                 info.description = pic->description().to8Bit(true);
                 info.picture_type = normalizePictureTypeFromFlac(pic->type());
+                keepPictureProps(info, *pic);
 
                 state.extracted_covers.push_back(std::move(info));
                 ++idx;
@@ -700,8 +707,7 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 if (!pic.isValid()) continue;
 
                 std::string mime = pic.mimeType().to8Bit(true);
-                const char *ext = extFromMime(mime);
-                std::filesystem::path outPath = temp_dir / ("cover_" + std::to_string(idx) + ext);
+                const std::filesystem::path outPath = coverPath(temp_dir, idx, pic.picture());
 
                 std::ofstream out(outPath, std::ios::binary);
                 out.write(pic.picture().data(), pic.picture().size());
@@ -765,13 +771,8 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
-            // compute technical fields from the *optimized* image data
-            int w=0, h=0, d=0, c=0;
-            computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
-            if (w > 0) pic->setWidth(w);
-            if (h > 0) pic->setHeight(h);
-            if (d > 0) pic->setColorDepth(d);
-            if (c > 0) pic->setNumColors(c);
+            // technical fields describe the *optimized* image data
+            setPictureProps(*pic, info);
 
             flacFile->addPicture(pic);
         }
@@ -855,15 +856,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
-            int w=0;
-            int h=0;
-            int d=0;
-            int c=0;
-            computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
-            if (w > 0) pic->setWidth(w);
-            if (h > 0) pic->setHeight(h);
-            if (d > 0) pic->setColorDepth(d);
-            if (c > 0) pic->setNumColors(c);
+            setPictureProps(*pic, info);
 
             xc->addPicture(pic);
         }
@@ -887,12 +880,7 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
-            int w=0, h=0, d=0, c=0;
-            computeImageProps(info.temp_file_path, info.mime_type, w, h, d, c);
-            if (w > 0) pic->setWidth(w);
-            if (h > 0) pic->setHeight(h);
-            if (d > 0) pic->setColorDepth(d);
-            if (c > 0) pic->setNumColors(c);
+            setPictureProps(*pic, info);
 
             xc->addPicture(pic);
         }

@@ -20,4 +20,9 @@ std::string MimeDetector::detect(const std::filesystem::path& path)
     }
 }
 
+std::string MimeDetector::detect(const std::span<const uint8_t> data)
+{
+    return std::string(qadmimes::MimeDetector::detect(data));
+}
+
 } // namespace chisel

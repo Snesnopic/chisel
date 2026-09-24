@@ -10,7 +10,9 @@
 #ifndef CHISEL_MIME_DETECTOR_HPP
 #define CHISEL_MIME_DETECTOR_HPP
 
+#include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 
 namespace chisel {
@@ -29,6 +31,12 @@ namespace chisel {
          * @return A string representing the MIME type (e.g., "image/jpeg").
          */
         static std::string detect(const std::filesystem::path& path);
+
+        /**
+         * @brief Detect the MIME type of in-memory data from its content alone.
+         * @return The MIME type, or an empty string if the content isn't recognized.
+         */
+        static std::string detect(std::span<const uint8_t> data);
     };
 
 } // namespace chisel
