@@ -645,11 +645,13 @@ namespace chisel {
                 // if Phase 2 already recompressed this same file, rebuild on top of
                 // those bytes instead of the (possibly stale, with --output-dir) original
                 ExtractedContent effective_content = content;
+                bool recompressed = false;
                 {
                     std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
                     auto it = recompressed_paths_.find(content.original_path.string());
                     if (it != recompressed_paths_.end()) {
                         effective_content.original_path = it->second;
+                        recompressed = true;
                     }
                 }
 
@@ -663,8 +665,13 @@ namespace chisel {
 
                 if (new_temp_file.empty()) {
                     Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
-                    // publish explicit Phase 3 complete event even if skipped
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
+                    // publish explicit Phase 3 complete event even if skipped, phase 2's result being the final one
+                    auto final_size = orig_size;
+                    if (recompressed) {
+                        if (const auto size = std::filesystem::file_size(effective_content.original_path, ec); !ec) final_size = size;
+                    }
+                    const bool replaced = recompressed && !dry_run_;
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=replaced ? effective_content.original_path : content.original_path, .original_size=orig_size, .final_size=final_size, .replaced=replaced, .duration=duration});
                     continue;
                 }
 
