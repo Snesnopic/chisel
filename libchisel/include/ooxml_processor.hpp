@@ -18,14 +18,15 @@
 namespace chisel {
 
 /**
- * @brief Implements IProcessor for Office Open XML (OOXML) files.
+ * @brief Implements IProcessor for Office Open XML (OOXML) files and other OPC packages.
  *
- * @details This processor handles .docx, .xlsx, and .pptx files.
- * It treats them as ZIP archives and extracts their contents; embedded
- * images (PNG/JPG) and other recognized parts are optimized independently
- * by the executor recursing into each extracted file (dispatched to
- * PngProcessor/ZopfliPngProcessor/JpegProcessor/etc. as appropriate).
- * finalize_extraction() just re-zips whatever ends up on disk.
+ * @details This processor handles .docx, .xlsx and .pptx files and their variants,
+ * plus the other formats built on Open Packaging Conventions: XLSB, add-ins, Visio
+ * drawings, Office themes, XPS/OpenXPS, DWFx and 3MF. It treats them as ZIP archives
+ * and extracts their contents; embedded images (PNG/JPG) and other recognized parts
+ * are optimized independently by the executor recursing into each extracted file
+ * (dispatched to PngProcessor/ZopfliPngProcessor/JpegProcessor/etc. as appropriate).
+ * finalize_extraction() then re-zips every part, in the original order, with deflate.
  */
 class OOXMLProcessor final : public IProcessor {
 public:
@@ -35,22 +36,38 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 6> kMimes = {
+        static constexpr std::array<std::string_view, 19> kMimes = {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/vnd.openxmlformats-officedocument.presentationml.template"
+            "application/vnd.openxmlformats-officedocument.presentationml.template",
+            "application/vnd.ms-excel.sheet.binary.macroenabled.12",
+            "application/vnd.ms-excel.addin.macroenabled.12",
+            "application/vnd.ms-powerpoint.addin.macroenabled.12",
+            "application/vnd.ms-officetheme",
+            "application/vnd.ms-visio.drawing.macroenabled.12",
+            "application/vnd.ms-visio.stencil",
+            "application/vnd.ms-visio.stencil.macroenabled.12",
+            "application/vnd.ms-visio.template",
+            "application/vnd.ms-visio.template.macroenabled.12",
+            "application/vnd.ms-xpsdocument",
+            "application/oxps",
+            "model/vnd.dwfx+xps",
+            "application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
         };
         return {kMimes.data(), kMimes.size()};
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 14> kExts = {
+        // .vsdx only by extension: its sniffed type is shared with binary .vsd files
+        static constexpr std::array<std::string_view, 30> kExts = {
             ".docx", ".docm", ".dotm", ".dotx",
-            ".xlsx", ".xlsm", ".xltm", ".xltx",
-            ".pptx", ".pptm", ".potm", ".potx", ".ppsm", ".ppsx"
+            ".xlsx", ".xlsm", ".xltm", ".xltx", ".xlsb", ".xlam",
+            ".pptx", ".pptm", ".potm", ".potx", ".ppsm", ".ppsx", ".ppam", ".sldx", ".sldm",
+            ".thmx", ".vsdx", ".vsdm", ".vssx", ".vssm", ".vstx", ".vstm",
+            ".xps", ".oxps", ".dwfx", ".3mf"
         };
         return {kExts.data(), kExts.size()};
     }
