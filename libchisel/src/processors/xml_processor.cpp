@@ -195,6 +195,13 @@ std::size_t doctype_end(const std::string_view in, const std::size_t pos) {
  * unambiguously.
  */
 std::optional<std::string> minify_xml(const std::string_view in) {
+    // control characters other than tab, cr and lf can't appear in a well-formed document
+    if (std::ranges::any_of(in, [](const char c) {
+            const auto u = static_cast<unsigned char>(c);
+            return u < 0x20 && u != '\t' && u != '\n' && u != '\r';
+        })) {
+        return std::nullopt;
+    }
     std::string minified;
     minified.reserve(in.size());
     std::vector<std::string_view> open;
