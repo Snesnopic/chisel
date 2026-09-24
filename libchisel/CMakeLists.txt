@@ -223,6 +223,8 @@ endif()
 target_compile_features(libchisel PRIVATE cxx_std_20)
 if(WIN32)
     target_compile_definitions(libchisel PUBLIC LIBARCHIVE_STATIC PLATFORM_WINDOWS)
+    # unity builds may put windows.h, and its min/max macros, before any std::min/std::max
+    target_compile_definitions(libchisel PRIVATE NOMINMAX)
 elseif(APPLE)
     target_compile_definitions(libchisel PUBLIC PLATFORM_APPLE)
 elseif(UNIX AND NOT APPLE)
