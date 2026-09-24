@@ -103,6 +103,10 @@ set(LIBCHISEL_SOURCES
         src/utils/chisel.cpp
         include/xml_processor.hpp
         src/processors/xml_processor.cpp
+        include/data_uri.hpp
+        src/utils/data_uri.cpp
+        include/data_uri_processor.hpp
+        src/processors/data_uri_processor.cpp
         include/options.hpp
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp
