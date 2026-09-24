@@ -4,6 +4,7 @@
 
 #include "../../include/zopflipng_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/png_structure.hpp"
 #include "zopflipng_lib.h"
 #include "zlib_container.h"
 #include <array>
@@ -39,9 +40,10 @@ namespace {
         }
     };
 
-    std::vector<unsigned char> decode_png_rgba8(const std::filesystem::path &file,
-                                                png_uint_32 &width,
-                                                png_uint_32 &height) {
+    // big-endian rgba16, so 16-bit samples are compared whole
+    std::vector<unsigned char> decode_png_rgba16(const std::filesystem::path &file,
+                                                 png_uint_32 &width,
+                                                 png_uint_32 &height) {
         const unique_FILE fp(chisel::open_file(file.string().c_str(), "rb"));
         if (!fp) throw std::runtime_error("Cannot open PNG: " + file.string());
 
@@ -66,19 +68,19 @@ namespace {
         int bit_depth, color_type;
         png_get_IHDR(rd.png, rd.info, &width, &height, &bit_depth, &color_type, nullptr, nullptr, nullptr);
 
-        // configure transforms for consistent rgba8 output
-        if (bit_depth == 16) png_set_strip_16(rd.png);
+        // configure transforms for consistent rgba16 output
         if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(rd.png);
         if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) png_set_expand_gray_1_2_4_to_8(rd.png);
         if (png_get_valid(rd.png, rd.info, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(rd.png);
-        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(rd.png, 0xFF, PNG_FILLER_AFTER);
+        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(rd.png, 0xFFFF, PNG_FILLER_AFTER);
         if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(rd.png);
+        if (bit_depth < 16) png_set_expand_16(rd.png);
 
         png_read_update_info(rd.png, rd.info);
 
         const std::size_t rowbytes = png_get_rowbytes(rd.png, rd.info);
-        if (rowbytes != static_cast<std::size_t>(width) * 4) {
-             throw std::runtime_error("Rowbytes mismatch, expected RGBA8");
+        if (rowbytes != static_cast<std::size_t>(width) * 8) {
+             throw std::runtime_error("Rowbytes mismatch, expected RGBA16");
         }
 
         std::vector<unsigned char> image(rowbytes * height);
@@ -145,6 +147,23 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
             throw std::runtime_error("ZopflipngProcessor: cannot open input");
         }
 
+        const auto end = png::image_end(origpng);
+        if (!end) throw std::runtime_error("ZopflipngProcessor: malformed PNG");
+        // data after IEND isn't part of the image, but it's kept
+        const std::vector<unsigned char> tail(origpng.begin() + static_cast<std::ptrdiff_t>(*end), origpng.end());
+        origpng.resize(*end);
+
+        // fdAT frames are only ever copied byte-for-byte, never re-encoded, so a new color type would desync them
+        const bool animated = has_actl_chunk(origpng);
+        const auto carried = png::carried_chunks(origpng, options.preserve_metadata, animated);
+        if (!carried) throw std::runtime_error("ZopflipngProcessor: malformed PNG");
+        if (carried->blocked) {
+            Logger::log(LogLevel::Debug, "Unknown chunk that can't outlive a re-encoding, left as is: " +
+                        input.filename().string(), get_name());
+            fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+            return;
+        }
+
         // configure options
         ZopfliPNGOptions opts;
         opts.lossy_transparent = false;
@@ -154,18 +173,8 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.num_iterations_large = options.iterations_large;
         apply_filter_strategy_search(options, opts);
 
-        // fdAT frames are only ever copied byte-for-byte, never re-encoded, so a new color type would desync them
-        if (has_actl_chunk(origpng)) {
-            opts.keep_colortype = true;
-        }
-
-        if (options.preserve_metadata) {
-            // keep common metadata and specialized chunks (APNG, 9Patch)
-            opts.keepchunks = {"tEXt", "zTXt", "iTXt", "eXIf", "iCCP", "sRGB", "gAMA", "cHRM", "sBIT", "pHYs", "acTL", "fcTL", "fdAT", "npTc"};
-        } else {
-            // even if not preserving metadata, we MUST keep animation/scaling chunks to avoid breaking the file functionality
-            opts.keepchunks = {"acTL", "fcTL", "fdAT", "npTc"};
-        }
+        // chunks such as bKGD or sBIT are written in terms of the source's color type
+        opts.keep_colortype = animated || carried->color_bound;
 
         // optimize
         std::vector<unsigned char> resultpng;
@@ -174,9 +183,14 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
             throw std::runtime_error("ZopflipngProcessor: optimization failed");
         }
 
-        // write output file
-        std::ofstream ofs(output, std::ios::binary);
-        ofs.write(reinterpret_cast<const char*>(resultpng.data()), resultpng.size());
+        // the source's ancillary chunks go back verbatim, in their original places
+        if (!png::insert_chunks(resultpng, *carried)) {
+            throw std::runtime_error("ZopflipngProcessor: cannot insert the PNG chunks");
+        }
+        resultpng.insert(resultpng.end(), tail.begin(), tail.end());
+        if (!write_file(output, resultpng)) {
+            throw std::runtime_error("ZopflipngProcessor: cannot write " + output.string());
+        }
 
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
@@ -197,14 +211,14 @@ bool ZopfliPngProcessor::raw_equal(const std::filesystem::path &a,
     std::vector<unsigned char> imgA, imgB;
 
     try {
-        imgA = decode_png_rgba8(a, wa, ha);
+        imgA = decode_png_rgba16(a, wa, ha);
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Warning, std::string("Raw_equal: Failed to decode png (a): ") + a.string() + " (" + e.what() + ")", get_name());
         return false;
     }
 
     try {
-        imgB = decode_png_rgba8(b, wb, hb);
+        imgB = decode_png_rgba16(b, wb, hb);
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Warning, std::string("Raw_equal: Failed to decode png (b): ") + b.string() + " (" + e.what() + ")", get_name());
         return false;
@@ -220,7 +234,9 @@ bool ZopfliPngProcessor::raw_equal(const std::filesystem::path &a,
         return false;
     }
 
-    return true;
+    const auto tail_a = png::trailing_data(a);
+    const auto tail_b = png::trailing_data(b);
+    return tail_a && tail_b && *tail_a == *tail_b;
 }
 
 } // namespace chisel

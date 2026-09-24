@@ -91,6 +91,8 @@ set(LIBCHISEL_SOURCES
         src/utils/jpeg_structure.cpp
         include/c2pa_manifest.hpp
         src/utils/c2pa_manifest.cpp
+        include/png_structure.hpp
+        src/utils/png_structure.cpp
         include/mpeg_processor.hpp
         src/processors/mpeg_processor.cpp
         include/ogg_processor.hpp

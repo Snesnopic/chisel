@@ -4,6 +4,7 @@
 
 #include "../../include/png_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/png_structure.hpp"
 #include <png.h>
 #include <zlib.h>
 #include <vector>
@@ -16,6 +17,9 @@
 #include <map>
 #include "file_utils.hpp"
 #include <array>
+#include <filesystem>
+#include <optional>
+#include <string_view>
 
 
 namespace chisel {
@@ -67,101 +71,6 @@ namespace chisel {
     };
 
     /**
-     * @brief Copies ancillary chunks (metadata) from a PNG reader to a writer.
-     * @param in_png The source png_structp.
-     * @param in_info The source png_infop.
-     * @param out_png The destination png_structp.
-     * @param out_info The destination png_infop.
-     * @param preserve If true, metadata is copied.
-     */
-    void copy_metadata_if_requested(png_structp in_png, png_infop in_info,
-                                    png_structp out_png, png_infop out_info,
-                                    bool preserve) {
-        if (!preserve) return;
-        // color profiles and gamma
-        // iccp
-        if (png_get_valid(in_png, in_info, PNG_INFO_iCCP)) {
-            png_charp name = nullptr;
-            int comp_type = 0;
-            png_bytep profile = nullptr;
-            png_uint_32 profile_len = 0;
-            if (png_get_iCCP(in_png, in_info, &name, &comp_type, &profile, &profile_len)) {
-                png_set_iCCP(out_png, out_info, name, comp_type, profile, profile_len);
-            }
-        }
-        // srgb
-        if (png_get_valid(in_png, in_info, PNG_INFO_sRGB)) {
-            int intent = 0;
-            if (png_get_sRGB(in_png, in_info, &intent)) {
-                png_set_sRGB(out_png, out_info, intent);
-            }
-        }
-        // gama
-        if (png_get_valid(in_png, in_info, PNG_INFO_gAMA)) {
-            double gamma = 0.0;
-            if (png_get_gAMA(in_png, in_info, &gamma)) {
-                png_set_gAMA(out_png, out_info, gamma);
-            }
-        }
-        // chrm
-        if (png_get_valid(in_png, in_info, PNG_INFO_cHRM)) {
-            double wx, wy, rx, ry, gx, gy, bx, by;
-            if (png_get_cHRM(in_png, in_info, &wx, &wy, &rx, &ry, &gx, &gy, &bx, &by)) {
-                png_set_cHRM(out_png, out_info, wx, wy, rx, ry, gx, gy, bx, by);
-            }
-        }
-
-        // sbit
-        if (png_get_valid(in_png, in_info, PNG_INFO_sBIT)) {
-            png_color_8p sig_bit = nullptr;
-            if (png_get_sBIT(in_png, in_info, &sig_bit)) {
-                png_set_sBIT(out_png, out_info, sig_bit);
-            }
-        }
-
-        // phys (pixel per unit)
-        if (png_get_valid(in_png, in_info, PNG_INFO_pHYs)) {
-            png_uint_32 xppu = 0, yppu = 0;
-            int unit = 0;
-            if (png_get_pHYs(in_png, in_info, &xppu, &yppu, &unit)) {
-                png_set_pHYs(out_png, out_info, xppu, yppu, unit);
-            }
-        }
-
-        // splt (suggested palettes)
-        int n_splt = 0;
-        png_sPLT_tp splt_ptr = nullptr;
-        n_splt = png_get_sPLT(in_png, in_info, &splt_ptr);
-        if (n_splt > 0 && splt_ptr) {
-            png_set_sPLT(out_png, out_info, splt_ptr, n_splt);
-        }
-
-        // text
-        png_textp text = nullptr;
-        int num_text = 0;
-        png_get_text(in_png, in_info, &text, &num_text);
-        if (num_text > 0 && text) {
-            png_set_text(out_png, out_info, text, num_text);
-        }
-
-        // time (last timestamp)
-        if (png_get_valid(in_png, in_info, PNG_INFO_tIME)) {
-            png_timep mod_time = nullptr;
-            if (png_get_tIME(in_png, in_info, &mod_time)) {
-                png_set_tIME(out_png, out_info, mod_time);
-            }
-        }
-
-        // bkgd: preserve only if compatible with output format (rgb/gray)
-        if (png_get_valid(in_png, in_info, PNG_INFO_bKGD)) {
-            png_color_16p bkgd = nullptr;
-            if (png_get_bKGD(in_png, in_info, &bkgd)) {
-                png_set_bKGD(out_png, out_info, bkgd);
-            }
-        }
-    }
-
-    /**
      * @brief Packs RGBA color components into a single 32-bit integer.
      * @return The packed 32-bit color value.
      */
@@ -201,26 +110,30 @@ namespace chisel {
     };
 
     /**
-     * @brief Reads and decodes a (possibly animated) PNG into 8-bit RGBA frames.
+     * @brief Reads and decodes a (possibly animated) PNG into RGBA frames.
      * @param png The libpng read struct, positioned right after png_read_info().
      * @param info The libpng info struct.
+     * @param rgba16 Decode to 16-bit RGBA (big-endian) instead of 8-bit RGBA, keeping 16-bit samples whole.
      * @return The decoded canvas/animation metadata and per-frame pixel data.
      */
-    PngDecoded read_png_frames(png_structp png, png_infop info) {
+    PngDecoded read_png_frames(png_structp png, png_infop info, const bool rgba16) {
         PngDecoded result;
         int bit_depth, color_type;
         png_get_IHDR(png, info, &result.canvas_width, &result.canvas_height,
                      &bit_depth, &color_type, nullptr, nullptr, nullptr);
 
-        if (bit_depth == 16) png_set_strip_16(png);
+        if (bit_depth == 16 && !rgba16) png_set_strip_16(png);
         if (color_type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(png);
         if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8) png_set_expand_gray_1_2_4_to_8(png);
         if (png_get_valid(png, info, PNG_INFO_tRNS)) png_set_tRNS_to_alpha(png);
-        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
+        if (!(color_type & PNG_COLOR_MASK_ALPHA)) png_set_filler(png, rgba16 ? 0xFFFF : 0xFF, PNG_FILLER_AFTER);
         if (color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA) png_set_gray_to_rgb(png);
+        if (rgba16 && bit_depth < 16) png_set_expand_16(png);
+        png_set_interlace_handling(png);
 
         png_read_update_info(png, info);
-        // now, every row read from here on out is guaranteed to be rgba8
+        // now, every row read from here on out is guaranteed to be rgba8 (or rgba16)
+        const std::size_t pixel_bytes = rgba16 ? 8 : 4;
 
 #ifdef PNG_APNG_SUPPORTED
         if (png_get_valid(png, info, PNG_INFO_acTL)) {
@@ -256,7 +169,7 @@ namespace chisel {
                 frame.height = result.canvas_height;
             }
 
-            const std::size_t rowbytes = static_cast<std::size_t>(frame.width) * 4;
+            const std::size_t rowbytes = static_cast<std::size_t>(frame.width) * pixel_bytes;
             frame.rgba.resize(rowbytes * frame.height);
             std::vector<png_bytep> row_pointers(frame.height);
             for (png_uint_32 y = 0; y < frame.height; ++y) {
@@ -272,11 +185,70 @@ namespace chisel {
     }
 
 
+    namespace png_rewrite {
+    // 16-bit samples fit in 8 bits when each one repeats its high byte
+    bool narrow_to_8bit(PngDecoded& decoded) {
+        for (const auto& frame : decoded.frames) {
+            for (std::size_t i = 0; i < frame.rgba.size(); i += 2) {
+                if (frame.rgba[i] != frame.rgba[i + 1]) return false;
+            }
+        }
+        for (auto& frame : decoded.frames) {
+            std::vector<unsigned char> narrow(frame.rgba.size() / 2);
+            for (std::size_t i = 0; i < narrow.size(); ++i) narrow[i] = frame.rgba[2 * i];
+            frame.rgba = std::move(narrow);
+        }
+        return true;
+    }
+
+    void append_to_vector(png_structp png, png_bytep bytes, png_size_t size) {
+        auto* out = static_cast<std::vector<unsigned char>*>(png_get_io_ptr(png));
+        bool failed = false;
+        try {
+            out->insert(out->end(), bytes, bytes + size);
+        } catch (...) {
+            failed = true;
+        }
+        if (failed) png_error(png, "out of memory");
+    }
+
+    void flush_nothing(png_structp) {}
+
+    // leaves the image as it is for the next stage
+    void copy_unchanged(const std::filesystem::path& input, const std::filesystem::path& output,
+                        const std::string_view reason, const std::string_view tag) {
+        Logger::log(LogLevel::Debug, std::string(reason) + ", left as is: " + input.filename().string(), tag);
+        std::error_code ec;
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing, ec);
+        if (ec) throw std::runtime_error("Cannot copy PNG: " + ec.message());
+    }
+    } // namespace png_rewrite
+
     // single pass recompress with optimization
     void PngProcessor::recompress(const std::filesystem::path &input,
                                   const std::filesystem::path &output, const ProcessingOptions &options) {
 
         Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
+        using namespace png_rewrite;
+
+        std::vector<unsigned char> source = chisel::read_file(input);
+        const auto end = png::image_end(source);
+        if (!end) throw std::runtime_error("Malformed PNG: " + input.string());
+        // data after IEND isn't part of the image, but it's kept
+        const std::vector<unsigned char> tail(source.begin() + static_cast<std::ptrdiff_t>(*end), source.end());
+        source.resize(*end);
+
+        const auto carried = png::carried_chunks(source, options.preserve_metadata, false);
+        if (!carried) throw std::runtime_error("Malformed PNG: " + input.string());
+        if (carried->blocked) {
+            copy_unchanged(input, output, "Unknown chunk that can't outlive a re-encoding", get_name());
+            return;
+        }
+        // their values can't follow a new color type or palette
+        if (carried->color_bound) {
+            copy_unchanged(input, output, "bKGD, sBIT, hIST or pCAL chunk", get_name());
+            return;
+        }
 
         // --- PASS 1: READ + ANALYZE ---
 
@@ -298,7 +270,12 @@ namespace chisel {
         png_init_io(rd.png, fp_in.get());
         png_read_info(rd.png, rd.info);
 
-        const PngDecoded decoded = read_png_frames(rd.png, rd.info);
+        const bool deep = png_get_bit_depth(rd.png, rd.info) == 16;
+        PngDecoded decoded = read_png_frames(rd.png, rd.info, deep);
+        if (deep && !narrow_to_8bit(decoded)) {
+            copy_unchanged(input, output, "16-bit samples", get_name());
+            return;
+        }
         const png_uint_32 width = decoded.canvas_width;
         const png_uint_32 height = decoded.canvas_height;
 
@@ -339,12 +316,7 @@ namespace chisel {
 
         // --- PASS 2: WRITE ---
 
-        const unique_FILE fp_out(chisel::open_file(output.string().c_str(), "wb"));
-        if (!fp_out) {
-            Logger::log(LogLevel::Error, "Cannot open png output: " + output.string(), get_name());
-            throw std::runtime_error("Cannot open PNG output");
-        }
-
+        std::vector<unsigned char> encoded;
         PngWrite wr;
         wr.png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
         if (!wr.png) throw std::runtime_error("png_create_write_struct failed (writer)");
@@ -352,7 +324,7 @@ namespace chisel {
         if (!wr.info) throw std::runtime_error("png_create_info_struct failed (writer)");
         if (setjmp(png_jmpbuf(wr.png))) throw std::runtime_error("libpng write error");
 
-        png_init_io(wr.png, fp_out.get());
+        png_set_write_fn(wr.png, &encoded, append_to_vector, flush_nothing);
 
         // set max compression
         png_set_compression_level(wr.png, 9);
@@ -398,22 +370,6 @@ namespace chisel {
             }
         }
 #endif
-
-        // copy metadata (must be done *before* png_write_info)
-        // re-open read struct to get metadata
-        {
-            unique_FILE fp_in_meta(chisel::open_file(input.string().c_str(), "rb"));
-            PngRead rd_meta;
-            rd_meta.png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-            if (!rd_meta.png) throw std::runtime_error("png_create_read_struct failed (meta)");
-            rd_meta.info = png_create_info_struct(rd_meta.png);
-            if (!rd_meta.info) throw std::runtime_error("png_create_info_struct failed (meta)");
-            if (setjmp(png_jmpbuf(rd_meta.png))) throw std::runtime_error("libpng error (meta)");
-            png_init_io(rd_meta.png, fp_in_meta.get());
-            png_read_info(rd_meta.png, rd_meta.info);
-
-            copy_metadata_if_requested(rd_meta.png, rd_meta.info, wr.png, wr.info, options.preserve_metadata);
-        } // meta read structs destroyed here
 
         png_write_info(wr.png, wr.info);
 
@@ -482,6 +438,11 @@ namespace chisel {
 
         png_write_end(wr.png, wr.info);
 
+        // the source's ancillary chunks go back verbatim, in their original places
+        if (!png::insert_chunks(encoded, *carried)) throw std::runtime_error("Cannot insert the PNG chunks");
+        encoded.insert(encoded.end(), tail.begin(), tail.end());
+        if (!write_file(output, encoded)) throw std::runtime_error("Cannot write PNG output: " + output.string());
+
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
 
@@ -494,7 +455,7 @@ namespace chisel {
     namespace {
         /**
          * @brief Decodes a PNG file into canvas/animation metadata and
-         * per-frame RGBA8 pixel data, for use by raw_equal().
+         * per-frame RGBA16 pixel data, for use by raw_equal().
          */
         PngDecoded decode_png_file(const std::filesystem::path &file) {
             const unique_FILE fp(chisel::open_file(file.string().c_str(), "rb"));
@@ -512,7 +473,7 @@ namespace chisel {
             png_init_io(rd.png, fp.get());
             png_read_info(rd.png, rd.info);
 
-            return read_png_frames(rd.png, rd.info);
+            return read_png_frames(rd.png, rd.info, true);
         }
     } // namespace
 
@@ -547,10 +508,12 @@ namespace chisel {
             if (fa.rgba != fb.rgba) return false;
         }
 
-        return true;
+        const auto ta = png::trailing_data(a);
+        const auto tb = png::trailing_data(b);
+        return ta && tb && *ta == *tb;
     }
 bool PngProcessor::is_signed(const std::filesystem::path& file_path) const {
-    // c2pa keeps its manifest in a caBX chunk
+    // c2pa keeps its manifest in a caBX chunk, a digital signature goes in dSIG
     std::ifstream in(file_path, std::ios::binary);
     std::array<uint8_t, 8> head{};
     if (!in.read(reinterpret_cast<char*>(head.data()), head.size()) || std::memcmp(head.data(), "\x89PNG\r\n\x1a\n", 8) != 0) {
@@ -558,7 +521,7 @@ bool PngProcessor::is_signed(const std::filesystem::path& file_path) const {
     }
     while (in.read(reinterpret_cast<char*>(head.data()), head.size())) {
         const std::string_view type(reinterpret_cast<const char*>(head.data() + 4), 4);
-        if (type == "caBX") return true;
+        if (type == "caBX" || type == "dSIG") return true;
         if (type == "IEND") break;
         in.seekg(static_cast<std::streamoff>(read_be32(head.data())) + 4, std::ios::cur);
     }
