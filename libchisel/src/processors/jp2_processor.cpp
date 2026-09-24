@@ -9,7 +9,10 @@
 #include <optional>
 #include <vector>
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <openjpeg.h>
+#include <iterator>
+#include <string_view>
 #include <filesystem>
 #include <stdexcept>
 #include <iostream>
@@ -130,12 +133,47 @@ static std::optional<std::string> extract_com_comment(const std::filesystem::pat
     return std::nullopt;
 }
 
+// true when the jp2 header holds a palette (pclr) or a component mapping (cmap)
+static bool has_palette(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    // walks the boxes in [begin, end), looking into the jp2h superbox
+    const auto walk = [&data](auto&& self, std::size_t begin, const std::size_t end) -> bool {
+        while (begin + 8 <= end) {
+            uint64_t size = read_be32(data.data() + begin);
+            std::size_t header = 8;
+            if (size == 1) {
+                if (begin + 16 > end) return false;
+                size = read_be64(data.data() + begin + 8);
+                header = 16;
+            } else if (size == 0) {
+                size = end - begin;
+            }
+            if (size < header || size > end - begin) return false;
+            const std::string_view type(reinterpret_cast<const char*>(data.data() + begin + 4), 4);
+            if (type == "pclr" || type == "cmap") return true;
+            if (type == "jp2h" && self(self, begin + header, begin + size)) return true;
+            begin += size;
+        }
+        return false;
+    };
+    return walk(walk, 0, data.size());
+}
+
 void Jp2Processor::recompress(const std::filesystem::path& input_path,
                                const std::filesystem::path& output_path,
                                const ProcessingOptions &/*options*/) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input_path.string(), get_name());
 
     const OPJ_CODEC_FORMAT format = detect_codec_format(input_path);
+
+    // openjpeg decodes a palette image to its colors: re-encoded, it would no longer hold the indices
+    // the file stored, which is what a pdf with an Indexed color space reads from it
+    if (format == OPJ_CODEC_JP2 && has_palette(input_path)) {
+        Logger::log(LogLevel::Debug, "Palette image, left as is: " + input_path.string(), get_name());
+        std::filesystem::copy_file(input_path, output_path, std::filesystem::copy_options::overwrite_existing);
+        return;
+    }
 
     // --- DECODER SETUP ---
     opj_dparameters_t dparam;
