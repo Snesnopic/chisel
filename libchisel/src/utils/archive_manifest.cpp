@@ -162,8 +162,18 @@ bool write_archive_manifest(archive* a, const ArchiveManifest& manifest, const s
     const bool zip = (archive_format(a) & ARCHIVE_FORMAT_BASE_MASK) == ARCHIVE_FORMAT_ZIP;
     std::vector<char> buffer(64 * 1024);
     for (const auto& item : manifest.items) {
-        const std::unique_ptr<archive_entry, decltype(&archive_entry_free)> entry(
+        std::unique_ptr<archive_entry, decltype(&archive_entry_free)> entry(
             archive_entry_clone(item.entry.get()), archive_entry_free);
+        // epub, odf and openraster forbid extra fields on a leading stored mimetype, libarchive adds none without times and owner
+        const char* name = archive_entry_pathname(item.entry.get());
+        if (zip && item.stored && &item == &manifest.items.front() && name != nullptr &&
+            std::strcmp(name, "mimetype") == 0) {
+            entry.reset(archive_entry_new());
+            if (entry) {
+                archive_entry_copy_pathname(entry.get(), "mimetype");
+                archive_entry_set_mode(entry.get(), archive_entry_mode(item.entry.get()));
+            }
+        }
         if (!entry) return false;
 
         std::ifstream in;
