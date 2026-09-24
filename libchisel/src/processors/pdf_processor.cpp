@@ -11,6 +11,7 @@
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDFLogger.hh>
+#include <qpdf/QPDFCryptoProvider.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/Pl_Flate.hh>
 #include <fstream>
@@ -106,6 +107,31 @@ std::string file_extension(QPDFObjectHandle const& stream, const bool decodable,
         return extension.empty() ? ".bin" : extension;
     }
     return {};
+}
+
+/**
+ * @brief Keeps an embedded file's /Params /Size and /CheckSum (MD5) in line with its new content.
+ * @param content The file holding the new decoded content.
+ */
+void update_embedded_file_params(QPDFObjectHandle const& stream, const std::filesystem::path& content) {
+    const QPDFObjectHandle dict = stream.getDict();
+    if (!dict.getKey("/Type").isNameAndEquals("/EmbeddedFile")) return;
+    QPDFObjectHandle params = dict.getKey("/Params");
+    if (!params.isDictionary()) return;
+    std::vector<uint8_t> data;
+    if (!read_file(content, data)) return;
+    if (params.hasKey("/Size")) {
+        params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(data.size())));
+    }
+    if (params.hasKey("/CheckSum")) {
+        const auto md5 = QPDFCryptoProvider::getImpl();
+        QPDFCryptoImpl::MD5_Digest digest;
+        md5->MD5_init();
+        md5->MD5_update(data.data(), data.size());
+        md5->MD5_finalize();
+        md5->MD5_digest(digest);
+        params.replaceKey("/CheckSum", QPDFObjectHandle::newString(std::string(reinterpret_cast<const char*>(digest), sizeof digest)));
+    }
 }
 
 /**
@@ -391,6 +417,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             // inject the raw data, keeping the original dictionary filters
             // intact unless new_filter says otherwise
             if (replace_stream) {
+                if (file_was_optimized) update_embedded_file_params(obj, info.file);
                 auto provider = std::make_shared<raw_stream_provider>(std::move(raw_data_to_inject));
                 if (new_filter.isInitialized()) {
                     obj.replaceStreamData(provider, new_filter, QPDFObjectHandle::newNull());
