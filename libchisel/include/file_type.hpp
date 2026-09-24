@@ -213,7 +213,7 @@ inline std::optional<ContainerFormat> parse_container_format(const std::string &
     if (s == "cpio") return ContainerFormat::Cpio;
     if (s == "a" || s == "ar" || s == "lib") return ContainerFormat::Ar;
     if (s == "zst" || s == "zstd" || s == "tzst") return ContainerFormat::Zstd;
-    if (s == "3mf" || s == "kmz" || s == "vsix" || s == "nupkg" || s == "air" || s == "bsz" || s == "cdr" || s == "csl" || s == "grs" || s == "ita" || s == "itz" || s == "nbk" || s == "notebook" || s == "oex" || s == "osk" || s == "pk3" || s == "puz" || s == "stz" || s == "vlt" || s == "wal" || s == "wba" || s == "wmz" || s == "wsz" || s == "xap" || s == "xmz" || s == "xsn" || s == "gallery" || s == "gallerycollection" || s == "galleryitem" || s == "appx" || s == "bar" || s == "dwf" || s == "easm" || s == "rmskin" || s == "sldx" || s == "zipx") return ContainerFormat::Zip;
+    if (s == "3mf" || s == "kmz" || s == "vsix" || s == "nupkg" || s == "air" || s == "bsz" || s == "grs" || s == "ita" || s == "itz" || s == "nbk" || s == "notebook" || s == "oex" || s == "osk" || s == "pk3" || s == "stz" || s == "vlt" || s == "wba" || s == "wmz" || s == "wsz" || s == "xap" || s == "xmz" || s == "gallery" || s == "gallerycollection" || s == "galleryitem" || s == "appx" || s == "bar" || s == "rmskin" || s == "sldx" || s == "zipx") return ContainerFormat::Zip;
     if (s == "war" || s == "ear") return ContainerFormat::Jar;
     if (s == "aab")   return ContainerFormat::Apk;
     if (s == "knz") return ContainerFormat::Kanzi;
