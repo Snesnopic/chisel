@@ -3,6 +3,7 @@
 #include "../../include/file_utils.hpp"
 #include "../../include/base64_utils.hpp"
 #include "../../include/random_utils.hpp"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <regex>
@@ -86,6 +87,31 @@ std::vector<MemChunk> parse_mime_memory(const std::filesystem::path& input_path)
     }
 
     return chunks;
+}
+
+// apple mail's .emlx starts with the message's byte count, padded with spaces, and ends with a plist after it
+bool update_emlx_length(const std::filesystem::path& original, const std::filesystem::path& rebuilt) {
+    std::ifstream in(original, std::ios::binary);
+    std::string first_line;
+    if (!std::getline(in, first_line)) return false;
+    in.close();
+    auto field = std::string_view(first_line);
+    if (field.ends_with('\r')) field.remove_suffix(1);
+    const auto digits = std::min(field.find_first_not_of("0123456789"), field.size());
+    if (digits == 0 || digits > 15 || field.find_first_not_of(' ', digits) != std::string_view::npos) return false;
+
+    std::error_code ec;
+    const auto old_size = std::filesystem::file_size(original, ec);
+    std::vector<uint8_t> data;
+    if (ec || !read_file(rebuilt, data) || data.size() < first_line.size()) return false;
+    const auto length = std::stoll(std::string(field.substr(0, digits))) + static_cast<long long>(data.size()) -
+                        static_cast<long long>(old_size);
+    if (length < 0) return false;
+    auto number = std::to_string(length);
+    if (number.size() < field.size()) number.resize(field.size(), ' ');
+    data.erase(data.begin(), data.begin() + static_cast<std::ptrdiff_t>(field.size()));
+    data.insert(data.begin(), number.begin(), number.end());
+    return write_file(rebuilt, data);
 }
 
 } // namespace
@@ -217,6 +243,10 @@ std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent&
     }
     out.close();
 
+    if (content.original_path.extension() == ".emlx" && !update_emlx_length(content.original_path, output_file)) {
+        Logger::log(LogLevel::Warning, "Unexpected .emlx length line, left as is", get_name());
+        return {};
+    }
     return output_file;
 }
 

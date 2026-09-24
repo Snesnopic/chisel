@@ -44,8 +44,8 @@ public:
 
     [[nodiscard]] std::span<const std::string_view, std::dynamic_extent>
     get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 5> exts = {
-            ".eml", ".msg", ".mht", ".mhtml", ".mbx"
+        static constexpr std::array<std::string_view, 6> exts = {
+            ".eml", ".msg", ".mht", ".mhtml", ".mbx", ".emlx"
         };
         return {exts};
     }
