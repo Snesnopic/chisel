@@ -23,7 +23,11 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <climits>
 #include <cstdlib>
+#include <optional>
+#include <zlib.h>
 #include "zlib_container.h"
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
@@ -216,6 +220,30 @@ void enable_qpdf_zopfli_once(const ProcessingOptions& options) {
             Pl_Flate::setZopfliIterations(static_cast<int>(options.iterations));
         }
     });
+}
+
+// inflates a whole zlib stream, or nothing unless it ends cleanly, checksum included
+std::optional<std::vector<unsigned char>> inflate_zlib(const unsigned char* data, const std::size_t size) {
+    if (size > UINT_MAX) return std::nullopt;
+    z_stream zs{};
+    if (inflateInit(&zs) != Z_OK) return std::nullopt;
+    zs.next_in = const_cast<Bytef*>(data);
+    zs.avail_in = static_cast<uInt>(size);
+    std::vector<unsigned char> out;
+    std::array<unsigned char, 1 << 16> chunk{};
+    int rc = Z_OK;
+    while (rc == Z_OK) {
+        zs.next_out = chunk.data();
+        zs.avail_out = static_cast<uInt>(chunk.size());
+        rc = inflate(&zs, Z_NO_FLUSH);
+        if (rc != Z_OK && rc != Z_STREAM_END) break;
+        out.insert(out.end(), chunk.data(), chunk.data() + (chunk.size() - zs.avail_out));
+        // input used up with the output buffer not full: the stream is truncated
+        if (rc == Z_OK && zs.avail_in == 0 && zs.avail_out != 0) break;
+    }
+    inflateEnd(&zs);
+    if (rc != Z_STREAM_END) return std::nullopt;
+    return out;
 }
 
 /**
@@ -413,6 +441,23 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                         replace_stream = true;
                         if (is_convertible_to_flate) {
                             new_filter = QPDFObjectHandle::newName("/FlateDecode");
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
+                }
+            }
+            // with /DecodeParms the inflated bytes are still the predictor's output, and deflating them
+            // again as they are keeps /DecodeParms valid
+            else if (is_flate && has_decode_parms && info.decodable) {
+                try {
+                    const std::shared_ptr<Buffer> raw = obj.getRawStreamData();
+                    if (const auto inflated = inflate_zlib(raw->getBuffer(), raw->getSize())) {
+                        auto recompressed = ZopfliCompressor::compress(
+                            *inflated, pick_iterations(inflated->size(), options), ZopfliFormat::ZLIB);
+                        if (recompressed.size() < raw->getSize()) {
+                            raw_data_to_inject = std::move(recompressed);
+                            replace_stream = true;
                         }
                     }
                 } catch (const std::exception& e) {
