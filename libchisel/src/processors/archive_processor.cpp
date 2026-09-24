@@ -9,7 +9,11 @@
 #include "../../include/file_type.hpp"
 #include "../../include/random_utils.hpp"
 #include <archive.h>
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <optional>
@@ -43,6 +47,38 @@ static ContainerFormat detect_format(const fs::path& path) {
         }
     }
     return ContainerFormat::Unknown;
+}
+
+// --- rainmeter skin footer ---
+
+// .rmskin packages end with the size of the zip before them, a flags byte and "RMSKIN\0"
+static constexpr std::size_t kRmskinFooterSize = 16;
+
+static std::optional<char> read_rmskin_flags(const fs::path& path) {
+    std::ifstream in(path, std::ios::binary | std::ios::ate);
+    const auto size = in ? static_cast<std::uint64_t>(in.tellg()) : 0;
+    std::array<char, kRmskinFooterSize> footer{};
+    if (size < footer.size()) return std::nullopt;
+    in.seekg(static_cast<std::streamoff>(size - footer.size()));
+    if (!in.read(footer.data(), footer.size()) || std::memcmp(footer.data() + 9, "RMSKIN", 7) != 0 ||
+        read_le64(reinterpret_cast<const uint8_t*>(footer.data())) != size - footer.size()) {
+        return std::nullopt;
+    }
+    return footer[8];
+}
+
+static bool append_rmskin_footer(const fs::path& path, const char flags) {
+    std::error_code ec;
+    const auto size = fs::file_size(path, ec);
+    if (ec) return false;
+    std::array<char, kRmskinFooterSize> footer{};
+    write_le64(reinterpret_cast<uint8_t*>(footer.data()), size);
+    footer[8] = flags;
+    std::memcpy(footer.data() + 9, "RMSKIN", 7);
+    std::ofstream out(path, std::ios::binary | std::ios::app);
+    out.write(footer.data(), footer.size());
+    out.close();
+    return !out.fail();
 }
 
 // --- libarchive create ---
@@ -264,6 +300,13 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
         Logger::log(LogLevel::Error, "Compressed archive not found: " + tmp_archive.string(), get_name());
         fs::remove_all(content.temp_dir);
         throw std::runtime_error("ArchiveProcessor: tmp archive missing");
+    }
+
+    if (const auto flags = read_rmskin_flags(src_path); flags && !append_rmskin_footer(tmp_archive, *flags)) {
+        Logger::log(LogLevel::Error, "Can't write the .rmskin footer: " + tmp_archive.string(), get_name());
+        fs::remove_all(content.temp_dir);
+        fs::remove(tmp_archive, ec);
+        throw std::runtime_error("ArchiveProcessor: rmskin footer not written");
     }
 
     chisel::cleanup_temp_dir(content.temp_dir, get_name());
