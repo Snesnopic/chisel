@@ -163,9 +163,10 @@ std::optional<ExtractedContent> PeProcessor::prepare_extraction(const std::files
         }
 
         std::filesystem::path out_p = content.temp_dir / (std::to_string(i) + "_" + entry.name + ext);
-        std::ofstream out_file(out_p, std::ios::binary);
-        out_file.write(reinterpret_cast<const char*>(p), entry.data_entry.Size);
-        out_file.close();
+        if (!write_file(out_p, p, entry.data_entry.Size)) {
+            cleanup_temp_dir(content.temp_dir, get_name());
+            throw std::runtime_error("Can't write " + out_p.string());
+        }
 
         content.extracted_files.push_back(out_p);
         used_entries.push_back(entry);
@@ -475,9 +476,11 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
         (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + content.original_path.extension().string());
 
-    std::ofstream out_file(output_path, std::ios::binary);
-    out_file.write(reinterpret_cast<const char*>(raw_data.data()), static_cast<std::streamsize>(raw_data.size()));
-    out_file.close();
+    if (!write_file(output_path, raw_data)) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw std::runtime_error("Can't write " + output_path.string());
+    }
     return output_path;
 }
 

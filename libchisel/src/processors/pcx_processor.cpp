@@ -231,6 +231,8 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
             write_le32(tmp, off);
             os.write(reinterpret_cast<const char*>(tmp), 4);
         }
+        os.close();
+        if (os.fail()) throw std::runtime_error("PcxProcessor: can't write " + output.string());
 
     } else {
         // Single PCX
@@ -241,6 +243,8 @@ void PcxProcessor::recompress(const std::filesystem::path& input,
         
         std::ofstream os(output, std::ios::binary);
         write_pcx_internal(os, h, pix, pal, options.preserve_metadata);
+        os.close();
+        if (os.fail()) throw std::runtime_error("PcxProcessor: can't write " + output.string());
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());

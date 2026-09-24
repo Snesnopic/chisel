@@ -220,7 +220,8 @@ void apply_patches(const fs::path& output, const AviCleanupPlan& plan) {
         out.seekp(static_cast<std::streamoff>(SparseRewriteUtil::shift(plan.removed_ranges, pos)));
         out.write(reinterpret_cast<char*>(buf), 4);
     }
-    if (!out) throw std::runtime_error("avi: failed while patching");
+    out.close();
+    if (out.fail()) throw std::runtime_error("avi: failed while patching");
 }
 
 // Byte range of the top-level 'movi' LIST's payload, used by raw_equal().
@@ -282,9 +283,7 @@ void AviProcessor::recompress(const fs::path& input,
     plan.scan(in, file_size, options.preserve_metadata);
 
     if (plan.removed_ranges.empty()) {
-        std::ifstream src(input, std::ios::binary);
-        std::ofstream dst(output, std::ios::binary | std::ios::trunc);
-        dst << src.rdbuf();
+        fs::copy_file(input, output, fs::copy_options::overwrite_existing);
         Logger::log(LogLevel::Debug, "Nothing to strip for " + input.string(), get_name());
         return;
     }

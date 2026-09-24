@@ -137,6 +137,7 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
 
     std::regex b64_regex(R"(^\s*Content-Transfer-Encoding:\s*base64\s*$)", std::regex_constants::icase);
 
+    bool write_failed = false;
     auto flush_b64 = [&]() {
         if (!b64_buffer.empty()) {
             std::string clean_b64;
@@ -150,7 +151,10 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
                 const std::vector<uint8_t> binary_data = Base64Utils::decode(clean_b64);
                 const std::filesystem::path tmp_file = content.temp_dir /
                                                 ("mime_asset_" + RandomUtils::random_suffix() + ".bin");
-                chisel::write_file(tmp_file, binary_data);
+                if (!chisel::write_file(tmp_file, binary_data)) {
+                    write_failed = true;
+                    return;
+                }
 
                 if (!current_text.empty()) {
                     state->chunks.push_back(TextChunk{current_text});
@@ -200,6 +204,10 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
     }
 
     flush_b64();
+    if (write_failed) {
+        chisel::cleanup_temp_dir(content.temp_dir, get_name());
+        throw std::runtime_error("Can't write the parts of " + input_path.string());
+    }
     if (!current_text.empty()) {
         state->chunks.push_back(TextChunk{current_text});
     }

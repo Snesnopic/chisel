@@ -30,6 +30,7 @@ void SparseRewriteUtil::stream_copy_with_skips(std::ifstream& in, std::ofstream&
             in.read(buffer.data(), chunk);
             if (!in) throw std::runtime_error("sparse_rewrite: read failed while copying");
             out.write(buffer.data(), chunk);
+            if (!out) throw std::runtime_error("sparse_rewrite: write failed while copying");
             from += static_cast<uint64_t>(chunk);
         }
     };
@@ -39,6 +40,9 @@ void SparseRewriteUtil::stream_copy_with_skips(std::ifstream& in, std::ofstream&
         pos = start + length;
     }
     copy_range(pos, file_size);
+    // what's still buffered can fail too
+    out.flush();
+    if (!out) throw std::runtime_error("sparse_rewrite: write failed while copying");
 }
 
 } // namespace chisel

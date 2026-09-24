@@ -186,12 +186,14 @@ void WoffProcessor::recompress(const std::filesystem::path& input_path,
         // update header length (must run last: metadata/private blocks above extend the file)
         write_be32(new_woff.data() + 8, current_offset);
 
-        std::ofstream out(output_path, std::ios::binary);
-        out.write(reinterpret_cast<const char*>(new_woff.data()), new_woff.size());
-        out.close();
+        if (!write_file(output_path, new_woff)) throw std::runtime_error("can't write " + output_path.string());
 
     } catch (const std::exception& e) {
+        // a partial output would look like a smaller file
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
         Logger::log(LogLevel::Error, "failed to recompress woff: " + std::string(e.what()), get_name());
+        throw;
     }
 }
 

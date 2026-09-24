@@ -45,9 +45,10 @@ std::optional<ExtractedContent> GftProcessor::prepare_extraction(const std::file
     else if (payload_size > 3 && payload[0] == 'G' && payload[1] == 'I' && payload[2] == 'F') ext = ".gif";
 
     std::filesystem::path inner_path = content.temp_dir / ("inner_image" + ext);
-    std::ofstream out_file(inner_path, std::ios::binary);
-    out_file.write(reinterpret_cast<const char*>(payload), payload_size);
-    out_file.close();
+    if (!write_file(inner_path, payload, payload_size)) {
+        cleanup_temp_dir(content.temp_dir, get_name());
+        throw std::runtime_error("Can't write " + inner_path.string());
+    }
 
     content.extracted_files.push_back(inner_path);
     content.extras = std::make_any<std::size_t>(header_size); // save for later
@@ -73,6 +74,11 @@ std::filesystem::path GftProcessor::finalize_extraction(const ExtractedContent& 
     out_file.close();
 
     cleanup_temp_dir(content.temp_dir, get_name());
+    if (out_file.fail()) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw std::runtime_error("Can't write " + output_path.string());
+    }
     return output_path;
 }
 

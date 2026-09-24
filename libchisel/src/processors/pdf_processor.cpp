@@ -289,9 +289,10 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
         if (ext.empty()) continue;
 
         std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ext);
-        std::ofstream ofs(out_file, std::ios::binary);
-        ofs.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
-        ofs.close();
+        if (!write_file(out_file, data)) {
+            cleanup_temp_dir(content.temp_dir, get_name());
+            throw std::runtime_error("Can't write " + out_file.string());
+        }
 
         info.file = out_file;
         content.extracted_files.push_back(out_file);

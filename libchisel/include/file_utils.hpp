@@ -123,6 +123,12 @@ namespace chisel {
     bool write_file(const std::filesystem::path& path, const std::vector<uint8_t>& buf);
 
     /**
+     * @brief Writes a block of bytes to a file, replacing it.
+     * @return false unless every byte got written and the file was closed without errors.
+     */
+    bool write_file(const std::filesystem::path& path, const void* data, std::size_t size);
+
+    /**
      * @brief Reads the entire contents of a file into a byte buffer.
      *
      * This overload writes the file's raw bytes into the provided output vector.

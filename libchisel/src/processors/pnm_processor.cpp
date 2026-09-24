@@ -164,8 +164,9 @@ void PnmProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("PnmProcessor: write data failed");
     }
 
-    fclose(f_out);
+    const bool closed = fclose(f_out) == 0;
     if (owned_pixels.empty()) stbi_image_free(data);
+    if (!closed) throw std::runtime_error("PnmProcessor: write data failed");
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }

@@ -176,6 +176,10 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
             out_file.write(reinterpret_cast<const char*>(payload + biSize + palette_size), xor_data_size);
         }
         out_file.close();
+        if (out_file.fail()) {
+            cleanup_temp_dir(content.temp_dir, get_name());
+            throw std::runtime_error("Can't write " + out_path.string());
+        }
 
         content.extracted_files.push_back(out_path);
         metas->push_back(std::move(meta));

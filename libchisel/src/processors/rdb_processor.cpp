@@ -55,9 +55,10 @@ std::optional<ExtractedContent> RdbProcessor::prepare_extraction(const std::file
 
         if (file_size > 0 && file_offset <= data.size() && file_size <= data.size() - file_offset) {
             std::filesystem::path inner_path = content.temp_dir / (format_index(i) + ".bin");
-            std::ofstream out_file(inner_path, std::ios::binary);
-            out_file.write(reinterpret_cast<const char*>(data.data() + file_offset), file_size);
-            out_file.close();
+            if (!write_file(inner_path, data.data() + file_offset, file_size)) {
+                cleanup_temp_dir(content.temp_dir, get_name());
+                throw std::runtime_error("Can't write " + inner_path.string());
+            }
 
             content.extracted_files.push_back(inner_path);
         }
@@ -126,11 +127,13 @@ std::filesystem::path RdbProcessor::finalize_extraction(const ExtractedContent& 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
         (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".rdb");
 
-    std::ofstream out_file(output_path, std::ios::binary);
-    out_file.write(reinterpret_cast<const char*>(new_rdb.data()), new_rdb.size());
-    out_file.close();
-
+    const bool written = write_file(output_path, new_rdb);
     cleanup_temp_dir(content.temp_dir, get_name());
+    if (!written) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw std::runtime_error("Can't write " + output_path.string());
+    }
     return output_path;
 }
 

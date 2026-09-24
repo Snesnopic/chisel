@@ -81,9 +81,9 @@ void Woff2Processor::recompress(const std::filesystem::path& input,
     }
     output_data.resize(max_woff2_size);
 
-    std::ofstream out_file(output, std::ios::binary);
-    if (!out_file) throw std::runtime_error("Cannot open output file: " + output.string());
-    out_file.write(reinterpret_cast<const char*>(output_data.data()), output_data.size());
+    if (!write_file(output, output_data.data(), output_data.size())) {
+        throw std::runtime_error("Cannot write output file: " + output.string());
+    }
 
     Logger::log(LogLevel::Debug, "Finished WOFF2 recompression for " + output.string(), get_name());
 }

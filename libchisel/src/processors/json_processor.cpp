@@ -35,9 +35,9 @@ void JsonProcessor::recompress(const std::filesystem::path& input_path,
     if (!doc) {
         // e.g. json with comments: not chisel's to fix
         Logger::log(LogLevel::Info, "Not strict JSON, left as is: " + std::string(err.msg) + " at " + std::to_string(err.pos), get_name());
-        std::ofstream copy(output_path, std::ios::binary);
-        copy.write(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-        if (!copy) throw std::runtime_error("JsonProcessor: could not write output file");
+        if (!write_file(output_path, buffer.data(), buffer.size())) {
+            throw std::runtime_error("JsonProcessor: could not write output file");
+        }
         return;
     }
 
@@ -50,17 +50,12 @@ void JsonProcessor::recompress(const std::filesystem::path& input_path,
     }
 
     // save to output path
-    std::ofstream ofs(output_path, std::ios::binary);
-    if (!ofs) {
-        free(json);
-        yyjson_doc_free(doc);
-        throw std::runtime_error("JsonProcessor: could not open output file");
-    }
-    ofs.write(json, static_cast<std::streamsize>(out_len));
+    const bool written = write_file(output_path, json, out_len);
 
     // cleanup
     free(json);
     yyjson_doc_free(doc);
+    if (!written) throw std::runtime_error("JsonProcessor: could not write output file");
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output_path.string(), get_name());
 }

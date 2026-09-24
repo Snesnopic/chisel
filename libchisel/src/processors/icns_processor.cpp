@@ -64,9 +64,10 @@ std::optional<ExtractedContent> IcnsProcessor::prepare_extraction(const std::fil
         }
 
         std::filesystem::path out_path = content.temp_dir / (format_index(index) + ext);
-        std::ofstream out_file(out_path, std::ios::binary);
-        out_file.write(reinterpret_cast<const char*>(payload), payload_size);
-        out_file.close();
+        if (!write_file(out_path, payload, payload_size)) {
+            cleanup_temp_dir(content.temp_dir, get_name());
+            throw std::runtime_error("Can't write " + out_path.string());
+        }
 
         content.extracted_files.push_back(out_path);
         ostypes.push_back(ostype);
@@ -117,11 +118,13 @@ std::filesystem::path IcnsProcessor::finalize_extraction(const ExtractedContent&
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
         (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".icns");
 
-    std::ofstream out_file(output_path, std::ios::binary);
-    out_file.write(reinterpret_cast<const char*>(new_icns.data()), new_icns.size());
-    out_file.close();
-
+    const bool written = write_file(output_path, new_icns);
     cleanup_temp_dir(content.temp_dir, get_name());
+    if (!written) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw std::runtime_error("Can't write " + output_path.string());
+    }
     return output_path;
 }
 

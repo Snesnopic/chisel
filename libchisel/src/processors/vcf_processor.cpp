@@ -107,9 +107,10 @@ std::optional<ExtractedContent> VcfProcessor::prepare_extraction(const std::file
             else if (bv.size() > 2 && bv[0] == 'G' && bv[1] == 'I' && bv[2] == 'F') ext = ".gif";
 
             std::filesystem::path inner_path = content.temp_dir / ("photo_" + std::to_string(positions.size()) + ext);
-            std::ofstream out_file(inner_path, std::ios::binary);
-            out_file.write(bv.data(), bv.size());
-            out_file.close();
+            if (!write_file(inner_path, bv.data(), bv.size())) {
+                cleanup_temp_dir(content.temp_dir, get_name());
+                throw std::runtime_error("Can't write " + inner_path.string());
+            }
 
             content.extracted_files.push_back(inner_path);
             
@@ -183,11 +184,13 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
         (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".vcf");
 
-    std::ofstream out_file(output_path, std::ios::binary);
-    out_file.write(new_content.data(), new_content.size());
-    out_file.close();
-
+    const bool written = write_file(output_path, new_content.data(), new_content.size());
     cleanup_temp_dir(content.temp_dir, get_name());
+    if (!written) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw std::runtime_error("Can't write " + output_path.string());
+    }
     return output_path;
 }
 

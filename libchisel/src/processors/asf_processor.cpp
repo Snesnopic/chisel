@@ -181,7 +181,8 @@ void apply_patches(const fs::path& output, const AsfCleanupPlan& plan) {
         out.seekp(static_cast<std::streamoff>(SparseRewriteUtil::shift(plan.removed_ranges, pos)));
         out.write(reinterpret_cast<char*>(buf), width);
     }
-    if (!out) throw std::runtime_error("asf: failed while patching sizes");
+    out.close();
+    if (out.fail()) throw std::runtime_error("asf: failed while patching sizes");
 }
 
 // Byte range of the top-level Data Object, used by raw_equal().

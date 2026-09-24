@@ -444,7 +444,8 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("Cannot open JPEG output");
     }
     out.write(reinterpret_cast<const char*>(result.data()), static_cast<std::streamsize>(result.size()));
-    if (!out) {
+    out.close();
+    if (out.fail()) {
         Logger::log(LogLevel::Error, "Cannot write jpeg output: " + output.string(), get_name());
         throw std::runtime_error("Cannot write JPEG output");
     }

@@ -33,9 +33,7 @@ std::vector<uint8_t> read_file_bytes(const std::filesystem::path& path) {
 }
 
 void write_webp_data(const std::filesystem::path& output, const WebPData& data) {
-    std::ofstream out(output, std::ios::binary);
-    if (!out) throw std::runtime_error("cannot open output file: " + output.string());
-    out.write(reinterpret_cast<const char*>(data.bytes), static_cast<long>(data.size));
+    if (!write_file(output, data.bytes, data.size)) throw std::runtime_error("cannot write output file: " + output.string());
 }
 
 // copies EXIF/XMP/ICCP chunks from the original bytes into the freshly-assembled mux

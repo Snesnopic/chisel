@@ -257,7 +257,8 @@ void apply_patches(const fs::path& output, const Mp4CleanupPlan& plan) {
             out.write(reinterpret_cast<char*>(out_buf), width);
         }
     }
-    if (!out) throw std::runtime_error("mp4: failed while patching offsets");
+    out.close();
+    if (out.fail()) throw std::runtime_error("mp4: failed while patching offsets");
 }
 
 // Concatenated byte length of every top-level mdat, used by raw_equal().

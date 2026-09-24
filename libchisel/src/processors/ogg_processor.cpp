@@ -417,8 +417,14 @@ void OggProcessor::recompress(const fs::path& input,
         }
         const rehuff_theora::Status st =
             rehuff_theora::recompress(f_in, f_out, rehuff_theora::Options{});
-        fclose(f_out);
+        const bool write_error = std::ferror(f_out) != 0;
+        const bool written = fclose(f_out) == 0 && !write_error;
         fclose(f_in);
+        if (!written) {
+            std::error_code ec;
+            fs::remove(output, ec);
+            throw std::runtime_error("OggProcessor: can't write " + output.string());
+        }
         if (st != rehuff_theora::Status::ok) {
             const std::string msg = "rehuff_theora failed with status " +
                 std::to_string(static_cast<int>(st)) + " for " + input.string();
@@ -535,9 +541,10 @@ void OggProcessor::recompress(const fs::path& input,
     FLAC__stream_encoder_delete(encoder);
     FLAC__stream_decoder_delete(decoder);
     fclose(f_in);
-    fclose(f_out);
+    const bool write_error = std::ferror(f_out) != 0;
+    const bool written = fclose(f_out) == 0 && !write_error;
 
-    if (!success || ctx.failed) {
+    if (!success || ctx.failed || !written) {
         std::error_code ec;
         fs::remove(output, ec);
         throw std::runtime_error("OggProcessor: recompression failed or aborted");

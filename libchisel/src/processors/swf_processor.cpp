@@ -90,9 +90,14 @@ void SwfProcessor::recompress(const std::filesystem::path& input_path,
 
         out.write(reinterpret_cast<const char*>(compressed_payload.data()), compressed_payload.size());
         out.close();
+        if (out.fail()) throw std::runtime_error("can't write " + output_path.string());
 
     } catch (...) {
+        // a partial output would look like a smaller file
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
         Logger::log(LogLevel::Error, "failed to recompress swf payload", get_name());
+        throw;
     }
 }
 

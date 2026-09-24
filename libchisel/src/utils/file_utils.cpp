@@ -171,10 +171,16 @@ namespace chisel {
     }
     // helper to write buffer into file
     bool write_file(const std::filesystem::path &path, const std::vector<uint8_t> &buf) {
+        return write_file(path, buf.data(), buf.size());
+    }
+
+    bool write_file(const std::filesystem::path &path, const void* data, const std::size_t size) {
         std::ofstream out(path, std::ios::binary);
         if (!out) return false;
-        out.write(reinterpret_cast<const char*>(buf.data()), buf.size());
-        return true;
+        out.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+        // closing flushes the buffer, where a full disk shows up
+        out.close();
+        return !out.fail();
     }
 
     bool read_file(const std::filesystem::path &path, std::vector<uint8_t> &buf) {

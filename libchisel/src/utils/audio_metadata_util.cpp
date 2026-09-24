@@ -285,9 +285,9 @@ void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
 
         const std::filesystem::path outPath = coverPath(temp_dir, idx, apic->picture());
 
-        std::ofstream out(outPath, std::ios::binary);
-        out.write(apic->picture().data(), apic->picture().size());
-        out.close();
+        if (!write_file(outPath, apic->picture().data(), apic->picture().size())) {
+            throw std::runtime_error("Can't write cover art to " + outPath.string());
+        }
 
         AudioCoverInfo info;
         info.temp_file_path = outPath;
@@ -362,9 +362,9 @@ void extractApeV2Covers(TagLib::APE::Tag* tag,
             const std::string mime = detectMime(imgData);
             const std::filesystem::path outPath = coverPath(temp_dir, idx, imgData);
 
-            std::ofstream out(outPath, std::ios::binary);
-            out.write(imgData.data(), imgData.size());
-            out.close();
+            if (!write_file(outPath, imgData.data(), imgData.size())) {
+                throw std::runtime_error("Can't write cover art to " + outPath.string());
+            }
 
             AudioCoverInfo info;
             info.temp_file_path = outPath;
@@ -423,9 +423,9 @@ void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
     for (auto *pic : tag->pictureList()) {
         const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
-        std::ofstream out(outPath, std::ios::binary);
-        out.write(pic->data().data(), pic->data().size());
-        out.close();
+        if (!write_file(outPath, pic->data().data(), pic->data().size())) {
+            throw std::runtime_error("Can't write cover art to " + outPath.string());
+        }
 
         AudioCoverInfo info;
         info.temp_file_path = outPath;
@@ -489,9 +489,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
         for (auto *pic : flacFile->pictureList()) {
             const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
-            std::ofstream out(outPath, std::ios::binary);
-            out.write(pic->data().data(), pic->data().size());
-            out.close();
+            if (!write_file(outPath, pic->data().data(), pic->data().size())) {
+                throw std::runtime_error("Can't write cover art to " + outPath.string());
+            }
 
             AudioCoverInfo info;
             info.temp_file_path = outPath;
@@ -543,9 +543,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 for (const auto &cover : covers) {
                     const std::filesystem::path outPath = coverPath(temp_dir, idx, cover.data());
 
-                    std::ofstream out(outPath, std::ios::binary);
-                    out.write(cover.data().data(), cover.data().size());
-                    out.close();
+                    if (!write_file(outPath, cover.data().data(), cover.data().size())) {
+                        throw std::runtime_error("Can't write cover art to " + outPath.string());
+                    }
 
                     AudioCoverInfo info;
                     info.temp_file_path = outPath;
@@ -571,9 +571,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
             for (auto *pic : pics) {
                 const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
-                std::ofstream out(outPath, std::ios::binary);
-                out.write(pic->data().data(), pic->data().size());
-                out.close();
+                if (!write_file(outPath, pic->data().data(), pic->data().size())) {
+                    throw std::runtime_error("Can't write cover art to " + outPath.string());
+                }
 
                 AudioCoverInfo info;
                 info.temp_file_path = outPath;
@@ -598,9 +598,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
             for (auto *pic : pics) {
                 const std::filesystem::path outPath = coverPath(temp_dir, idx, pic->data());
 
-                std::ofstream out(outPath, std::ios::binary);
-                out.write(pic->data().data(), pic->data().size());
-                out.close();
+                if (!write_file(outPath, pic->data().data(), pic->data().size())) {
+                    throw std::runtime_error("Can't write cover art to " + outPath.string());
+                }
 
                 AudioCoverInfo info;
                 info.temp_file_path = outPath;
@@ -641,9 +641,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 if (ext.empty()) ext = extFromMime(mime);
                 std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx) + ext);
 
-                std::ofstream out(outPath, std::ios::binary);
-                out.write(data.data(), data.size());
-                out.close();
+                if (!write_file(outPath, data.data(), data.size())) {
+                    throw std::runtime_error("Can't write cover art to " + outPath.string());
+                }
 
                 AudioCoverInfo info;
                 info.temp_file_path = outPath;
@@ -709,9 +709,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
                 std::string mime = pic.mimeType().to8Bit(true);
                 const std::filesystem::path outPath = coverPath(temp_dir, idx, pic.picture());
 
-                std::ofstream out(outPath, std::ios::binary);
-                out.write(pic.picture().data(), pic.picture().size());
-                out.close();
+                if (!write_file(outPath, pic.picture().data(), pic.picture().size())) {
+                    throw std::runtime_error("Can't write cover art to " + outPath.string());
+                }
 
                 AudioCoverInfo info;
                 info.temp_file_path = outPath;
@@ -1014,7 +1014,13 @@ std::optional<ExtractedContent> AudioMetadataUtil::prepareCoverExtraction(
     content.original_path = input_path;
     content.temp_dir = make_temp_dir_for(input_path, temp_dir_prefix);
 
-    AudioExtractionState state = extractCovers(input_path, content.temp_dir);
+    AudioExtractionState state;
+    try {
+        state = extractCovers(input_path, content.temp_dir);
+    } catch (...) {
+        cleanup_temp_dir(content.temp_dir, tag);
+        throw;
+    }
 
     if (state.extracted_covers.empty()) {
         Logger::log(LogLevel::Debug, "No embedded cover art found", tag);

@@ -202,6 +202,8 @@ void MngProcessor::recompress(const std::filesystem::path& input,
             ++i;
         }
     }
+    os.close();
+    if (os.fail()) throw std::runtime_error("MngProcessor: can't write " + output.string());
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }

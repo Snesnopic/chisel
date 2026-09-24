@@ -135,6 +135,11 @@ namespace {
             }
         }
 
+        // any failed fwrite above leaves the error flag set
+        if (std::fflush(out_file.get()) != 0 || std::ferror(out_file.get()) != 0) {
+            throw std::runtime_error("TgaProcessor: Failed to write " + output.string());
+        }
+
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
     }
 

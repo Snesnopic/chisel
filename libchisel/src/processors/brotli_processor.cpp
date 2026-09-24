@@ -78,12 +78,10 @@ std::optional<ExtractedContent> BrotliProcessor::prepare_extraction(const std::f
 
     std::filesystem::path inner_path = content.temp_dir / inner_name;
 
-    std::ofstream out_file(inner_path, std::ios::binary);
-    if (!out_file) {
+    if (!write_file(inner_path, raw_data)) {
+        cleanup_temp_dir(content.temp_dir, get_name());
         throw std::runtime_error("Can't create inner file for brotli");
     }
-    out_file.write(reinterpret_cast<const char*>(raw_data.data()), raw_data.size());
-    out_file.close();
 
     content.extracted_files.push_back(inner_path);
     content.format = ContainerFormat::Unknown;

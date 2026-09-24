@@ -148,8 +148,11 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     }
 
     WavpackCloseFile(ctx_out);
-    std::fclose(out);
+    // the write callback reports short writes to WavPack, the final flush shows up only here
+    const bool write_error = std::ferror(out) != 0;
+    const bool written = std::fclose(out) == 0 && !write_error;
     WavpackCloseFile(ctx_in);
+    if (!written) throw std::runtime_error("WavPackProcessor: can't write " + output.string());
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
