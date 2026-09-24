@@ -3,6 +3,7 @@
 //
 
 #include "../../include/tiff_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
 #include <tiffio.h>
@@ -383,6 +384,10 @@ std::string TiffProcessor::get_raw_checksum(const std::filesystem::path&) const 
     TIFFClose(in_a);
     TIFFClose(in_b);
     return same;
+}
+
+bool TiffProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::tiff_has_manifest(file_path);
 }
 
 } // namespace chisel

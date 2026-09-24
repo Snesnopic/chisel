@@ -3,6 +3,7 @@
 //
 
 #include "jxl_processor.hpp"
+#include "c2pa_manifest.hpp"
 #include "logger.hpp"
 #include <jxl/encode.h>
 #include <jxl/decode.h>
@@ -348,6 +349,10 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
 std::string JxlProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw pixel data
     return "";
+}
+
+bool JxlProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::jxl_has_manifest(file_path);
 }
 
 } // namespace chisel

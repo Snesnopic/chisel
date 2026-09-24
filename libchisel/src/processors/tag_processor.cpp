@@ -3,6 +3,7 @@
 //
 
 #include "../../include/tag_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/audio_metadata_util.hpp"
 
 namespace chisel {
@@ -19,6 +20,10 @@ std::optional<ExtractedContent> TagProcessor::prepare_extraction(const fs::path&
 
 std::filesystem::path TagProcessor::finalize_extraction(const ExtractedContent &content, const ProcessingOptions &options) {
     return AudioMetadataUtil::finalizeCoverExtraction(content, get_name());
+}
+
+bool TagProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::riff_has_manifest(file_path);
 }
 
 } // namespace chisel

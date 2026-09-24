@@ -3,6 +3,7 @@
 //
 
 #include "../../include/mpeg_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/audio_metadata_util.hpp"
 #include "../../include/file_utils.hpp"
@@ -110,6 +111,10 @@ bool MpegProcessor::raw_equal(const std::filesystem::path &a,
 
     if (pcm_a.channels != pcm_b.channels || pcm_a.sample_rate != pcm_b.sample_rate) return false;
     return pcm_a.samples == pcm_b.samples;
+}
+
+bool MpegProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::id3_has_manifest(file_path);
 }
 
 } // namespace chisel

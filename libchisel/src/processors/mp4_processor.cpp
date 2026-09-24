@@ -3,6 +3,7 @@
 //
 
 #include "../../include/mp4_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/audio_metadata_util.hpp"
 #include "../../include/sparse_rewrite_util.hpp"
@@ -411,6 +412,10 @@ bool Mp4Processor::raw_equal(const fs::path& a, const fs::path& b) const {
         Logger::log(LogLevel::Warning, std::string("raw_equal: ") + e.what(), get_name());
         return false;
     }
+}
+
+bool Mp4Processor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::bmff_has_manifest(file_path);
 }
 
 } // namespace chisel

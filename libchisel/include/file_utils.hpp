@@ -12,6 +12,8 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <initializer_list>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -144,6 +146,13 @@ namespace chisel {
      * @return false if the file can't be read.
      */
     bool file_contains(const std::filesystem::path& path, std::string_view needle);
+
+    /**
+     * @brief Checks whether the first limit bytes of a file contain any of some byte sequences.
+     * @return false if the file can't be read.
+     */
+    bool file_contains(const std::filesystem::path& path, std::initializer_list<std::string_view> needles,
+                       std::uint64_t limit = std::numeric_limits<std::uint64_t>::max());
 
 } // namespace chisel
 

@@ -3,6 +3,7 @@
 //
 
 #include "../../include/optigif_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/gif_animation_compare.hpp"
 #include "file_utils.hpp"
@@ -80,6 +81,10 @@ bool OptigifProcessor::raw_equal(const std::filesystem::path& a, const std::file
 
 std::string OptigifProcessor::get_raw_checksum(const std::filesystem::path&) const {
     return "";
+}
+
+bool OptigifProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::gif_has_manifest(file_path);
 }
 
 } // namespace chisel

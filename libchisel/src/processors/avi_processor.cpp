@@ -3,6 +3,7 @@
 //
 
 #include "../../include/avi_processor.hpp"
+#include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/sparse_rewrite_util.hpp"
 #include "file_utils.hpp"
@@ -309,6 +310,10 @@ bool AviProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
         Logger::log(LogLevel::Warning, std::string("raw_equal: ") + e.what(), get_name());
         return false;
     }
+}
+
+bool AviProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return c2pa::riff_has_manifest(file_path);
 }
 
 } // namespace chisel

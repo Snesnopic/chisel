@@ -109,6 +109,11 @@ public:
      * @return true if both files' 'movi' bytes match exactly.
      */
     [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+    /**
+     * @brief True when the file carries a C2PA manifest (C2PA chunk).
+     */
+    [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
 };
 
 } // namespace chisel

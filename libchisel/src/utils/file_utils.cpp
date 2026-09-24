@@ -185,18 +185,33 @@ namespace chisel {
     }
 
     bool file_contains(const std::filesystem::path& path, const std::string_view needle) {
+        return file_contains(path, {needle});
+    }
+
+    bool file_contains(const std::filesystem::path& path, const std::initializer_list<std::string_view> needles,
+                       std::uint64_t limit) {
         std::ifstream in(path, std::ios::binary);
-        if (!in || needle.empty()) return false;
-        std::vector<char> buffer(std::max<std::size_t>(1 << 20, needle.size() * 2));
+        std::size_t longest = 0;
+        for (const auto needle : needles) {
+            if (needle.empty()) return false;
+            longest = std::max(longest, needle.size());
+        }
+        if (!in || longest == 0) return false;
+        std::vector<char> buffer(std::max<std::size_t>(1 << 20, longest * 2));
         std::size_t kept = 0;
         for (;;) {
-            in.read(buffer.data() + kept, static_cast<std::streamsize>(buffer.size() - kept));
+            const auto want = static_cast<std::size_t>(std::min<std::uint64_t>(buffer.size() - kept, limit));
+            in.read(buffer.data() + kept, static_cast<std::streamsize>(want));
             const auto got = static_cast<std::size_t>(in.gcount());
+            limit -= got;
             const std::size_t filled = kept + got;
-            if (std::string_view(buffer.data(), filled).find(needle) != std::string_view::npos) return true;
-            if (got == 0 || !in) return false;
+            const std::string_view chunk(buffer.data(), filled);
+            for (const auto needle : needles) {
+                if (chunk.find(needle) != std::string_view::npos) return true;
+            }
+            if (got == 0 || !in || limit == 0) return false;
             // the tail may hold the start of a match that continues in the next chunk
-            kept = std::min(filled, needle.size() - 1);
+            kept = std::min(filled, longest - 1);
             std::memmove(buffer.data(), buffer.data() + filled - kept, kept);
         }
     }

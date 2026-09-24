@@ -111,6 +111,11 @@ namespace chisel {
          * default raw_equal() are unreachable
          */
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override { return ""; }
+
+        /**
+         * @brief True when a WAV file carries a C2PA manifest (C2PA chunk).
+         */
+        [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
     };
 
 } // namespace chisel

@@ -432,4 +432,8 @@ bool XmlProcessor::raw_equal(const std::filesystem::path& a, const std::filesyst
     });
 }
 
+bool XmlProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return file_contains(file_path, {"http://www.w3.org/2000/09/xmldsig#", "http://c2pa.org/manifest"});
+}
+
 } // namespace chisel

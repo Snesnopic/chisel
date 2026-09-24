@@ -91,6 +91,11 @@ public:
      *       comparison rather than relying on this checksum.
      */
     [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
+
+    /**
+     * @brief True when the image carries a C2PA manifest (application extension).
+     */
+    [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
 };
 
 } // namespace chisel

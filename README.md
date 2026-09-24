@@ -158,10 +158,13 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
     Verify raw checksums before replacing files.
 
 -   `--break-signatures`
-    Optimize digitally signed files too (signed PDFs, Office/ODF documents, APK/JAR/XPI/APPX/MSIX/NuGet
-    packages, Authenticode executables, S/MIME emails, C2PA images), invalidating their signatures.
+    Optimize digitally signed files too (signed PDFs, Office/ODF documents, legacy Office and MSI files,
+    APK/JAR/XPI/APPX/MSIX/NuGet packages, Authenticode executables, S/MIME emails, XML signatures,
+    images, videos and audio with a C2PA manifest), invalidating their signatures.
     APPX/MSIX packages count as signed even without a signature, as their block map breaks too.
     By default they are left untouched and reported as skipped.
+    DKIM signatures don't count: nearly every received email has one, and it stops verifying once
+    the email's attachments are optimized.
 
 -   `--threads <N>`
     Number of worker threads to use (default: half of available cores).

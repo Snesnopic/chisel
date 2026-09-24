@@ -4,6 +4,7 @@
 
 #include "../../include/cfbf_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <stdexcept>
 #include <filesystem>
 
@@ -491,6 +492,22 @@ bool CfbfProcessor::raw_equal(const std::filesystem::path& a, const std::filesys
 #else
     return true;
 #endif
+}
+
+bool CfbfProcessor::is_signed(const std::filesystem::path& file_path) const {
+    // directory entry names are utf-16le
+    const auto utf16 = [](const std::string_view name) {
+        std::string wide;
+        for (const char c : name) {
+            wide += c;
+            wide += '\0';
+        }
+        return wide;
+    };
+    const auto authenticode = utf16("\x05" "DigitalSignature");
+    const auto xml_signatures = utf16("_xmlsignatures");
+    const auto signatures = utf16("_signatures");
+    return file_contains(file_path, {authenticode, xml_signatures, signatures});
 }
 
 } // namespace chisel

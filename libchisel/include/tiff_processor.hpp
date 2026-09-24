@@ -105,6 +105,11 @@ namespace chisel {
          * count are identical.
          */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
+
+        /**
+         * @brief True when the image carries a C2PA manifest (tag 52545).
+         */
+        [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
     };
 
 } // namespace chisel

@@ -9,6 +9,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/events.hpp"
 #include "../../include/event_bus.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <future>
 #include <vector>
@@ -330,7 +331,8 @@ namespace chisel {
 
         IProcessor *processor = procs.front();
 
-        if (!m_options.break_signatures && processor->is_signed(path)) {
+        if (!m_options.break_signatures &&
+            std::ranges::any_of(procs, [&path](const IProcessor* p) { return p->is_signed(path); })) {
             Logger::log(LogLevel::Warning, "Digitally signed, left untouched: " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Digitally signed", .is_signed=true});
             return;
