@@ -87,6 +87,8 @@ set(LIBCHISEL_SOURCES
         include/audio_metadata_util.hpp
         src/utils/audio_metadata_util.cpp
         src/utils/base64_utils.cpp
+        include/jpeg_structure.hpp
+        src/utils/jpeg_structure.cpp
         include/mpeg_processor.hpp
         src/processors/mpeg_processor.cpp
         include/ogg_processor.hpp
