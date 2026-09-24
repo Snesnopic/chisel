@@ -97,6 +97,11 @@ Chisel& Chisel::verifyChecksums(const bool val) {
     return *this;
 }
 
+Chisel& Chisel::breakSignatures(const bool val) {
+    impl_->options.break_signatures = val;
+    return *this;
+}
+
 Chisel& Chisel::dryRun(const bool val) {
     impl_->dryRun = val;
     return *this;

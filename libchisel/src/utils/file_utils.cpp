@@ -9,6 +9,8 @@
 
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
+#include <algorithm>
+#include <cstring>
 #include <system_error>
 
 
@@ -180,6 +182,23 @@ namespace chisel {
         if (!in) return false;
         buf.assign(std::istreambuf_iterator(in), {});
         return true;
+    }
+
+    bool file_contains(const std::filesystem::path& path, const std::string_view needle) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in || needle.empty()) return false;
+        std::vector<char> buffer(std::max<std::size_t>(1 << 20, needle.size() * 2));
+        std::size_t kept = 0;
+        for (;;) {
+            in.read(buffer.data() + kept, static_cast<std::streamsize>(buffer.size() - kept));
+            const auto got = static_cast<std::size_t>(in.gcount());
+            const std::size_t filled = kept + got;
+            if (std::string_view(buffer.data(), filled).find(needle) != std::string_view::npos) return true;
+            if (got == 0 || !in) return false;
+            // the tail may hold the start of a match that continues in the next chunk
+            kept = std::min(filled, needle.size() - 1);
+            std::memmove(buffer.data(), buffer.data() + filled - kept, kept);
+        }
     }
 
     std::vector<uint8_t> read_file(const std::filesystem::path& path) {

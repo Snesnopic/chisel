@@ -139,6 +139,12 @@ namespace chisel {
      */
     std::vector<uint8_t> read_file(const std::filesystem::path& path);
 
+    /**
+     * @brief Checks whether a file contains a byte sequence, reading it in chunks.
+     * @return false if the file can't be read.
+     */
+    bool file_contains(const std::filesystem::path& path, std::string_view needle);
+
 } // namespace chisel
 
 #endif // CHISEL_FILE_UTILS_HPP

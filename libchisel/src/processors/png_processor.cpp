@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <map>
 #include "file_utils.hpp"
+#include <array>
 
 
 namespace chisel {
@@ -548,4 +549,20 @@ namespace chisel {
 
         return true;
     }
+bool PngProcessor::is_signed(const std::filesystem::path& file_path) const {
+    // c2pa keeps its manifest in a caBX chunk
+    std::ifstream in(file_path, std::ios::binary);
+    std::array<uint8_t, 8> head{};
+    if (!in.read(reinterpret_cast<char*>(head.data()), head.size()) || std::memcmp(head.data(), "\x89PNG\r\n\x1a\n", 8) != 0) {
+        return false;
+    }
+    while (in.read(reinterpret_cast<char*>(head.data()), head.size())) {
+        const std::string_view type(reinterpret_cast<const char*>(head.data() + 4), 4);
+        if (type == "caBX") return true;
+        if (type == "IEND") break;
+        in.seekg(static_cast<std::streamoff>(read_be32(head.data())) + 4, std::ios::cur);
+    }
+    return false;
+}
+
 } // namespace chisel

@@ -122,4 +122,8 @@ std::string OdfProcessor::get_raw_checksum(const std::filesystem::path& /*file_p
     return "";
 }
 
+bool OdfProcessor::is_signed(const std::filesystem::path& file_path) const {
+    return archive_is_signed(file_path);
+}
+
 } // namespace chisel

@@ -133,6 +133,11 @@ public:
      */
     [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
+    /**
+     * @brief True when the PDF holds a signature dictionary (/ByteRange): rewriting the file invalidates it.
+     */
+    [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
+
 private:
     /**
      * @brief Holds metadata about an extracted PDF stream.

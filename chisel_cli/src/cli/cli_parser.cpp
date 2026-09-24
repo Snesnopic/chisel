@@ -30,6 +30,9 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_flag("--verify-checksums", settings.options.verify_checksums,
                  "Verify raw checksums before replacing files.");
 
+    app.add_flag("--break-signatures", settings.options.break_signatures,
+                 "Optimize digitally signed files too, invalidating their signatures.");
+
     app.add_option("-o,--output", settings.output_path,
                    "Write optimized files to PATH instead of modifying in-place.\n"
                    "For stdin, PATH is the output file; so it is for a single input file, unless\n"

@@ -107,6 +107,12 @@ public:
     Chisel& verifyChecksums(bool val);
 
     /**
+     * @brief Enable or disable the optimization of digitally signed files, which invalidates their signatures.
+     * Default: false (signed files are left untouched).
+     */
+    Chisel& breakSignatures(bool val);
+
+    /**
      * @brief Enable or disable dry-run mode.
      * Default: false.
      */

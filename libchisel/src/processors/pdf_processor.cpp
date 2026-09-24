@@ -539,4 +539,9 @@ std::string PdfProcessor::get_raw_checksum(const std::filesystem::path&) const {
     return "";
 }
 
+bool PdfProcessor::is_signed(const std::filesystem::path& file_path) const {
+    // signature dictionaries can't sit in object streams, so their /ByteRange key is in the raw bytes
+    return file_contains(file_path, "/ByteRange");
+}
+
 } // namespace chisel

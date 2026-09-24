@@ -130,6 +130,11 @@ public:
      * @return An empty string.
      */
     [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
+
+    /**
+     * @brief True when the package holds OPC digital signatures.
+     */
+    [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
 };
 
 } // namespace chisel

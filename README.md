@@ -157,6 +157,11 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
 -   `--verify-checksums`
     Verify raw checksums before replacing files.
 
+-   `--break-signatures`
+    Optimize digitally signed files too (signed PDFs, Office/ODF documents, APK/JAR/XPI/APPX/NuGet
+    packages, Authenticode executables, S/MIME emails, C2PA images), invalidating their signatures.
+    By default they are left untouched and reported as skipped.
+
 -   `--threads <N>`
     Number of worker threads to use (default: half of available cores).
 

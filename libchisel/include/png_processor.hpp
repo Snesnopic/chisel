@@ -90,6 +90,11 @@ namespace chisel {
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
         /**
+         * @brief True when the image carries a C2PA manifest (caBX chunk).
+         */
+        [[nodiscard]] bool is_signed(const std::filesystem::path& file_path) const override;
+
+        /**
          * @brief Compares two PNG files by decoding them to raw RGBA8 and comparing.
          *
          * @param a First PNG file.

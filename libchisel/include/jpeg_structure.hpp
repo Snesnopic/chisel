@@ -101,6 +101,9 @@ std::optional<std::string> find_xmp(std::span<const uint8_t> image, std::size_t 
 /// @brief Returns the EXIF APP1 payload (starting with "Exif\0\0") of an image's header, if any.
 std::optional<std::vector<uint8_t>> find_exif(std::span<const uint8_t> image, std::size_t limit);
 
+/// @brief True if the image's header carries a C2PA manifest (JUMBF in APP11), which signs the image data.
+bool has_c2pa_manifest(std::span<const uint8_t> image, std::size_t limit);
+
 /// @brief True if the image's XMP marks it as an Apple HDR gain map.
 bool is_apple_gain_map(std::span<const uint8_t> image);
 

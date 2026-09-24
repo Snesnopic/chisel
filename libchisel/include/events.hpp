@@ -62,6 +62,7 @@ struct FileAnalyzeErrorEvent {
 struct FileAnalyzeSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
     std::string reason;         ///< Reason for skipping
+    bool is_signed = false;     ///< Left untouched to keep its digital signature valid
 };
 
 // --- Phase 2: Processing ---

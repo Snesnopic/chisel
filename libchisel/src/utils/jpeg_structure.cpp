@@ -360,6 +360,22 @@ std::optional<std::vector<uint8_t>> find_exif(const std::span<const uint8_t> ima
     return std::vector<uint8_t>(payload->begin(), payload->end());
 }
 
+bool has_c2pa_manifest(const std::span<const uint8_t> image, const std::size_t limit) {
+    std::size_t p = 2;
+    while (p + 4 <= limit && image[p] == 0xFF) {
+        const uint8_t marker = image[p + 1];
+        if (marker == 0xDA || marker == 0xD9) break;
+        const std::size_t len = (static_cast<std::size_t>(image[p + 2]) << 8) | image[p + 3];
+        if (len < 2 || p + 2 + len > limit) break;
+        if (marker == 0xEB) {
+            const std::string_view payload(reinterpret_cast<const char*>(image.data() + p + 4), len - 2);
+            if (payload.starts_with("JP") && payload.find("c2pa") != std::string_view::npos) return true;
+        }
+        p += 2 + len;
+    }
+    return false;
+}
+
 bool is_apple_gain_map(const std::span<const uint8_t> image) {
     const auto end = first_image_end(image);
     const auto xmp = find_xmp(image, end ? *end : image.size());

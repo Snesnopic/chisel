@@ -367,6 +367,27 @@ int main(int argc, char* argv[]) {
         on_finish(e.path.filename().string());
     });
 
+    bus.subscribe<FileAnalyzeSkippedEvent>([&](const FileAnalyzeSkippedEvent& e) {
+        if (!e.is_signed) return;
+        if (!settings.quiet) {
+            std::scoped_lock lock(g_console_mtx);
+            clear_line_internal();
+            std::cerr << YELLOW << "[SKIP] " << e.path.filename().string()
+                      << " (digitally signed, --break-signatures to optimize it anyway)" << RESET << std::endl;
+        }
+
+        Result r;
+        r.path = e.path;
+        r.mime = MimeDetector::detect(e.path);
+        std::error_code ec;
+        r.size_before = std::filesystem::file_size(e.path, ec);
+        r.size_after = r.size_before;
+        r.success = true;
+        r.error_msg = "Digitally signed, left untouched";
+        std::scoped_lock lock(g_results_mtx);
+        results.push_back(std::move(r));
+    });
+
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
         if (!settings.quiet) {
             std::string status_msg;

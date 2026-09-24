@@ -12,6 +12,8 @@
 #include <vector>
 #include <fstream>
 #include <cstring>
+#include <array>
+#include "../../include/file_utils.hpp"
 
 namespace chisel {
 
@@ -422,6 +424,22 @@ bool WebpProcessor::raw_equal(const std::filesystem::path& a,
 std::string WebpProcessor::get_raw_checksum(const std::filesystem::path&) const {
     // TODO: implement checksum of raw WebP data
     return "";
+}
+
+bool WebpProcessor::is_signed(const std::filesystem::path& file_path) const {
+    // c2pa keeps its manifest in a C2PA chunk
+    std::ifstream in(file_path, std::ios::binary);
+    std::array<uint8_t, 12> head{};
+    if (!in.read(reinterpret_cast<char*>(head.data()), head.size()) || std::memcmp(head.data(), "RIFF", 4) != 0 ||
+        std::memcmp(head.data() + 8, "WEBP", 4) != 0) {
+        return false;
+    }
+    while (in.read(reinterpret_cast<char*>(head.data()), 8)) {
+        if (std::memcmp(head.data(), "C2PA", 4) == 0) return true;
+        const uint32_t size = read_le32(head.data() + 4);
+        in.seekg(static_cast<std::streamoff>(size) + (size & 1), std::ios::cur);
+    }
+    return false;
 }
 
 } // namespace chisel

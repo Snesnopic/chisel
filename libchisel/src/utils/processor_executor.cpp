@@ -319,6 +319,12 @@ namespace chisel {
 
         IProcessor *processor = procs.front();
 
+        if (!m_options.break_signatures && processor->is_signed(path)) {
+            Logger::log(LogLevel::Warning, "Digitally signed, left untouched: " + path.string(), "Executor");
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Digitally signed", .is_signed=true});
+            return;
+        }
+
         const fs::path& current_path = path;
         bool scheduled_for_extraction = false;
         bool scheduled_for_recompression = false;

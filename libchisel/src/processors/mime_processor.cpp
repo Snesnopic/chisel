@@ -282,4 +282,17 @@ bool MimeProcessor::raw_equal(const std::filesystem::path& a, const std::filesys
     return true;
 }
 
+bool MimeProcessor::is_signed(const std::filesystem::path& file_path) const {
+    std::ifstream in(file_path, std::ios::binary);
+    std::string line;
+    while (std::getline(in, line)) {
+        const auto lower = to_lower_copy(line);
+        if (lower.starts_with("content-type:") &&
+            (lower.find("multipart/signed") != std::string::npos || lower.find("pkcs7-mime") != std::string::npos)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace chisel

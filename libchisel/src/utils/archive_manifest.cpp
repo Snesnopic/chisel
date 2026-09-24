@@ -8,6 +8,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -94,7 +95,65 @@ bool extract_data(archive* a, archive_entry* entry, const fs::path& out, const s
     return true;
 }
 
+// entries holding a package signature, or the digests it signs
+bool is_signature_entry(std::string name) {
+    for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (name.starts_with("meta-inf/") && name.find('/', 9) == std::string::npos) {
+        const auto leaf = std::string_view(name).substr(9);
+        for (const std::string_view suffix : {".sf", ".rsa", ".dsa", ".ec"}) {
+            if (leaf.ends_with(suffix)) return true;
+        }
+        for (const std::string_view signature : {"cose.sig", "documentsignatures.xml", "macrosignatures.xml",
+                                                 "packagesignatures.xml", "signatures.xml"}) {
+            if (leaf == signature) return true;
+        }
+        return leaf.starts_with("sig-");
+    }
+    return name == "appxsignature.p7x" || name == ".signature.p7s" || name.starts_with("_xmlsignatures/") ||
+           name.starts_with("package/services/digital-signature/") || name.find("/_codesignature/") != std::string::npos;
+}
+
+// apk signature scheme v2 and later put a block ending with this magic right before the central directory
+bool has_apk_signing_block(std::ifstream& in, const std::uint64_t size) {
+    constexpr std::uint64_t kEndRecord = 22;
+    const auto tail_size = std::min<std::uint64_t>(size, kEndRecord + 0xFFFF);
+    std::string tail(tail_size, '\0');
+    in.seekg(static_cast<std::streamoff>(size - tail_size));
+    if (!in.read(tail.data(), static_cast<std::streamsize>(tail_size))) return false;
+    const auto end_record = tail.rfind("PK\x05\x06");
+    if (end_record == std::string::npos || end_record + kEndRecord > tail.size()) return false;
+    const auto directory = read_le32(reinterpret_cast<const uint8_t*>(tail.data() + end_record + 16));
+    if (directory < 16 || directory > size) return false;
+    std::string magic(16, '\0');
+    in.seekg(directory - 16);
+    return in.read(magic.data(), 16) && magic == "APK Sig Block 42";
+}
+
 } // namespace
+
+bool archive_is_signed(const fs::path& input) {
+    std::ifstream in(input, std::ios::binary | std::ios::ate);
+    std::string magic(4, '\0');
+    const auto size = in ? static_cast<std::uint64_t>(in.tellg()) : 0;
+    in.seekg(0);
+    if (size < 4 || !in.read(magic.data(), 4) || magic != "PK\x03\x04") return false;
+    if (has_apk_signing_block(in, size)) return true;
+
+    const std::unique_ptr<archive, decltype(&archive_read_free)> a(archive_read_new(), archive_read_free);
+    if (!a) return false;
+    archive_read_support_format_zip(a.get());
+#ifdef _WIN32
+    if (archive_read_open_filename_w(a.get(), input.wstring().c_str(), 10240) != ARCHIVE_OK) return false;
+#else
+    if (archive_read_open_filename(a.get(), input.string().c_str(), 10240) != ARCHIVE_OK) return false;
+#endif
+    archive_entry* entry = nullptr;
+    int r = ARCHIVE_OK;
+    while ((r = archive_read_next_header(a.get(), &entry)) == ARCHIVE_OK || r == ARCHIVE_WARN) {
+        if (const char* name = archive_entry_pathname(entry); name != nullptr && is_signature_entry(name)) return true;
+    }
+    return false;
+}
 
 std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, const fs::path& dest_dir,
                                                      const bool zip_only, const std::string_view tag) {

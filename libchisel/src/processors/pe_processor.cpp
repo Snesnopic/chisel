@@ -481,4 +481,19 @@ std::string PeProcessor::get_raw_checksum(const std::filesystem::path& /*file_pa
     return "";
 }
 
+bool PeProcessor::is_signed(const std::filesystem::path& file_path) const {
+    // the security directory, which locates the authenticode certificate, is in the headers
+    std::ifstream in(file_path, std::ios::binary);
+    std::vector<uint8_t> headers(1 << 20);
+    in.read(reinterpret_cast<char*>(headers.data()), static_cast<std::streamsize>(headers.size()));
+    headers.resize(static_cast<std::size_t>(in.gcount()));
+    const auto layout = parse_layout(headers);
+    if (!layout || layout->num_data_dir <= 4) return false;
+    const std::size_t security_pos = layout->data_dir_offset + 4 * sizeof(ImageDataDirectory);
+    if (security_pos + sizeof(ImageDataDirectory) > headers.size()) return false;
+    ImageDataDirectory security{};
+    std::memcpy(&security, headers.data() + security_pos, sizeof(security));
+    return security.VirtualAddress != 0 && security.Size != 0;
+}
+
 } // namespace chisel

@@ -519,4 +519,9 @@ std::string JpegProcessor::get_raw_checksum(const std::filesystem::path&) const 
     return "";
 }
 
+bool JpegProcessor::is_signed(const std::filesystem::path& file_path) const {
+    std::vector<uint8_t> data;
+    return read_file(file_path, data) && data.size() > 4 && jpeg::has_c2pa_manifest(data, data.size());
+}
+
 } // namespace chisel

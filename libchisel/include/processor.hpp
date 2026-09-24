@@ -147,6 +147,16 @@ public:
                                          const std::filesystem::path& b) const {
         return get_raw_checksum(a) == get_raw_checksum(b);
     }
+
+    /**
+     * @brief Whether the file carries a digital signature that processing would invalidate.
+     *
+     * Signed files are left untouched unless ProcessingOptions::break_signatures is set.
+     * @param file_path Path to the file.
+     */
+    [[nodiscard]] virtual bool is_signed(const std::filesystem::path& file_path) const {
+        return false;
+    }
 };
 
 } // namespace chisel

@@ -22,6 +22,7 @@ namespace chisel {
         size_t iterations_large = iterations / 3;/// Iteration count on large images (Zopfli)
         bool verify_checksums = false;           /// Verify original files are semantically equal to processed files
         bool preserve_metadata = true;           /// Don't discard metadata during recompression
+        bool break_signatures = false;           /// Optimize digitally signed files too, invalidating their signatures
     };
 
 } // namespace chisel

@@ -56,6 +56,14 @@ std::optional<ArchiveManifest> read_archive_manifest(const std::filesystem::path
 std::vector<std::filesystem::path> manifest_files(const ArchiveManifest& manifest);
 
 /**
+ * @brief Whether a zip carries a digital signature that repacking would invalidate.
+ *
+ * Detects signed JAR/APK/XPI entries, the APK Signature Scheme v2+ block, and the signature
+ * parts of APPX/MSIX, NuGet, OPC (OOXML, XPS, VSIX), ODF, EPUB and iOS app packages.
+ */
+bool archive_is_signed(const std::filesystem::path& input);
+
+/**
  * @brief Writes the manifest's entries, in order, with their original headers and current data.
  * @param a A writer already set to the output format and opened.
  */
