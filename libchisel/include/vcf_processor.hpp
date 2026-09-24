@@ -39,7 +39,7 @@ namespace chisel {
         }
 
         [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-            static constexpr std::array<std::string_view, 1> kExts = { ".vcf" };
+            static constexpr std::array<std::string_view, 2> kExts = { ".vcf", ".vcard" };
             return {kExts.data(), kExts.size()};
         }
 
