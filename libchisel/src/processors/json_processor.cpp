@@ -4,6 +4,7 @@
 
 #include "../../include/json_processor.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/file_utils.hpp"
 #include <yyjson.h>
 #include <filesystem>
 #include <fstream>
@@ -32,8 +33,12 @@ void JsonProcessor::recompress(const std::filesystem::path& input_path,
     yyjson_read_err err;
     yyjson_doc *doc = yyjson_read_opts(buffer.data(), buffer.size(), YYJSON_READ_NUMBER_AS_RAW, nullptr, &err);
     if (!doc) {
-        Logger::log(LogLevel::Error, "JSON parse error: " + std::string(err.msg) + " at " + std::to_string(err.pos), get_name());
-        throw std::runtime_error("JsonProcessor: failed to parse JSON");
+        // e.g. json with comments: not chisel's to fix
+        Logger::log(LogLevel::Info, "Not strict JSON, left as is: " + std::string(err.msg) + " at " + std::to_string(err.pos), get_name());
+        std::ofstream copy(output_path, std::ios::binary);
+        copy.write(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        if (!copy) throw std::runtime_error("JsonProcessor: could not write output file");
+        return;
     }
 
     // write minified JSON
@@ -73,6 +78,9 @@ std::string JsonProcessor::get_raw_checksum(const std::filesystem::path& /*file_
 }
 
 bool JsonProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    // files left as is may not parse at all
+    if (read_file(a) == read_file(b)) return true;
+
     yyjson_doc *doc_a = yyjson_read_file(a.string().c_str(), YYJSON_READ_NUMBER_AS_RAW, nullptr, nullptr);
     yyjson_doc *doc_b = yyjson_read_file(b.string().c_str(), YYJSON_READ_NUMBER_AS_RAW, nullptr, nullptr);
 
