@@ -303,6 +303,12 @@ namespace chisel {
             return;
         }
 
+        // nothing can shrink an empty file, and processors take an empty output for a failure
+        if (std::error_code size_ec; fs::file_size(path, size_ec) == 0 && !size_ec) {
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Empty file"});
+            return;
+        }
+
         event_bus_.publish(FileAnalyzeStartEvent{path});
 
         const auto mime = MimeDetector::detect(path);
