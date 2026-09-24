@@ -223,6 +223,11 @@ namespace chisel {
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 --retries;
             }
+            if (ec) {
+                Logger::log(LogLevel::Error, "Rename failed: " + original_file.string() + " (" + ec.message() + ")", "Executor");
+                fs::remove(temp_file, ec);
+                return std::nullopt;
+            }
         }
 
         // a dry run still updates extracted files, so containers report their real size
