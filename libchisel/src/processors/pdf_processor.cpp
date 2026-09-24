@@ -14,6 +14,7 @@
 #include <qpdf/QPDFCryptoProvider.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/Pl_Flate.hh>
+#include <qpdf/Pl_OStream.hh>
 #include <fstream>
 #include <sstream>
 #include <map>
@@ -250,6 +251,8 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     QPDF pdf;
     auto qlogger = QPDFLogger::create();
     qlogger->setOutputStreams(&warn_os, &err_os);
+    // setOutputStreams sends warnings to the error stream
+    qlogger->setWarn(std::make_shared<Pl_OStream>("qpdf warnings", warn_os));
     pdf.setLogger(qlogger);
     pdf.processFile(input_path.string().c_str());
 
@@ -322,6 +325,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         QPDF pdf;
         auto qlogger = QPDFLogger::create();
         qlogger->setOutputStreams(&warn_os, &err_os);
+        // setOutputStreams sends warnings to the error stream
+        qlogger->setWarn(std::make_shared<Pl_OStream>("qpdf warnings", warn_os));
         pdf.setLogger(qlogger);
 
         pdf.processFile(content.original_path.string().c_str());
