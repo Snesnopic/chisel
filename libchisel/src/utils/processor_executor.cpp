@@ -58,6 +58,73 @@ namespace chisel {
             }
             return common.value_or(fs::path{});
         }
+
+        // writes source's bytes over target from the start and truncates it only at the end
+        bool overwrite_contents(const fs::path& source, const fs::path& target) {
+            std::ifstream in(source, std::ios::binary);
+            std::fstream out(target, std::ios::binary | std::ios::in | std::ios::out);
+            if (!in || !out) return false;
+            std::vector<char> buffer(1 << 20);
+            std::uintmax_t size = 0;
+            while (in) {
+                in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                const auto got = in.gcount();
+                if (got <= 0) break;
+                out.write(buffer.data(), got);
+                if (!out) return false;
+                size += static_cast<std::uintmax_t>(got);
+            }
+            if (in.bad()) return false;
+            out.close();
+            if (out.fail()) return false;
+            std::error_code ec;
+            fs::resize_file(target, size, ec);
+            return !ec;
+        }
+
+        // overwrites target in place, putting it back from a backup if that fails halfway
+        std::error_code overwrite_keeping_backup(const fs::path& temp, const fs::path& target) {
+            std::error_code ec;
+            const auto backup = fs::temp_directory_path() /
+                                (target.filename().string() + ".chisel-backup-" + RandomUtils::random_suffix());
+            if (!fs::copy_file(target, backup, fs::copy_options::overwrite_existing, ec) || ec) {
+                std::error_code rm_ec;
+                fs::remove(backup, rm_ec);
+                return ec ? ec : std::make_error_code(std::errc::io_error);
+            }
+            if (overwrite_contents(temp, target)) {
+                fs::remove(backup, ec);
+                fs::remove(temp, ec);
+                return {};
+            }
+            if (overwrite_contents(backup, target)) {
+                fs::remove(backup, ec);
+            } else {
+                Logger::log(LogLevel::Error, "Can't restore " + target.string() + ", its original content is in " +
+                            backup.string(), "Executor");
+            }
+            return std::make_error_code(std::errc::io_error);
+        }
+
+        // copies temp next to target and renames it over target, so target is never left half-written;
+        // where nothing can be created next to it (sandboxed apps on macOS), overwrites it in place instead
+        std::error_code replace_via_copy(const fs::path& temp, const fs::path& target) {
+            std::error_code ec;
+            const auto sibling = target.parent_path() / (".chisel-" + RandomUtils::random_suffix() + ".tmp");
+            if (fs::copy_file(temp, sibling, fs::copy_options::overwrite_existing, ec) && !ec) {
+                fs::rename(sibling, target, ec);
+                if (!ec) {
+                    fs::remove(temp, ec);
+                    return {};
+                }
+            }
+            std::error_code rm_ec;
+            fs::remove(sibling, rm_ec);
+#ifdef __APPLE__
+            if (fs::exists(target, rm_ec)) return overwrite_keeping_backup(temp, target);
+#endif
+            return ec ? ec : std::make_error_code(std::errc::io_error);
+        }
     } // namespace
 
     ProcessorExecutor::ProcessorExecutor(ProcessorRegistry &registry,
@@ -146,11 +213,7 @@ namespace chisel {
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, dest, ec);
-                if (ec == std::errc::cross_device_link) {
-                    ec.clear();
-                    fs::copy(temp_file, dest, fs::copy_options::overwrite_existing, ec);
-                    if (!ec) fs::remove(temp_file, ec);
-                }
+                if (ec == std::errc::cross_device_link) ec = replace_via_copy(temp_file, dest);
                 if (!ec) {
                     replaced = true;
                     break;
@@ -178,36 +241,11 @@ namespace chisel {
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
-
 #ifdef __APPLE__
-                // fallback to stream copy for sandboxed environments
-                if (ec) {
-                    ec.clear();
-                    std::ifstream src(temp_file, std::ios::binary);
-                    std::ofstream dst(original_file, std::ios::binary | std::ios::trunc);
-
-                    if (src && dst) {
-                        dst << src.rdbuf();
-                        dst.flush();
-
-                        if (dst.good()) {
-                            Logger::log(LogLevel::Info, "STREAM OVERWRITE SUCCESSFUL", "Executor");
-                            fs::remove(temp_file, ec);
-                            ec.clear();
-                        } else {
-                            Logger::log(LogLevel::Error, "FAILED TO FLUSH STREAM", "Executor");
-                            ec = std::make_error_code(std::errc::io_error);
-                        }
-                    } else {
-                        ec = std::make_error_code(std::errc::permission_denied);
-                    }
-                }
+                // the temp file sits on the system volume, and sandboxed apps may not rename into the folder
+                if (ec) ec = replace_via_copy(temp_file, original_file);
 #else
-                if (ec == std::errc::cross_device_link) {
-                    ec.clear();
-                    fs::copy(temp_file, original_file, fs::copy_options::overwrite_existing, ec);
-                    if (!ec) fs::remove(temp_file, ec);
-                }
+                if (ec == std::errc::cross_device_link) ec = replace_via_copy(temp_file, original_file);
 #endif
 
                 if (!ec) {
