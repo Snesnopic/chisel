@@ -37,7 +37,16 @@ std::shared_ptr<archive_entry> zip_entry_copy(archive_entry* source) {
     return entry;
 }
 
-// the entry's own path under dest_dir, or a folder of its own when that path is unsafe or taken
+// windows paths stay short of MAX_PATH with room for the temp files made next to them,
+// and no file system takes a name longer than 255
+bool fits_path_limits(const fs::path& path) {
+#ifdef _WIN32
+    if (path.native().size() > 200) return false;
+#endif
+    return std::ranges::all_of(path, [](const fs::path& part) { return part.native().size() <= 255; });
+}
+
+// the entry's own path under dest_dir, or a folder of its own when that path is unsafe, taken or too long
 fs::path extraction_path(archive_entry* entry, const fs::path& dest_dir, const std::size_t index) {
     const char* raw = archive_entry_pathname(entry);
     std::string name = raw != nullptr ? raw : "";
@@ -47,7 +56,7 @@ fs::path extraction_path(archive_entry* entry, const fs::path& dest_dir, const s
 
     std::error_code ec;
     fs::path out;
-    if (sanitize_archive_entry_path(name, dest_dir, out) && out.has_filename() &&
+    if (sanitize_archive_entry_path(name, dest_dir, out) && out.has_filename() && fits_path_limits(out) &&
         out != dest_dir.lexically_normal() && !fs::exists(fs::symlink_status(out, ec))) {
         fs::create_directories(out.parent_path(), ec);
         if (!ec && fs::is_directory(out.parent_path(), ec)) return out;

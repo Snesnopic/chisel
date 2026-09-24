@@ -108,7 +108,13 @@ namespace chisel {
         std::error_code ec;
         std::filesystem::create_directories(base_tmp, ec);
 
-        const std::string stem = input_path.stem().string();
+        // the stem only makes the folder recognizable, and a long one eats into path length limits
+        std::string stem = input_path.stem().string();
+        if (stem.size() > 32) {
+            std::size_t cut = 32;
+            while (cut > 0 && (static_cast<unsigned char>(stem[cut]) & 0xC0) == 0x80) --cut;
+            stem.resize(cut);
+        }
         const std::string dir_name = prefix + "_" + stem + "_" + RandomUtils::random_suffix();
         auto dir = base_tmp / dir_name;
 
