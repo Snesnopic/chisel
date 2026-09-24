@@ -445,8 +445,14 @@ int main(int argc, char* argv[]) {
         std::cerr << "\nCollecting files...\n\n" << std::flush;
     }
 
+    // results under -o keep their paths relative to the input arguments
+    std::vector<fs::path> roots;
+    for (const auto& in : settings.inputs) {
+        if (in != "-" && fs::exists(in)) roots.push_back(in);
+    }
+
     // run processing
-    executor.process(inputs);
+    executor.process(inputs, roots);
     g_executor.store(nullptr);
 
     // Final cleanup of the progress bar line: reflect whichever phase actually

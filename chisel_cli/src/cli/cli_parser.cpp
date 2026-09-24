@@ -32,7 +32,9 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
 
     app.add_option("-o,--output", settings.output_path,
                    "Write optimized files to PATH instead of modifying in-place.\n"
-                   "(If input is stdin, PATH is a file. Otherwise, PATH is a directory).");
+                   "For stdin, PATH is the output file; so it is for a single input file, unless\n"
+                   "PATH is an existing directory. Otherwise PATH is a directory mirroring the\n"
+                   "inputs' folder structure. Files that can't be improved are copied unchanged.");
 
     app.add_option("--report", settings.report_path,
                    "CSV report export filename.")

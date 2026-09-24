@@ -23,6 +23,7 @@
 #include <thread>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include "event_bus.hpp"
 #include "thread_pool.hpp"
@@ -79,13 +80,24 @@ public:
     /**
      * @brief Entry point: process a list of input files.
      *
-     * This function executes the 3-phase processing pipeline.
+     * This function executes the 3-phase processing pipeline. With an output path, it is the
+     * output file when the only root is a file (unless it names a directory); otherwise it is a
+     * directory where results keep their paths relative to the deepest folder holding all roots.
+     * Inputs that aren't improved are copied there unchanged.
      * @param inputs Vector of filesystem paths to process.
+     * @param roots Files and folders the inputs were collected from; defaults to the inputs.
      */
-    void process(const std::vector<std::filesystem::path>& inputs);
+    void process(const std::vector<std::filesystem::path>& inputs,
+                 const std::vector<std::filesystem::path>& roots = {});
 
+    /**
+     * @brief Moves an optimized temp file to its destination (in place, or into the output directory).
+     * @param nested True for files extracted from a container: they are always replaced in place,
+     *               since Phase 3 rebuilds their container from them.
+     * @return The destination and whether the user-visible file was replaced, or std::nullopt on failure.
+     */
     std::optional<std::pair<std::filesystem::path, bool>> move_to_destination(
-        const std::filesystem::path &original_file, const std::filesystem::path &temp_file) const;
+        const std::filesystem::path &original_file, const std::filesystem::path &temp_file, bool nested);
 
     /**
      * @brief Checks if a stop has been requested.
@@ -141,6 +153,22 @@ private:
      */
     void finalize_containers();
 
+    /// @brief Directory for a file's Phase 2 temp outputs, on the same mount point as their destination.
+    [[nodiscard]] std::filesystem::path temp_dir_for(const std::filesystem::path& file, bool nested) const;
+
+    /// @brief Where a top-level input's result goes under the output path.
+    [[nodiscard]] std::filesystem::path destination_for(const std::filesystem::path& input) const;
+
+    /**
+     * @brief Dry run: keeps a container's Phase 2 result under its own file name, for Phase 3 to rebuild on.
+     * @return The kept file, or std::nullopt on failure.
+     */
+    std::optional<std::filesystem::path> keep_for_finalize(const std::filesystem::path& file,
+                                                           const std::filesystem::path& temp_file) const;
+
+    /// @brief Copies the inputs that weren't written to the output path, unchanged.
+    void copy_unchanged_inputs(const std::vector<std::filesystem::path>& inputs) const;
+
     /**
      * @brief Handles file replacement logic after a task succeeds.
      *
@@ -158,7 +186,11 @@ private:
                             std::chrono::milliseconds duration) const;
     ThreadPool pool_;                             ///< Thread pool for Phase 2
     ProcessingOptions m_options;
-    std::stack<ExtractedContent> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
+    struct PendingContainer {
+        ExtractedContent content;
+        bool nested = false; ///< True if the container was itself extracted from another container
+    };
+    std::stack<PendingContainer> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
     struct WorkItem {
         std::filesystem::path path;                            ///< Path to the file to be processed
         std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any
@@ -174,15 +206,19 @@ private:
      * FlacProcessor, ApeProcessor, OggProcessor, MkvProcessor, XmlProcessor),
      * Phase 3's finalize_extraction() rebuilds starting from ExtractedContent::original_path.
      * In the default in-place mode Phase 2 overwrites that same path, so this is a
-     * no-op; but with --output-dir, Phase 2 writes the recompressed result to a
-     * different path entirely, leaving original_path pointing at the untouched
-     * pristine file. Without this map, Phase 3 would silently rebuild from that
-     * stale original, discarding Phase 2's recompression outright.
+     * no-op; but with --output-dir (or in a dry run, which keeps the result in
+     * dry_run_dir_), Phase 2 writes the recompressed result to a different path
+     * entirely, leaving original_path pointing at the untouched pristine file.
+     * Without this map, Phase 3 would silently rebuild from that stale original,
+     * discarding Phase 2's recompression outright.
      */
     std::unordered_map<std::string, std::filesystem::path> recompressed_paths_;
-    mutable std::mutex recompressed_paths_mutex_; ///< Guards recompressed_paths_ (written concurrently by Phase 2's thread pool)
+    std::unordered_set<std::string> outputs_written_; ///< Destinations already written under the output path
+    mutable std::mutex recompressed_paths_mutex_; ///< Guards recompressed_paths_ and outputs_written_ (written concurrently by Phase 2's thread pool)
 
     std::filesystem::path output_dir_;            ///< Optional output directory
+    std::filesystem::path output_base_;           ///< Folder the output directory mirrors
+    std::filesystem::path dry_run_dir_;           ///< Kept Phase 2 results of a dry run, removed at the end
     EventBus& event_bus_;                         ///< Bus for publishing events
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry
     EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression

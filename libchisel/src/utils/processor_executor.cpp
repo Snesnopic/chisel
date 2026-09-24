@@ -22,6 +22,43 @@
 namespace fs = std::filesystem;
 
 namespace chisel {
+    namespace {
+        bool is_junk(const fs::path& path) {
+            auto name = path.filename().string();
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            return name == ".ds_store" || name == "desktop.ini" || name.starts_with("._");
+        }
+
+        fs::path normalized(const fs::path& path) {
+            std::error_code ec;
+            auto result = fs::absolute(path, ec);
+            if (ec) result = path;
+            result = result.lexically_normal();
+            // drop a trailing separator
+            if (!result.has_filename() && result.has_relative_path()) result = result.parent_path();
+            return result;
+        }
+
+        // deepest folder holding every root, a folder root counting as itself
+        fs::path common_parent(const std::vector<fs::path>& roots) {
+            std::optional<fs::path> common;
+            for (const auto& root : roots) {
+                auto dir = normalized(root);
+                if (!fs::is_directory(dir)) dir = dir.parent_path();
+                if (!common) {
+                    common = dir;
+                    continue;
+                }
+                fs::path prefix;
+                for (auto a = common->begin(), b = dir.begin(); a != common->end() && b != dir.end() && *a == *b; ++a, ++b) {
+                    prefix /= *a;
+                }
+                common = prefix;
+            }
+            return common.value_or(fs::path{});
+        }
+    } // namespace
+
     ProcessorExecutor::ProcessorExecutor(ProcessorRegistry &registry,
                                          const ProcessingOptions &options,
                                          const EncodeMode mode,
@@ -40,38 +77,34 @@ namespace chisel {
            {
            }
 
-    void ProcessorExecutor::process(const std::vector<fs::path> &inputs) {
-        if (has_output_dir_ && !dry_run_) {
-            bool create_dir = false;
-            if (inputs.size() > 1) {
-                // Multiple inputs -> Output must be a directory
-                output_is_directory_ = true;
-                create_dir = true;
-            } else {
-                // Single input
-                if (fs::is_directory(output_dir_)) {
-                    // Output exists and is a directory
-                    output_is_directory_ = true;
-                } else {
-                    // Output does not exist OR is a file -> Treat as filename
-                    output_is_directory_ = false;
-
-                    // Create parent directory if needed?
-                    // Standard cp fails if parent doesn't exist, but we can be nice.
-                    if (output_dir_.has_parent_path()) {
-                        std::error_code ec;
-                        fs::create_directories(output_dir_.parent_path(), ec);
-                    }
-                }
-            }
-
-            if (create_dir) {
+    void ProcessorExecutor::process(const std::vector<fs::path> &inputs, const std::vector<fs::path> &roots) {
+        struct DryRunDirGuard {
+            const fs::path& dir;
+            ~DryRunDirGuard() {
                 std::error_code ec;
+                if (!dir.empty()) fs::remove_all(dir, ec);
+            }
+        } dry_run_dir_guard{.dir=dry_run_dir_};
+
+        if (dry_run_) {
+            dry_run_dir_ = fs::temp_directory_path() / ("chisel-dry-run-" + RandomUtils::random_suffix());
+        } else if (has_output_dir_) {
+            const auto& layout_roots = roots.empty() ? inputs : roots;
+            output_is_directory_ = layout_roots.size() != 1 || !fs::is_regular_file(layout_roots.front()) ||
+                                   fs::is_directory(output_dir_) || !output_dir_.has_filename();
+            std::error_code ec;
+            if (output_is_directory_) {
+                output_base_ = common_parent(layout_roots);
                 fs::create_directories(output_dir_, ec);
                 if (ec) {
                     Logger::log(LogLevel::Error, "Failed to create output directory: " + output_dir_.string(), "Executor");
-                    return; // Abort if we can't create output dir
+                    return;
                 }
+                for (const auto &path: inputs) {
+                    fs::create_directories(destination_for(path).parent_path(), ec);
+                }
+            } else if (output_dir_.has_parent_path()) {
+                fs::create_directories(output_dir_.parent_path(), ec);
             }
         }
 
@@ -83,11 +116,14 @@ namespace chisel {
         process_work_list();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         finalize_containers();
+        if (stop_flag_.load(std::memory_order_relaxed)) return;
+        copy_unchanged_inputs(inputs);
     }
 
     std::optional<std::pair<fs::path, bool>> ProcessorExecutor::move_to_destination(
         const fs::path& original_file,
-        const fs::path& temp_file) const {
+        const fs::path& temp_file,
+        const bool nested) {
 
         std::error_code ec;
         const auto new_size = fs::file_size(temp_file, ec);
@@ -100,13 +136,11 @@ namespace chisel {
         bool replaced = false;
         fs::path dest = original_file;
 
-        if (dry_run_) {
+        if (dry_run_ && !nested) {
             Logger::log(LogLevel::Info, "[DRY-RUN] Would replace: " + original_file.string(), "Executor");
             fs::remove(temp_file, ec);
-        } else if (has_output_dir_) {
-            dest = output_is_directory_
-                  ? (output_dir_ / original_file.filename())
-                  : output_dir_;
+        } else if (has_output_dir_ && !nested) {
+            dest = destination_for(original_file);
 
             int retries = 10;
             while (retries > 0) {
@@ -136,6 +170,8 @@ namespace chisel {
                 return std::nullopt;
             }
             replaced = true;
+            std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+            outputs_written_.insert(dest.string());
         } else {
             // in-place
             int retries = 10;
@@ -189,7 +225,64 @@ namespace chisel {
             }
         }
 
-        return std::make_pair(dest, replaced);
+        // a dry run still updates extracted files, so containers report their real size
+        return std::make_pair(dest, replaced && !dry_run_);
+    }
+
+    fs::path ProcessorExecutor::temp_dir_for([[maybe_unused]] const fs::path& file, const bool nested) const {
+        if (has_output_dir_ && !nested && !dry_run_) {
+            return destination_for(file).parent_path();
+        }
+#ifdef __APPLE__
+        return fs::temp_directory_path(); // use system temp to bypass sandbox restrictions
+#else
+        // keep the temp file on the same mount point; a dry run never writes next to the inputs
+        return dry_run_ ? fs::temp_directory_path() : file.parent_path();
+#endif
+    }
+
+    fs::path ProcessorExecutor::destination_for(const fs::path& input) const {
+        if (!output_is_directory_) return output_dir_;
+        const auto path = normalized(input);
+        auto relative = path.lexically_relative(output_base_);
+        if (relative.empty() || *relative.begin() == "..") {
+            // no common parent (inputs on different drives): keep the whole path under the drive's name
+            auto root = path.root_name().string();
+            std::erase_if(root, [](const char c) { return c == ':' || c == '/' || c == '\\'; });
+            relative = fs::path(root) / path.relative_path();
+        }
+        return output_dir_ / relative;
+    }
+
+    std::optional<fs::path> ProcessorExecutor::keep_for_finalize(const fs::path& file, const fs::path& temp_file) const {
+        // own folder per file: finalizers may pick the format from the extension
+        const auto kept = dry_run_dir_ / RandomUtils::random_suffix() / file.filename();
+        std::error_code ec;
+        fs::create_directories(kept.parent_path(), ec);
+        if (!ec) fs::rename(temp_file, kept, ec);
+        if (ec) {
+            Logger::log(LogLevel::Warning, "Failed to keep the dry run result of " + file.string() + " (" + ec.message() + ")", "Executor");
+            fs::remove(temp_file, ec);
+            return std::nullopt;
+        }
+        return kept;
+    }
+
+    void ProcessorExecutor::copy_unchanged_inputs(const std::vector<fs::path>& inputs) const {
+        if (!has_output_dir_ || dry_run_) return;
+        for (const auto &input: inputs) {
+            if (stop_flag_.load(std::memory_order_relaxed)) return;
+            const auto dest = destination_for(input);
+            if (is_junk(input) || outputs_written_.contains(dest.string())) continue;
+            std::error_code ec;
+            if (fs::equivalent(input, dest, ec)) continue;
+            fs::copy_file(input, dest, fs::copy_options::overwrite_existing, ec);
+            if (ec) {
+                Logger::log(LogLevel::Error, "Failed to copy " + input.string() + " to " + dest.string() + " (" + ec.message() + ")", "Executor");
+            } else {
+                Logger::log(LogLevel::Debug, "Copied unchanged: " + input.string(), "Executor");
+            }
+        }
     }
 
     void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth) {
@@ -204,10 +297,7 @@ namespace chisel {
             return;
         }
 
-        auto name = path.filename().string();
-
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
-        if (name == ".ds_store" || name == "desktop.ini" || name.starts_with("._")) {
+        if (is_junk(path)) {
             event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Junk file"});
 
             return;
@@ -247,7 +337,7 @@ namespace chisel {
                 std::error_code ec;
                 content->original_size = fs::file_size(content->original_path, ec);
                 if (ec) content->original_size = 0;
-                finalize_stack_.push(*content);
+                finalize_stack_.push({.content=*content, .nested=parent.has_value()});
                 for (const auto &child: content->extracted_files) {
                     analyze_path(child, path, depth + 1);
                 }
@@ -284,6 +374,7 @@ namespace chisel {
             pool_.enqueue([this, item](stop_token st) {
                 const auto& file = item.path;
                 const auto& parent_container = item.parent_container;
+                const bool nested = parent_container.has_value();
                 if (st.stop_requested()) {
                     event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                     return;
@@ -336,18 +427,8 @@ namespace chisel {
                                 pipeline_ok = false;
                                 break;
                             }
-#ifdef __APPLE__
-                            fs::path target_dir = has_output_dir_
-                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
-                                : fs::temp_directory_path(); // use system temp to bypass sandbox restrictions
-#else
-                            // resolve target directory to keep temp file on the same mount point
-                            fs::path target_dir = has_output_dir_
-                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
-                                : file.parent_path();
-#endif
 
-                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            fs::path tmp = temp_dir_for(file, nested) / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             struct TempFileGuard {
                                 fs::path path;
                                 bool release = false;
@@ -435,18 +516,8 @@ namespace chisel {
 
                         for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
-#ifdef __APPLE__
-                            fs::path target_dir = has_output_dir_
-                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
-                                : fs::temp_directory_path(); // use system temp to bypass sandbox restrictions
-#else
-                            // resolve target directory to keep temp file on the same mount point
-                            fs::path target_dir = has_output_dir_
-                                ? (output_is_directory_ ? output_dir_ : output_dir_.parent_path())
-                                : file.parent_path();
-#endif
 
-                            fs::path tmp = target_dir / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            fs::path tmp = temp_dir_for(file, nested) / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             Result r{.tmp=tmp, .size=0, .success=false};
                             try {
                                 candidates[i]->recompress(file, tmp, m_options);
@@ -497,11 +568,21 @@ namespace chisel {
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
                     if (success) {
-                        auto move_result = move_to_destination(file, final_temp_path);
+                        std::optional<std::pair<fs::path, bool>> move_result;
+                        fs::path result_path;
+                        if (dry_run_ && !nested && item.is_container) {
+                            // a dry run keeps a container's result for Phase 3 to rebuild on
+                            if (auto kept = keep_for_finalize(file, final_temp_path)) {
+                                result_path = *kept;
+                                move_result.emplace(file, false);
+                            }
+                        } else if ((move_result = move_to_destination(file, final_temp_path, nested))) {
+                            result_path = move_result->first;
+                        }
                         if (move_result) {
                             {
                                 std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
-                                recompressed_paths_[file.string()] = move_result->first;
+                                recompressed_paths_[file.string()] = result_path;
                             }
                             event_bus_.publish(FileProcessCompleteEvent{
                                 .path=file,
@@ -533,7 +614,7 @@ namespace chisel {
 
     void ProcessorExecutor::finalize_containers() {
         while (!finalize_stack_.empty() && !stop_flag_.load()) {
-            auto content = finalize_stack_.top();
+            auto [content, nested] = finalize_stack_.top();
             finalize_stack_.pop();
 
             event_bus_.publish(ContainerFinalizeStartEvent{content.original_path});
@@ -599,7 +680,7 @@ namespace chisel {
                 }
 
                 // use the helper and publish the specific Phase 3 event
-                auto move_result = move_to_destination(content.original_path, new_temp_file);
+                auto move_result = move_to_destination(content.original_path, new_temp_file, nested);
                 if (move_result) {
                     event_bus_.publish(ContainerFinalizeCompleteEvent{
                         .path=content.original_path,

@@ -151,7 +151,9 @@ public:
     Chisel& mode(EncodeMode m);
 
     /**
-     * @brief Set a separate output directory.
+     * @brief Set a separate output directory, mirroring the inputs' folder structure.
+     * A single input file is written to this path as a file, unless it's an existing directory.
+     * Files that can't be improved are copied unchanged.
      * Default: empty (in-place).
      */
     Chisel& outputDirectory(const std::filesystem::path& dir);
