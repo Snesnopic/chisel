@@ -169,22 +169,7 @@ private:
     /// @brief Copies the inputs that weren't written to the output path, unchanged.
     void copy_unchanged_inputs(const std::vector<std::filesystem::path>& inputs) const;
 
-    /**
-     * @brief Handles file replacement logic after a task succeeds.
-     *
-     * Manages --dry-run, --output, and in-place replacement,
-     * then publishes the final FileProcessCompleteEvent.
-     *
-     * @param original_file The path to the source file.
-     * @param temp_file The path to the newly created optimized file.
-     * @param original_size The size of the original file in bytes.
-     * @param duration The time taken for the recompression task.
-     */
-    void handle_temp_file(const std::filesystem::path& original_file,
-                            const std::filesystem::path& temp_file,
-                            uintmax_t original_size,
-                            std::chrono::milliseconds duration) const;
-    ThreadPool pool_;                             ///< Thread pool for Phase 2
+    ThreadPool pool_;                            ///< Thread pool for Phase 2
     ProcessingOptions m_options;
     struct PendingContainer {
         ExtractedContent content;
