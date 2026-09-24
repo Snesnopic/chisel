@@ -36,7 +36,10 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     args.emplace_back("--unsafe");
 
     args.emplace_back("--quiet");
-    
+
+    // otherwise mkclean rewrites MuxingApp/WritingApp and stamps DateUTC with the current time
+    args.emplace_back("--keep-info");
+
 #ifdef _WIN32
     // On Windows, use wide strings for paths if the API supports it, 
     // or at least ensure we use the absolute path string.
