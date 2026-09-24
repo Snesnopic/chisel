@@ -107,6 +107,8 @@ set(LIBCHISEL_SOURCES
         src/utils/data_uri.cpp
         include/data_uri_processor.hpp
         src/processors/data_uri_processor.cpp
+        include/psd_processor.hpp
+        src/processors/psd_processor.cpp
         include/options.hpp
         include/zopfli_compressor.hpp
         src/utils/zopfli_compressor.cpp

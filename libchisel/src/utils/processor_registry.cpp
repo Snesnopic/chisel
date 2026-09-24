@@ -26,6 +26,7 @@
 #include "tga_processor.hpp"
 #include "xml_processor.hpp"
 #include "data_uri_processor.hpp"
+#include "psd_processor.hpp"
 #include "tag_processor.hpp"
 #include "wavpack_processor.hpp"
 #include "webp_processor.hpp"
@@ -91,6 +92,7 @@ ProcessorRegistry::ProcessorRegistry() {
     processors_.push_back(std::make_unique<PnmProcessor>());
     processors_.push_back(std::make_unique<XmlProcessor>());
     processors_.push_back(std::make_unique<DataUriProcessor>());
+    processors_.push_back(std::make_unique<PsdProcessor>());
     processors_.push_back(std::make_unique<Woff2Processor>());
     processors_.push_back(std::make_unique<BrotliProcessor>());
     processors_.push_back(std::make_unique<CfbfProcessor>());
