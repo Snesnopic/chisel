@@ -22,6 +22,7 @@ using MimeChunk = std::variant<TextChunk, Base64Chunk>;
 
 struct MimeState {
     std::vector<MimeChunk> chunks;
+    std::string line_break = "\r\n"; ///< the file's own, for the re-encoded base64 lines
 };
 
 class MimeProcessor : public IProcessor {

@@ -140,11 +140,13 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
         }
     };
 
+    bool crlf = false;
     while (std::getline(in, line)) {
         std::string raw_line = line + "\n";
         std::string clean_line = line;
         if (!clean_line.empty() && clean_line.back() == '\r') {
             clean_line.pop_back();
+            crlf = true;
         }
 
         if (clean_line.size() >= 2 && clean_line[0] == '-' && clean_line[1] == '-') {
@@ -175,6 +177,7 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
     if (!current_text.empty()) {
         state->chunks.push_back(TextChunk{current_text});
     }
+    state->line_break = crlf ? "\r\n" : "\n";
 
     if (content.extracted_files.empty()) {
         chisel::cleanup_temp_dir(content.temp_dir);
@@ -208,7 +211,7 @@ std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent&
             std::string new_b64 = Base64Utils::encode(opt_data);
             
             for (size_t i = 0; i < new_b64.length(); i += 76) {
-                out << new_b64.substr(i, 76) << "\r\n";
+                out << new_b64.substr(i, 76) << state->line_break;
             }
         }
     }
