@@ -34,7 +34,7 @@ public:
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_mime_types() const noexcept override {
-        static constexpr std::array<std::string_view, 13> kMimes = {
+        static constexpr std::array<std::string_view, 15> kMimes = {
             "application/zip",
             "application/x-7z-compressed",
             "application/x-zip-compressed",
@@ -50,12 +50,14 @@ public:
             "application/vnd.comicbook+tar",
             "application/epub+zip",
             "application/x-archive",
+            "image/openraster",
+            "application/vnd.google-earth.kmz",
         };
         return {kMimes.data(), kMimes.size()};
     }
 
     [[nodiscard]] std::span<const std::string_view> get_supported_extensions() const noexcept override {
-        static constexpr std::array<std::string_view, 53> kExts = {
+        static constexpr std::array<std::string_view, 54> kExts = {
             ".zip", ".tar", ".tgz", ".iso", ".cpio", ".jar", ".xpi", ".apk",
             ".cbz", ".cbt", ".epub", ".a", ".ar", ".lib", ".7z", ".cb7",
             ".air", ".bsz", ".cdr", ".csl", ".gallery", ".gallerycollection",
@@ -63,7 +65,7 @@ public:
             ".notebook", ".oex", ".osk", ".pk3", ".puz", ".stz", ".vlt",
             ".wal", ".wba", ".wsz", ".xap", ".xl", ".xmz",
             ".xsn", ".kmz", ".vsix", ".nupkg", ".appx", ".bar", ".easm",
-            ".rmskin", ".zipx", ".deb", ".ipk"
+            ".rmskin", ".zipx", ".deb", ".ipk", ".ora"
             // .gz, .tgz handled via MIME; .svgz/.wmz/.emz handled by GzProcessor
         };
         return {kExts.data(), kExts.size()};
