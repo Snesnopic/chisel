@@ -3,29 +3,18 @@
 //
 
 #include "../../include/archive_processor.hpp"
+#include "../../include/archive_manifest.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/mime_detector.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/random_utils.hpp"
 #include <archive.h>
-#include <archive_entry.h>
 #include <filesystem>
-#include <fstream>
+#include <memory>
 #include <string>
-#include <vector>
 #include <optional>
 #include <system_error>
-#include <unordered_map>
-#include <algorithm>
-#include <chrono>
-#include <cctype>
 #include "file_utils.hpp"
-#ifndef _WIN32
-#include <sys/stat.h>
-#else
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
 
 namespace chisel {
 
@@ -56,249 +45,45 @@ static ContainerFormat detect_format(const fs::path& path) {
     return ContainerFormat::Unknown;
 }
 
-// --- libarchive extract/create ---
+// --- libarchive create ---
 
-/**
- * @brief Validates that a symlink entry's target stays within the extraction sandbox.
- *
- * A symlink's own path is sanitized separately (see sanitize_archive_entry_path);
- * this additionally validates what it *points to*, since an unvalidated absolute
- * or ".."-laden target lets a crafted archive plant a link to any file on the
- * host filesystem. Relative targets are resolved against the symlink's own
- * directory, matching POSIX symlink semantics.
- *
- * @param raw_target The raw symlink target string from the archive entry.
- * @param symlink_parent_dir The directory that will contain the symlink.
- * @param dest_dir The extraction destination (sandbox root).
- * @return True if the resolved target stays inside dest_dir.
- */
-static bool sanitize_symlink_target(const std::string& raw_target,
-                                     const fs::path& symlink_parent_dir,
-                                     const fs::path& dest_dir) {
-    if (raw_target.empty()) return false;
-    if (raw_target.find('\0') != std::string::npos) return false;
+// same tar variant as the source, so e.g. pax subsecond times survive
+static int set_tar_format(archive* a, const int source_format) {
+    if (source_format == ARCHIVE_FORMAT_TAR_USTAR || source_format == ARCHIVE_FORMAT_TAR_PAX_INTERCHANGE ||
+        source_format == ARCHIVE_FORMAT_TAR_GNUTAR) {
+        return archive_write_set_format(a, source_format);
+    }
+    return archive_write_set_format_pax_restricted(a);
+}
 
-    std::string t = raw_target;
-    for (auto& c : t) { if (c == '\\') c = '/'; }
-
-    const fs::path target_path(t);
-    const fs::path candidate = target_path.is_absolute()
-        ? target_path
-        : symlink_parent_dir / target_path;
-
-    const auto normalized = candidate.lexically_normal();
-    const auto base = fs::path(dest_dir).lexically_normal();
-
-    return path_is_within(normalized, base);
+static int set_cpio_format(archive* a, const int source_format) {
+    switch (source_format) {
+        case ARCHIVE_FORMAT_CPIO_POSIX:
+        case ARCHIVE_FORMAT_CPIO_BIN_LE:
+        case ARCHIVE_FORMAT_CPIO_SVR4_NOCRC:
+        case ARCHIVE_FORMAT_CPIO_PWB:
+            return archive_write_set_format(a, source_format);
+        default:
+            return archive_write_set_format_cpio(a);
+    }
 }
 
 /**
- * @brief Extracts the contents of an archive to a destination directory using libarchive.
- * @param archive_path The path to the archive file.
- * @param dest_dir The directory where contents will be extracted.
- * @return True on successful extraction, false otherwise.
- */
-static bool extract_with_libarchive(const fs::path& archive_path, const fs::path& dest_dir) {
-    struct archive* a = archive_read_new();
-    struct archive_entry* entry = nullptr;
-
-    archive_read_support_filter_all(a);
-    archive_read_support_format_all(a);
-    archive_read_set_options(a, "hdrcharset=UTF-8");
-
-    #ifdef _WIN32
-        int r = archive_read_open_filename_w(a, archive_path.wstring().c_str(), 10240);
-    #else
-        int r = archive_read_open_filename(a, archive_path.string().c_str(), 10240);
-    #endif
-    if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
-    }
-    if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Archive_read_open_filename: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-        archive_read_free(a);
-        return false;
-    }
-
-    std::error_code ec;
-    std::vector<char> buffer(64 * 1024);
-
-    // maps each entry's original (unsanitized) pathname, as recorded in the
-    // archive, to the actual sanitized path it was extracted to. Needed to
-    // resolve hardlink targets: libarchive's own hardlink field always
-    // refers to the original name, which no longer matches once we
-    // override the entry's pathname to the sanitized extraction path below.
-    std::unordered_map<std::string, fs::path> extracted_paths;
-
-    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
-        const char* current = archive_entry_pathname(entry);
-        if (!current) {
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        fs::path out_path;
-        if (!sanitize_archive_entry_path(current, dest_dir, out_path)) {
-            Logger::log(LogLevel::Warning, "Skipping suspicious archive entry (path traversal): " + std::string(current), "ArchiveProcessor");
-            archive_read_data_skip(a);
-            continue;
-        }
-        extracted_paths[current] = out_path;
-
-        if (!ensure_parent_dirs(out_path, ec)) {
-            Logger::log(LogLevel::Error, "Can't create folder for: " + out_path.string(), "ArchiveProcessor");
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        if (archive_entry_filetype(entry) == AE_IFDIR) {
-            fs::create_directories(out_path, ec);
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        if (archive_entry_filetype(entry) == AE_IFLNK) {
-            const char* link_target = archive_entry_symlink(entry);
-            if (link_target && link_target[0]) {
-                if (!sanitize_symlink_target(link_target, out_path.parent_path(), dest_dir)) {
-                    Logger::log(LogLevel::Warning,
-                                "Skipping symlink with unsafe target (escapes extraction sandbox): " +
-                                std::string(current) + " -> " + link_target,
-                                "ArchiveProcessor");
-                } else {
-                    std::error_code rc;
-                    fs::create_directories(out_path.parent_path(), rc);
-#ifdef _WIN32
-                    std::error_code tmp_ec;
-                    fs::create_symlink(fs::path(link_target), out_path, tmp_ec);
-                    (void)tmp_ec;
-#else
-                    std::error_code sce;
-                    fs::create_symlink(fs::path(link_target), out_path, sce);
-#endif
-                }
-            }
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        // hardlink entries (tar/cpio/pax) reference a previously-seen entry
-        // by its *original* archive-internal name, which no longer matches
-        // once entries are rewritten to sanitized, absolute paths. Resolve
-        // it against extracted_paths and recreate the link ourselves,
-        // instead of letting libarchive resolve it (it can't, since it only
-        // knows the original, pre-sanitization names).
-        if (const char* hardlink_target = archive_entry_hardlink(entry)) {
-            const auto it_target = extracted_paths.find(hardlink_target);
-            if (it_target == extracted_paths.end()) {
-                Logger::log(LogLevel::Warning,
-                            "Skipping hardlink with unresolved target: " + std::string(current) +
-                            " -> " + hardlink_target,
-                            "ArchiveProcessor");
-            } else {
-                std::error_code link_ec;
-                fs::create_hard_link(it_target->second, out_path, link_ec);
-                if (link_ec) {
-                    Logger::log(LogLevel::Warning,
-                                "Failed to create hardlink " + out_path.string() + " -> " +
-                                it_target->second.string() + ": " + link_ec.message(),
-                                "ArchiveProcessor");
-                }
-            }
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        // override the pathname to match the sanitized path
-        archive_entry_set_pathname(entry, out_path.string().c_str());
-
-        // extract directly with libarchive preserving time and permissions
-        constexpr int extract_flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
-        const int ext_r = archive_read_extract(a, entry, extract_flags);
-
-        if (ext_r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "extraction failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-            archive_read_free(a);
-            return false;
-        }
-    }
-
-    if (r != ARCHIVE_EOF) {
-        Logger::log(LogLevel::Error, "Error during iteration: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-        archive_read_free(a);
-        return false;
-    }
-
-    archive_read_free(a);
-    return true;
-}
-
-/**
- * @brief A hash function for std::pair, used for the hardlink map.
- */
-struct PairHash {
-    template <class T1, class T2>
-    std::size_t operator()(const std::pair<T1,T2>& p) const noexcept {
-        auto h1 = std::hash<T1>{}(p.first);
-        auto h2 = std::hash<T2>{}(p.second);
-        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
-    }
-};
-
-/**
- * @brief Returns a (volume_id, file_id) pair uniquely identifying the file
- * a path resolves to, used to detect and preserve hardlinks when creating
- * an archive. Analogous to POSIX's (st_dev, st_ino) on every platform.
- * @param p The path to query.
- * @return The file identity, or std::nullopt if it could not be determined.
- */
-static std::optional<std::pair<uintmax_t, uintmax_t>> get_file_identity(const fs::path& p) {
-#ifdef _WIN32
-    HANDLE h = CreateFileW(p.c_str(), 0,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                           nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return std::nullopt;
-
-    BY_HANDLE_FILE_INFORMATION info{};
-    const bool ok = GetFileInformationByHandle(h, &info) != 0;
-    CloseHandle(h);
-    if (!ok) return std::nullopt;
-
-    const auto file_id = (static_cast<uintmax_t>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
-    return std::make_pair(static_cast<uintmax_t>(info.dwVolumeSerialNumber), file_id);
-#else
-    struct stat st{};
-    if (stat(p.c_str(), &st) != 0) return std::nullopt;
-    return std::make_pair(static_cast<uintmax_t>(st.st_dev), static_cast<uintmax_t>(st.st_ino));
-#endif
-}
-
-/**
- * @brief Creates an archive from a source directory using libarchive.
- * @param src_dir The directory containing the files to be archived.
+ * @brief Rebuilds an archive from its manifest using libarchive.
+ * @param manifest The entries read by prepare_extraction, with their current data.
  * @param out_path The path to the output archive file.
  * @param fmt The target container format for the new archive.
  * @return True on successful creation, false otherwise.
  */
-static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_path, ContainerFormat fmt) {
-    archive* a = archive_write_new();
+static bool create_with_libarchive(const ArchiveManifest& manifest, const fs::path& out_path, ContainerFormat fmt) {
+    const std::unique_ptr<archive, decltype(&archive_write_free)> owner(archive_write_new(), archive_write_free);
+    archive* a = owner.get();
     if (!a) return false;
 
     int r = ARCHIVE_OK;
 
     switch (fmt) {
         case ContainerFormat::Epub:
-            r = archive_write_set_format_zip(a);
-            if (r == ARCHIVE_OK) {
-                // "store" applies only to the mandatory "mimetype" entry written
-                // below; it's switched back to deflate right after via
-                // archive_write_zip_set_compression_deflate(). compression-level
-                // is a separate field untouched by that call, so it's safe to
-                // set it once here for the rest of the archive's entries.
-                archive_write_set_format_option(a, "zip", "compression", "store");
-                archive_write_set_format_option(a, "zip", "compression-level", "9");
-            }
-            break;
         case ContainerFormat::Zip:
         case ContainerFormat::Cbz:
         case ContainerFormat::Jar:
@@ -307,6 +92,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
         case ContainerFormat::Dwfx:
         case ContainerFormat::Xps:
         case ContainerFormat::Apk:
+            // entries stored in the source stay stored, see write_archive_manifest
             r = archive_write_set_format_zip(a);
             if (r == ARCHIVE_OK) {
                 archive_write_set_format_option(a, "zip", "compression", "deflate");
@@ -315,10 +101,10 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             break;
         case ContainerFormat::Tar:
         case ContainerFormat::Cbt:
-            r = archive_write_set_format_pax_restricted(a);
+            r = set_tar_format(a, manifest.format);
             break;
         case ContainerFormat::GZip:
-            r = archive_write_set_format_pax_restricted(a);
+            r = set_tar_format(a, manifest.format);
             if (r == ARCHIVE_OK) {
                 r = archive_write_add_filter_gzip(a);
                 if (r == ARCHIVE_OK) {
@@ -327,7 +113,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
             break;
         case ContainerFormat::BZip2:
-            r = archive_write_set_format_pax_restricted(a);
+            r = set_tar_format(a, manifest.format);
             if (r == ARCHIVE_OK) {
                 r = archive_write_add_filter_bzip2(a);
                 if (r == ARCHIVE_OK) {
@@ -336,7 +122,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
             break;
         case ContainerFormat::Xz:
-            r = archive_write_set_format_pax_restricted(a);
+            r = set_tar_format(a, manifest.format);
             if (r == ARCHIVE_OK) {
                 r = archive_write_add_filter_xz(a);
                 if (r == ARCHIVE_OK) {
@@ -345,7 +131,7 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             }
             break;
         case ContainerFormat::Zstd:
-            r = archive_write_set_format_pax_restricted(a);
+            r = set_tar_format(a, manifest.format);
             if (r == ARCHIVE_OK) {
                 r = archive_write_add_filter_zstd(a);
                 if (r == ARCHIVE_OK) {
@@ -372,23 +158,23 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
             break;
 
         case ContainerFormat::Cpio:
-            r = archive_write_set_format_cpio(a);
+            r = set_cpio_format(a, manifest.format);
             break;
 
         case ContainerFormat::Ar:
-            r = archive_write_set_format_ar_bsd(a);
+            // GNU/SysV ar (e.g. .deb, GNU static libraries) keeps its own variant
+            r = manifest.format == ARCHIVE_FORMAT_AR_GNU ? archive_write_set_format_ar_svr4(a)
+                                                         : archive_write_set_format_ar_bsd(a);
             break;
         default:
             Logger::log(LogLevel::Error, "Unsupported output format for writing: " + container_format_to_string(fmt), "ArchiveProcessor");
-            archive_write_free(a);
             return false;
     }
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
     }
-    if (r != ARCHIVE_OK) {
+    if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
         Logger::log(LogLevel::Error, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-        archive_write_free(a);
         return false;
     }
 
@@ -400,206 +186,17 @@ static bool create_with_libarchive(const fs::path& src_dir, const fs::path& out_
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
     }
-    if (r != ARCHIVE_OK) {
+    if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
         Logger::log(LogLevel::Error, "Archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-        archive_write_free(a);
         return false;
     }
 
-    std::error_code ec;
-    std::vector<char> buffer(64 * 1024);
-
-    const fs::path root(src_dir);
-    std::unordered_map<std::pair<uintmax_t,uintmax_t>, std::string, PairHash> hardlink_map;
-
-    if (fmt == ContainerFormat::Epub) {
-        fs::path mimetype_path = fs::path(src_dir) / "mimetype";
-        if (fs::exists(mimetype_path)) {
-
-            std::ifstream ifs(mimetype_path, std::ios::binary);
-            std::vector<char> buf((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-
-            archive_entry* entry = archive_entry_new();
-            archive_entry_set_pathname(entry, "mimetype");
-            archive_entry_set_size(entry, buf.size());
-            archive_entry_set_filetype(entry, AE_IFREG);
-            archive_entry_set_perm(entry, 0644);
-            archive_entry_set_mtime(entry, 0, 0);
-
-            int rh = archive_write_header(a, entry);
-            if (rh != ARCHIVE_OK && rh != ARCHIVE_WARN) {
-                Logger::log(LogLevel::Error, "Archive_write_header (mimetype): " + std::string(archive_error_string(a)), "ArchiveProcessor");
-                archive_entry_free(entry);
-                archive_write_close(a);
-                archive_write_free(a);
-                return false;
-            }
-            if (!buf.empty()) {
-                la_ssize_t wrote = archive_write_data(a, buf.data(), buf.size());
-                if (wrote < 0) {
-                    Logger::log(LogLevel::Error, "Archive_write_data (mimetype): " + std::string(archive_error_string(a)), "ArchiveProcessor");
-                    archive_entry_free(entry);
-                    archive_write_close(a);
-                    archive_write_free(a);
-                    return false;
-                }
-            }
-            archive_write_finish_entry(a); // finish this entry
-            archive_entry_free(entry);
-        }
-
-        // "compression=store" above was needed only for the mandatory,
-        // uncompressed "mimetype" entry per the EPUB spec; restore normal
-        // deflate compression so the rest of the archive's contents aren't
-        // also written uncompressed. archive_write_set_format_option() only
-        // accepts changes in the writer's "new" state (before any entry is
-        // written), so it can't be used here; archive_write_zip_set_compression_deflate()
-        // is explicitly allowed after entries have already been written.
-        archive_write_zip_set_compression_deflate(a);
+    const bool written = write_archive_manifest(a, manifest, "ArchiveProcessor");
+    if (archive_write_close(a) != ARCHIVE_OK) {
+        Logger::log(LogLevel::Error, "Archive_write_close: " + std::string(archive_error_string(a)), "ArchiveProcessor");
+        return false;
     }
-
-    std::vector<fs::path> files;
-    for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
-        std::error_code ec2;
-        // is_symlink is checked first: is_directory()/is_regular_file() both follow
-        // symlinks, so a symlink to a directory would otherwise be misclassified here
-        const bool is_symlink = fs::is_symlink(it->path(), ec2);
-        const bool include = is_symlink || fs::is_regular_file(it->path(), ec2) || fs::is_directory(it->path(), ec2);
-        if (include) {
-            if (fmt == ContainerFormat::Epub && it->path().filename() == "mimetype") continue;
-            files.push_back(it->path());
-        }
-    }
-    if (fmt == ContainerFormat::Cbz || fmt == ContainerFormat::Cbt) {
-        std::sort(files.begin(), files.end(), [&](const fs::path& a, const fs::path& b) {
-            return natural_less_path(a, b, root);
-        });
-    }
-
-    for (const auto& p : files) {
-        const bool is_dir = fs::is_directory(p, ec);
-        const bool is_reg = fs::is_regular_file(p, ec);
-        const bool is_symlink = fs::is_symlink(p, ec);
-
-        archive_entry* entry = archive_entry_new();
-        if (!entry) {
-            Logger::log(LogLevel::Error, "Archive_entry_new failed", "ArchiveProcessor");
-            archive_write_close(a);
-            archive_write_free(a);
-            return false;
-        }
-
-        std::string rel = rel_path_of(root, p);
-        if (rel.empty()) rel = p.filename().generic_string();
-        archive_entry_set_pathname(entry, rel.c_str());
-
-        if (is_symlink) {
-            // must be checked before is_dir/is_reg: fs::is_directory() and
-            // fs::is_regular_file() both follow symlinks, so a symlink
-            // pointing to a file or directory would otherwise be silently
-            // dereferenced here, reading/naming entries after its target
-            // instead of preserving it as a symlink.
-            archive_entry_set_filetype(entry, AE_IFLNK);
-            archive_entry_set_perm(entry, 0777);
-            auto target = fs::read_symlink(p, ec);
-            if (!ec) {
-                archive_entry_set_symlink(entry, target.string().c_str());
-            }
-        } else if (is_dir) {
-            archive_entry_set_filetype(entry, AE_IFDIR);
-            archive_entry_set_perm(entry, 0755);
-        } else if (is_reg) {
-            archive_entry_set_filetype(entry, AE_IFREG);
-            std::uintmax_t fsize = fs::file_size(p, ec);
-            if (ec) fsize = 0;
-            archive_entry_set_size(entry, static_cast<la_int64_t>(fsize));
-
-#ifndef _WIN32
-            // posix: read real stats for permissions and modified time
-            struct stat st{};
-            if (stat(p.c_str(), &st) == 0) {
-                archive_entry_set_perm(entry, st.st_mode);
-                archive_entry_set_mtime(entry, st.st_mtime, 0);
-            } else {
-                archive_entry_set_perm(entry, 0644);
-            }
-#else
-            // windows fallback
-            archive_entry_set_perm(entry, 0644);
-            auto ftime = fs::last_write_time(p, ec);
-            if (!ec) {
-                auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                    ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
-                std::time_t tt = std::chrono::system_clock::to_time_t(sctp);
-                archive_entry_set_mtime(entry, tt, 0);
-            }
-#endif
-            // hardlink detection/deduplication (cross-platform): only bother
-            // resolving a file identity if the filesystem reports more than
-            // one link to begin with.
-            if (const auto link_count = fs::hard_link_count(p, ec); !ec && link_count > 1) {
-                if (const auto id = get_file_identity(p)) {
-                    auto it_hl = hardlink_map.find(*id);
-                    if (it_hl != hardlink_map.end()) {
-                        archive_entry_set_hardlink(entry, it_hl->second.c_str());
-                        archive_entry_set_size(entry, 0);
-                    } else {
-                        hardlink_map[*id] = rel;
-                    }
-                }
-            }
-        } else {
-            archive_entry_free(entry);
-            continue;
-        }
-
-        r = archive_write_header(a, entry);
-        if (r == ARCHIVE_WARN) {
-            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
-        }
-        if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Archive_write_header: " + std::string(archive_error_string(a)) + " for " + rel, "ArchiveProcessor");
-            archive_entry_free(entry);
-            archive_write_close(a);
-            archive_write_free(a);
-            return false;
-        }
-
-        if (is_reg) {
-            bool skip_data = (archive_entry_hardlink(entry) != nullptr);
-            if (!skip_data) {
-                std::ifstream ifs(p, std::ios::binary);
-                if (!ifs) {
-                    Logger::log(LogLevel::Error, "Can't open file for reading: " + p.string(), "ArchiveProcessor");
-                    archive_entry_free(entry);
-                    archive_write_close(a);
-                    archive_write_free(a);
-                    return false;
-                }
-                while (ifs) {
-                    ifs.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-                    std::streamsize got = ifs.gcount();
-                    if (got > 0) {
-                        la_ssize_t wrote = archive_write_data(a, buffer.data(), static_cast<std::size_t>(got));
-                        if (wrote < 0) {
-                            Logger::log(LogLevel::Error, "Archive_write_data: " + std::string(archive_error_string(a)), "ArchiveProcessor");
-                            archive_entry_free(entry);
-                            archive_write_close(a);
-                            archive_write_free(a);
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        archive_write_finish_entry(a); // finish this entry
-        archive_entry_free(entry);
-    }
-
-    archive_write_close(a);
-    archive_write_free(a);
-    return true;
+    return written;
 }
 
 // --- IProcessor implementation ---
@@ -620,21 +217,16 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
         return std::nullopt;
     }
 
-    if (!extract_with_libarchive(input_path, content.temp_dir)) {
+    auto manifest = read_archive_manifest(input_path, content.temp_dir, false, get_name());
+    if (!manifest) {
         Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
         cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }
 
-    for (auto& p : fs::recursive_directory_iterator(content.temp_dir)) {
-        std::error_code ec;
-        if (fs::is_regular_file(p.path(), ec) || fs::is_symlink(p.path(), ec)) {
-            // nested archives are not special-cased here: ProcessorExecutor
-            // recurses into every extracted file regardless, re-detecting its
-            // format independently.
-            content.extracted_files.push_back(p.path());
-        }
-    }
+    // nested archives need no special case, the executor re-detects every extracted file
+    content.extracted_files = manifest_files(*manifest);
+    content.extras = std::move(*manifest);
 
     Logger::log(
         LogLevel::Info,
@@ -656,7 +248,8 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
     const fs::path tmp_archive = fs::temp_directory_path() /
                                  (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + out_ext);
 
-    if (!create_with_libarchive(content.temp_dir, tmp_archive, out_fmt)) {
+    const auto* manifest = std::any_cast<ArchiveManifest>(&content.extras);
+    if (manifest == nullptr || !create_with_libarchive(*manifest, tmp_archive, out_fmt)) {
         Logger::log(LogLevel::Error, "Archive creation failed: " + tmp_archive.string(), get_name());
         fs::remove_all(content.temp_dir);
         // create_with_libarchive may have already opened/partially written tmp_archive

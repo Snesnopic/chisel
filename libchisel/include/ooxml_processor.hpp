@@ -93,10 +93,10 @@ public:
      * @brief Rebuilds the OOXML archive from the (possibly already
      * independently optimized) extracted files.
      *
-     * Walks the temp directory and re-zips every file and directory found
-     * there (each part having already been optimized in place, if
-     * applicable, by the executor's own recursive per-file dispatch)
-     * using libarchive at maximum deflate compression.
+     * Re-zips every entry of the package in its original order (each part
+     * having already been optimized in place, if applicable, by the executor's
+     * own recursive per-file dispatch) using libarchive at maximum deflate
+     * compression.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
      * @param options Processing options (e.g. metadata preservation).

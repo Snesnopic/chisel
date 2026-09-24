@@ -134,69 +134,6 @@ namespace chisel {
         return s;
     }
 
-    bool ensure_parent_dirs(const fs::path &p, std::error_code &ec) {
-        const auto parent = p.parent_path();
-        if (parent.empty()) return true;
-        if (fs::exists(parent, ec)) return !ec;
-        fs::create_directories(parent, ec);
-        return !ec;
-    }
-
-    std::string rel_path_of(const fs::path &root, const fs::path &p) {
-        // lexically_relative operates purely on path components and never
-        // touches the filesystem, unlike fs::relative() which internally
-        // calls weakly_canonical() and therefore resolves symlinks. Since p
-        // may itself be (or contain) a symlink, resolving it here would make
-        // the computed name reflect the symlink's target instead of its
-        // location within root, which is unsafe when used to name archive
-        // entries during repacking.
-        const auto rel = p.lexically_relative(root);
-        std::string s = rel.generic_string();
-        return s.empty() || s == "." ? p.filename().generic_string() : s;
-    }
-
-    bool natural_less_string(const std::string &sa, const std::string &sb) {
-        size_t i = 0;
-        size_t j = 0;
-        while (i < sa.size() && j < sb.size()) {
-            if ((std::isdigit(static_cast<unsigned char>(sa[i])) != 0) && (
-                    std::isdigit(static_cast<unsigned char>(sb[j])) != 0)) {
-                size_t ia = i;
-                size_t jb = j;
-                while (ia < sa.size() && (std::isdigit(static_cast<unsigned char>(sa[ia])) != 0)) ++ia;
-                while (jb < sb.size() && (std::isdigit(static_cast<unsigned char>(sb[jb])) != 0)) ++jb;
-
-                std::string as = sa.substr(i, ia - i);
-                std::string bs = sb.substr(j, jb - j);
-
-                auto strip_leading = [](const std::string &s) -> std::string {
-                    size_t k = 0;
-                    while (k + 1 < s.size() && s[k] == '0') ++k;
-                    return s.substr(k);
-                };
-
-                std::string as2 = strip_leading(as);
-                std::string bs2 = strip_leading(bs);
-
-                if (as2.size() != bs2.size()) return as2.size() < bs2.size();
-                if (as2 != bs2) return as2 < bs2;
-                i = ia;
-                j = jb;
-            } else {
-                if (sa[i] != sb[j]) return sa[i] < sb[j];
-                ++i;
-                ++j;
-            }
-        }
-        return sa.size() < sb.size();
-    }
-
-    bool natural_less_path(const fs::path &a, const fs::path &b, const fs::path &root) {
-        const std::string sa = rel_path_of(root, a);
-        const std::string sb = rel_path_of(root, b);
-        return natural_less_string(sa, sb);
-    }
-
     bool path_is_within(const fs::path &normalized, const fs::path &base) {
         const auto ns = normalized.string();
         const auto bs = base.string();

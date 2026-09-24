@@ -6,7 +6,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/random_utils.hpp"
 #include "../../include/file_type.hpp"
-#include "../../include/zip_extract_util.hpp"
+#include "../../include/archive_manifest.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -38,12 +38,13 @@ std::optional<ExtractedContent> OdfProcessor::prepare_extraction(const std::file
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
 
-    auto extracted = extract_zip_entries(input_path, temp_dir, get_name());
-    if (!extracted) {
+    auto manifest = read_archive_manifest(input_path, temp_dir, true, get_name());
+    if (!manifest) {
         cleanup_temp_dir(temp_dir, get_name());
         return std::nullopt;
     }
-    content.extracted_files = std::move(*extracted);
+    content.extracted_files = manifest_files(*manifest);
+    content.extras = std::move(*manifest);
 
     Logger::log(LogLevel::Debug, "Exiting prepare_extraction for " + input_path.string(), get_name());
 
@@ -76,7 +77,7 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("ODFProcessor: set_format_zip failed");
     }
-    archive_write_set_format_option(out, "zip", "compression", "store");
+    archive_write_set_format_option(out, "zip", "compression", "deflate");
     archive_write_set_format_option(out, "zip", "compression-level", "9");
 
     int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
@@ -90,116 +91,15 @@ std::filesystem::path OdfProcessor::finalize_extraction(const ExtractedContent& 
         throw std::runtime_error("ODFProcessor: open_filename failed");
     }
 
-    // walk the temp dir directly (not content.extracted_files, which never includes
-    // directories) so empty directory entries aren't silently dropped on rebuild
-    std::error_code walk_ec;
-    std::vector<fs::path> all_entries;
-    for (auto dit = fs::recursive_directory_iterator(content.temp_dir, walk_ec);
-         !walk_ec && dit != fs::recursive_directory_iterator(); ++dit) {
-        all_entries.push_back(dit->path());
-    }
-
-    // ensure "mimetype" is written first
-    std::vector<fs::path> files_ordered;
-    auto it = std::find_if(all_entries.begin(), all_entries.end(),
-                           [](const fs::path& f){ return f.filename() == "mimetype"; });
-    if (it != all_entries.end()) {
-        files_ordered.push_back(*it);
-    }
-    for (const auto& f : all_entries) {
-        if (f.filename() != "mimetype") {
-            files_ordered.push_back(f);
-        }
-    }
-
-    try {
-        std::error_code ec;
-        for (const auto& file : files_ordered) {
-            fs::path rel = fs::relative(file, content.temp_dir, ec);
-            if (ec) rel = fs::path(file).filename();
-
-            const bool is_dir = fs::is_directory(file, ec);
-
-            std::vector<unsigned char> final_data;
-            if (!is_dir) {
-                std::ifstream ifs(file, std::ios::binary);
-                if (!ifs) {
-                    Logger::log(LogLevel::Error, "Failed to open file for reading: " + file.filename().string(), get_name());
-                    continue;
-                }
-                final_data.assign((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
-            }
-
-            if (is_dir) {
-                Logger::log(LogLevel::Debug, "Copied directory entry: " + rel.string(), get_name());
-            } else if (rel.filename() == "mimetype") {
-                Logger::log(LogLevel::Debug, "Stored mimetype entry uncompressed", get_name());
-                // option is already 'store', do nothing
-            } else {
-                // "store" above was needed only for the mandatory, uncompressed
-                // "mimetype" entry; switch to deflate for everything else. libarchive's
-                // zip writer applies its own deflate to whatever raw bytes we hand it via
-                // archive_write_data() below -- there is no per-entry compression override,
-                // so pre-compressing (e.g. with zopfli) here and writing under "store"
-                // would silently embed raw deflate bytes in an entry flagged uncompressed,
-                // corrupting the file for any standards-compliant zip/ODF reader.
-                archive_write_zip_set_compression_deflate(out);
-                Logger::log(LogLevel::Debug, "Copied entry (deflate): " + rel.string(), get_name());
-            }
-
-            archive_entry* entry = archive_entry_new();
-            if (entry == nullptr) {
-                Logger::log(LogLevel::Error, "Archive_entry_new failed", get_name());
-                throw std::runtime_error("ODFProcessor: archive_entry_new failed");
-            }
-
-            archive_entry_set_pathname(entry, rel.generic_string().c_str());
-            archive_entry_set_size(entry, is_dir ? 0 : static_cast<la_int64_t>(final_data.size()));
-            archive_entry_set_filetype(entry, is_dir ? AE_IFDIR : AE_IFREG);
-            archive_entry_set_perm(entry, is_dir ? 0755 : 0644);
-            archive_entry_set_mtime(entry, 0, 0);
-
-            int wh = archive_write_header(out, entry);
-            if (wh == ARCHIVE_WARN) {
-                Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
-            }
-            if (wh != ARCHIVE_OK) {
-                Logger::log(LogLevel::Error,
-                            "Failed to write header for: " + rel.string() +
-                            " (" + std::string(archive_error_string(out)) + ")", get_name());
-                archive_entry_free(entry);
-                throw std::runtime_error("ODFProcessor: write_header failed");
-            }
-
-            if (!is_dir) {
-                la_ssize_t wrote = archive_write_data(out, final_data.data(), final_data.size());
-                if (wrote < 0) {
-                    Logger::log(LogLevel::Error,
-                                "Failed to write data for: " + rel.string() +
-                                " (" + std::string(archive_error_string(out)) + ")", get_name());
-                    archive_entry_free(entry);
-                    throw std::runtime_error("ODFProcessor: write_data failed");
-                }
-            }
-
-            archive_write_finish_entry(out); // finish this entry
-            archive_entry_free(entry);
-
-        }
-    } catch (const std::exception& e) {
-        // log the error before cleanup
-        Logger::log(LogLevel::Error, "Failed to finalize odf: " + std::string(e.what()) + " for file: " + content.original_path.filename().string(), get_name());
+    const auto* manifest = std::any_cast<ArchiveManifest>(&content.extras);
+    if (manifest == nullptr || !write_archive_manifest(out, *manifest, get_name())) {
+        Logger::log(LogLevel::Error, "Failed to finalize odf for file: " + content.original_path.filename().string(), get_name());
         archive_write_close(out);
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
-        throw;
-    } catch (...) {
-        // log unknown error
-        Logger::log(LogLevel::Error, "Failed to finalize odf: unknown exception for file: " + content.original_path.filename().string(), get_name());
-        archive_write_close(out);
-        archive_write_free(out);
-        cleanup_temp_dir(content.temp_dir);
-        throw;
+        std::error_code rm_ec;
+        fs::remove(tmp_path, rm_ec);
+        throw std::runtime_error("ODFProcessor: writing entries failed");
     }
 
     int close_w = archive_write_close(out);

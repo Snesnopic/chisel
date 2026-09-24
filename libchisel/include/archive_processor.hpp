@@ -94,8 +94,8 @@ public:
     /**
      * @brief Extracts all files from a supported archive into a temp directory.
      *
-     * Uses `archive_read_...` functions (libarchive) to decompress the
-     * container and write all entries to a unique temporary directory.
+     * Uses libarchive to extract the regular entries to a unique temporary
+     * directory, keeping a manifest of every entry (see archive_manifest.hpp).
      *
      * @param input_path Path to the archive file (e.g., .zip, .rar).
      * @return An ExtractedContent struct containing the list of
@@ -107,9 +107,8 @@ public:
     /**
      * @brief Re-builds the archive from the (modified) extracted files.
      *
-     * Uses `archive_write_...` (libarchive) to create a new archive.
-     * If the original format is not writable (e.g., RAR), it will
-     * re-package the contents into a ZIP archive.
+     * Writes the manifest's entries back in their original order and with their
+     * original metadata, in the same format (and variant) as the source.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
      * @param options Processing options (e.g. metadata preservation).
