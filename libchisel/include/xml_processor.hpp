@@ -11,28 +11,17 @@
 #define CHISEL_XML_PROCESSOR_HPP
 
 #include "processor.hpp"
-#include <pugixml.hpp>
-#include <memory>
-#include <vector>
-#include <utility>
 #include <array>
 
 namespace chisel {
 
 /**
- * @brief holds dom and mappings for extracted base64 files.
- */
-struct xml_state {
-    std::shared_ptr<pugi::xml_document> doc;
-    std::vector<std::pair<std::filesystem::path, pugi::xml_attribute>> mappings;
-};
-
-/**
- * @brief implements IProcessor for XML files using pugixml.
+ * @brief implements IProcessor for XML files.
  *
- * @details parses XML documents to perform minification (recompression)
- * and handles the extraction and reinjection of embedded base64 assets
- * (like images in data URIs).
+ * @details minifies by dropping whitespace inside tags and around the root element,
+ * leaving text, attribute values, comments, CDATA and the DOCTYPE byte-identical,
+ * and recompresses base64 images embedded in attributes as data URIs.
+ * Documents whose encoding isn't ASCII-compatible (e.g. UTF-16) are left untouched.
  */
 class XmlProcessor : public IProcessor {
 public:
@@ -88,7 +77,7 @@ public:
     // --- operations ---
 
     /**
-     * @brief recompresses an XML file by parsing and saving it in raw format (minified).
+     * @brief writes the minified XML, or a copy of the input if it can't be minified safely.
      * @param input_path path to the original XML file.
      * @param output_path path where the minified XML should be written.
      * @param options Processing options.
@@ -105,10 +94,10 @@ public:
         const std::filesystem::path& input_path) override;
 
     /**
-     * @brief re-encodes previously extracted and processed assets back to base64 into the dom.
+     * @brief puts the assets that got smaller back into their data URIs.
      * @param content the ExtractedContent struct with processor state and file paths.
      * @param options Processing options (e.g. metadata preservation).
-     * @return path to the newly created minified XML file containing the updated assets.
+     * @return path to the rebuilt XML file, or an empty path if no asset changed.
      */
     std::filesystem::path finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) override;
 
@@ -122,10 +111,10 @@ public:
     [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
     /**
-     * @brief checks if two XML files are semantically equivalent by stripping formatting.
+     * @brief checks that two XML files have the same nodes, text and attribute values, compared verbatim.
      * @param a first XML file.
      * @param b second XML file.
-     * @return true if the raw dom representation is identical.
+     * @return true if the documents are equivalent.
      */
     [[nodiscard]] bool raw_equal(const std::filesystem::path& a,
                                  const std::filesystem::path& b) const override;
