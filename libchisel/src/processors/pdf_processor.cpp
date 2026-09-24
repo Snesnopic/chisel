@@ -11,9 +11,11 @@
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDFLogger.hh>
+#include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
 #include <qpdf/Pl_Flate.hh>
 #include <fstream>
 #include <sstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -64,56 +66,46 @@ struct LoggerStreamBuf final : std::stringbuf {
 };
 
 /**
- * @brief Guesses a file extension for a PDF stream based on its dictionary and content.
- * @param stream The QPDFObjectHandle for the stream.
- * @param data The raw (decoded) stream data.
- * @return A string representing the guessed file extension (e.g., ".jpg", ".png").
+ * @brief File names of the embedded file streams listed in the document's /EmbeddedFiles tree.
  */
-std::string guess_extension(QPDFObjectHandle const& stream,
-                                   const std::vector<unsigned char>& data) {
-    if (!stream.isStream()) return ".bin";
+std::map<QPDFObjGen, std::string> embedded_file_names(QPDF& pdf) {
+    std::map<QPDFObjGen, std::string> names;
+    QPDFEmbeddedFileDocumentHelper helper(pdf);
+    for (const auto& [key, spec] : helper.getEmbeddedFiles()) {
+        const QPDFObjectHandle stream = spec->getEmbeddedFileStream();
+        if (stream.isStream()) names.emplace(stream.getObjGen(), spec->getFilename());
+    }
+    return names;
+}
+
+/**
+ * @brief Extension for a stream that holds a whole file, which is extracted for the executor
+ *        to detect and process.
+ * @param decodable Whether the stream's data could be fully decoded.
+ * @param names File names of embedded file streams.
+ * @return The extension, or an empty string for data that is only meaningful inside the PDF
+ *         (content streams, raw pixels, fonts...), which finalize_extraction recompresses itself.
+ */
+std::string file_extension(QPDFObjectHandle const& stream, const bool decodable,
+                           const std::map<QPDFObjGen, std::string>& names) {
     const QPDFObjectHandle dict = stream.getDict();
-    if (dict.hasKey("/Subtype") && dict.getKey("/Subtype").isName()) {
-        const std::string subtype = dict.getKey("/Subtype").getName();
-        if (subtype == "/Image") {
-            if (dict.hasKey("/Filter")) {
-                const auto filter = dict.getKey("/Filter");
-                if (filter.isName()) {
-                    const std::string fname = filter.getName();
-                    if (fname == "/DCTDecode") return ".jpg";
-                    if (fname == "/JPXDecode") return ".jp2";
-                    if (fname == "/FlateDecode") {
-                        if (data.size() >= 8 &&
-                            data[0] == 0x89 && data[1] == 0x50 &&
-                            data[2] == 0x4E && data[3] == 0x47) {
-                            return ".png";
-                        }
-                        return ".raw";
-                    }
-                }
-            }
-        }
-        if (subtype == "/Form") return ".form";
+    if (!dict.isDictionary()) return {};
+
+    // image codecs aren't decoded; behind another filter the result couldn't be injected back as is
+    QPDFObjectHandle filter = dict.getKey("/Filter");
+    if (filter.isArray() && filter.getArrayNItems() == 1) filter = filter.getArrayItem(0);
+    if (filter.isNameAndEquals("/DCTDecode")) return ".jpg";
+    if (filter.isNameAndEquals("/JPXDecode")) return ".jp2";
+
+    if (!decodable) return {};
+    const QPDFObjectHandle type = dict.getKey("/Type");
+    if (type.isNameAndEquals("/Metadata")) return ".xml";
+    if (type.isNameAndEquals("/EmbeddedFile")) {
+        const auto it = names.find(stream.getObjGen());
+        const auto extension = it != names.end() ? std::filesystem::path(it->second).extension().string() : "";
+        return extension.empty() ? ".bin" : extension;
     }
-    if (dict.hasKey("/FontFile2")) return ".ttf";
-    if (dict.hasKey("/FontFile3")) {
-        if (dict.hasKey("/Subtype") && dict.getKey("/Subtype").isName() &&
-            dict.getKey("/Subtype").getName() == "/Type1C") {
-            return ".otf";
-        }
-        return ".cff";
-    }
-    if (dict.hasKey("/Type") && dict.getKey("/Type").isName() &&
-        dict.getKey("/Type").getName() == "/Metadata") {
-        return ".xml";
-    }
-    if (data.size() >= 4) {
-        if (data[0] == 0xFF && data[1] == 0xD8) return ".jpg";
-        if (data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) return ".png";
-        if (data[0] == 0x25 && data[1] == 0x50 && data[2] == 0x44 && data[3] == 0x46) return ".pdf";
-        if (data[0] == 0x4F && data[1] == 0x54 && data[2] == 0x54 && data[3] == 0x4F) return ".otf";
-    }
-    return ".bin";
+    return {};
 }
 
 /**
@@ -236,6 +228,7 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     pdf.processFile(input_path.string().c_str());
 
     auto objects = pdf.getAllObjects();
+    const auto names = embedded_file_names(pdf);
     PdfState st;
     st.temp_dir = content.temp_dir;
 
@@ -262,15 +255,16 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
             info.decodable = false;
         }
 
-        std::string ext = guess_extension(obj, data);
-        std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ext);
+        info.original_size = data.size();
+        const std::string ext = file_extension(obj, info.decodable, names);
+        if (ext.empty()) continue;
 
+        std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ext);
         std::ofstream ofs(out_file, std::ios::binary);
         ofs.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
         ofs.close();
 
         info.file = out_file;
-        info.original_size = data.size();
         content.extracted_files.push_back(out_file);
     }
 
