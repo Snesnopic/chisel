@@ -24,6 +24,15 @@ namespace fs = std::filesystem;
 std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::filesystem::path& input_path) {
     Logger::log(LogLevel::Debug, "Entering prepare_extraction for " + input_path.filename().string(), get_name());
 
+    // encrypted office documents are ole storages, not zips
+    std::array<char, 4> magic{};
+    std::ifstream probe(input_path, std::ios::binary);
+    if (!probe.read(magic.data(), magic.size()) || std::string_view(magic.data(), magic.size()) != "PK\x03\x04") {
+        Logger::log(LogLevel::Info, "Not a zip package, skipped: " + input_path.filename().string(), get_name());
+        return std::nullopt;
+    }
+    probe.close();
+
     ExtractedContent content;
     content.original_path = input_path;
 

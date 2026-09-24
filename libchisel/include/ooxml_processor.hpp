@@ -80,8 +80,8 @@ public:
     /**
      * @brief Extracts all files from the OOXML (ZIP) container.
      *
-     * Uses libarchive to unzip the .docx/.xlsx/.pptx file into
-     * a temporary directory.
+     * Uses libarchive to unzip the package into a temporary directory.
+     * Files that aren't ZIP packages (e.g. encrypted Office documents) are skipped.
      *
      * @param input_path Path to the OOXML file.
      * @return An ExtractedContent struct.
