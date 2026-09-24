@@ -502,7 +502,8 @@ namespace chisel {
                             // accept the recompressed file only if it is smaller than the original
                             // and, if checksum verification is enabled, the raw checksums match
                             const bool size_improved = (new_size > 0 && new_size < orig_size);
-                            const bool checksum_ok = !m_options.verify_checksums ||
+                            // only a result that gets kept needs checking
+                            const bool checksum_ok = !size_improved || !m_options.verify_checksums ||
                                 candidates[0]->raw_equal(file, last_tmp);
 
                             if (size_improved && checksum_ok) {
