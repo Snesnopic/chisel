@@ -171,7 +171,10 @@ std::optional<ExtractedContent> PeProcessor::prepare_extraction(const std::files
         used_entries.push_back(entry);
     }
 
-    if (content.extracted_files.empty()) return std::nullopt;
+    if (content.extracted_files.empty()) {
+        cleanup_temp_dir(content.temp_dir, get_name());
+        return std::nullopt;
+    }
 
     content.extras = std::make_any<std::vector<RsrcEntry>>(used_entries);
     return content;
@@ -228,6 +231,13 @@ void PeProcessor::traverse_rsrc(const std::vector<uint8_t>& data, const uint32_t
 
 std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions&) {
     Logger::log(LogLevel::Debug, "starting pe finalization for " + content.original_path.string(), get_name());
+
+    // the extracted resources go away however this ends
+    struct TempDirGuard {
+        const std::filesystem::path& dir;
+        std::string_view tag;
+        ~TempDirGuard() { cleanup_temp_dir(dir, tag); }
+    } temp_dir_guard{.dir=content.temp_dir, .tag=get_name()};
 
     auto raw_data = read_file(content.original_path);
     auto rsrc_entries = std::any_cast<std::vector<RsrcEntry>>(content.extras);
@@ -468,8 +478,6 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
     std::ofstream out_file(output_path, std::ios::binary);
     out_file.write(reinterpret_cast<const char*>(raw_data.data()), static_cast<std::streamsize>(raw_data.size()));
     out_file.close();
-
-    cleanup_temp_dir(content.temp_dir, get_name());
     return output_path;
 }
 

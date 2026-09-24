@@ -206,7 +206,7 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
     state->line_break = crlf ? "\r\n" : "\n";
 
     if (content.extracted_files.empty()) {
-        chisel::cleanup_temp_dir(content.temp_dir);
+        chisel::cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }
 
@@ -217,14 +217,18 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
 std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent& content, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering finalize_extraction", get_name());
 
-    std::filesystem::path output_file = content.temp_dir / ("final_" + RandomUtils::random_suffix() + ".mime");
-    std::ofstream out(output_file, std::ios::binary);
-
-    if (!content.extras.has_value()) {
-        return output_file;
+    const auto* state_ptr = std::any_cast<std::shared_ptr<MimeState>>(&content.extras);
+    if (state_ptr == nullptr || !*state_ptr) {
+        chisel::cleanup_temp_dir(content.temp_dir, get_name());
+        return {};
     }
+    const auto& state = *state_ptr;
 
-    auto state = std::any_cast<std::shared_ptr<MimeState>>(content.extras);
+    // outside temp_dir, which goes away with the extracted files
+    const std::filesystem::path output_file = std::filesystem::temp_directory_path() /
+                                              (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() +
+                                               content.original_path.extension().string());
+    std::ofstream out(output_file, std::ios::binary);
 
     for (const auto& chunk : state->chunks) {
         if (std::holds_alternative<TextChunk>(chunk)) {
@@ -242,9 +246,17 @@ std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent&
         }
     }
     out.close();
+    chisel::cleanup_temp_dir(content.temp_dir, get_name());
 
+    std::error_code ec;
+    if (out.fail()) {
+        Logger::log(LogLevel::Error, "Can't write " + output_file.string(), get_name());
+        std::filesystem::remove(output_file, ec);
+        return {};
+    }
     if (content.original_path.extension() == ".emlx" && !update_emlx_length(content.original_path, output_file)) {
         Logger::log(LogLevel::Warning, "Unexpected .emlx length line, left as is", get_name());
+        std::filesystem::remove(output_file, ec);
         return {};
     }
     return output_file;
