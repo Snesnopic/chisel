@@ -6,6 +6,7 @@
 #include "../../include/jpeg_structure.hpp"
 #include "../../include/logger.hpp"
 #include <jpeglib.h>
+#include <array>
 #include <cstdio>
 #include <stdexcept>
 #include <vector>
@@ -145,7 +146,8 @@ void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo,
 }
 
 /**
- * @brief Losslessly re-encodes one JPEG image held in memory.
+ * @brief Losslessly re-encodes one JPEG image held in memory, as the smaller of a progressive and a
+ *        baseline encoding: on small images the headers of the progressive scans outweigh their gain.
  * @param mirror_jfif Write a JFIF header only if the source had one.
  * @param clean Set when libjpeg ended the image exactly at the end of @p in, without warnings.
  * @return False on a libjpeg error.
@@ -153,27 +155,32 @@ void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo,
 bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, const bool mirror_jfif,
                std::vector<uint8_t>& out, bool& clean) {
     jpeg_decompress_struct srcinfo{};
-    jpeg_compress_struct dstinfo{};
+    // progressive, then baseline
+    std::array<jpeg_compress_struct, 2> dstinfo{};
+    std::array<std::vector<uint8_t>, 2> encoded;
+    std::array<VectorDest, 2> dest{};
     JpegErrorMgr jsrcerr{}, jdsterr{};
-    VectorDest dest{};
-    dest.out = &out;
-    dest.pub.init_destination = vector_init;
-    dest.pub.empty_output_buffer = vector_grow;
-    dest.pub.term_destination = vector_term;
 
     srcinfo.err = jpeg_std_error(&jsrcerr.pub);
     jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
-    dstinfo.err = jpeg_std_error(&jdsterr.pub);
+    jpeg_std_error(&jdsterr.pub);
     jdsterr.pub.error_exit = jpeg_error_exit_longjmp;
+    for (std::size_t i = 0; i < dstinfo.size(); ++i) {
+        dstinfo[i].err = &jdsterr.pub;
+        dest[i].out = &encoded[i];
+        dest[i].pub.init_destination = vector_init;
+        dest[i].pub.empty_output_buffer = vector_grow;
+        dest[i].pub.term_destination = vector_term;
+    }
 
     if (setjmp(jsrcerr.setjmp_buffer) || setjmp(jdsterr.setjmp_buffer)) {
-        jpeg_destroy_compress(&dstinfo);
+        for (auto& d : dstinfo) jpeg_destroy_compress(&d);
         jpeg_destroy_decompress(&srcinfo);
         return false;
     }
 
     jpeg_create_decompress(&srcinfo);
-    jpeg_create_compress(&dstinfo);
+    for (auto& d : dstinfo) jpeg_create_compress(&d);
 
     jpeg_mem_src(&srcinfo, in.data(), static_cast<unsigned long>(in.size()));
     for (int m = 0; m < 16; ++m) {
@@ -182,7 +189,7 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
     jpeg_save_markers(&srcinfo, JPEG_COM, 0xFFFF);
 
     if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
-        jpeg_destroy_compress(&dstinfo);
+        for (auto& d : dstinfo) jpeg_destroy_compress(&d);
         jpeg_destroy_decompress(&srcinfo);
         return false;
     }
@@ -193,23 +200,27 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
 
     jvirt_barray_ptr *coef_arrays = jpeg_read_coefficients(&srcinfo);
     clean = srcinfo.src->bytes_in_buffer == 0 && jsrcerr.pub.num_warnings == 0;
-    jpeg_copy_critical_parameters(&srcinfo, &dstinfo);
-    if (mirror_jfif) {
-        dstinfo.write_JFIF_header = srcinfo.saw_JFIF_marker;
+    for (std::size_t i = 0; i < dstinfo.size(); ++i) {
+        const bool baseline = i == 1;
+        // libjpeg's own defaults: a single sequential scan
+        if (baseline) jpeg_c_set_int_param(&dstinfo[i], JINT_COMPRESS_PROFILE, JCP_FASTEST);
+        jpeg_copy_critical_parameters(&srcinfo, &dstinfo[i]);
+        if (mirror_jfif) {
+            dstinfo[i].write_JFIF_header = srcinfo.saw_JFIF_marker;
+        }
+        if (!baseline && srcinfo.progressive_mode) {
+            jpeg_simple_progression(&dstinfo[i]);
+        }
+        dstinfo[i].optimize_coding = TRUE;
+        dstinfo[i].dest = &dest[i].pub;
+        jpeg_write_coefficients(&dstinfo[i], coef_arrays);
+        write_markers(&srcinfo, &dstinfo[i], policy);
+        jpeg_finish_compress(&dstinfo[i]);
     }
-
-    if (srcinfo.progressive_mode) {
-        jpeg_simple_progression(&dstinfo);
-    }
-
-    dstinfo.optimize_coding = TRUE;
-    dstinfo.dest = &dest.pub;
-    jpeg_write_coefficients(&dstinfo, coef_arrays);
-    write_markers(&srcinfo, &dstinfo, policy);
-    jpeg_finish_compress(&dstinfo);
     // Do NOT call jpeg_finish_decompress(&srcinfo) when using jpeg_read_coefficients
-    jpeg_destroy_compress(&dstinfo);
+    for (auto& d : dstinfo) jpeg_destroy_compress(&d);
     jpeg_destroy_decompress(&srcinfo);
+    out = std::move(encoded[1].size() < encoded[0].size() ? encoded[1] : encoded[0]);
     return true;
 }
 
