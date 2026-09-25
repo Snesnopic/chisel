@@ -12,6 +12,7 @@
 
 #include "processor.hpp"
 #include <array>
+#include <optional>
 #include <string_view>
 #include <span>
 #include <unordered_map>
@@ -19,6 +20,16 @@
 #include <vector>
 
 namespace chisel {
+
+/**
+ * @brief Sample layout of a PDF image, as its dictionary declares it.
+ */
+struct PdfImageLayout {
+    int width = 0;
+    int height = 0;
+    int colors = 0; ///< Samples per pixel
+    int bits = 0;   ///< Bits per sample
+};
 
 /**
  * @brief Implements IProcessor for PDF files using qpdf and Zopfli.
@@ -147,6 +158,8 @@ private:
         bool has_decode_parms = false;///< True if stream has /DecodeParms
         std::filesystem::path file;   ///< Path to the extracted raw stream data
         uintmax_t original_size = 0;  ///< Tracking for injection criteria
+        std::optional<PdfImageLayout> image; ///< Set when the image's samples went out as a PNG
+        uintmax_t png_size = 0;       ///< Size of that PNG as written
     };
 
     /**

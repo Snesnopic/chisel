@@ -329,7 +329,8 @@ namespace chisel {
         }
     }
 
-    void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth) {
+    void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth,
+                                         const bool keep_pixel_format) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
 
         if (depth > kMaxNestingDepth) {
@@ -396,7 +397,7 @@ namespace chisel {
                 if (ec) content->original_size = 0;
                 finalize_stack_.push({.content=*content, .nested=parent.has_value()});
                 for (const auto &child: content->extracted_files) {
-                    analyze_path(child, path, depth + 1);
+                    analyze_path(child, path, depth + 1, content->fixed_pixel_format.contains(child));
                 }
                 scheduled_for_extraction = true;
             } else {
@@ -410,7 +411,8 @@ namespace chisel {
             }
         }
         if (processor->can_recompress()) {
-            work_list_.push_back({.path=current_path, .parent_container=parent, .is_container=scheduled_for_extraction});
+            work_list_.push_back({.path=current_path, .parent_container=parent, .is_container=scheduled_for_extraction,
+                                  .keep_pixel_format=keep_pixel_format});
             scheduled_for_recompression = true;
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
@@ -432,6 +434,8 @@ namespace chisel {
                 const auto& file = item.path;
                 const auto& parent_container = item.parent_container;
                 const bool nested = parent_container.has_value();
+                ProcessingOptions options = m_options;
+                options.keep_pixel_format = item.keep_pixel_format;
                 if (st.stop_requested()) {
                     event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                     return;
@@ -499,7 +503,7 @@ namespace chisel {
 
                             bool stage_ok;
                             try {
-                                candidates[i]->recompress(current, tmp, m_options);
+                                candidates[i]->recompress(current, tmp, options);
                                 stage_ok = safe_size(tmp) > 0;
                             } catch (const std::exception& e) {
                                 Logger::log(LogLevel::Warning, "Pipeline stage " + std::to_string(i) + " (" +
@@ -578,7 +582,7 @@ namespace chisel {
                             fs::path tmp = temp_dir_for(file, nested) / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             Result r{.tmp=tmp, .size=0, .success=false};
                             try {
-                                candidates[i]->recompress(file, tmp, m_options);
+                                candidates[i]->recompress(file, tmp, options);
                                 auto sz = safe_size(tmp);
                                 if (sz > 0) {
                                     r.size = sz;

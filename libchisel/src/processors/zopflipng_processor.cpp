@@ -173,8 +173,8 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         opts.num_iterations_large = options.iterations_large;
         apply_filter_strategy_search(options, opts);
 
-        // chunks such as bKGD or sBIT are written in terms of the source's color type
-        opts.keep_colortype = animated || carried->color_bound;
+        // chunks such as bKGD or sBIT are written in terms of the source's color type, and a container may declare it
+        opts.keep_colortype = animated || carried->color_bound || options.keep_pixel_format;
 
         // optimize
         std::vector<unsigned char> resultpng;

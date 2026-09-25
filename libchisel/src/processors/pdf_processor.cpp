@@ -25,8 +25,10 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <string_view>
 #include <zlib.h>
 #include "zlib_container.h"
 #include "zopfli.h"
@@ -246,6 +248,271 @@ std::optional<std::vector<unsigned char>> inflate_zlib(const unsigned char* data
     return out;
 }
 
+// raw image samples travel through the png pipeline and come back as png-predicted flate data
+namespace pdf_image {
+
+// bigger images keep the plain recompression: the png pipeline holds several copies of them in memory
+constexpr std::uint64_t kMaxSamples = std::uint64_t{64} << 20;
+// smaller ones can't repay the /DecodeParms entry a predictor needs
+constexpr std::uint64_t kMinSamples = 64;
+
+constexpr std::array<unsigned char, 8> kSignature = {137, 80, 78, 71, 13, 10, 26, 10};
+
+// samples per pixel of an image color space, 0 when it can't be told
+int color_components(const QPDFObjectHandle& space) {
+    if (space.isName()) {
+        const std::string name = space.getName();
+        if (name == "/DeviceGray") return 1;
+        if (name == "/DeviceRGB") return 3;
+        if (name == "/DeviceCMYK") return 4;
+        return 0;
+    }
+    if (!space.isArray() || space.getArrayNItems() < 2 || !space.getArrayItem(0).isName()) return 0;
+    const std::string family = space.getArrayItem(0).getName();
+    if (family == "/Indexed" || family == "/Separation" || family == "/CalGray") return 1;
+    if (family == "/CalRGB" || family == "/Lab") return 3;
+    if (family == "/ICCBased") {
+        const QPDFObjectHandle profile = space.getArrayItem(1);
+        if (!profile.isStream()) return 0;
+        const QPDFObjectHandle n = profile.getDict().getKey("/N");
+        return n.isInteger() ? n.getIntValueAsInt() : 0;
+    }
+    if (family == "/DeviceN") {
+        const QPDFObjectHandle names = space.getArrayItem(1);
+        return names.isArray() ? names.getArrayNItems() : 0;
+    }
+    return 0;
+}
+
+std::uint64_t row_size(const PdfImageLayout& image) {
+    return (static_cast<std::uint64_t>(image.width) * static_cast<std::uint64_t>(image.colors) *
+            static_cast<std::uint64_t>(image.bits) + 7) / 8;
+}
+
+/**
+ * @brief The layout of an image whose samples fit a PNG, which allows 1 to 16-bit gray but only
+ *        8 and 16-bit samples with more channels.
+ * @param samples Size of the samples qpdf decoded, which must be exactly the declared ones.
+ */
+std::optional<PdfImageLayout> layout_of(QPDFObjectHandle const& stream, const std::size_t samples) {
+    const QPDFObjectHandle dict = stream.getDict();
+    if (!dict.isDictionary() || !dict.getKey("/Subtype").isNameAndEquals("/Image")) return std::nullopt;
+    const QPDFObjectHandle width = dict.getKey("/Width");
+    const QPDFObjectHandle height = dict.getKey("/Height");
+    if (!width.isInteger() || !height.isInteger()) return std::nullopt;
+    PdfImageLayout image{.width = width.getIntValueAsInt(), .height = height.getIntValueAsInt()};
+    if (const QPDFObjectHandle mask = dict.getKey("/ImageMask"); mask.isBool() && mask.getBoolValue()) {
+        image.colors = 1;
+        image.bits = 1;
+    } else {
+        const QPDFObjectHandle bits = dict.getKey("/BitsPerComponent");
+        if (!bits.isInteger()) return std::nullopt;
+        image.colors = color_components(dict.getKey("/ColorSpace"));
+        image.bits = bits.getIntValueAsInt();
+    }
+    const bool gray = image.colors == 1 &&
+                      (image.bits == 1 || image.bits == 2 || image.bits == 4 || image.bits == 8 || image.bits == 16);
+    const bool color = image.colors >= 2 && image.colors <= 4 && (image.bits == 8 || image.bits == 16);
+    if (image.width <= 0 || image.height <= 0 || (!gray && !color)) return std::nullopt;
+    const std::uint64_t size = row_size(image) * static_cast<std::uint64_t>(image.height);
+    if (size != samples || size < kMinSamples || size > kMaxSamples) return std::nullopt;
+    return image;
+}
+
+unsigned char color_type(const int colors) {
+    switch (colors) {
+        case 1: return 0;
+        case 2: return 4;
+        case 3: return 2;
+        default: return 6;
+    }
+}
+
+void put_u32(std::vector<unsigned char>& out, const std::uint32_t value) {
+    for (int shift = 24; shift >= 0; shift -= 8) out.push_back(static_cast<unsigned char>(value >> shift));
+}
+
+std::uint32_t get_u32(const unsigned char* p) {
+    return (std::uint32_t{p[0]} << 24) | (std::uint32_t{p[1]} << 16) | (std::uint32_t{p[2]} << 8) | std::uint32_t{p[3]};
+}
+
+void append_chunk(std::vector<unsigned char>& png, const std::string_view type, const std::vector<unsigned char>& data) {
+    put_u32(png, static_cast<std::uint32_t>(data.size()));
+    const std::size_t start = png.size();
+    png.insert(png.end(), type.begin(), type.end());
+    png.insert(png.end(), data.begin(), data.end());
+    put_u32(png, static_cast<std::uint32_t>(crc32(0, png.data() + start, static_cast<uInt>(png.size() - start))));
+}
+
+// the samples as a png of unfiltered, cheaply deflated rows: the png pipeline redoes both
+std::optional<std::vector<unsigned char>> to_png(const PdfImageLayout& image, const std::vector<unsigned char>& samples) {
+    const auto row = static_cast<std::size_t>(row_size(image));
+    const auto height = static_cast<std::size_t>(image.height);
+    std::vector<unsigned char> rows;
+    rows.reserve((row + 1) * height);
+    for (std::size_t y = 0; y < height; ++y) {
+        rows.push_back(0);
+        const auto begin = samples.begin() + static_cast<std::ptrdiff_t>(y * row);
+        rows.insert(rows.end(), begin, begin + static_cast<std::ptrdiff_t>(row));
+    }
+    uLongf size = compressBound(static_cast<uLong>(rows.size()));
+    std::vector<unsigned char> idat(size);
+    if (compress2(idat.data(), &size, rows.data(), static_cast<uLong>(rows.size()), 1) != Z_OK) return std::nullopt;
+    idat.resize(size);
+
+    std::vector<unsigned char> header;
+    put_u32(header, static_cast<std::uint32_t>(image.width));
+    put_u32(header, static_cast<std::uint32_t>(image.height));
+    header.insert(header.end(), {static_cast<unsigned char>(image.bits), color_type(image.colors), 0, 0, 0});
+
+    std::vector<unsigned char> png(kSignature.begin(), kSignature.end());
+    append_chunk(png, "IHDR", header);
+    append_chunk(png, "IDAT", idat);
+    append_chunk(png, "IEND", {});
+    return png;
+}
+
+// the zlib data of a png that kept the image's layout, without interlacing
+std::optional<std::vector<unsigned char>> image_data(const std::vector<unsigned char>& png, const PdfImageLayout& image) {
+    if (png.size() < kSignature.size() || !std::equal(kSignature.begin(), kSignature.end(), png.begin())) {
+        return std::nullopt;
+    }
+    std::vector<unsigned char> data;
+    bool header = false;
+    for (std::size_t pos = kSignature.size(); pos + 12 <= png.size();) {
+        const std::uint32_t length = get_u32(&png[pos]);
+        if (length > png.size() - pos - 12) return std::nullopt;
+        const std::string_view type(reinterpret_cast<const char*>(&png[pos + 4]), 4);
+        const unsigned char* body = &png[pos + 8];
+        if (type == "IHDR") {
+            header = length == 13 && get_u32(body) == static_cast<std::uint32_t>(image.width) &&
+                     get_u32(body + 4) == static_cast<std::uint32_t>(image.height) && body[8] == image.bits &&
+                     body[9] == color_type(image.colors) && body[10] == 0 && body[11] == 0 && body[12] == 0;
+            if (!header) return std::nullopt;
+        } else if (type == "IDAT") {
+            if (!header) return std::nullopt;
+            data.insert(data.end(), body, body + length);
+        } else if (type == "IEND") {
+            break;
+        }
+        pos += 12 + static_cast<std::size_t>(length);
+    }
+    if (!header || data.empty()) return std::nullopt;
+    return data;
+}
+
+// undoes the png row filters; nothing unless every row names a known filter
+std::optional<std::vector<unsigned char>> unfilter(const std::vector<unsigned char>& rows, const PdfImageLayout& image) {
+    const auto row = static_cast<std::size_t>(row_size(image));
+    const auto height = static_cast<std::size_t>(image.height);
+    if (rows.size() != (row + 1) * height) return std::nullopt;
+    const auto bpp = static_cast<std::size_t>(std::max(1, image.colors * image.bits / 8));
+    std::vector<unsigned char> out(row * height);
+    for (std::size_t y = 0; y < height; ++y) {
+        const unsigned char type = rows[y * (row + 1)];
+        const unsigned char* in = &rows[y * (row + 1) + 1];
+        unsigned char* cur = &out[y * row];
+        const unsigned char* prev = y > 0 ? cur - row : nullptr;
+        for (std::size_t x = 0; x < row; ++x) {
+            const int a = x >= bpp ? cur[x - bpp] : 0;
+            const int b = prev ? prev[x] : 0;
+            const int c = prev && x >= bpp ? prev[x - bpp] : 0;
+            int predicted;
+            switch (type) {
+                case 0: predicted = 0; break;
+                case 1: predicted = a; break;
+                case 2: predicted = b; break;
+                case 3: predicted = (a + b) / 2; break;
+                case 4: {
+                    const int p = a + b - c;
+                    const int pa = std::abs(p - a);
+                    const int pb = std::abs(p - b);
+                    const int pc = std::abs(p - c);
+                    predicted = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+                    break;
+                }
+                default: return std::nullopt;
+            }
+            cur[x] = static_cast<unsigned char>(in[x] + predicted);
+        }
+    }
+    return out;
+}
+
+QPDFObjectHandle predictor_parms(const PdfImageLayout& image) {
+    QPDFObjectHandle parms = QPDFObjectHandle::newDictionary();
+    parms.replaceKey("/Predictor", QPDFObjectHandle::newInteger(15));
+    // one color, 8 bits and one column are the defaults
+    if (image.colors != 1) parms.replaceKey("/Colors", QPDFObjectHandle::newInteger(image.colors));
+    if (image.bits != 8) parms.replaceKey("/BitsPerComponent", QPDFObjectHandle::newInteger(image.bits));
+    if (image.width != 1) parms.replaceKey("/Columns", QPDFObjectHandle::newInteger(image.width));
+    return parms;
+}
+
+// what a /DecodeParms entry adds to the stream dictionary, which is written outside object streams
+std::size_t parms_cost(QPDFObjectHandle parms) {
+    return parms.isNull() ? 0 : std::string_view(" /DecodeParms ").size() + parms.unparse().size();
+}
+
+struct Encoding {
+    std::vector<unsigned char> data;
+    QPDFObjectHandle decode_parms; ///< null for none
+};
+
+/**
+ * @brief The smallest Flate encoding of an image's samples, if it beats the stream as it is: the samples
+ *        deflated as they are, the rows its own predictor made, or the rows the PNG pipeline filtered.
+ * @param png_file The PNG the samples went out as, with png_size its size as written.
+ */
+std::optional<Encoding> smallest_encoding(QPDFObjectHandle& stream, const PdfImageLayout& image,
+                                          const std::filesystem::path& png_file, const uintmax_t png_size,
+                                          const ProcessingOptions& options) {
+    const std::shared_ptr<Buffer> raw = stream.getRawStreamData();
+    const std::shared_ptr<Buffer> decoded = stream.getStreamData(qpdf_dl_specialized);
+    const std::vector<unsigned char> samples(decoded->getBuffer(), decoded->getBuffer() + decoded->getSize());
+
+    const QPDFObjectHandle dict = stream.getDict();
+    std::optional<Encoding> best;
+    std::size_t best_cost = raw->getSize() + parms_cost(dict.getKey("/DecodeParms"));
+    const auto consider = [&](std::vector<unsigned char> data, QPDFObjectHandle parms) {
+        const std::size_t cost = data.size() + parms_cost(parms);
+        if (cost >= best_cost) return;
+        best_cost = cost;
+        best = Encoding{std::move(data), std::move(parms)};
+    };
+
+    consider(ZopfliCompressor::compress(samples, pick_iterations(samples.size(), options), ZopfliFormat::ZLIB),
+             QPDFObjectHandle::newNull());
+
+    if (classify_single_filter(stream) == SingleFilterKind::Flate && dict.hasKey("/DecodeParms")) {
+        QPDFObjectHandle parms = dict.getKey("/DecodeParms");
+        if (parms.isArray() && parms.getArrayNItems() == 1) parms = parms.getArrayItem(0);
+        const auto rows = inflate_zlib(raw->getBuffer(), raw->getSize());
+        if (parms.isDictionary() && rows) {
+            consider(ZopfliCompressor::compress(*rows, pick_iterations(rows->size(), options), ZopfliFormat::ZLIB),
+                     parms);
+        }
+    }
+
+    // only what the png pipeline shrank, and only if it decodes back to the very same samples
+    std::error_code ec;
+    std::vector<unsigned char> png;
+    if (const auto size = std::filesystem::file_size(png_file, ec); ec || size >= png_size || !read_file(png_file, png)) {
+        return best;
+    }
+    auto data = image_data(png, image);
+    const auto rows = data ? inflate_zlib(data->data(), data->size()) : std::nullopt;
+    if (const auto restored = rows ? unfilter(*rows, image) : std::nullopt; restored && *restored == samples) {
+        consider(std::move(*data), predictor_parms(image));
+    } else {
+        Logger::log(LogLevel::Warning, png_file.filename().string() + " came back with another layout or other samples, not used",
+                    "PdfProcessor");
+    }
+    return best;
+}
+
+} // namespace pdf_image
+
 /**
  * @brief Removes common metadata objects from a PDF.
  * @param pdf The QPDF instance to modify.
@@ -314,7 +581,24 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
 
         info.original_size = data.size();
         const std::string ext = file_extension(obj, info.decodable, names);
-        if (ext.empty()) continue;
+        if (ext.empty()) {
+            // raw samples go through the png pipeline, which must keep the layout the dictionary declares
+            if (!info.decodable || classify_single_filter(obj) == SingleFilterKind::None) continue;
+            const auto layout = pdf_image::layout_of(obj, data.size());
+            const auto png = layout ? pdf_image::to_png(*layout, data) : std::nullopt;
+            if (!png) continue;
+            std::filesystem::path png_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ".png");
+            if (!write_file(png_file, *png)) {
+                cleanup_temp_dir(content.temp_dir, get_name());
+                throw std::runtime_error("Can't write " + png_file.string());
+            }
+            info.file = png_file;
+            info.image = layout;
+            info.png_size = png->size();
+            content.extracted_files.push_back(png_file);
+            content.fixed_pixel_format.insert(png_file);
+            continue;
+        }
 
         std::filesystem::path out_file = content.temp_dir / ("object_" + std::to_string(obj_id) + ext);
         if (!write_file(out_file, data)) {
@@ -383,6 +667,19 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                  filter_kind == SingleFilterKind::Ascii85 ||
                  filter_kind == SingleFilterKind::AsciiHex);
             bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
+
+            if (info.image) {
+                try {
+                    if (auto encoding = pdf_image::smallest_encoding(obj, *info.image, info.file, info.png_size, options)) {
+                        // a /Filter name, not an array, is what makes QPDFWriter keep the data as it is
+                        obj.replaceStreamData(std::make_shared<raw_stream_provider>(std::move(encoding->data)),
+                                              QPDFObjectHandle::newName("/FlateDecode"), encoding->decode_parms);
+                    }
+                } catch (const std::exception& e) {
+                    Logger::log(LogLevel::Debug, "Image obj " + std::to_string(obj_id) + " left as is: " + e.what(), get_name());
+                }
+                continue;
+            }
 
             std::error_code ec;
             uintmax_t disk_size = info.file.empty() ? 0 : std::filesystem::file_size(info.file, ec);

@@ -23,6 +23,7 @@ namespace chisel {
         bool verify_checksums = false;           /// Verify original files are semantically equal to processed files
         bool preserve_metadata = true;           /// Don't discard metadata during recompression
         bool break_signatures = false;           /// Optimize digitally signed files too, invalidating their signatures
+        bool keep_pixel_format = false;          /// Set by the executor, not by users: keep an image's color type and bit depth, which its container declares (e.g. a PDF image)
     };
 
 } // namespace chisel

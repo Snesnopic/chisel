@@ -231,6 +231,12 @@ namespace chisel {
         Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
         using namespace png_rewrite;
 
+        // this encoder picks its own color type, so it can't serve an image whose format is declared outside
+        if (options.keep_pixel_format) {
+            copy_unchanged(input, output, "Color type fixed by the container", get_name());
+            return;
+        }
+
         std::vector<unsigned char> source = chisel::read_file(input);
         const auto end = png::image_end(source);
         if (!end) throw std::runtime_error("Malformed PNG: " + input.string());

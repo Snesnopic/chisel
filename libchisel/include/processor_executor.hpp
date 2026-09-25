@@ -136,8 +136,10 @@ private:
      * @param path The file or directory path to analyze.
      * @param parent The parent container path if this is an extracted file.
      * @param depth Current container nesting depth (0 for top-level inputs).
+     * @param keep_pixel_format True for an image whose color type and bit depth its container declares.
      */
-    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt, unsigned depth = 0);
+    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt,
+                      unsigned depth = 0, bool keep_pixel_format = false);
 
     /**
      * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
@@ -180,6 +182,7 @@ private:
         std::filesystem::path path;                            ///< Path to the file to be processed
         std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any
         bool is_container = false;                             ///< True if this item is the intermediate recompression of a container
+        bool keep_pixel_format = false;                        ///< True if its container declares the image's color type and bit depth
     };
     std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
 

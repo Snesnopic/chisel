@@ -12,6 +12,7 @@
 
 #include <any>
 #include <filesystem>
+#include <set>
 #include <vector>
 #include <string>
 #include <optional>
@@ -60,6 +61,7 @@ struct ExtractedContent {
     uintmax_t original_size = 0;                        ///< Original size before any processing
     std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
     std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
+    std::set<std::filesystem::path> fixed_pixel_format; ///< Extracted images whose color type and bit depth the container declares
     ContainerFormat format;                             ///< Format of the container
 };
 
