@@ -4,6 +4,7 @@
 
 #include "audio_metadata_util.hpp"
 #include <array>
+#include <memory>
 #include <fstream>
 #include <string_view>
 #include <stdexcept>
@@ -409,6 +410,89 @@ bool rebuildOggPictures(TagLib::Ogg::File& file, const std::string_view header,
     return file.TagLib::Ogg::File::save();
 }
 
+// RIFF (WAV) and FORM (AIFF) files keep their ID3v2 tag in an "id3 " or "ID3 " chunk
+bool isChunkContainer(const std::filesystem::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    std::array<char, 12> head{};
+    if (!in.read(head.data(), static_cast<std::streamsize>(head.size()))) return false;
+    const std::string_view riff(head.data(), 4);
+    const std::string_view form(head.data() + 8, 4);
+    return (riff == "RIFF" && form == "WAVE") || (riff == "FORM" && (form == "AIFF" || form == "AIFC"));
+}
+
+bool copyRange(std::ifstream& in, std::ofstream& out, const uint64_t from, const uint64_t to) {
+    in.clear();
+    in.seekg(static_cast<std::streamoff>(from));
+    std::vector<char> buffer(1 << 20);
+    for (uint64_t left = to - from; left > 0;) {
+        const auto n = static_cast<std::streamsize>(std::min<uint64_t>(left, buffer.size()));
+        if (!in.read(buffer.data(), n)) return false;
+        out.write(buffer.data(), n);
+        left -= static_cast<uint64_t>(n);
+    }
+    return static_cast<bool>(out);
+}
+
+// the first "id3 " or "ID3 " chunk gets the new data where it is, with its size and the container's fixed
+bool replaceId3Chunk(const std::filesystem::path& file, const TagLib::ByteVector& data) {
+    std::ifstream in(file, std::ios::binary | std::ios::ate);
+    if (!in) return false;
+    const auto fileSize = static_cast<uint64_t>(in.tellg());
+    std::array<uint8_t, 12> head{};
+    in.seekg(0);
+    if (!in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()))) return false;
+    const bool le = std::memcmp(head.data(), "RIFF", 4) == 0;
+    const auto get32 = [le](const uint8_t* b) {
+        return le ? b[0] | b[1] << 8 | b[2] << 16 | static_cast<uint32_t>(b[3]) << 24
+                  : static_cast<uint32_t>(b[0]) << 24 | b[1] << 16 | b[2] << 8 | b[3];
+    };
+    const auto put32 = [le](uint8_t* b, const uint32_t v) {
+        for (int i = 0; i < 4; ++i) b[i] = static_cast<uint8_t>(v >> (le ? 8 * i : 8 * (3 - i)));
+    };
+
+    uint64_t chunk = 12;
+    uint32_t oldSize = 0;
+    for (std::array<uint8_t, 8> header{}; ; chunk += 8 + static_cast<uint64_t>(oldSize) + (oldSize & 1)) {
+        in.seekg(static_cast<std::streamoff>(chunk));
+        if (chunk + 8 > fileSize || !in.read(reinterpret_cast<char*>(header.data()), 8)) return false;
+        oldSize = get32(header.data() + 4);
+        if (std::memcmp(header.data(), "id3 ", 4) == 0 || std::memcmp(header.data(), "ID3 ", 4) == 0) break;
+    }
+    if (chunk + 8 + oldSize > fileSize) return false;
+    const uint64_t oldEnd = std::min<uint64_t>(fileSize, chunk + 8 + oldSize + (oldSize & 1));
+    const uint64_t newSize = data.size();
+    const uint64_t container = get32(head.data() + 4) + (newSize + (newSize & 1)) - (oldEnd - chunk - 8);
+    if (container > UINT32_MAX) return false;
+
+    std::filesystem::path tmp = file;
+    tmp += ".id3" + RandomUtils::random_suffix();
+    bool written = false;
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        std::array<uint8_t, 4> size{};
+        put32(size.data(), static_cast<uint32_t>(container));
+        out.write(reinterpret_cast<const char*>(head.data()), 4);
+        out.write(reinterpret_cast<const char*>(size.data()), 4);
+        if (copyRange(in, out, 8, chunk + 4)) {
+            put32(size.data(), static_cast<uint32_t>(newSize));
+            out.write(reinterpret_cast<const char*>(size.data()), 4);
+            out.write(data.data(), static_cast<std::streamsize>(data.size()));
+            if (newSize & 1) out.put('\0');
+            written = copyRange(in, out, oldEnd, fileSize);
+        }
+        out.close();
+        written = written && out.good();
+    }
+    in.close();
+    std::error_code ec;
+    if (!written) {
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
+    std::filesystem::rename(tmp, file, ec);
+    return !ec;
+}
+
 // normalize picture type flac
 int normalizePictureTypeFromFlac(const TagLib::FLAC::Picture::Type t) {
     return t;
@@ -479,6 +563,39 @@ bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
         tag->addFrame(frame);
     }
     return true;
+}
+
+// WAV and AIFF: TagLib renders the ID3v2 tag, but saving would move its chunk, bext and iXML to the end of the file
+bool rebuildChunkId3Covers(const std::filesystem::path& file, const std::vector<AudioCoverInfo>& covers) {
+    // TagLib keeps a pointer to the name: it has to outlive the file objects below
+#ifdef _WIN32
+    const std::wstring name = file.wstring();
+#else
+    const std::string name = file.string();
+#endif
+    TagLib::ByteVector rendered;
+    {
+        std::ifstream probe(file, std::ios::binary);
+        std::array<char, 4> magic{};
+        probe.read(magic.data(), static_cast<std::streamsize>(magic.size()));
+        probe.close();
+        std::unique_ptr<TagLib::File> taglibFile;
+        TagLib::ID3v2::Tag* tag = nullptr;
+        if (std::string_view(magic.data(), 4) == "RIFF") {
+            auto wav = std::make_unique<TagLib::RIFF::WAV::File>(name.c_str());
+            if (wav->hasID3v2Tag()) tag = wav->ID3v2Tag();
+            taglibFile = std::move(wav);
+        } else {
+            auto aiff = std::make_unique<TagLib::RIFF::AIFF::File>(name.c_str());
+            if (aiff->hasID3v2Tag()) tag = aiff->tag();
+            taglibFile = std::move(aiff);
+        }
+        if (!taglibFile->isValid() || tag == nullptr) return false;
+        const auto version = id3v2Version(tag);
+        if (!rebuildId3v2Covers(tag, covers)) return false;
+        rendered = tag->render(version);
+    }
+    return replaceId3Chunk(file, rendered);
 }
 
 
@@ -907,6 +1024,9 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
     if (startsWith(input_path, "fLaC")) {
         return rebuildFlacPictures(input_path, state.extracted_covers);
     }
+    if (isChunkContainer(input_path)) {
+        return rebuildChunkId3Covers(input_path, state.extracted_covers);
+    }
 #ifdef _WIN32
     TagLib::FileRef ref(input_path.wstring().c_str());
 #else
@@ -946,24 +1066,6 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             // only the ID3v2 tag changed: keep its version, and any ID3v1 or APE tag as it is
             return mpegFile->save(TagLib::MPEG::File::ID3v2, TagLib::File::StripNone, version,
                                   TagLib::File::DoNotDuplicate);
-        }
-        return false;
-    }
-
-    // wav
-    if (auto *wavFile = dynamic_cast<TagLib::RIFF::WAV::File*>(file_ref)) {
-        const auto version = id3v2Version(wavFile->ID3v2Tag());
-        if (rebuildId3v2Covers(wavFile->ID3v2Tag(), state.extracted_covers)) {
-            return wavFile->save(TagLib::RIFF::WAV::File::ID3v2, TagLib::File::StripNone, version);
-        }
-        return false;
-    }
-
-    // aiff
-    if (auto *aiffFile = dynamic_cast<TagLib::RIFF::AIFF::File*>(file_ref)) {
-        const auto version = id3v2Version(aiffFile->tag());
-        if (rebuildId3v2Covers(aiffFile->tag(), state.extracted_covers)) {
-            return aiffFile->save(version);
         }
         return false;
     }
