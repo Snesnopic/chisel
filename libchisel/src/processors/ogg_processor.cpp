@@ -394,6 +394,15 @@ namespace {
         return ctx.pcm;
     }
 
+    // the output is the input as it is
+    void copy_as_is(const fs::path& input, const fs::path& output) {
+        try {
+            fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+        } catch (const fs::filesystem_error&) {
+            throw std::runtime_error("OggProcessor: direct copy failed for " + input.string());
+        }
+    }
+
 } // namespace
 
 void OggProcessor::recompress(const fs::path& input,
@@ -483,6 +492,14 @@ void OggProcessor::recompress(const fs::path& input,
             throw std::runtime_error("OggProcessor: direct copy for Opus failed");
         }
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
+        return;
+    }
+
+    // Speex and the other codecs have no recompressor here: libFLAC would only fail on them
+    if (!codecs.flac) {
+        fclose(f_in);
+        Logger::log(LogLevel::Debug, "No FLAC stream, left as is: " + input.string(), get_name());
+        copy_as_is(input, output);
         return;
     }
 
