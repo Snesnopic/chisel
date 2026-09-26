@@ -939,6 +939,10 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // trueaudio
     if (auto *ttaFile = dynamic_cast<TagLib::TrueAudio::File*>(file_ref)) {
+        // TagLib saves a TrueAudio ID3v2 tag only as 2.4: an older tag stays as it is, covers included
+        if (ttaFile->hasID3v2Tag() && id3v2Version(ttaFile->ID3v2Tag()) != TagLib::ID3v2::v4) {
+            return true;
+        }
         if (rebuildId3v2Covers(ttaFile->ID3v2Tag(true), state.extracted_covers)) {
             return ttaFile->save();
         }
