@@ -154,6 +154,13 @@ void WavPackProcessor::recompress(const std::filesystem::path& input,
     WavpackCloseFile(ctx_in);
     if (!written) throw std::runtime_error("WavPackProcessor: can't write " + output.string());
 
+    // libwavpack reads past ID3v2 tags in front of the file but doesn't write them
+    if (options.preserve_metadata) {
+        if (const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(input); !id3.empty()) {
+            AudioMetadataUtil::writeWithHead(output, output, id3, 0);
+        }
+    }
+
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 

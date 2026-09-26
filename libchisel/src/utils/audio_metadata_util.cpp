@@ -3,7 +3,10 @@
 //
 
 #include "audio_metadata_util.hpp"
+#include <array>
 #include <fstream>
+#include <string_view>
+#include <stdexcept>
 #include <iterator>
 #include <setjmp.h>
 #include <vector>
@@ -1075,12 +1078,20 @@ std::filesystem::path AudioMetadataUtil::finalizeCoverExtraction(
         (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() +
          content.original_path.extension().string());
 
+    // TagLib would rewrite or drop ID3v2 tags in front of a format that doesn't define them: they go back as they are
+    std::vector<uint8_t> id3;
     try {
         std::filesystem::copy_file(content.original_path, final_temp_path,
                                    std::filesystem::copy_options::overwrite_existing);
+        id3 = foreignId3v2Tags(final_temp_path);
+        if (!id3.empty()) {
+            writeWithHead(final_temp_path, final_temp_path, {}, id3.size());
+        }
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Error, "Failed to copy audio file: " + std::string(e.what()), tag);
         cleanup_temp_dir(content.temp_dir, tag);
+        std::error_code ec;
+        std::filesystem::remove(final_temp_path, ec);
         return {};
     }
 
@@ -1091,9 +1102,90 @@ std::filesystem::path AudioMetadataUtil::finalizeCoverExtraction(
         return {};
     }
 
+    if (!id3.empty()) {
+        try {
+            writeWithHead(final_temp_path, final_temp_path, id3, 0);
+        } catch (const std::exception& e) {
+            Logger::log(LogLevel::Error, "Failed to put the ID3v2 tags back: " + std::string(e.what()), tag);
+            cleanup_temp_dir(content.temp_dir, tag);
+            std::filesystem::remove(final_temp_path);
+            return {};
+        }
+    }
+
     cleanup_temp_dir(content.temp_dir, tag);
     Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + final_temp_path.string(), tag);
     return final_temp_path;
+}
+
+std::vector<uint8_t> AudioMetadataUtil::foreignId3v2Tags(const std::filesystem::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    std::array<uint8_t, 10> header{};
+    std::size_t end = 0;
+    while (in.seekg(static_cast<std::streamoff>(end)) && in.read(reinterpret_cast<char*>(header.data()), 10)) {
+        if (std::memcmp(header.data(), "ID3", 3) != 0 || header[3] < 2 || header[3] > 4 || header[4] == 0xff) {
+            break;
+        }
+        std::size_t size = 0;
+        bool syncsafe = true;
+        for (std::size_t i = 6; i < 10; ++i) {
+            syncsafe = syncsafe && (header[i] & 0x80) == 0;
+            size = (size << 7) | header[i];
+        }
+        if (!syncsafe) {
+            break;
+        }
+        const bool footer = header[3] == 4 && (header[5] & 0x10) != 0;
+        end += 10 + size + (footer ? 10 : 0);
+    }
+    if (end == 0) {
+        return {};
+    }
+
+    // MPEG audio and TrueAudio define their ID3v2 tag: these formats only put up with one in front
+    std::array<char, 4> magic{};
+    in.clear();
+    in.seekg(static_cast<std::streamoff>(end));
+    in.read(magic.data(), magic.size());
+    const std::string_view format(magic.data(), static_cast<std::size_t>(in.gcount()));
+    if (format != "fLaC" && format != "MAC " && format != "wvpk" && format != "MPCK" && !format.starts_with("MP+")) {
+        return {};
+    }
+    std::vector<uint8_t> tags(end);
+    in.clear();
+    in.seekg(0);
+    if (!in.read(reinterpret_cast<char*>(tags.data()), static_cast<std::streamsize>(end))) {
+        return {};
+    }
+    return tags;
+}
+
+void AudioMetadataUtil::writeWithHead(const std::filesystem::path& src, const std::filesystem::path& dst,
+                                      const std::span<const uint8_t> head, const std::size_t skip) {
+    // written next to dst first, so that src can be dst itself
+    std::filesystem::path tmp = dst;
+    tmp += ".head" + RandomUtils::random_suffix();
+    bool written = false;
+    {
+        std::ifstream in(src, std::ios::binary);
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        if (in && out) {
+            out.write(reinterpret_cast<const char*>(head.data()), static_cast<std::streamsize>(head.size()));
+            in.seekg(static_cast<std::streamoff>(skip));
+            std::vector<char> buffer(1 << 20);
+            while (in.read(buffer.data(), static_cast<std::streamsize>(buffer.size())) || in.gcount() > 0) {
+                out.write(buffer.data(), in.gcount());
+            }
+            out.close();
+            written = !in.bad() && out.good();
+        }
+    }
+    if (!written) {
+        std::error_code ec;
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Can't rewrite " + dst.string());
+    }
+    std::filesystem::rename(tmp, dst);
 }
 
 void AudioMetadataUtil::placeholderCopyRecompress(

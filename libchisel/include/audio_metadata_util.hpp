@@ -10,7 +10,10 @@
 #ifndef CHISEL_AUDIO_METADATA_UTIL_HPP
 #define CHISEL_AUDIO_METADATA_UTIL_HPP
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -106,6 +109,27 @@ public:
      */
     static bool rebuildCovers(const std::filesystem::path& input_path,
                               const AudioExtractionState& state);
+
+    /**
+     * @brief Returns the ID3v2 tags a FLAC, APE, WavPack or Musepack file carries in front of its own header.
+     *
+     * Those formats don't define them: their decoders skip them, but encoders don't write them back and TagLib may
+     * rewrite or drop them, so they are kept aside and put back as they are.
+     * @param file Audio file.
+     * @return The tags as stored, or an empty vector if the file doesn't start with ID3v2 tags followed by one of
+     *         those formats.
+     */
+    static std::vector<uint8_t> foreignId3v2Tags(const std::filesystem::path& file);
+
+    /**
+     * @brief Writes @p dst as @p head followed by the content of @p src from byte @p skip on.
+     * @param src Source file; it may be @p dst itself.
+     * @param dst Destination file.
+     * @param head Bytes to put in front, possibly none.
+     * @param skip Leading bytes of @p src to leave out.
+     */
+    static void writeWithHead(const std::filesystem::path& src, const std::filesystem::path& dst,
+                              std::span<const uint8_t> head, std::size_t skip);
 
     /**
      * @brief Shared prepare_extraction() for audio processors that only expose cover

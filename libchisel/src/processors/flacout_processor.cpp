@@ -10,6 +10,7 @@
 #include <sstream>
 #include <iomanip>
 #include <stdexcept>
+#include <vector>
 
 namespace chisel {
 
@@ -27,9 +28,25 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
     cfg.copy_metadata = options.preserve_metadata;
     cfg.verbose = false;
 
-    if (!flacoutcpp::optimise(input.string(), output.string(), cfg)) {
+    // flacoutcpp copies the metadata of a file that starts with the FLAC header: ID3v2 tags in front go back after
+    const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(input);
+    std::filesystem::path source = input;
+    if (!id3.empty()) {
+        source = output;
+        source += ".flac";
+        AudioMetadataUtil::writeWithHead(input, source, {}, id3.size());
+    }
+    const bool optimised = flacoutcpp::optimise(source.string(), output.string(), cfg);
+    if (source != input) {
+        std::error_code ec;
+        std::filesystem::remove(source, ec);
+    }
+    if (!optimised) {
         Logger::log(LogLevel::Error, "flacoutcpp optimise failed", get_name());
         throw std::runtime_error("flacoutcpp: optimise failed");
+    }
+    if (!id3.empty() && options.preserve_metadata) {
+        AudioMetadataUtil::writeWithHead(output, output, id3, 0);
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());

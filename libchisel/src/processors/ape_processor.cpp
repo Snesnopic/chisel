@@ -227,6 +227,10 @@ void ApeProcessor::recompress(const std::filesystem::path& input,
         if (!copy_apetag(input, output)) {
             Logger::log(LogLevel::Debug, "APEv2 metadata copy skipped or failed", get_name());
         }
+        // MAC reads past ID3v2 tags in front of the file but doesn't write them
+        if (const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(input); !id3.empty()) {
+            AudioMetadataUtil::writeWithHead(output, output, id3, 0);
+        }
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
