@@ -300,6 +300,11 @@ void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
     }
 }
 
+// TagLib writes only ID3v2.3 and 2.4: a 2.2 tag is closest to 2.3
+TagLib::ID3v2::Version id3v2Version(const TagLib::ID3v2::Tag* tag) {
+    return tag != nullptr && tag->header()->majorVersion() >= 4 ? TagLib::ID3v2::v4 : TagLib::ID3v2::v3;
+}
+
 // shared helper to reinsert cover in ID3v2 tag
 // returns true if edits were made
 bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
@@ -781,24 +786,29 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // mp3
     if (auto *mpegFile = dynamic_cast<TagLib::MPEG::File*>(file_ref)) {
+        const auto version = id3v2Version(mpegFile->ID3v2Tag());
         if (rebuildId3v2Covers(mpegFile->ID3v2Tag(true), state.extracted_covers)) {
-            return mpegFile->save();
+            // only the ID3v2 tag changed: keep its version, and any ID3v1 or APE tag as it is
+            return mpegFile->save(TagLib::MPEG::File::ID3v2, TagLib::File::StripNone, version,
+                                  TagLib::File::DoNotDuplicate);
         }
         return false;
     }
 
     // wav
     if (auto *wavFile = dynamic_cast<TagLib::RIFF::WAV::File*>(file_ref)) {
+        const auto version = id3v2Version(wavFile->ID3v2Tag());
         if (rebuildId3v2Covers(wavFile->ID3v2Tag(), state.extracted_covers)) {
-            return wavFile->save();
+            return wavFile->save(TagLib::RIFF::WAV::File::ID3v2, TagLib::File::StripNone, version);
         }
         return false;
     }
 
     // aiff
     if (auto *aiffFile = dynamic_cast<TagLib::RIFF::AIFF::File*>(file_ref)) {
+        const auto version = id3v2Version(aiffFile->tag());
         if (rebuildId3v2Covers(aiffFile->tag(), state.extracted_covers)) {
-            return aiffFile->save();
+            return aiffFile->save(version);
         }
         return false;
     }
@@ -987,16 +997,18 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // dsf
     if (auto *dsfFile = dynamic_cast<TagLib::DSF::File*>(file_ref)) {
+        const auto version = id3v2Version(dsfFile->tag());
         if (rebuildId3v2Covers(dsfFile->tag(), state.extracted_covers)) {
-            return dsfFile->save();
+            return dsfFile->save(version);
         }
         return false;
     }
 
     // dsdiff
     if (auto *dsdiffFile = dynamic_cast<TagLib::DSDIFF::File*>(file_ref)) {
+        const auto version = id3v2Version(dsdiffFile->ID3v2Tag());
         if (rebuildId3v2Covers(dsdiffFile->ID3v2Tag(true), state.extracted_covers)) {
-            return dsdiffFile->save();
+            return dsdiffFile->save(TagLib::DSDIFF::File::ID3v2, TagLib::File::StripNone, version);
         }
         return false;
     }
