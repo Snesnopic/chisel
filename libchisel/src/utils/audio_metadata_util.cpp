@@ -1354,6 +1354,13 @@ std::vector<uint8_t> AudioMetadataUtil::foreignId3v2Tags(const std::filesystem::
         return {};
     }
 
+    // zero padding some taggers leave outside the tag's declared size stays with the tags
+    in.clear();
+    in.seekg(static_cast<std::streamoff>(end));
+    for (int c = in.get(); c == 0; c = in.get()) {
+        ++end;
+    }
+
     // MPEG audio and TrueAudio define their ID3v2 tag: these formats only put up with one in front
     std::array<char, 4> magic{};
     in.clear();

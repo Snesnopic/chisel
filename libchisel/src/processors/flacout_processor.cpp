@@ -5,6 +5,7 @@
 #include "../../include/flacout_processor.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/audio_metadata_util.hpp"
+#include "../../include/random_utils.hpp"
 #include <flacoutcpp.hpp>
 #include <FLAC/all.h>
 #include <sstream>
@@ -80,10 +81,29 @@ std::string FlacoutProcessor::get_raw_checksum(const std::filesystem::path& file
 
 bool FlacoutProcessor::raw_equal(const std::filesystem::path& a,
                                  const std::filesystem::path& b) const {
+    // libFLAC doesn't find the stream behind ID3v2 tags followed by zero padding: decode it without them
+    const auto decode = [](const std::filesystem::path& file, unsigned& rate, unsigned& channels, unsigned& bps) {
+        const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(file);
+        if (id3.empty()) return decode_flac_pcm(file, rate, channels, bps);
+        const std::filesystem::path stripped =
+            std::filesystem::temp_directory_path() / ("flacout_raw_" + RandomUtils::random_suffix() + ".flac");
+        AudioMetadataUtil::writeWithHead(file, stripped, {}, id3.size());
+        std::vector<int32_t> pcm;
+        try {
+            pcm = decode_flac_pcm(stripped, rate, channels, bps);
+        } catch (...) {
+            std::error_code ec;
+            std::filesystem::remove(stripped, ec);
+            throw;
+        }
+        std::error_code ec;
+        std::filesystem::remove(stripped, ec);
+        return pcm;
+    };
     unsigned ra, ca, bpsa;
     unsigned rb, cb, bpsb;
-    const auto pcmA = decode_flac_pcm(a, ra, ca, bpsa);
-    const auto pcmB = decode_flac_pcm(b, rb, cb, bpsb);
+    const auto pcmA = decode(a, ra, ca, bpsa);
+    const auto pcmB = decode(b, rb, cb, bpsb);
 
     if (ra != rb || ca != cb || bpsa != bpsb) return false;
     return pcmA == pcmB;
