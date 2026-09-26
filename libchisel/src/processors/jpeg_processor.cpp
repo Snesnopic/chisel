@@ -4,16 +4,11 @@
 
 #include "../../include/jpeg_processor.hpp"
 #include "../../include/jpeg_structure.hpp"
+#include "../../include/jpeg_transcode.hpp"
 #include "../../include/logger.hpp"
-#include <jpeglib.h>
-#include <array>
-#include <cstdio>
 #include <stdexcept>
 #include <vector>
 #include <algorithm>
-#include <memory>
-#include <csetjmp>
-#include <cstring>
 #include <cstdint>
 #include <fstream>
 #include <optional>
@@ -22,252 +17,6 @@
 namespace chisel {
 
 namespace {
-
-// error manager (jpeg error -> c++ exception)
-struct JpegErrorMgr {
-    jpeg_error_mgr pub{};
-    char msg[JMSG_LENGTH_MAX]{};
-    jmp_buf setjmp_buffer;
-};
-
-/**
- * @brief libjpeg error handler that jumps back on error.
- * @param cinfo Pointer to the libjpeg error context.
- */
-void jpeg_error_exit_longjmp(const j_common_ptr cinfo) {
-    auto *err = reinterpret_cast<JpegErrorMgr *>(cinfo->err);
-    (*cinfo->err->format_message)(cinfo, err->msg);
-    Logger::log(LogLevel::Warning, std::string("Libjpeg: ") + err->msg, "libjpeg");
-    longjmp(err->setjmp_buffer, 1);
-}
-
-// libjpeg destination that grows a std::vector
-struct VectorDest {
-    jpeg_destination_mgr pub{};
-    std::vector<uint8_t>* out = nullptr;
-};
-
-void vector_init(const j_compress_ptr cinfo) {
-    auto* dest = reinterpret_cast<VectorDest*>(cinfo->dest);
-    dest->out->resize(1 << 16);
-    dest->pub.next_output_byte = dest->out->data();
-    dest->pub.free_in_buffer = dest->out->size();
-}
-
-boolean vector_grow(const j_compress_ptr cinfo) {
-    auto* dest = reinterpret_cast<VectorDest*>(cinfo->dest);
-    const std::size_t used = dest->out->size();
-    dest->out->resize(used * 2);
-    dest->pub.next_output_byte = dest->out->data() + used;
-    dest->pub.free_in_buffer = dest->out->size() - used;
-    return TRUE;
-}
-
-void vector_term(const j_compress_ptr cinfo) {
-    auto* dest = reinterpret_cast<VectorDest*>(cinfo->dest);
-    dest->out->resize(dest->out->size() - dest->pub.free_in_buffer);
-}
-
-/**
- * @brief Which markers of an image survive re-encoding.
- */
-struct MarkerPolicy {
-    bool keep_all = true;                    ///< preserve metadata
-    bool keep_links = false;                 ///< without metadata, still keep MPF and ISO gain map segments
-    std::optional<std::string> xmp;          ///< replacement standard XMP packet; empty drops it
-    std::optional<std::vector<uint8_t>> exif; ///< replacement EXIF payload
-};
-
-bool has_prefix(const std::vector<JOCTET>& data, const std::string_view id) {
-    return data.size() >= id.size() && memcmp(data.data(), id.data(), id.size()) == 0;
-}
-
-struct MarkerData {
-    int marker;
-    std::vector<JOCTET> data;
-};
-
-bool keep_marker(MarkerData& m, const MarkerPolicy& policy) {
-    if (m.marker == JPEG_APP0 + 1 && has_prefix(m.data, jpeg::kXmpId)) {
-        if (!policy.xmp) return policy.keep_all;
-        if (policy.xmp->empty()) return false;
-        m.data.assign(jpeg::kXmpId.begin(), jpeg::kXmpId.end());
-        m.data.insert(m.data.end(), policy.xmp->begin(), policy.xmp->end());
-        return true;
-    }
-    if (m.marker == JPEG_APP0 + 1 && has_prefix(m.data, jpeg::kExifId) && policy.exif) {
-        m.data.assign(policy.exif->begin(), policy.exif->end());
-        return true;
-    }
-    if (policy.keep_all) return true;
-    if (m.marker != JPEG_APP0 + 2) return false;
-    // the color profile is part of how the image looks, not metadata
-    if (has_prefix(m.data, std::string_view("ICC_PROFILE\0", 12))) return true;
-    return policy.keep_links && (has_prefix(m.data, std::string_view("MPF\0", 4)) ||
-                                 has_prefix(m.data, std::string_view("urn:iso:std:iso:ts:21496:-1\0", 28)));
-}
-
-/**
- * @brief Tells whether decoders need the source's Adobe segment to read its colors, i.e. whether without
- *        it they would pick another color space from the JFIF header or the component ids.
- */
-bool adobe_decides_colors(const j_decompress_ptr srcinfo) {
-    if (!srcinfo->saw_Adobe_marker || srcinfo->num_components == 1) return false;
-    if (srcinfo->num_components != 3 || srcinfo->Adobe_transform != 1) return true;
-    const jpeg_component_info* c = srcinfo->comp_info;
-    return !srcinfo->saw_JFIF_marker && c[0].component_id == 'R' && c[1].component_id == 'G' &&
-           c[2].component_id == 'B';
-}
-
-/**
- * @brief Copies the saved markers allowed by @p policy, plus an Adobe segment that decides the colors, in
- *        their original order from the decompressor to the compressor.
- */
-void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo, const MarkerPolicy& policy) {
-    const bool keep_adobe = adobe_decides_colors(srcinfo);
-    std::vector<MarkerData> markers;
-    for (jpeg_saved_marker_ptr m = srcinfo->marker_list; m; m = m->next) {
-        if ((m->marker >= JPEG_APP0 && m->marker <= JPEG_APP0 + 15) ||
-            m->marker == JPEG_COM) {
-            if (m->data && m->data_length > 0) {
-                MarkerData md{.marker=m->marker, .data={m->data, m->data + m->data_length}};
-                const bool adobe = keep_adobe && md.marker == JPEG_APP0 + 14 && has_prefix(md.data, "Adobe");
-                if (adobe || keep_marker(md, policy)) markers.push_back(std::move(md));
-            }
-        }
-    }
-
-    // a segment repeating the previous one of its kind adds nothing
-    std::array<const MarkerData*, 17> last{};
-    for (const auto& m : markers) {
-        const MarkerData*& previous = last[m.marker == JPEG_COM ? 16 : m.marker - JPEG_APP0];
-        if (previous && previous->data == m.data) continue;
-        previous = &m;
-        jpeg_write_marker(dstinfo, m.marker, m.data.data(), static_cast<unsigned int>(m.data.size()));
-    }
-}
-
-/**
- * @brief Losslessly re-encodes one JPEG image held in memory, as the smaller of a progressive and a
- *        baseline encoding: on small images the headers of the progressive scans outweigh their gain.
- * @param clean Set when libjpeg ended the image exactly at the end of @p in, without warnings.
- * @return False on a libjpeg error.
- */
-bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, std::vector<uint8_t>& out,
-               bool& clean) {
-    jpeg_decompress_struct srcinfo{};
-    // progressive, then baseline
-    std::array<jpeg_compress_struct, 2> dstinfo{};
-    std::array<std::vector<uint8_t>, 2> encoded;
-    std::array<VectorDest, 2> dest{};
-    JpegErrorMgr jsrcerr{}, jdsterr{};
-
-    srcinfo.err = jpeg_std_error(&jsrcerr.pub);
-    jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
-    jpeg_std_error(&jdsterr.pub);
-    jdsterr.pub.error_exit = jpeg_error_exit_longjmp;
-    for (std::size_t i = 0; i < dstinfo.size(); ++i) {
-        dstinfo[i].err = &jdsterr.pub;
-        dest[i].out = &encoded[i];
-        dest[i].pub.init_destination = vector_init;
-        dest[i].pub.empty_output_buffer = vector_grow;
-        dest[i].pub.term_destination = vector_term;
-    }
-
-    if (setjmp(jsrcerr.setjmp_buffer) || setjmp(jdsterr.setjmp_buffer)) {
-        for (auto& d : dstinfo) jpeg_destroy_compress(&d);
-        jpeg_destroy_decompress(&srcinfo);
-        return false;
-    }
-
-    jpeg_create_decompress(&srcinfo);
-    for (auto& d : dstinfo) jpeg_create_compress(&d);
-
-    jpeg_mem_src(&srcinfo, in.data(), static_cast<unsigned long>(in.size()));
-    for (int m = 0; m < 16; ++m) {
-        jpeg_save_markers(&srcinfo, JPEG_APP0 + m, 0xFFFF);
-    }
-    jpeg_save_markers(&srcinfo, JPEG_COM, 0xFFFF);
-
-    if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
-        for (auto& d : dstinfo) jpeg_destroy_compress(&d);
-        jpeg_destroy_decompress(&srcinfo);
-        return false;
-    }
-
-    Logger::log(LogLevel::Debug,
-                std::string("Jpeg ") + (srcinfo.progressive_mode ? "progressive" : "baseline"),
-                "JpegProcessor");
-
-    jvirt_barray_ptr *coef_arrays = jpeg_read_coefficients(&srcinfo);
-    clean = srcinfo.src->bytes_in_buffer == 0 && jsrcerr.pub.num_warnings == 0;
-    for (std::size_t i = 0; i < dstinfo.size(); ++i) {
-        const bool baseline = i == 1;
-        // libjpeg's own defaults: a single sequential scan
-        if (baseline) jpeg_c_set_int_param(&dstinfo[i], JINT_COMPRESS_PROFILE, JCP_FASTEST);
-        jpeg_copy_critical_parameters(&srcinfo, &dstinfo[i]);
-        // the source's own jfif and adobe segments are copied with the rest; without metadata a bare jfif stands in
-        dstinfo[i].write_JFIF_header = !policy.keep_all && srcinfo.saw_JFIF_marker;
-        dstinfo[i].write_Adobe_marker = FALSE;
-        if (!baseline && srcinfo.progressive_mode) {
-            jpeg_simple_progression(&dstinfo[i]);
-        }
-        dstinfo[i].optimize_coding = TRUE;
-        dstinfo[i].dest = &dest[i].pub;
-        jpeg_write_coefficients(&dstinfo[i], coef_arrays);
-        write_markers(&srcinfo, &dstinfo[i], policy);
-        jpeg_finish_compress(&dstinfo[i]);
-    }
-    // Do NOT call jpeg_finish_decompress(&srcinfo) when using jpeg_read_coefficients
-    for (auto& d : dstinfo) jpeg_destroy_compress(&d);
-    jpeg_destroy_decompress(&srcinfo);
-    out = std::move(encoded[1].size() < encoded[0].size() ? encoded[1] : encoded[0]);
-    return true;
-}
-
-struct Pixels {
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-    std::vector<unsigned char> data;
-    bool operator==(const Pixels&) const = default;
-};
-
-/**
- * @brief Decodes the first image of a JPEG held in memory.
- * @return False if it can't be decoded.
- */
-bool decode_pixels(const std::span<const uint8_t> in, Pixels& px) {
-    jpeg_decompress_struct cinfo{};
-    JpegErrorMgr jsrcerr{};
-    cinfo.err = jpeg_std_error(&jsrcerr.pub);
-    jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
-
-    if (setjmp(jsrcerr.setjmp_buffer)) {
-        jpeg_destroy_decompress(&cinfo);
-        return false;
-    }
-
-    jpeg_create_decompress(&cinfo);
-    jpeg_mem_src(&cinfo, in.data(), static_cast<unsigned long>(in.size()));
-    if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
-        jpeg_destroy_decompress(&cinfo);
-        return false;
-    }
-    jpeg_start_decompress(&cinfo);
-    px.width = static_cast<int>(cinfo.output_width);
-    px.height = static_cast<int>(cinfo.output_height);
-    px.channels = cinfo.output_components;
-    const std::size_t stride = static_cast<std::size_t>(cinfo.output_width) * static_cast<std::size_t>(cinfo.output_components);
-    px.data.resize(stride * cinfo.output_height);
-    while (cinfo.output_scanline < cinfo.output_height) {
-        unsigned char* row = px.data.data() + stride * cinfo.output_scanline;
-        jpeg_read_scanlines(&cinfo, &row, 1);
-    }
-    // Do not call jpeg_finish_decompress when we break early or just want to destroy
-    jpeg_destroy_decompress(&cinfo);
-    return true;
-}
 
 /**
  * @brief Writes new MPF sizes and offsets into the re-encoded first image.
@@ -328,7 +77,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
     std::vector<std::vector<uint8_t>> images;
     for (const auto& img : layout.images) {
         const auto src = data.subspan(img.start, img.size);
-        MarkerPolicy policy{.keep_all = preserve_metadata, .keep_links = true, .xmp = std::nullopt, .exif = std::nullopt};
+        jpeg::MarkerPolicy policy{.keep_all = preserve_metadata, .keep_links = true, .xmp = std::nullopt, .exif = std::nullopt};
         if (!preserve_metadata) {
             if (const auto x = jpeg::find_xmp(src, src.size())) policy.xmp = jpeg::reduce_xmp(*x);
         }
@@ -336,7 +85,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
         bool clean = false;
         const bool resizable = !declares_gain_map || layout.images.size() == 1;
         if (resizable && jpeg::first_image_end(src) == src.size() &&
-            transcode(src, policy, out, clean) && clean && out.size() < src.size()) {
+            jpeg::transcode(src, policy, jpeg::ScanMode::Smallest, out, clean) && clean && out.size() < src.size()) {
             images.push_back(std::move(out));
         } else {
             images.emplace_back(src.begin(), src.end());
@@ -347,7 +96,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
         images[i].assign(src.begin(), src.end());
     };
 
-    MarkerPolicy policy{.keep_all = preserve_metadata, .keep_links = has_links, .xmp = std::nullopt, .exif = std::nullopt};
+    jpeg::MarkerPolicy policy{.keep_all = preserve_metadata, .keep_links = has_links, .xmp = std::nullopt, .exif = std::nullopt};
     // apple renders the gain map using maker note values from this exif, so keep just those
     const bool apple_hdr = std::ranges::any_of(layout.images, [&](const jpeg::SecondaryImage& img) {
         return jpeg::is_apple_gain_map(data.subspan(img.start, img.size));
@@ -378,7 +127,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
 
     std::vector<uint8_t> out;
     bool clean = false;
-    if (!transcode(primary, policy, out, clean)) {
+    if (!jpeg::transcode(primary, policy, jpeg::ScanMode::Smallest, out, clean)) {
         Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", "JpegProcessor");
         throw std::runtime_error("Libjpeg error");
     }
@@ -442,9 +191,9 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
     } else {
         // malformed marker structure: let libjpeg decide what it can read, as before
         bool clean = false;
-        const MarkerPolicy policy{.keep_all = options.preserve_metadata, .keep_links = false, .xmp = std::nullopt,
+        const jpeg::MarkerPolicy policy{.keep_all = options.preserve_metadata, .keep_links = false, .xmp = std::nullopt,
                                   .exif = std::nullopt};
-        if (!transcode(data, policy, result, clean)) {
+        if (!jpeg::transcode(data, policy, jpeg::ScanMode::Smallest, result, clean)) {
             Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", get_name());
             throw std::runtime_error("Libjpeg error");
         }
@@ -471,8 +220,8 @@ bool JpegProcessor::raw_equal(const std::filesystem::path &a,
     if (!chisel::read_file(a, da) || !chisel::read_file(b, db)) {
         return false;
     }
-    Pixels pa, pb;
-    if (!decode_pixels(da, pa) || !decode_pixels(db, pb) || pa != pb) {
+    jpeg::Pixels pa, pb;
+    if (!jpeg::decode_pixels(da, pa) || !jpeg::decode_pixels(db, pb) || pa != pb) {
         return false;
     }
 
@@ -494,8 +243,9 @@ bool JpegProcessor::raw_equal(const std::filesystem::path &a,
         if (x.entry != y.entry || !std::ranges::equal(sa.subspan(ca, x.start - ca), sb.subspan(cb, y.start - cb))) {
             return false;
         }
-        Pixels px, py;
-        if (!decode_pixels(sa.subspan(x.start, x.size), px) || !decode_pixels(sb.subspan(y.start, y.size), py) ||
+        jpeg::Pixels px, py;
+        if (!jpeg::decode_pixels(sa.subspan(x.start, x.size), px) ||
+            !jpeg::decode_pixels(sb.subspan(y.start, y.size), py) ||
             px != py) {
             return false;
         }
