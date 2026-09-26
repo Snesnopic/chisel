@@ -348,6 +348,67 @@ bool rebuildFlacPictures(const std::filesystem::path& file, const std::vector<Au
     return ok;
 }
 
+// Ogg Vorbis and Opus: only the pictures change, where TagLib would sort and upper-case every comment
+bool rebuildOggPictures(TagLib::Ogg::File& file, const std::string_view header,
+                        const std::vector<AudioCoverInfo>& covers) {
+    const TagLib::ByteVector packet = file.packet(1);
+    const auto size = static_cast<std::size_t>(packet.size());
+    if (size < header.size() + 8 || std::memcmp(packet.data(), header.data(), header.size()) != 0) return false;
+    std::size_t pos = header.size();
+    const std::size_t vendor = packet.toUInt(static_cast<unsigned int>(pos), false);
+    if (vendor > size - pos - 8) return false;
+    pos += 4 + vendor;
+    const unsigned int count = packet.toUInt(static_cast<unsigned int>(pos), false);
+    pos += 4;
+
+    TagLib::ByteVector rebuilt = packet.mid(0, static_cast<unsigned int>(pos));
+    std::size_t picture = 0;
+    for (unsigned int i = 0; i < count; ++i) {
+        if (size - pos < 4) return false;
+        const std::size_t length = packet.toUInt(static_cast<unsigned int>(pos), false);
+        pos += 4;
+        if (length > size - pos) return false;
+        TagLib::ByteVector field = packet.mid(static_cast<unsigned int>(pos), static_cast<unsigned int>(length));
+        pos += length;
+        // the same fields TagLib reads as pictures, in the same order as the extracted covers
+        if (const int sep = field.find('='); sep >= 1) {
+            const TagLib::String key = TagLib::String(field.mid(0, sep), TagLib::String::UTF8).upper();
+            const bool block = key == "METADATA_BLOCK_PICTURE";
+            TagLib::FLAC::Picture parsed;
+            if (block || key == "COVERART") {
+                const TagLib::ByteVector old = TagLib::ByteVector::fromBase64(field.mid(sep + 1));
+                if (!old.isEmpty() && (!block || parsed.parse(old))) {
+                    const TagLib::ByteVector data =
+                        picture < covers.size() ? readFileToByteVector(covers[picture].temp_file_path) : TagLib::ByteVector();
+                    if (!data.isEmpty()) {
+                        if (block) {
+                            parsed.setData(data);
+                            setPictureProps(parsed, covers[picture]);
+                        }
+                        field = field.mid(0, sep + 1) + (block ? parsed.render() : data).toBase64();
+                    }
+                    ++picture;
+                }
+            }
+        }
+        rebuilt.append(TagLib::ByteVector::fromUInt(field.size(), false));
+        rebuilt.append(field);
+    }
+    TagLib::ByteVector rest = packet.mid(static_cast<unsigned int>(pos));
+    if (header == "OpusTags") {
+        // RFC 7845: what follows the comments is padding when its first byte is even
+        if (!rest.isEmpty() && (rest[0] & 1) == 0) rest.clear();
+    } else if (rest.size() > 1 && rest.mid(1) == TagLib::ByteVector(rest.size() - 1, '\0')) {
+        // the Vorbis framing bit stays, the zero padding after it goes
+        rest.resize(1);
+    }
+    rebuilt.append(rest);
+
+    file.setPacket(1, rebuilt);
+    // the Vorbis and Opus overrides of save() would render the comment packet again
+    return file.TagLib::Ogg::File::save();
+}
+
 // normalize picture type flac
 int normalizePictureTypeFromFlac(const TagLib::FLAC::Picture::Type t) {
     return t;
@@ -945,50 +1006,12 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // ogg vorbis
     if (auto *oggVorbis = dynamic_cast<TagLib::Ogg::Vorbis::File*>(file_ref)) {
-        auto *xc = oggVorbis->tag();
-        if (xc == nullptr) return false;
-
-        xc->removeAllPictures();
-
-        for (const auto &info : state.extracted_covers) {
-            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
-            if (data.isEmpty()) continue;
-
-            auto *pic = new TagLib::FLAC::Picture;
-            pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
-            pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
-            pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
-            pic->setData(data);
-
-            setPictureProps(*pic, info);
-
-            xc->addPicture(pic);
-        }
-        return oggVorbis->save();
+        return rebuildOggPictures(*oggVorbis, std::string_view("\x03vorbis", 7), state.extracted_covers);
     }
 
     // ogg opus
     if (auto *oggOpus = dynamic_cast<TagLib::Ogg::Opus::File*>(file_ref)) {
-        auto *xc = oggOpus->tag();
-        if (xc == nullptr) return false;
-
-        xc->removeAllPictures();
-
-        for (const auto &info : state.extracted_covers) {
-            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
-            if (data.isEmpty()) continue;
-
-            auto *pic = new TagLib::FLAC::Picture;
-            pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
-            pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
-            pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
-            pic->setData(data);
-
-            setPictureProps(*pic, info);
-
-            xc->addPicture(pic);
-        }
-        return oggOpus->save();
+        return rebuildOggPictures(*oggOpus, "OpusTags", state.extracted_covers);
     }
 
     // mkv (matroska / webm)
