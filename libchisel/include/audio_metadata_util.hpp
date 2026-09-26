@@ -122,6 +122,25 @@ public:
     static std::vector<uint8_t> foreignId3v2Tags(const std::filesystem::path& file);
 
     /**
+     * @brief Returns the metadata blocks of an Ogg FLAC stream as stored, except STREAMINFO.
+     * @param file Ogg FLAC file, with the current or the pre-1.1.1 mapping.
+     * @return Each block with its 4-byte header, in stream order, or std::nullopt if the stream can't be read.
+     */
+    static std::optional<std::vector<std::vector<uint8_t>>> oggFlacMetadata(const std::filesystem::path& file);
+
+    /**
+     * @brief Puts @p blocks in place of the metadata blocks an encoder wrote after STREAMINFO in an Ogg FLAC stream.
+     *
+     * The encoder must have written its VORBIS_COMMENT block and then an APPLICATION placeholder for each other
+     * block: when @p blocks has no VORBIS_COMMENT, the encoder's stays. Each block keeps the last-block flag of the
+     * one it replaces.
+     * @param file Ogg FLAC file.
+     * @param blocks Blocks with their 4-byte header, VORBIS_COMMENT first if there is one.
+     * @return true on success.
+     */
+    static bool putOggFlacMetadata(const std::filesystem::path& file, const std::vector<std::vector<uint8_t>>& blocks);
+
+    /**
      * @brief Writes @p dst as @p head followed by the content of @p src from byte @p skip on.
      * @param src Source file; it may be @p dst itself.
      * @param dst Destination file.

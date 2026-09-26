@@ -3,6 +3,7 @@
 //
 
 #include "audio_metadata_util.hpp"
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <fstream>
@@ -1405,6 +1406,57 @@ void AudioMetadataUtil::writeWithHead(const std::filesystem::path& src, const st
         throw std::runtime_error("Can't rewrite " + dst.string());
     }
     std::filesystem::rename(tmp, dst);
+}
+
+std::optional<std::vector<std::vector<uint8_t>>> AudioMetadataUtil::oggFlacMetadata(const std::filesystem::path& file) {
+    // TagLib keeps a pointer to the name: it has to outlive the file object
+#ifdef _WIN32
+    const std::wstring name = file.wstring();
+#else
+    const std::string name = file.string();
+#endif
+    TagLib::Ogg::FLAC::File ogg(name.c_str(), false);
+    if (!ogg.isValid()) return std::nullopt;
+    // the current mapping carries STREAMINFO in the first packet, the old one in the second
+    const TagLib::ByteVector first = ogg.packet(0);
+    bool last = first.startsWith(TagLib::ByteVector("\x7f" "FLAC", 5)) && first.size() > 13 && (first[13] & 0x80) != 0;
+    std::vector<std::vector<uint8_t>> blocks;
+    for (unsigned int index = 1; !last; ++index) {
+        const TagLib::ByteVector block = ogg.packet(index);
+        if (block.size() < 4 || block.size() - 4 != block.toUInt(1, 3, true)) return std::nullopt;
+        last = (block[0] & 0x80) != 0;
+        if ((block[0] & 0x7f) != FLAC__METADATA_TYPE_STREAMINFO) blocks.emplace_back(block.begin(), block.end());
+    }
+    return blocks;
+}
+
+bool AudioMetadataUtil::putOggFlacMetadata(const std::filesystem::path& file,
+                                           const std::vector<std::vector<uint8_t>>& blocks) {
+    if (blocks.empty()) return true;
+    if (std::ranges::any_of(blocks, [](const std::vector<uint8_t>& b) { return b.size() < 4; })) return false;
+#ifdef _WIN32
+    const std::wstring name = file.wstring();
+#else
+    const std::string name = file.string();
+#endif
+    TagLib::Ogg::FLAC::File ogg(name.c_str(), false);
+    if (!ogg.isValid()) return false;
+    const bool comments = (blocks.front()[0] & 0x7f) == FLAC__METADATA_TYPE_VORBIS_COMMENT;
+    const unsigned int first = comments ? 1 : 2;
+    for (std::size_t i = 0; i < blocks.size(); ++i) {
+        const auto index = first + static_cast<unsigned int>(i);
+        const TagLib::ByteVector old = ogg.packet(index);
+        // only the blocks the encoder wrote, never an audio packet
+        const int written = comments && i == 0 ? FLAC__METADATA_TYPE_VORBIS_COMMENT : FLAC__METADATA_TYPE_APPLICATION;
+        if (old.size() < 4 || (old[0] & 0x7f) != written || ((old[0] & 0x80) != 0) != (i + 1 == blocks.size())) {
+            return false;
+        }
+        TagLib::ByteVector block(reinterpret_cast<const char*>(blocks[i].data()),
+                                 static_cast<unsigned int>(blocks[i].size()));
+        block[0] = static_cast<char>((old[0] & 0x80) | (block[0] & 0x7f));
+        ogg.setPacket(index, block);
+    }
+    return ogg.TagLib::Ogg::File::save();
 }
 
 void AudioMetadataUtil::placeholderCopyRecompress(

@@ -246,7 +246,6 @@ namespace {
         FLAC__StreamEncoder* encoder = nullptr;
         FILE* f_out = nullptr;
         bool encoder_init = false;
-        bool preserve_metadata = true;
         bool failed = false;
         std::vector<FLAC__StreamMetadata*> meta_blocks;
 
@@ -256,23 +255,6 @@ namespace {
             }
         }
     };
-
-    void dec_metadata_cb(const FLAC__StreamDecoder*, const FLAC__StreamMetadata* metadata, void* client_data) {
-        auto* ctx = static_cast<TranscodeContext*>(client_data);
-        if (!ctx->preserve_metadata) return;
-
-        // prevent vector reallocation after encoder initialization
-        if (ctx->encoder_init) return;
-
-        // preserve both vorbis comments and embedded pictures
-        if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT ||
-            metadata->type == FLAC__METADATA_TYPE_PICTURE) {
-            FLAC__StreamMetadata* copy = FLAC__metadata_object_clone(metadata);
-            if (copy) {
-                ctx->meta_blocks.push_back(copy);
-            }
-            }
-    }
 
     void dec_error_cb(const FLAC__StreamDecoder*, const FLAC__StreamDecoderErrorStatus status, void*) {
         Logger::log(LogLevel::Warning, "Libflac warning: " + std::string(FLAC__StreamDecoderErrorStatusString[status]), "OggProcessor");
@@ -503,6 +485,27 @@ void OggProcessor::recompress(const fs::path& input,
         return;
     }
 
+    // libFLAC keeps only STREAMINFO and rewrites what it's given: its placeholders make room for the input's blocks
+    std::vector<std::vector<uint8_t>> blocks;
+    if (options.preserve_metadata) {
+        auto stored = AudioMetadataUtil::oggFlacMetadata(input);
+        if (!stored) {
+            fclose(f_in);
+            Logger::log(LogLevel::Warning, "Unreadable metadata blocks, left as is: " + input.string(), get_name());
+            copy_as_is(input, output);
+            return;
+        }
+        std::erase_if(*stored, [](const std::vector<uint8_t>& b) {
+            const int type = b[0] & 0x7f;
+            return type == FLAC__METADATA_TYPE_PADDING || type == FLAC__METADATA_TYPE_SEEKTABLE;
+        });
+        // the mapping puts the comments first
+        std::ranges::stable_partition(*stored, [](const std::vector<uint8_t>& b) {
+            return (b[0] & 0x7f) == FLAC__METADATA_TYPE_VORBIS_COMMENT;
+        });
+        blocks = std::move(*stored);
+    }
+
     // fallback to flac context setup
     FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();
     if (decoder == nullptr) {
@@ -521,12 +524,29 @@ void OggProcessor::recompress(const fs::path& input,
     TranscodeContext ctx;
     ctx.f_in = f_in;
     ctx.encoder = encoder;
-    ctx.preserve_metadata = options.preserve_metadata;
+    // the Ogg mapping header counts only the blocks libFLAC is given, so the comment block is given too
+    const auto add = [&ctx](const FLAC__MetadataType type) {
+        FLAC__StreamMetadata* block = FLAC__metadata_object_new(type);
+        if (block != nullptr) ctx.meta_blocks.push_back(block);
+        return block != nullptr;
+    };
+    bool allocated = add(FLAC__METADATA_TYPE_VORBIS_COMMENT);
+    for (const auto& b : blocks) {
+        if ((b[0] & 0x7f) != FLAC__METADATA_TYPE_VORBIS_COMMENT) {
+            allocated = allocated && add(FLAC__METADATA_TYPE_APPLICATION);
+        }
+    }
+    if (!allocated) {
+        FLAC__stream_decoder_delete(decoder);
+        FLAC__stream_encoder_delete(encoder);
+        fclose(f_in);
+        throw std::runtime_error("OggProcessor: out of memory");
+    }
 
     const FLAC__StreamDecoderInitStatus init_stat = FLAC__stream_decoder_init_ogg_stream(
         decoder,
         read_cb, seek_cb, tell_cb, length_cb, eof_cb,
-        dec_write_cb, dec_metadata_cb, dec_error_cb,
+        dec_write_cb, nullptr, dec_error_cb,
         &ctx
     );
 
@@ -565,6 +585,11 @@ void OggProcessor::recompress(const fs::path& input,
         std::error_code ec;
         fs::remove(output, ec);
         throw std::runtime_error("OggProcessor: recompression failed or aborted");
+    }
+    if (!AudioMetadataUtil::putOggFlacMetadata(output, blocks)) {
+        Logger::log(LogLevel::Warning, "Metadata blocks not put back, left as is: " + input.string(), get_name());
+        copy_as_is(input, output);
+        return;
     }
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
