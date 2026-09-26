@@ -3,7 +3,7 @@ use std::fs::File;
 use std::os::raw::{c_char, c_int};
 use std::panic;
 
-use optivorbis::{OggToOgg, Remuxer};
+use optivorbis::{OggToOgg, Remuxer, VorbisOptimizerSettings, VorbisVendorStringAction};
 
 #[no_mangle]
 pub extern "C" fn chisel_optimize_vorbis(
@@ -36,7 +36,10 @@ pub extern "C" fn chisel_optimize_vorbis(
             Err(_) => return -4,
         };
 
-        let remuxer = OggToOgg::new_with_defaults();
+        // keep the vendor string as it is: by default optivorbis appends its own tag to it
+        let mut optimizer_settings = VorbisOptimizerSettings::default();
+        optimizer_settings.vendor_string_action = VorbisVendorStringAction::Copy;
+        let remuxer = OggToOgg::new(Default::default(), optimizer_settings);
 
         match remuxer.remux(&mut input_file, &mut output_file) {
             Ok(_) => 0,
