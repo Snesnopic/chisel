@@ -294,6 +294,7 @@ void extractId3v2Covers(TagLib::ID3v2::Tag* tag,
         info.mime_type = apic->mimeType().to8Bit(true);
         info.description = apic->description().to8Bit(true);
         info.picture_type = apic->type();
+        info.format_specific = std::make_any<TagLib::String::Type>(apic->textEncoding());
 
         extracted_covers.push_back(std::move(info));
         ++idx;
@@ -319,8 +320,11 @@ bool rebuildId3v2Covers(TagLib::ID3v2::Tag* tag,
         if (data.isEmpty()) continue;
 
         auto *frame = new TagLib::ID3v2::AttachedPictureFrame;
-        frame->setMimeType(info.mime_type);
-        frame->setDescription(info.description);
+        if (info.format_specific.has_value() && info.format_specific.type() == typeid(TagLib::String::Type)) {
+            frame->setTextEncoding(std::any_cast<TagLib::String::Type>(info.format_specific));
+        }
+        frame->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+        frame->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
         frame->setType(static_cast<TagLib::ID3v2::AttachedPictureFrame::Type>(info.picture_type));
         frame->setPicture(data);
 
@@ -456,8 +460,8 @@ bool rebuildXiphCovers(TagLib::Ogg::XiphComment* tag,
         if (data.isEmpty()) continue;
 
         auto *pic = new TagLib::FLAC::Picture;
-        pic->setMimeType(info.mime_type);
-        pic->setDescription(info.description);
+        pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+        pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
         pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
         pic->setData(data);
 
@@ -771,8 +775,8 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (data.isEmpty()) continue;
 
             auto *pic = new TagLib::FLAC::Picture;
-            pic->setMimeType(info.mime_type);
-            pic->setDescription(info.description);
+            pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+            pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
@@ -861,8 +865,8 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (data.isEmpty()) continue;
 
             auto *pic = new TagLib::FLAC::Picture;
-            pic->setMimeType(info.mime_type);
-            pic->setDescription(info.description);
+            pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+            pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
@@ -885,8 +889,8 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (data.isEmpty()) continue;
 
             auto *pic = new TagLib::FLAC::Picture;
-            pic->setMimeType(info.mime_type);
-            pic->setDescription(info.description);
+            pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+            pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
             pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
             pic->setData(data);
 
@@ -985,8 +989,8 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
             if (data.isEmpty()) continue;
 
             TagLib::ASF::Picture pic;
-            pic.setMimeType(info.mime_type);
-            pic.setDescription(info.description);
+            pic.setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+            pic.setDescription(TagLib::String(info.description, TagLib::String::UTF8));
             pic.setType(static_cast<TagLib::ASF::Picture::Type>(info.picture_type));
             pic.setPicture(data);
 
