@@ -108,39 +108,41 @@ bool keep_marker(MarkerData& m, const MarkerPolicy& policy) {
 }
 
 /**
- * @brief Copies the saved markers allowed by @p policy from the decompressor to the compressor.
+ * @brief Tells whether decoders need the source's Adobe segment to read its colors, i.e. whether without
+ *        it they would pick another color space from the JFIF header or the component ids.
+ */
+bool adobe_decides_colors(const j_decompress_ptr srcinfo) {
+    if (!srcinfo->saw_Adobe_marker || srcinfo->num_components == 1) return false;
+    if (srcinfo->num_components != 3 || srcinfo->Adobe_transform != 1) return true;
+    const jpeg_component_info* c = srcinfo->comp_info;
+    return !srcinfo->saw_JFIF_marker && c[0].component_id == 'R' && c[1].component_id == 'G' &&
+           c[2].component_id == 'B';
+}
+
+/**
+ * @brief Copies the saved markers allowed by @p policy, plus an Adobe segment that decides the colors, in
+ *        their original order from the decompressor to the compressor.
  */
 void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo, const MarkerPolicy& policy) {
+    const bool keep_adobe = adobe_decides_colors(srcinfo);
     std::vector<MarkerData> markers;
     for (jpeg_saved_marker_ptr m = srcinfo->marker_list; m; m = m->next) {
         if ((m->marker >= JPEG_APP0 && m->marker <= JPEG_APP0 + 15) ||
             m->marker == JPEG_COM) {
             if (m->data && m->data_length > 0) {
                 MarkerData md{.marker=m->marker, .data={m->data, m->data + m->data_length}};
-                if (keep_marker(md, policy)) markers.push_back(std::move(md));
+                const bool adobe = keep_adobe && md.marker == JPEG_APP0 + 14 && has_prefix(md.data, "Adobe");
+                if (adobe || keep_marker(md, policy)) markers.push_back(std::move(md));
             }
         }
     }
 
-    std::ranges::stable_sort(markers,
-                      [](const auto &a, const auto &b) { return a.marker < b.marker; });
-
-    markers.erase(std::unique(markers.begin(), markers.end(),
-                              [](const auto &a, const auto &b) {
-                                  return a.marker == b.marker && a.data == b.data;
-                              }),
-                  markers.end());
-
-    for (const auto &m: markers) {
-        // jpeg_write_coefficients() already wrote its own JFIF/Adobe header; skip the source's to avoid a duplicate
-        if (dstinfo->write_JFIF_header && m.marker == JPEG_APP0 &&
-            m.data.size() >= 5 && memcmp(m.data.data(), "JFIF\0", 5) == 0) {
-            continue;
-        }
-        if (dstinfo->write_Adobe_marker && m.marker == JPEG_APP0 + 14 &&
-            m.data.size() >= 5 && memcmp(m.data.data(), "Adobe", 5) == 0) {
-            continue;
-        }
+    // a segment repeating the previous one of its kind adds nothing
+    std::array<const MarkerData*, 17> last{};
+    for (const auto& m : markers) {
+        const MarkerData*& previous = last[m.marker == JPEG_COM ? 16 : m.marker - JPEG_APP0];
+        if (previous && previous->data == m.data) continue;
+        previous = &m;
         jpeg_write_marker(dstinfo, m.marker, m.data.data(), static_cast<unsigned int>(m.data.size()));
     }
 }
@@ -148,12 +150,11 @@ void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo,
 /**
  * @brief Losslessly re-encodes one JPEG image held in memory, as the smaller of a progressive and a
  *        baseline encoding: on small images the headers of the progressive scans outweigh their gain.
- * @param mirror_jfif Write a JFIF header only if the source had one.
  * @param clean Set when libjpeg ended the image exactly at the end of @p in, without warnings.
  * @return False on a libjpeg error.
  */
-bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, const bool mirror_jfif,
-               std::vector<uint8_t>& out, bool& clean) {
+bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, std::vector<uint8_t>& out,
+               bool& clean) {
     jpeg_decompress_struct srcinfo{};
     // progressive, then baseline
     std::array<jpeg_compress_struct, 2> dstinfo{};
@@ -205,9 +206,9 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
         // libjpeg's own defaults: a single sequential scan
         if (baseline) jpeg_c_set_int_param(&dstinfo[i], JINT_COMPRESS_PROFILE, JCP_FASTEST);
         jpeg_copy_critical_parameters(&srcinfo, &dstinfo[i]);
-        if (mirror_jfif) {
-            dstinfo[i].write_JFIF_header = srcinfo.saw_JFIF_marker;
-        }
+        // the source's own jfif and adobe segments are copied with the rest; without metadata a bare jfif stands in
+        dstinfo[i].write_JFIF_header = !policy.keep_all && srcinfo.saw_JFIF_marker;
+        dstinfo[i].write_Adobe_marker = FALSE;
         if (!baseline && srcinfo.progressive_mode) {
             jpeg_simple_progression(&dstinfo[i]);
         }
@@ -335,7 +336,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
         bool clean = false;
         const bool resizable = !declares_gain_map || layout.images.size() == 1;
         if (resizable && jpeg::first_image_end(src) == src.size() &&
-            transcode(src, policy, true, out, clean) && clean && out.size() < src.size()) {
+            transcode(src, policy, out, clean) && clean && out.size() < src.size()) {
             images.push_back(std::move(out));
         } else {
             images.emplace_back(src.begin(), src.end());
@@ -377,7 +378,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
 
     std::vector<uint8_t> out;
     bool clean = false;
-    if (!transcode(primary, policy, false, out, clean)) {
+    if (!transcode(primary, policy, out, clean)) {
         Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", "JpegProcessor");
         throw std::runtime_error("Libjpeg error");
     }
@@ -443,7 +444,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         bool clean = false;
         const MarkerPolicy policy{.keep_all = options.preserve_metadata, .keep_links = false, .xmp = std::nullopt,
                                   .exif = std::nullopt};
-        if (!transcode(data, policy, false, result, clean)) {
+        if (!transcode(data, policy, result, clean)) {
             Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", get_name());
             throw std::runtime_error("Libjpeg error");
         }
