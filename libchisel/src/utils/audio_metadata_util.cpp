@@ -350,16 +350,34 @@ bool rebuildFlacPictures(const std::filesystem::path& file, const std::vector<Au
     return ok;
 }
 
-// Ogg Vorbis and Opus: only the pictures change, where TagLib would sort and upper-case every comment
-bool rebuildOggPictures(TagLib::Ogg::File& file, const std::string_view header,
-                        const std::vector<AudioCoverInfo>& covers) {
-    const TagLib::ByteVector packet = file.packet(1);
-    const auto size = static_cast<std::size_t>(packet.size());
-    if (size < header.size() + 8 || std::memcmp(packet.data(), header.data(), header.size()) != 0) return false;
-    std::size_t pos = header.size();
+enum class OggCodec { Vorbis, Opus, Speex, Flac };
+
+// Ogg Vorbis, Opus, Speex and FLAC: only the pictures change, where TagLib would sort and upper-case every comment
+bool rebuildOggPictures(TagLib::Ogg::File& file, const OggCodec codec, const std::vector<AudioCoverInfo>& covers) {
+    unsigned int index = 1;
+    // FLAC keeps them in its VORBIS_COMMENT block, one of the header packets
+    while (codec == OggCodec::Flac) {
+        const TagLib::ByteVector block = file.packet(index);
+        if (block.size() < 4) return false;
+        if ((block[0] & 0x7f) == 4) break;
+        if ((block[0] & 0x80) != 0) return false;
+        ++index;
+    }
+    const std::string_view header = codec == OggCodec::Vorbis ? std::string_view("\x03vorbis", 7)
+                                  : codec == OggCodec::Opus   ? std::string_view("OpusTags")
+                                                              : std::string_view();
+    const std::size_t start = codec == OggCodec::Flac ? 4 : header.size();
+    const TagLib::ByteVector packet = file.packet(index);
+    auto size = static_cast<std::size_t>(packet.size());
+    if (size < start + 8 || std::string_view(packet.data(), header.size()) != header) return false;
+    if (codec == OggCodec::Flac) {
+        size = std::min<std::size_t>(size, 4 + packet.toUInt(1, 3, true));
+    }
+    std::size_t pos = start;
     const std::size_t vendor = packet.toUInt(static_cast<unsigned int>(pos), false);
     if (vendor > size - pos - 8) return false;
     pos += 4 + vendor;
+    const std::size_t countPos = pos;
     const unsigned int count = packet.toUInt(static_cast<unsigned int>(pos), false);
     pos += 4;
 
@@ -396,18 +414,50 @@ bool rebuildOggPictures(TagLib::Ogg::File& file, const std::string_view header,
         rebuilt.append(TagLib::ByteVector::fromUInt(field.size(), false));
         rebuilt.append(field);
     }
-    TagLib::ByteVector rest = packet.mid(static_cast<unsigned int>(pos));
-    if (header == "OpusTags") {
+    // covers whose fields went away with the other metadata (--no-meta) come back after the last field
+    unsigned int added = 0;
+    for (; picture < covers.size(); ++picture) {
+        const AudioCoverInfo& info = covers[picture];
+        const TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+        if (data.isEmpty()) continue;
+        TagLib::FLAC::Picture fresh;
+        fresh.setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
+        fresh.setDescription(TagLib::String(info.description, TagLib::String::UTF8));
+        fresh.setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
+        fresh.setData(data);
+        setPictureProps(fresh, info);
+        const TagLib::ByteVector field = TagLib::ByteVector("METADATA_BLOCK_PICTURE=") + fresh.render().toBase64();
+        rebuilt.append(TagLib::ByteVector::fromUInt(field.size(), false));
+        rebuilt.append(field);
+        ++added;
+    }
+    if (added > 0) {
+        const TagLib::ByteVector total = TagLib::ByteVector::fromUInt(count + added, false);
+        for (unsigned int i = 0; i < 4; ++i) rebuilt[static_cast<unsigned int>(countPos) + i] = total[i];
+    }
+    TagLib::ByteVector rest = packet.mid(static_cast<unsigned int>(pos), static_cast<unsigned int>(size - pos));
+    if (codec == OggCodec::Opus) {
         // RFC 7845: what follows the comments is padding when its first byte is even
         if (!rest.isEmpty() && (rest[0] & 1) == 0) rest.clear();
-    } else if (rest.size() > 1 && rest.mid(1) == TagLib::ByteVector(rest.size() - 1, '\0')) {
-        // the Vorbis framing bit stays, the zero padding after it goes
-        rest.resize(1);
+    } else if (codec == OggCodec::Vorbis) {
+        // the framing bit stays, the zero padding after it goes
+        if (rest.size() > 1 && rest.mid(1) == TagLib::ByteVector(rest.size() - 1, '\0')) rest.resize(1);
+    } else if (rest == TagLib::ByteVector(rest.size(), '\0')) {
+        // Speex and FLAC comments end with the last field: zeros after it are padding
+        rest.clear();
     }
     rebuilt.append(rest);
+    if (codec == OggCodec::Flac) {
+        // the block header keeps its type and last-block flag
+        const std::size_t length = rebuilt.size() - 4;
+        if (length > 0xffffff) return false;
+        rebuilt[1] = static_cast<char>(length >> 16 & 0xff);
+        rebuilt[2] = static_cast<char>(length >> 8 & 0xff);
+        rebuilt[3] = static_cast<char>(length & 0xff);
+    }
 
-    file.setPacket(1, rebuilt);
-    // the Vorbis and Opus overrides of save() would render the comment packet again
+    file.setPacket(index, rebuilt);
+    // each codec's own save() would render the comment packet again
     return file.TagLib::Ogg::File::save();
 }
 
@@ -712,30 +762,6 @@ void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
         extracted_covers.push_back(std::move(info));
         ++idx;
     }
-}
-
-// shared helper to rebuild xiph comment covers
-bool rebuildXiphCovers(TagLib::Ogg::XiphComment* tag,
-                       const std::vector<AudioCoverInfo>& covers) {
-    if (tag == nullptr) return false;
-
-    tag->removeAllPictures();
-
-    for (const auto &info : covers) {
-        TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
-        if (data.isEmpty()) continue;
-
-        auto *pic = new TagLib::FLAC::Picture;
-        pic->setMimeType(TagLib::String(info.mime_type, TagLib::String::UTF8));
-        pic->setDescription(TagLib::String(info.description, TagLib::String::UTF8));
-        pic->setType(static_cast<TagLib::FLAC::Picture::Type>(info.picture_type));
-        pic->setData(data);
-
-        setPictureProps(*pic, info);
-
-        tag->addPicture(pic);
-    }
-    return true;
 }
 
 } // namespace
@@ -1109,12 +1135,12 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // ogg vorbis
     if (auto *oggVorbis = dynamic_cast<TagLib::Ogg::Vorbis::File*>(file_ref)) {
-        return rebuildOggPictures(*oggVorbis, std::string_view("\x03vorbis", 7), state.extracted_covers);
+        return rebuildOggPictures(*oggVorbis, OggCodec::Vorbis, state.extracted_covers);
     }
 
     // ogg opus
     if (auto *oggOpus = dynamic_cast<TagLib::Ogg::Opus::File*>(file_ref)) {
-        return rebuildOggPictures(*oggOpus, "OpusTags", state.extracted_covers);
+        return rebuildOggPictures(*oggOpus, OggCodec::Opus, state.extracted_covers);
     }
 
     // mkv (matroska / webm)
@@ -1183,18 +1209,12 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // ogg flac
     if (auto *oggFlac = dynamic_cast<TagLib::Ogg::FLAC::File*>(file_ref)) {
-        if (rebuildXiphCovers(oggFlac->tag(), state.extracted_covers)) {
-            return oggFlac->save();
-        }
-        return false;
+        return rebuildOggPictures(*oggFlac, OggCodec::Flac, state.extracted_covers);
     }
 
     // ogg speex
     if (auto *oggSpeex = dynamic_cast<TagLib::Ogg::Speex::File*>(file_ref)) {
-        if (rebuildXiphCovers(oggSpeex->tag(), state.extracted_covers)) {
-            return oggSpeex->save();
-        }
-        return false;
+        return rebuildOggPictures(*oggSpeex, OggCodec::Speex, state.extracted_covers);
     }
 
     // asf / wma / wmv
