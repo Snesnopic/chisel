@@ -13,6 +13,7 @@
 #include <map>
 #include <span>
 #include <cstring>
+#include <FLAC/metadata.h>
 #include <taglib/fileref.h>
 #include "flac/flacfile.h"
 #include "flac/flacpicture.h"
@@ -262,6 +263,89 @@ void setPictureProps(TagLib::FLAC::Picture &pic, const AudioCoverInfo &info) {
     pic.setHeight(h);
     pic.setColorDepth(d);
     pic.setNumColors(c);
+}
+
+bool startsWith(const std::filesystem::path& file, const std::string_view magic) {
+    std::ifstream in(file, std::ios::binary);
+    std::string head(magic.size(), '\0');
+    return in.read(head.data(), static_cast<std::streamsize>(head.size())) && head == magic;
+}
+
+// libFLAC takes UTF-8 file names on Windows too
+std::string flacFileName(const std::filesystem::path& file) {
+    const std::u8string name = file.u8string();
+    return {name.begin(), name.end()};
+}
+
+// libFLAC rewrites the PICTURE blocks alone: TagLib would render the Vorbis comments again, sorted by key
+bool rebuildFlacPictures(const std::filesystem::path& file, const std::vector<AudioCoverInfo>& covers) {
+    FLAC__Metadata_Chain* chain = FLAC__metadata_chain_new();
+    if (chain == nullptr) return false;
+    bool ok = FLAC__metadata_chain_read(chain, flacFileName(file).c_str()) != 0;
+    FLAC__Metadata_Iterator* it = ok ? FLAC__metadata_iterator_new() : nullptr;
+    ok = ok && it != nullptr;
+    if (ok) {
+        FLAC__metadata_iterator_init(it, chain);
+        std::size_t idx = 0;
+        do {
+            FLAC__StreamMetadata* block = FLAC__metadata_iterator_get_block(it);
+            if (block->type != FLAC__METADATA_TYPE_PICTURE) continue;
+            if (idx < covers.size()) {
+                const AudioCoverInfo& info = covers[idx];
+                TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+                if (!data.isEmpty()) {
+                    int w = info.width;
+                    int h = info.height;
+                    int d = info.depth;
+                    int c = info.colors;
+                    computeImageProps(info.temp_file_path, w, h, d, c);
+                    block->data.picture.width = static_cast<FLAC__uint32>(w);
+                    block->data.picture.height = static_cast<FLAC__uint32>(h);
+                    block->data.picture.depth = static_cast<FLAC__uint32>(d);
+                    block->data.picture.colors = static_cast<FLAC__uint32>(c);
+                    ok = ok && FLAC__metadata_object_picture_set_data(
+                        block, reinterpret_cast<FLAC__byte*>(data.data()), data.size(), true);
+                }
+            }
+            ++idx;
+        } while (FLAC__metadata_iterator_next(it));
+
+        // without metadata the encoder dropped the PICTURE blocks: the covers go back after the last block
+        for (; ok && idx < covers.size(); ++idx) {
+            const AudioCoverInfo& info = covers[idx];
+            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
+            if (data.isEmpty()) continue;
+            FLAC__StreamMetadata* block = FLAC__metadata_object_new(FLAC__METADATA_TYPE_PICTURE);
+            if (block == nullptr) {
+                ok = false;
+                break;
+            }
+            int w = info.width;
+            int h = info.height;
+            int d = info.depth;
+            int c = info.colors;
+            computeImageProps(info.temp_file_path, w, h, d, c);
+            block->data.picture.type = static_cast<FLAC__StreamMetadata_Picture_Type>(info.picture_type);
+            block->data.picture.width = static_cast<FLAC__uint32>(w);
+            block->data.picture.height = static_cast<FLAC__uint32>(h);
+            block->data.picture.depth = static_cast<FLAC__uint32>(d);
+            block->data.picture.colors = static_cast<FLAC__uint32>(c);
+            std::string mime = info.mime_type;
+            std::string description = info.description;
+            ok = FLAC__metadata_object_picture_set_mime_type(block, mime.data(), true) &&
+                 FLAC__metadata_object_picture_set_description(
+                     block, reinterpret_cast<FLAC__byte*>(description.data()), true) &&
+                 FLAC__metadata_object_picture_set_data(
+                     block, reinterpret_cast<FLAC__byte*>(data.data()), data.size(), true) &&
+                 FLAC__metadata_iterator_insert_block_after(it, block);
+            if (!ok) FLAC__metadata_object_delete(block);
+        }
+    }
+    if (it != nullptr) FLAC__metadata_iterator_delete(it);
+    // padding stays as it was, so the file shrinks by what the pictures saved
+    ok = ok && FLAC__metadata_chain_write(chain, false, false);
+    FLAC__metadata_chain_delete(chain);
+    return ok;
 }
 
 // normalize picture type flac
@@ -759,6 +843,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
 
 bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
                                       const AudioExtractionState &state) {
+    if (startsWith(input_path, "fLaC")) {
+        return rebuildFlacPictures(input_path, state.extracted_covers);
+    }
 #ifdef _WIN32
     TagLib::FileRef ref(input_path.wstring().c_str());
 #else
