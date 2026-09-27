@@ -376,6 +376,31 @@ namespace {
         return ctx.pcm;
     }
 
+    /// True when a logical stream begins after the pages of another: a chained file.
+    bool is_chained(FILE* f) {
+        const long start_pos = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        bool past_head = false;
+        bool chained = false;
+        unsigned char header[27];
+        while (!chained && fread(header, 1, sizeof(header), f) == sizeof(header) &&
+               std::memcmp(header, "OggS", 4) == 0) {
+            if ((header[5] & 0x02) == 0) past_head = true;
+            else chained = past_head;
+            unsigned char segments[255];
+            const int num_segments = header[26];
+            if (num_segments > 0 &&
+                fread(segments, 1, static_cast<size_t>(num_segments), f) != static_cast<size_t>(num_segments)) {
+                break;
+            }
+            long body_len = 0;
+            for (int i = 0; i < num_segments; ++i) body_len += segments[i];
+            if (fseek(f, body_len, SEEK_CUR) != 0) break;
+        }
+        fseek(f, start_pos, SEEK_SET);
+        return chained;
+    }
+
     // the output is the input as it is
     void copy_as_is(const fs::path& input, const fs::path& output) {
         try {
@@ -428,7 +453,15 @@ void OggProcessor::recompress(const fs::path& input,
 
     // check vorbis early to prevent flac decoder init failures
     if (codecs.vorbis) {
+        const bool chained = is_chained(f_in);
         fclose(f_in);
+
+        // OptiVorbis gives every link codebooks of its own, which ffmpeg can't switch to at a link boundary
+        if (chained) {
+            Logger::log(LogLevel::Debug, "Chained Ogg, left as is: " + input.string(), get_name());
+            copy_as_is(input, output);
+            return;
+        }
 
         // OptiVorbis rewrites the whole container and keeps only the Vorbis
         // stream: fed a multiplexed file it exits successfully having thrown the
@@ -481,6 +514,14 @@ void OggProcessor::recompress(const fs::path& input,
     if (!codecs.flac) {
         fclose(f_in);
         Logger::log(LogLevel::Debug, "No FLAC stream, left as is: " + input.string(), get_name());
+        copy_as_is(input, output);
+        return;
+    }
+
+    // libFLAC decodes the first link only: the others would be lost
+    if (is_chained(f_in)) {
+        fclose(f_in);
+        Logger::log(LogLevel::Debug, "Chained Ogg, left as is: " + input.string(), get_name());
         copy_as_is(input, output);
         return;
     }
