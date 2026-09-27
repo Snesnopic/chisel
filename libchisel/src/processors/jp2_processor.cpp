@@ -52,132 +52,147 @@ static OPJ_CODEC_FORMAT detect_codec_format(const std::filesystem::path& path) {
     return OPJ_CODEC_JP2; // fallback, matches the previous default
 }
 
-// opj_j2k_read_com is a no-op stub in openjpeg, so the COM marker text is pulled from raw bytes here instead
-static std::optional<std::string> extract_com_comment(const std::filesystem::path& path) {
-    std::vector<uint8_t> data;
-    {
-        std::ifstream f(path, std::ios::binary);
-        if (!f) return std::nullopt;
-        data.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
-    }
-    if (data.size() < 4) return std::nullopt;
+// a box of a JP2/JPX file: where it starts, the length of its header and its whole size
+struct Jp2Box {
+    std::size_t start;
+    std::size_t header;
+    std::size_t size;
+    std::string_view type;
+};
 
-    auto read_be16 = [](const uint8_t* p) -> uint16_t {
-        return static_cast<uint16_t>((static_cast<uint32_t>(p[0]) << 8) | p[1]);
-    };
-    auto read_be32 = [](const uint8_t* p) -> uint32_t {
-        return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) | (static_cast<uint32_t>(p[2]) << 8) | p[3];
-    };
-
-    const uint8_t* codestream = nullptr;
-    size_t codestream_len = 0;
-
-    if (data.size() >= 2 && data[0] == 0xFF && data[1] == 0x4F) {
-        // raw .j2k/.j2c: the file itself is the codestream, starting at SOC
-        codestream = data.data();
-        codestream_len = data.size();
-    } else {
-        // .jp2: box-based container, find the 'jp2c' box holding the codestream
-        size_t pos = 0;
-        while (pos + 8 <= data.size()) {
-            uint64_t box_len = read_be32(data.data() + pos);
-            const uint8_t* type = data.data() + pos + 4;
-            size_t header_size = 8;
-
-            if (box_len == 1) {
-                if (pos + 16 > data.size()) break;
-                box_len = (static_cast<uint64_t>(read_be32(data.data() + pos + 8)) << 32) |
-                          read_be32(data.data() + pos + 12);
-                header_size = 16;
-            } else if (box_len == 0) {
-                box_len = data.size() - pos;
-            }
-            if (box_len < header_size || pos + box_len > data.size()) break;
-
-            if (std::memcmp(type, "jp2c", 4) == 0) {
-                codestream = data.data() + pos + header_size;
-                codestream_len = box_len - header_size;
-                break;
-            }
-            pos += box_len;
+// the boxes from begin on, up to end or to the first bytes that aren't a box, whose position goes in stop
+static std::vector<Jp2Box> read_boxes(const std::span<const uint8_t> data, std::size_t begin, const std::size_t end,
+                                      std::size_t& stop) {
+    std::vector<Jp2Box> boxes;
+    while (begin < end) {
+        if (end - begin < 8) break;
+        uint64_t size = read_be32(data.data() + begin);
+        std::size_t header = 8;
+        if (size == 1) {
+            if (end - begin < 16) break;
+            size = read_be64(data.data() + begin + 8);
+            header = 16;
+        } else if (size == 0) {
+            size = end - begin;
         }
+        if (size < header || size > end - begin) break;
+        boxes.push_back({begin, header, static_cast<std::size_t>(size),
+                         std::string_view(reinterpret_cast<const char*>(data.data() + begin + 4), 4)});
+        begin += static_cast<std::size_t>(size);
     }
-
-    if (!codestream || codestream_len < 4) return std::nullopt;
-
-    // walk main-header markers for COM (0xFF64), stop at SOT/SOD/EOC
-    size_t p = 2; // skip SOC
-    while (p + 4 <= codestream_len) {
-        if (codestream[p] != 0xFF) break;
-        const uint8_t marker = codestream[p + 1];
-        if (marker == 0x93 /*SOD*/ || marker == 0x90 /*SOT*/ || marker == 0xD9 /*EOC*/) break;
-
-        const uint16_t seg_len = read_be16(codestream + p + 2); // includes itself, excludes marker code
-        if (seg_len < 2 || p + 2 + static_cast<size_t>(seg_len) > codestream_len) break;
-
-        if (marker == 0x64 /*COM*/) {
-            const size_t payload_len = seg_len - 2;
-            if (payload_len < 2) break;
-            const uint8_t* payload = codestream + p + 4;
-            const uint16_t rcom = read_be16(payload);
-            const size_t text_len = payload_len - 2;
-            if (rcom == 1) { // iso-8859-1 text only; binary comments can't round-trip as a c-string
-                return std::string(reinterpret_cast<const char*>(payload + 2), text_len);
-            }
-            return std::nullopt;
-        }
-
-        p += 2 + seg_len;
-    }
-
-    return std::nullopt;
+    stop = begin;
+    return boxes;
 }
 
-// true when the jp2 header holds a palette (pclr) or a component mapping (cmap)
-static bool has_palette(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    // walks the boxes in [begin, end), looking into the jp2h superbox
-    const auto walk = [&data](auto&& self, std::size_t begin, const std::size_t end) -> bool {
-        while (begin + 8 <= end) {
-            uint64_t size = read_be32(data.data() + begin);
-            std::size_t header = 8;
-            if (size == 1) {
-                if (begin + 16 > end) return false;
-                size = read_be64(data.data() + begin + 8);
-                header = 16;
-            } else if (size == 0) {
-                size = end - begin;
-            }
-            if (size < header || size > end - begin) return false;
-            const std::string_view type(reinterpret_cast<const char*>(data.data() + begin + 4), 4);
-            if (type == "pclr" || type == "cmap") return true;
-            if (type == "jp2h" && self(self, begin + header, begin + size)) return true;
-            begin += size;
-        }
-        return false;
+static void append_box(std::vector<uint8_t>& out, const std::string_view type, const std::span<const uint8_t> payload) {
+    const auto put = [&out](const uint64_t value, const int bytes) {
+        for (int i = bytes - 1; i >= 0; --i) out.push_back(static_cast<uint8_t>(value >> (8 * i)));
     };
-    return walk(walk, 0, data.size());
+    const uint64_t size = payload.size() + 8;
+    if (size <= UINT32_MAX) {
+        put(size, 4);
+        out.insert(out.end(), type.begin(), type.end());
+    } else {
+        put(1, 4);
+        out.insert(out.end(), type.begin(), type.end());
+        put(size + 8, 8);
+    }
+    out.insert(out.end(), payload.begin(), payload.end());
+}
+
+// the marker segments of a codestream's main header, SOC excluded, or nothing if it doesn't parse
+static std::optional<std::vector<std::span<const uint8_t>>> main_header(const std::span<const uint8_t> codestream) {
+    if (codestream.size() < 2 || codestream[0] != 0xFF || codestream[1] != 0x4F) return std::nullopt;
+    std::vector<std::span<const uint8_t>> segments;
+    for (std::size_t p = 2;;) {
+        if (codestream.size() - p < 4 || codestream[p] != 0xFF) return std::nullopt;
+        // the first tile-part ends the main header
+        if (codestream[p + 1] == 0x90) return segments;
+        const std::size_t length = 2 + (static_cast<std::size_t>(codestream[p + 2]) << 8 | codestream[p + 3]);
+        if (length < 4 || length > codestream.size() - p) return std::nullopt;
+        segments.push_back(codestream.subspan(p, length));
+        p += length;
+    }
+}
+
+static bool is_comment(const std::span<const uint8_t> segment) {
+    return segment[1] == 0x64;
+}
+
+// the codestream with the given comments in place of the ones openjpeg wrote
+static std::optional<std::vector<uint8_t>> with_comments(const std::span<const uint8_t> codestream,
+                                                         const std::vector<std::span<const uint8_t>>& comments) {
+    const auto segments = main_header(codestream);
+    if (!segments) return std::nullopt;
+    std::vector<uint8_t> out(codestream.begin(), codestream.begin() + 2);
+    std::size_t end = 2;
+    for (const auto& segment : *segments) {
+        end += segment.size();
+        if (!is_comment(segment)) out.insert(out.end(), segment.begin(), segment.end());
+    }
+    for (const auto& comment : comments) out.insert(out.end(), comment.begin(), comment.end());
+    out.insert(out.end(), codestream.begin() + static_cast<std::ptrdiff_t>(end), codestream.end());
+    return out;
+}
+
+// XML, UUID (XMP, GeoJP2...), IPR and association (GMLJP2) boxes: what --no-meta drops
+static bool is_metadata(const std::string_view type) {
+    return type == "xml " || type == "uuid" || type == "uinf" || type == "jp2i" || type == "asoc" || type == "lbl ";
+}
+
+// the header box's content without its resolution box
+static std::vector<uint8_t> header_without_resolution(const std::span<const uint8_t> data, const Jp2Box& jp2h) {
+    std::size_t stop = 0;
+    const auto children = read_boxes(data, jp2h.start + jp2h.header, jp2h.start + jp2h.size, stop);
+    if (stop != jp2h.start + jp2h.size) {
+        const auto payload = data.subspan(jp2h.start + jp2h.header, jp2h.size - jp2h.header);
+        return {payload.begin(), payload.end()};
+    }
+    std::vector<uint8_t> out;
+    for (const Jp2Box& child : children) {
+        if (child.type == "res ") continue;
+        const auto bytes = data.subspan(child.start, child.size);
+        out.insert(out.end(), bytes.begin(), bytes.end());
+    }
+    return out;
 }
 
 void Jp2Processor::recompress(const std::filesystem::path& input_path,
                                const std::filesystem::path& output_path,
-                               const ProcessingOptions &/*options*/) {
+                               const ProcessingOptions& options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input_path.string(), get_name());
 
     const OPJ_CODEC_FORMAT format = detect_codec_format(input_path);
-
-    // openjpeg decodes a palette image to its colors: re-encoded, it would no longer hold the indices
-    // the file stored, which is what a pdf with an Indexed color space reads from it
-    if (format == OPJ_CODEC_JP2 && has_palette(input_path)) {
-        Logger::log(LogLevel::Debug, "Palette image, left as is: " + input_path.string(), get_name());
+    const std::vector<uint8_t> input = read_file(input_path);
+    const std::span<const uint8_t> data(input);
+    const auto leave_as_is = [&](const std::string& why) {
+        Logger::log(LogLevel::Debug, why + ", left as is: " + input_path.string(), get_name());
         std::filesystem::copy_file(input_path, output_path, std::filesystem::copy_options::overwrite_existing);
-        return;
+    };
+
+    // only the codestream changes: openjpeg understands a few of the boxes around it, so they're copied instead
+    std::vector<Jp2Box> boxes;
+    // bytes after the codestream that don't form boxes stay as they are
+    std::size_t tail = data.size();
+    std::span<const uint8_t> codestream = data;
+    if (format == OPJ_CODEC_JP2) {
+        boxes = read_boxes(data, 0, data.size(), tail);
+        // fragment tables locate codestreams by offset, which would move
+        if (std::ranges::any_of(boxes, [](const Jp2Box& b) { return b.type == "ftbl"; })) {
+            return leave_as_is("Fragment table");
+        }
+        const auto jp2c = std::ranges::find_if(boxes, [](const Jp2Box& b) { return b.type == "jp2c"; });
+        if (jp2c == boxes.end()) return leave_as_is("No codestream box");
+        codestream = data.subspan(jp2c->start + jp2c->header, jp2c->size - jp2c->header);
     }
+    const auto header = main_header(codestream);
+    if (!header) return leave_as_is("Unreadable codestream header");
 
     // --- DECODER SETUP ---
     opj_dparameters_t dparam;
     opj_set_default_decoder_parameters(&dparam);
+    // the components as stored: a palette or a channel definition stays in its box
+    dparam.flags |= OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG;
 
     opj_stream_t* in_stream = opj_stream_create_default_file_stream(input_path.string().c_str(), OPJ_TRUE);
     if (!in_stream) {
@@ -208,7 +223,7 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
         opj_destroy_codec(decoder);
         throw std::runtime_error("Jp2Processor: failed to decode image");
     }
-    
+
     opj_end_decompress(decoder, in_stream);
     opj_stream_destroy(in_stream);
     opj_destroy_codec(decoder);
@@ -223,13 +238,7 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
     cparam.cp_disto_alloc = 1;
     cparam.irreversible = 0; // use 5/3 wavelet transform
 
-    // opj_setup_encoder copies cp_comment internally, so it only needs to stay valid for this call
-    auto comment = extract_com_comment(input_path);
-    if (comment) {
-        cparam.cp_comment = comment->data();
-    }
-
-    opj_codec_t* encoder = opj_create_compress(format);
+    opj_codec_t* encoder = opj_create_compress(OPJ_CODEC_J2K);
     opj_set_info_handler(encoder, info_callback, nullptr);
     opj_set_warning_handler(encoder, warning_callback, nullptr);
     opj_set_error_handler(encoder, error_callback, nullptr);
@@ -259,6 +268,39 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
 
     if (!success) {
         throw std::runtime_error("Jp2Processor: compression pipeline failed");
+    }
+
+    // openjpeg signs the codestream with a comment of its own: the input's comments go there instead
+    std::vector<std::span<const uint8_t>> comments;
+    if (options.preserve_metadata) {
+        std::ranges::copy_if(*header, std::back_inserter(comments), is_comment);
+    }
+    const std::vector<uint8_t> encoded = read_file(output_path);
+    auto recoded = with_comments(encoded, comments);
+    if (!recoded) {
+        throw std::runtime_error("Jp2Processor: unreadable codestream from openjpeg");
+    }
+
+    std::vector<uint8_t> out;
+    if (format == OPJ_CODEC_J2K) {
+        out = std::move(*recoded);
+    } else {
+        bool replaced = false;
+        for (const Jp2Box& box : boxes) {
+            if (box.type == "jp2c" && !replaced) {
+                append_box(out, "jp2c", *recoded);
+                replaced = true;
+            } else if (!options.preserve_metadata && box.type == "jp2h") {
+                append_box(out, "jp2h", header_without_resolution(data, box));
+            } else if (options.preserve_metadata || !is_metadata(box.type)) {
+                const auto bytes = data.subspan(box.start, box.size);
+                out.insert(out.end(), bytes.begin(), bytes.end());
+            }
+        }
+        out.insert(out.end(), input.begin() + static_cast<std::ptrdiff_t>(tail), input.end());
+    }
+    if (!write_file(output_path, out)) {
+        throw std::runtime_error("Jp2Processor: can't write " + output_path.string());
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output_path.string(), get_name());
