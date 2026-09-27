@@ -4,6 +4,7 @@
 
 #include "../../include/jp2_processor.hpp"
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <fstream>
 #include <optional>
@@ -314,19 +315,29 @@ std::filesystem::path Jp2Processor::finalize_extraction(const ExtractedContent& 
     return {};
 }
 
-static std::vector<uint8_t> decode_jp2_rgba(const std::filesystem::path& path, int& w, int& h) {
+// the image as its codestream stores it: area, then each component's layout and samples at its own size
+struct RawImage {
+    std::array<OPJ_UINT32, 4> area{};
+    std::vector<std::array<OPJ_UINT32, 6>> layout;
+    std::vector<std::vector<OPJ_INT32>> samples;
+
+    bool operator==(const RawImage&) const = default;
+};
+
+static std::optional<RawImage> decode_raw(const std::filesystem::path& path) {
     const OPJ_CODEC_FORMAT format = detect_codec_format(path);
 
     opj_dparameters_t dparam;
     opj_set_default_decoder_parameters(&dparam);
+    dparam.flags |= OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG;
     opj_stream_t* stream = opj_stream_create_default_file_stream(path.string().c_str(), OPJ_TRUE);
-    if (!stream) return {};
+    if (!stream) return std::nullopt;
 
     opj_codec_t* decoder = opj_create_decompress(format);
     if (!opj_setup_decoder(decoder, &dparam)) {
         opj_stream_destroy(stream);
         opj_destroy_codec(decoder);
-        return {};
+        return std::nullopt;
     }
 
     opj_image_t* image = nullptr;
@@ -334,24 +345,25 @@ static std::vector<uint8_t> decode_jp2_rgba(const std::filesystem::path& path, i
         if (image) opj_image_destroy(image);
         opj_stream_destroy(stream);
         opj_destroy_codec(decoder);
-        return {};
+        return std::nullopt;
     }
 
-    w = static_cast<int>(image->x1 - image->x0);
-    h = static_cast<int>(image->y1 - image->y0);
-    const std::size_t size = static_cast<size_t>(w) * h * image->numcomps;
-    std::vector<uint8_t> pixels(size * sizeof(int));
-
-    for (uint32_t i = 0; i < image->numcomps; ++i) {
-        if (image->comps[i].data) {
-            std::memcpy(pixels.data() + (i * w * h * sizeof(int)), image->comps[i].data, static_cast<size_t>(w) * h * sizeof(int));
+    std::optional<RawImage> raw = RawImage{};
+    raw->area = {image->x0, image->y0, image->x1, image->y1};
+    for (OPJ_UINT32 i = 0; i < image->numcomps; ++i) {
+        const opj_image_comp_t& comp = image->comps[i];
+        if (comp.data == nullptr) {
+            raw.reset();
+            break;
         }
+        raw->layout.push_back({comp.w, comp.h, comp.dx, comp.dy, comp.prec, comp.sgnd});
+        raw->samples.emplace_back(comp.data, comp.data + static_cast<std::size_t>(comp.w) * comp.h);
     }
 
     opj_image_destroy(image);
     opj_stream_destroy(stream);
     opj_destroy_codec(decoder);
-    return pixels;
+    return raw;
 }
 
 std::string Jp2Processor::get_raw_checksum(const std::filesystem::path& /*file_path*/) const {
@@ -359,13 +371,9 @@ std::string Jp2Processor::get_raw_checksum(const std::filesystem::path& /*file_p
 }
 
 bool Jp2Processor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
-    int wa, ha, wb, hb;
-    const auto pixA = decode_jp2_rgba(a, wa, ha);
-    const auto pixB = decode_jp2_rgba(b, wb, hb);
-
-    if (pixA.empty() || pixB.empty()) return false;
-    if (wa != wb || ha != hb) return false;
-    return pixA == pixB;
+    const auto rawA = decode_raw(a);
+    const auto rawB = decode_raw(b);
+    return rawA && rawB && *rawA == *rawB;
 }
 
 } // namespace chisel
