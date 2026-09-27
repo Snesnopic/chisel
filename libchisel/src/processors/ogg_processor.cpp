@@ -527,25 +527,24 @@ void OggProcessor::recompress(const fs::path& input,
     }
 
     // libFLAC keeps only STREAMINFO and rewrites what it's given: its placeholders make room for the input's blocks
-    std::vector<std::vector<uint8_t>> blocks;
-    if (options.preserve_metadata) {
-        auto stored = AudioMetadataUtil::oggFlacMetadata(input);
-        if (!stored) {
-            fclose(f_in);
-            Logger::log(LogLevel::Warning, "Unreadable metadata blocks, left as is: " + input.string(), get_name());
-            copy_as_is(input, output);
-            return;
-        }
-        std::erase_if(*stored, [](const std::vector<uint8_t>& b) {
-            const int type = b[0] & 0x7f;
-            return type == FLAC__METADATA_TYPE_PADDING || type == FLAC__METADATA_TYPE_SEEKTABLE;
-        });
-        // the mapping puts the comments first
-        std::ranges::stable_partition(*stored, [](const std::vector<uint8_t>& b) {
-            return (b[0] & 0x7f) == FLAC__METADATA_TYPE_VORBIS_COMMENT;
-        });
-        blocks = std::move(*stored);
+    auto stored = AudioMetadataUtil::oggFlacMetadata(input);
+    if (!stored) {
+        fclose(f_in);
+        Logger::log(LogLevel::Warning, "Unreadable metadata blocks, left as is: " + input.string(), get_name());
+        copy_as_is(input, output);
+        return;
     }
+    std::erase_if(*stored, [&options](const std::vector<uint8_t>& b) {
+        const int type = b[0] & 0x7f;
+        // without metadata the pictures stay, as in native FLAC files
+        if (!options.preserve_metadata) return type != FLAC__METADATA_TYPE_PICTURE;
+        return type == FLAC__METADATA_TYPE_PADDING || type == FLAC__METADATA_TYPE_SEEKTABLE;
+    });
+    // the mapping puts the comments first
+    std::ranges::stable_partition(*stored, [](const std::vector<uint8_t>& b) {
+        return (b[0] & 0x7f) == FLAC__METADATA_TYPE_VORBIS_COMMENT;
+    });
+    const std::vector<std::vector<uint8_t>> blocks = std::move(*stored);
 
     // fallback to flac context setup
     FLAC__StreamDecoder* decoder = FLAC__stream_decoder_new();

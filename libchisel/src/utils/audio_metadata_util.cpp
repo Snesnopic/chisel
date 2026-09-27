@@ -350,6 +350,50 @@ bool rebuildFlacPictures(const std::filesystem::path& file, const std::vector<Au
     return ok;
 }
 
+// sets the 24-bit length in a FLAC metadata block's header from the block's size
+bool setFlacBlockLength(TagLib::ByteVector& block) {
+    const std::size_t length = block.size() - 4;
+    if (length > 0xffffff) return false;
+    block[1] = static_cast<char>(length >> 16 & 0xff);
+    block[2] = static_cast<char>(length >> 8 & 0xff);
+    block[3] = static_cast<char>(length & 0xff);
+    return true;
+}
+
+// marks the covers of an Ogg FLAC stream that come from its PICTURE blocks rather than its comments
+struct OggFlacPictureBlock {};
+
+// the header packets of an Ogg FLAC stream that hold a PICTURE block TagLib can read
+std::vector<unsigned int> oggFlacPicturePackets(TagLib::Ogg::File& file) {
+    std::vector<unsigned int> packets;
+    for (unsigned int index = 1;; ++index) {
+        const TagLib::ByteVector block = file.packet(index);
+        if (block.size() < 4) break;
+        TagLib::FLAC::Picture picture;
+        if ((block[0] & 0x7f) == FLAC__METADATA_TYPE_PICTURE && picture.parse(block.mid(4))) packets.push_back(index);
+        if ((block[0] & 0x80) != 0) break;
+    }
+    return packets;
+}
+
+// PICTURE blocks of an Ogg FLAC stream get their optimized images, like the blocks of a native FLAC file
+bool rebuildOggFlacPictureBlocks(TagLib::Ogg::File& file, const std::vector<AudioCoverInfo>& covers) {
+    const std::vector<unsigned int> packets = oggFlacPicturePackets(file);
+    for (std::size_t i = 0; i < packets.size() && i < covers.size(); ++i) {
+        const TagLib::ByteVector data = readFileToByteVector(covers[i].temp_file_path);
+        if (data.isEmpty()) continue;
+        const TagLib::ByteVector block = file.packet(packets[i]);
+        TagLib::FLAC::Picture picture;
+        picture.parse(block.mid(4));
+        picture.setData(data);
+        setPictureProps(picture, covers[i]);
+        TagLib::ByteVector rebuilt = block.mid(0, 4) + picture.render();
+        if (!setFlacBlockLength(rebuilt)) return false;
+        file.setPacket(packets[i], rebuilt);
+    }
+    return true;
+}
+
 enum class OggCodec { Vorbis, Opus, Speex, Flac };
 
 // Ogg Vorbis, Opus, Speex and FLAC: only the pictures change, where TagLib would sort and upper-case every comment
@@ -449,11 +493,7 @@ bool rebuildOggPictures(TagLib::Ogg::File& file, const OggCodec codec, const std
     rebuilt.append(rest);
     if (codec == OggCodec::Flac) {
         // the block header keeps its type and last-block flag
-        const std::size_t length = rebuilt.size() - 4;
-        if (length > 0xffffff) return false;
-        rebuilt[1] = static_cast<char>(length >> 16 & 0xff);
-        rebuilt[2] = static_cast<char>(length >> 8 & 0xff);
-        rebuilt[3] = static_cast<char>(length & 0xff);
+        if (!setFlacBlockLength(rebuilt)) return false;
     }
 
     file.setPacket(index, rebuilt);
@@ -739,6 +779,31 @@ bool rebuildApeV2Covers(TagLib::APE::Tag* tag,
 }
 
 // shared helper to extract covers from xiph comment (ogg variants)
+// covers in the PICTURE blocks of an Ogg FLAC stream, which TagLib only looks for among the comments
+void extractOggFlacPictureBlocks(TagLib::Ogg::File& file, const std::filesystem::path& temp_dir,
+                                 std::vector<AudioCoverInfo>& extracted_covers) {
+    for (const unsigned int index : oggFlacPicturePackets(file)) {
+        TagLib::FLAC::Picture pic;
+        pic.parse(file.packet(index).mid(4));
+        const std::filesystem::path outPath =
+            coverPath(temp_dir, static_cast<int>(extracted_covers.size()), pic.data());
+
+        if (!write_file(outPath, pic.data().data(), pic.data().size())) {
+            throw std::runtime_error("Can't write cover art to " + outPath.string());
+        }
+
+        AudioCoverInfo info;
+        info.temp_file_path = outPath;
+        info.mime_type = pic.mimeType().to8Bit(true);
+        info.description = pic.description().to8Bit(true);
+        info.picture_type = normalizePictureTypeFromFlac(pic.type());
+        keepPictureProps(info, pic);
+        info.format_specific = OggFlacPictureBlock{};
+
+        extracted_covers.push_back(std::move(info));
+    }
+}
+
 void extractXiphCovers(TagLib::Ogg::XiphComment* tag,
                        const std::filesystem::path& temp_dir,
                        std::vector<AudioCoverInfo>& extracted_covers) {
@@ -986,8 +1051,9 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
         return state;
     }
 
-    // ogg flac (xiph)
+    // ogg flac: its PICTURE blocks, as in native FLAC files, then the pictures among the comments
     if (auto *oggFlac = dynamic_cast<TagLib::Ogg::FLAC::File*>(file_ref)) {
+        extractOggFlacPictureBlocks(*oggFlac, temp_dir, state.extracted_covers);
         extractXiphCovers(oggFlac->tag(), temp_dir, state.extracted_covers);
         return state;
     }
@@ -1207,9 +1273,14 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
         return false;
     }
 
-    // ogg flac
+    // ogg flac: the PICTURE blocks, then the comments, saved together
     if (auto *oggFlac = dynamic_cast<TagLib::Ogg::FLAC::File*>(file_ref)) {
-        return rebuildOggPictures(*oggFlac, OggCodec::Flac, state.extracted_covers);
+        std::vector<AudioCoverInfo> blocks;
+        std::vector<AudioCoverInfo> comments;
+        for (const auto& info : state.extracted_covers) {
+            (info.format_specific.type() == typeid(OggFlacPictureBlock) ? blocks : comments).push_back(info);
+        }
+        return rebuildOggFlacPictureBlocks(*oggFlac, blocks) && rebuildOggPictures(*oggFlac, OggCodec::Flac, comments);
     }
 
     // ogg speex
