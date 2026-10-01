@@ -13,7 +13,6 @@
 #include <filesystem>
 #include <future>
 #include <vector>
-#include <stack>
 #include <string>
 #include <chrono>
 #include <fstream>
@@ -153,16 +152,17 @@ namespace chisel {
                 if (!dir.empty()) fs::remove_all(dir, ec);
             }
         } dry_run_dir_guard{.dir=dry_run_dir_};
-        // containers still here when the run stops early keep their extracted files in temp
+        // containers Phase 3 never took up (the run stopped early) still have their extracted files in temp
         struct PendingContainersGuard {
-            std::stack<PendingContainer>& stack;
+            std::deque<ContainerNode>& containers;
             ~PendingContainersGuard() {
                 std::error_code ec;
-                for (; !stack.empty(); stack.pop()) {
-                    if (!stack.top().content.temp_dir.empty()) fs::remove_all(stack.top().content.temp_dir, ec);
+                for (const auto& node : containers) {
+                    if (!node.finalized && !node.content.temp_dir.empty()) fs::remove_all(node.content.temp_dir, ec);
                 }
+                containers.clear();
             }
-        } pending_containers_guard{.stack=finalize_stack_};
+        } pending_containers_guard{.containers=containers_};
 
         if (dry_run_) {
             dry_run_dir_ = fs::temp_directory_path() / ("chisel-dry-run-" + RandomUtils::random_suffix());
@@ -340,7 +340,7 @@ namespace chisel {
     }
 
     void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth,
-                                         const bool keep_pixel_format) {
+                                         const bool keep_pixel_format, ContainerNode* parent_node) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
 
         if (depth > kMaxNestingDepth) {
@@ -405,9 +405,13 @@ namespace chisel {
                 std::error_code ec;
                 content->original_size = fs::file_size(content->original_path, ec);
                 if (ec) content->original_size = 0;
-                finalize_stack_.push({.content=*content, .nested=parent.has_value()});
+                auto& node = containers_.emplace_back();
+                node.content = *content;
+                node.nested = parent.has_value();
+                node.parent = parent_node;
+                if (parent_node) ++parent_node->pending;
                 for (const auto &child: content->extracted_files) {
-                    analyze_path(child, path, depth + 1, content->fixed_pixel_format.contains(child));
+                    analyze_path(child, path, depth + 1, content->fixed_pixel_format.contains(child), &node);
                 }
                 scheduled_for_extraction = true;
             } else {
@@ -685,98 +689,127 @@ namespace chisel {
     }
 
     void ProcessorExecutor::finalize_containers() {
-        while (!finalize_stack_.empty() && !stop_flag_.load()) {
-            auto [content, nested] = finalize_stack_.top();
-            finalize_stack_.pop();
+        // leaves first, the biggest of them first since they take longest to rebuild
+        std::vector<ContainerNode*> ready;
+        for (auto& node : containers_) {
+            if (node.pending.load() == 0) ready.push_back(&node);
+        }
+        std::ranges::stable_sort(ready, std::ranges::greater{},
+                                 [](const ContainerNode* node) { return node->content.original_size; });
+        for (auto* node : ready) {
+            schedule_finalize(*node);
+        }
+        pool_.wait_idle();
+    }
 
-            event_bus_.publish(ContainerFinalizeStartEvent{content.original_path});
+    void ProcessorExecutor::schedule_finalize(ContainerNode& node) {
+        try {
+            pool_.enqueue([this, &node](const stop_token st) {
+                if (st.stop_requested()) return;
+                finalize_container(node);
+                // the last container inside the parent to be rebuilt lets the parent go
+                if (node.parent && node.parent->pending.fetch_sub(1) == 1) schedule_finalize(*node.parent);
+            });
+        } catch (const std::runtime_error&) {
+            // the pool is stopping: the containers left are cleaned up at the end of the run
+        }
+    }
 
-            auto procs = registry_.find_by_mime(MimeDetector::detect(content.original_path));
-            if (procs.empty()) {
-                procs = registry_.find_by_extension(content.original_path.extension().string());
+    void ProcessorExecutor::finalize_container(ContainerNode& node) {
+        node.finalized = true;
+        const auto& content = node.content;
+        const bool nested = node.nested;
+
+        event_bus_.publish(ContainerFinalizeStartEvent{content.original_path});
+
+        auto procs = registry_.find_by_mime(MimeDetector::detect(content.original_path));
+        if (procs.empty()) {
+            procs = registry_.find_by_extension(content.original_path.extension().string());
+        }
+        if (procs.empty()) {
+            Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(), "Executor");
+            event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Unsupported format"});
+            return;
+        }
+
+        try {
+            // if Phase 2 already recompressed this same file, rebuild on top of
+            // those bytes instead of the (possibly stale, with --output-dir) original
+            ExtractedContent effective_content = content;
+            bool recompressed = false;
+            {
+                std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+                auto it = recompressed_paths_.find(content.original_path.string());
+                if (it != recompressed_paths_.end()) {
+                    effective_content.original_path = it->second;
+                    recompressed = true;
+                }
             }
-            if (procs.empty()) {
-                Logger::log(LogLevel::Warning, "No processor to finalize: " + content.original_path.string(), "Executor");
-                event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Unsupported format"});
-                continue;
+
+            auto start = std::chrono::steady_clock::now();
+            std::filesystem::path new_temp_file = procs.front()->finalize_extraction(effective_content, m_options);
+            auto end = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+            std::error_code ec;
+            auto orig_size = content.original_size;
+
+            if (new_temp_file.empty()) {
+                Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
+                // publish explicit Phase 3 complete event even if skipped, phase 2's result being the final one
+                auto final_size = orig_size;
+                if (recompressed) {
+                    if (const auto size = std::filesystem::file_size(effective_content.original_path, ec); !ec) final_size = size;
+                }
+                const bool replaced = recompressed && !dry_run_;
+                event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=replaced ? effective_content.original_path : content.original_path, .original_size=orig_size, .final_size=final_size, .replaced=replaced, .duration=duration});
+                return;
             }
 
-            try {
-                // if Phase 2 already recompressed this same file, rebuild on top of
-                // those bytes instead of the (possibly stale, with --output-dir) original
-                ExtractedContent effective_content = content;
-                bool recompressed = false;
-                {
-                    std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
-                    auto it = recompressed_paths_.find(content.original_path.string());
-                    if (it != recompressed_paths_.end()) {
-                        effective_content.original_path = it->second;
-                        recompressed = true;
-                    }
-                }
+            auto new_size = std::filesystem::file_size(new_temp_file, ec);
 
-                auto start = std::chrono::steady_clock::now();
-                std::filesystem::path new_temp_file = procs.front()->finalize_extraction(effective_content, m_options);
-                auto end = std::chrono::steady_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-                std::error_code ec;
-                auto orig_size = content.original_size;
-
-                if (new_temp_file.empty()) {
-                    Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
-                    // publish explicit Phase 3 complete event even if skipped, phase 2's result being the final one
-                    auto final_size = orig_size;
-                    if (recompressed) {
-                        if (const auto size = std::filesystem::file_size(effective_content.original_path, ec); !ec) final_size = size;
-                    }
-                    const bool replaced = recompressed && !dry_run_;
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=replaced ? effective_content.original_path : content.original_path, .original_size=orig_size, .final_size=final_size, .replaced=replaced, .duration=duration});
-                    continue;
-                }
-
-                auto new_size = std::filesystem::file_size(new_temp_file, ec);
-
-                // Only enforce "must be strictly smaller" for processors that are
-                // *pure* containers (can_recompress() == false), e.g. ArchiveProcessor,
-                // OdfProcessor, OOXMLProcessor: for these, Phase 2 never touches the
-                // original file, so falling back to it on a non-improving finalize is
-                // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor,
-                // MkvProcessor) already rebuild on top of Phase 2's recompressed bytes
-                // (effective_content.original_path, redirected above via
-                // recompressed_paths_) as part of reinserting an extracted resource
-                // (like cover art) - discarding this result would mean serving Phase 2's
-                // intermediate output with the pre-reinsertion resource still in place,
-                // not losing anything, but the extraction/reinsertion round-trip itself
-                // is treated as always worth keeping rather than re-compared by size.
-                if (!procs.front()->can_recompress() && !ec && new_size >= orig_size) {
-                    Logger::log(LogLevel::Debug,
-                                "Container finalize discarded (no size improvement): " + content.original_path.string(),
-                                "Executor");
-                    std::filesystem::remove(new_temp_file, ec);
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
-                    continue;
-                }
-
-                // use the helper and publish the specific Phase 3 event
-                auto move_result = move_to_destination(content.original_path, new_temp_file, nested);
-                if (move_result) {
-                    event_bus_.publish(ContainerFinalizeCompleteEvent{
-                        .path=content.original_path,
-                        .destination=move_result->first,
-                        .original_size=orig_size,
-                        .final_size=ec ? 0 : new_size,
-                        .replaced=move_result->second,
-                        .duration=duration
-                    });
-                } else {
-                    event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Failed to finalize container file"});
-                }
-
-            } catch (const std::exception &e) {
-                Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
-                event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message=e.what()});
+            // Only enforce "must be strictly smaller" for processors that are
+            // *pure* containers (can_recompress() == false), e.g. ArchiveProcessor,
+            // OdfProcessor, OOXMLProcessor: for these, Phase 2 never touches the
+            // original file, so falling back to it on a non-improving finalize is
+            // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor,
+            // MkvProcessor) already rebuild on top of Phase 2's recompressed bytes
+            // (effective_content.original_path, redirected above via
+            // recompressed_paths_) as part of reinserting an extracted resource
+            // (like cover art) - discarding this result would mean serving Phase 2's
+            // intermediate output with the pre-reinsertion resource still in place,
+            // not losing anything, but the extraction/reinsertion round-trip itself
+            // is treated as always worth keeping rather than re-compared by size.
+            if (!procs.front()->can_recompress() && !ec && new_size >= orig_size) {
+                Logger::log(LogLevel::Debug,
+                            "Container finalize discarded (no size improvement): " + content.original_path.string(),
+                            "Executor");
+                std::filesystem::remove(new_temp_file, ec);
+                event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
+                return;
             }
+
+            // use the helper and publish the specific Phase 3 event
+            auto move_result = move_to_destination(content.original_path, new_temp_file, nested);
+            if (move_result) {
+                event_bus_.publish(ContainerFinalizeCompleteEvent{
+                    .path=content.original_path,
+                    .destination=move_result->first,
+                    .original_size=orig_size,
+                    .final_size=ec ? 0 : new_size,
+                    .replaced=move_result->second,
+                    .duration=duration
+                });
+            } else {
+                event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Failed to finalize container file"});
+            }
+
+        } catch (const std::exception &e) {
+            Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
+            event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message=e.what()});
+        } catch (...) {
+            Logger::log(LogLevel::Error, "Unknown finalize error: " + content.original_path.string(), "Executor");
+            event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Unknown non-standard exception"});
         }
     }
 

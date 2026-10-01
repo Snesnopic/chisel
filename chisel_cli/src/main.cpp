@@ -207,7 +207,7 @@ int main(int argc, char* argv[]) {
 
     // true once finalization (phase 3) has started; switches the status label
     // from "Processing: " to "Finalizing: " for the shared progress bar
-    bool phase3_started = false;
+    std::atomic<bool> phase3_started{false};
     // guards the one-time phase-1 summary line ("N files found"), printed
     // right before whichever of phase 2/3 actually starts first
     bool phase1_summary_printed = false;
@@ -290,8 +290,7 @@ int main(int argc, char* argv[]) {
     };
 
     // phase 3 (finalization): same status-bar mechanism as phase 2, with the
-    // "Finalizing: " label; containers finalize one at a time, so at most one
-    // entry is ever active
+    // "Finalizing: " label
     bus.subscribe<ContainerFinalizeStartEvent>([&](const ContainerFinalizeStartEvent& e) {
         if (settings.quiet) return;
 

@@ -18,7 +18,8 @@
 #include "processor_registry.hpp"
 #include <filesystem>
 #include <vector>
-#include <stack>
+#include <deque>
+#include <atomic>
 #include <optional>
 #include <thread>
 #include <mutex>
@@ -51,7 +52,8 @@ namespace chisel {
  * - Phase 2: Recompression of eligible files (in PIPE or PARALLEL mode)
  * using the ThreadPool.
  * - Phase 3: Finalization (re-assembly) of containers after their
- * contents have been processed.
+ * contents have been processed, in parallel, each container once every
+ * container found inside it is done.
  *
  * It uses a ProcessorRegistry to discover processors, a ThreadPool to
  * parallelize work, and an EventBus to publish progress and results.
@@ -117,6 +119,8 @@ public:
     void request_stop();
 
 private:
+    struct ContainerNode;
+
     /**
      * @brief Maximum container nesting depth (archive-in-archive-in-archive...).
      *
@@ -131,15 +135,16 @@ private:
      *
      * If it's a file, it's added to work_list_.
      * If it's a container, its contents are extracted, added to
-     * work_list_, and the container is added to finalize_stack_.
+     * work_list_, and the container is added to containers_.
      *
      * @param path The file or directory path to analyze.
      * @param parent The parent container path if this is an extracted file.
      * @param depth Current container nesting depth (0 for top-level inputs).
      * @param keep_pixel_format True for an image whose color type and bit depth its container declares.
+     * @param parent_node The parent container's node if this is an extracted file.
      */
     void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt,
-                      unsigned depth = 0, bool keep_pixel_format = false);
+                      unsigned depth = 0, bool keep_pixel_format = false, ContainerNode* parent_node = nullptr);
 
     /**
      * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
@@ -149,11 +154,18 @@ private:
     void process_work_list();
 
     /**
-     * @brief Phase 3: Finalize all containers in finalize_stack_.
+     * @brief Phase 3: Finalize all containers in containers_ on the ThreadPool.
      *
-     * This runs sequentially (LIFO) after all file processing is complete.
+     * Runs after all file processing is complete. A container is rebuilt once every container
+     * found inside it is, so the ones with none start first, the biggest of them first.
      */
     void finalize_containers();
+
+    /// @brief Queues a container's finalization, and its parent's once it's the last one inside it.
+    void schedule_finalize(ContainerNode& node);
+
+    /// @brief Rebuilds one container from its processed contents and puts it in place.
+    void finalize_container(ContainerNode& node);
 
     /// @brief Directory for a file's Phase 2 temp outputs, on the same mount point as their destination.
     [[nodiscard]] std::filesystem::path temp_dir_for(const std::filesystem::path& file, bool nested) const;
@@ -171,13 +183,17 @@ private:
     /// @brief Copies the inputs that weren't written to the output path, unchanged.
     void copy_unchanged_inputs(const std::vector<std::filesystem::path>& inputs) const;
 
-    ThreadPool pool_;                            ///< Thread pool for Phase 2
+    ThreadPool pool_;                            ///< Thread pool for Phases 2 and 3
     ProcessingOptions m_options;
-    struct PendingContainer {
+    /// @brief A container extracted in Phase 1, rebuilt in Phase 3 once every container found inside it is.
+    struct ContainerNode {
         ExtractedContent content;
-        bool nested = false; ///< True if the container was itself extracted from another container
+        bool nested = false;                 ///< True if the container was itself extracted from another container
+        ContainerNode* parent = nullptr;     ///< The container this one was extracted from, if any
+        std::atomic<std::size_t> pending{0}; ///< Containers found inside this one that aren't rebuilt yet
+        bool finalized = false;              ///< Set once Phase 3 has taken it up
     };
-    std::stack<PendingContainer> finalize_stack_; ///< (Phase 1->3) Containers to be re-assembled
+    std::deque<ContainerNode> containers_; ///< (Phase 1->3) Containers to be re-assembled; a deque keeps nodes in place
     struct WorkItem {
         std::filesystem::path path;                            ///< Path to the file to be processed
         std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any
