@@ -110,6 +110,9 @@ void MpegProcessor::recompress(const fs::path& input,
     try {
         mp3packer::Packer packer;
         packer.recompress_huffman = true;
+        // the frame crcs and the whole xing/info frame are part of the file as it came
+        packer.keep_crc = true;
+        packer.preserve_xing = true;
         packer.process(input.string(), output.string());
     } catch (const std::exception& e) {
         throw std::runtime_error("Exception during mp3packercpp execution: " + std::string(e.what()));
