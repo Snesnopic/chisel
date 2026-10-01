@@ -153,6 +153,16 @@ namespace chisel {
                 if (!dir.empty()) fs::remove_all(dir, ec);
             }
         } dry_run_dir_guard{.dir=dry_run_dir_};
+        // containers still here when the run stops early keep their extracted files in temp
+        struct PendingContainersGuard {
+            std::stack<PendingContainer>& stack;
+            ~PendingContainersGuard() {
+                std::error_code ec;
+                for (; !stack.empty(); stack.pop()) {
+                    if (!stack.top().content.temp_dir.empty()) fs::remove_all(stack.top().content.temp_dir, ec);
+                }
+            }
+        } pending_containers_guard{.stack=finalize_stack_};
 
         if (dry_run_) {
             dry_run_dir_ = fs::temp_directory_path() / ("chisel-dry-run-" + RandomUtils::random_suffix());
