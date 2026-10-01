@@ -10,6 +10,9 @@
 #include <thread>
 #include <iomanip>
 #include <fstream>
+#include <algorithm>
+#include <map>
+#include <vector>
 #include "utils/color.hpp"
 #include "cli/CLI11.hpp"
 #include "cli/cli_parser.hpp"
@@ -237,8 +240,17 @@ int main(int argc, char* argv[]) {
 
     // phase 1 (analysis): a permanent line for every container found (regular
     // files print nothing here), indented by nesting depth so containers found
-    // inside another container are visually distinguishable from direct input
+    // inside another container are visually distinguishable from direct input;
+    // inputs are analyzed in parallel, so each input's lines wait for the input
+    // to be done and are printed together, each container above its contents
+    struct FoundContainer {
+        std::filesystem::path path;
+        std::size_t num_children = 0;
+    };
+    // per input, the containers found under each parent (an empty path for the input itself)
+    std::map<std::filesystem::path, std::map<std::filesystem::path, std::vector<FoundContainer>>> found_by_input;
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
+        std::scoped_lock lock(g_console_mtx);
         if (e.scheduled) {
             total++;
             phase2_total++;
@@ -249,10 +261,31 @@ int main(int argc, char* argv[]) {
         }
 
         if (settings.quiet || !(e.extracted && e.num_children > 0)) return;
+        found_by_input[e.root][e.parent.value_or(std::filesystem::path{})].push_back(
+            {.path=e.path, .num_children=e.num_children});
+    });
 
+    bus.subscribe<InputAnalyzeCompleteEvent>([&](const InputAnalyzeCompleteEvent& e) {
         std::scoped_lock lock(g_console_mtx);
-        std::cerr << std::string(2 + 2 * e.depth, ' ') << e.path.filename().string()
-                  << " -> found " << e.num_children << " files inside" << std::endl;
+        const auto it = found_by_input.find(e.path);
+        if (it == found_by_input.end()) return;
+        auto& children = it->second;
+        std::vector<std::pair<const FoundContainer*, unsigned>> stack;
+        const auto push_children = [&](const std::filesystem::path& parent, const unsigned depth) {
+            const auto c = children.find(parent);
+            if (c == children.end()) return;
+            std::ranges::sort(c->second, std::ranges::greater{}, [](const FoundContainer& f) { return f.path.filename(); });
+            for (const auto& f : c->second) stack.emplace_back(&f, depth);
+        };
+        push_children({}, 0);
+        while (!stack.empty()) {
+            const auto [f, depth] = stack.back();
+            stack.pop_back();
+            std::cerr << std::string(2 + 2 * depth, ' ') << f->path.filename().string()
+                      << " -> found " << f->num_children << " files inside" << std::endl;
+            push_children(f->path, depth + 1);
+        }
+        found_by_input.erase(it);
     });
 
     // Process Start: Update the "Processing: ..." text dynamically

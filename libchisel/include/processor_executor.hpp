@@ -48,7 +48,7 @@ namespace chisel {
  * @brief Orchestrates the analysis, processing, and finalization of files.
  *
  * @details ProcessorExecutor coordinates the three main phases of chisel:
- * - Phase 1: Recursive analysis of input files and containers.
+ * - Phase 1: Analysis of input files and of the containers found in them, on the ThreadPool.
  * - Phase 2: Recompression of eligible files (in PIPE or PARALLEL mode)
  * using the ThreadPool.
  * - Phase 3: Finalization (re-assembly) of containers after their
@@ -120,6 +120,7 @@ public:
 
 private:
     struct ContainerNode;
+    struct AnalysisRoot;
 
     /**
      * @brief Maximum container nesting depth (archive-in-archive-in-archive...).
@@ -131,20 +132,25 @@ private:
     static constexpr unsigned kMaxNestingDepth = 256;
 
     /**
-     * @brief Phase 1: Recursively analyze a path.
+     * @brief Phase 1: Analyze a path.
      *
      * If it's a file, it's added to work_list_.
-     * If it's a container, its contents are extracted, added to
-     * work_list_, and the container is added to containers_.
+     * If it's a container, its contents are extracted, the container is added to containers_,
+     * and each extracted file is queued for analysis on the ThreadPool.
      *
      * @param path The file or directory path to analyze.
      * @param parent The parent container path if this is an extracted file.
      * @param depth Current container nesting depth (0 for top-level inputs).
      * @param keep_pixel_format True for an image whose color type and bit depth its container declares.
      * @param parent_node The parent container's node if this is an extracted file.
+     * @param root The top-level input the path was found in.
      */
-    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent = std::nullopt,
-                      unsigned depth = 0, bool keep_pixel_format = false, ContainerNode* parent_node = nullptr);
+    void analyze_path(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent,
+                      unsigned depth, bool keep_pixel_format, ContainerNode* parent_node, AnalysisRoot& root);
+
+    /// @brief Queues a path's analysis, publishing InputAnalyzeCompleteEvent after the last one of its input.
+    void schedule_analysis(const std::filesystem::path& path, const std::optional<std::filesystem::path>& parent,
+                           unsigned depth, bool keep_pixel_format, ContainerNode* parent_node, AnalysisRoot& root);
 
     /**
      * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
@@ -183,7 +189,7 @@ private:
     /// @brief Copies the inputs that weren't written to the output path, unchanged.
     void copy_unchanged_inputs(const std::vector<std::filesystem::path>& inputs) const;
 
-    ThreadPool pool_;                            ///< Thread pool for Phases 2 and 3
+    ThreadPool pool_;                            ///< Thread pool for all three phases
     ProcessingOptions m_options;
     /// @brief A container extracted in Phase 1, rebuilt in Phase 3 once every container found inside it is.
     struct ContainerNode {
@@ -194,6 +200,12 @@ private:
         bool finalized = false;              ///< Set once Phase 3 has taken it up
     };
     std::deque<ContainerNode> containers_; ///< (Phase 1->3) Containers to be re-assembled; a deque keeps nodes in place
+    /// @brief A top-level input whose analysis, or that of something found inside it, is still queued or running.
+    struct AnalysisRoot {
+        std::filesystem::path path;
+        std::atomic<std::size_t> outstanding{0}; ///< Analyses of this input not finished yet
+    };
+    std::mutex analysis_mutex_; ///< Guards containers_ and work_list_ while Phase 1 runs on the ThreadPool
     struct WorkItem {
         std::filesystem::path path;                            ///< Path to the file to be processed
         std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any

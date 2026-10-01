@@ -186,10 +186,16 @@ namespace chisel {
             }
         }
 
+        // inputs and everything found inside them are analyzed on the pool; a deque keeps the roots in place
+        std::deque<AnalysisRoot> analysis_roots;
         for (const auto &path: inputs) {
-            if (stop_flag_.load(std::memory_order_relaxed)) return;
-            analyze_path(path);
+            analysis_roots.emplace_back().path = path;
         }
+        for (auto &root: analysis_roots) {
+            if (stop_flag_.load(std::memory_order_relaxed)) break;
+            schedule_analysis(root.path, std::nullopt, 0, false, nullptr, root);
+        }
+        pool_.wait_idle();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         process_work_list();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
@@ -339,8 +345,32 @@ namespace chisel {
         }
     }
 
+    void ProcessorExecutor::schedule_analysis(const fs::path &path, const std::optional<fs::path>& parent,
+                                              const unsigned depth, const bool keep_pixel_format,
+                                              ContainerNode* parent_node, AnalysisRoot& root) {
+        ++root.outstanding;
+        try {
+            pool_.enqueue([this, path, parent, depth, keep_pixel_format, parent_node, &root](const stop_token st) {
+                try {
+                    if (!st.stop_requested()) analyze_path(path, parent, depth, keep_pixel_format, parent_node, root);
+                } catch (const std::exception& e) {
+                    Logger::log(LogLevel::Error, "Analysis error on " + path.string() + ": " + e.what(), "Executor");
+                } catch (...) {
+                    Logger::log(LogLevel::Error, "Unknown analysis error on " + path.string(), "Executor");
+                }
+                // the input's last analysis, after every one it queued
+                if (--root.outstanding == 0 && !st.stop_requested()) {
+                    event_bus_.publish(InputAnalyzeCompleteEvent{root.path});
+                }
+            });
+        } catch (const std::runtime_error&) {
+            // the pool is stopping
+            --root.outstanding;
+        }
+    }
+
     void ProcessorExecutor::analyze_path(const fs::path &path, const std::optional<fs::path>& parent, const unsigned depth,
-                                         const bool keep_pixel_format, ContainerNode* parent_node) {
+                                         const bool keep_pixel_format, ContainerNode* parent_node, AnalysisRoot& root) {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
 
         if (depth > kMaxNestingDepth) {
@@ -405,13 +435,17 @@ namespace chisel {
                 std::error_code ec;
                 content->original_size = fs::file_size(content->original_path, ec);
                 if (ec) content->original_size = 0;
-                auto& node = containers_.emplace_back();
-                node.content = *content;
-                node.nested = parent.has_value();
-                node.parent = parent_node;
+                ContainerNode* node;
+                {
+                    std::lock_guard lock(analysis_mutex_);
+                    node = &containers_.emplace_back();
+                    node->content = *content;
+                    node->nested = parent.has_value();
+                    node->parent = parent_node;
+                }
                 if (parent_node) ++parent_node->pending;
                 for (const auto &child: content->extracted_files) {
-                    analyze_path(child, path, depth + 1, content->fixed_pixel_format.contains(child), &node);
+                    schedule_analysis(child, path, depth + 1, content->fixed_pixel_format.contains(child), node, root);
                 }
                 scheduled_for_extraction = true;
             } else {
@@ -425,15 +459,16 @@ namespace chisel {
             }
         }
         if (processor->can_recompress()) {
+            std::lock_guard lock(analysis_mutex_);
             work_list_.push_back({.path=current_path, .parent_container=parent, .is_container=scheduled_for_extraction,
                                   .keep_pixel_format=keep_pixel_format});
             scheduled_for_recompression = true;
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
             if (scheduled_for_extraction) {
-                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=true, .scheduled=scheduled_for_recompression, .num_children=content->extracted_files.size(), .depth=depth});
+                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=true, .scheduled=scheduled_for_recompression, .num_children=content->extracted_files.size(), .depth=depth, .parent=parent, .root=root.path});
             } else {
-                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=false, .scheduled=scheduled_for_recompression, .num_children=0, .depth=depth});
+                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .extracted=false, .scheduled=scheduled_for_recompression, .num_children=0, .depth=depth, .parent=parent, .root=root.path});
             }
         } else {
             Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");

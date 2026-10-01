@@ -46,6 +46,17 @@ struct FileAnalyzeCompleteEvent {
     bool scheduled = false;         ///< True if the file was scheduled for recompression
     std::size_t num_children = 0;   ///< Number of files found if extracted
     unsigned depth = 0;              ///< Nesting depth (0 = direct input, >0 = found inside another container)
+    std::optional<std::filesystem::path> parent; ///< Container the file was extracted from, if any
+    std::filesystem::path root;      ///< Top-level input the file was found in
+};
+
+/**
+ * @brief Emitted when a top-level input and everything found inside it has been analyzed.
+ *
+ * Inputs are analyzed in parallel, so this is where a consumer can present one input's findings together.
+ */
+struct InputAnalyzeCompleteEvent {
+    std::filesystem::path path; ///< The top-level input
 };
 
 /**
