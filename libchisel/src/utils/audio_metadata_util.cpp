@@ -138,6 +138,11 @@ void jpeg_error_exit_throw(const j_common_ptr cinfo) {
     // return control to computeImageProps
     longjmp(err->setjmp_buffer, 1);
 }
+void jpeg_output_message_log(const j_common_ptr cinfo) {
+    char buffer[JMSG_LENGTH_MAX];
+    (*cinfo->err->format_message)(cinfo, buffer);
+    Logger::log(LogLevel::Debug, buffer, "libjpeg");
+}
 
 // compute image props from the image's content; outputs are left untouched if it can't be read
 void computeImageProps(const std::filesystem::path &imagePath,
@@ -200,6 +205,7 @@ void computeImageProps(const std::filesystem::path &imagePath,
 
         cinfo.err = jpeg_std_error(&jsrcerr.pub);
         jsrcerr.pub.error_exit = jpeg_error_exit_throw;
+        jsrcerr.pub.output_message = jpeg_output_message_log;
 
         if (setjmp(jsrcerr.setjmp_buffer)) {
             // if libjpeg hits an error, it will jump here

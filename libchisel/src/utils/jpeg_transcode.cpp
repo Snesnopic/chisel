@@ -34,6 +34,16 @@ void jpeg_error_exit_longjmp(const j_common_ptr cinfo) {
     longjmp(err->setjmp_buffer, 1);
 }
 
+/**
+ * @brief libjpeg message handler that sends warnings to the log instead of stderr.
+ * @param cinfo Pointer to the libjpeg error context.
+ */
+void jpeg_output_message_log(const j_common_ptr cinfo) {
+    char buffer[JMSG_LENGTH_MAX];
+    (*cinfo->err->format_message)(cinfo, buffer);
+    Logger::log(LogLevel::Debug, buffer, "libjpeg");
+}
+
 // libjpeg destination that grows a std::vector
 struct VectorDest {
     jpeg_destination_mgr pub{};
@@ -143,8 +153,10 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
 
     srcinfo.err = jpeg_std_error(&jsrcerr.pub);
     jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
+    jsrcerr.pub.output_message = jpeg_output_message_log;
     jpeg_std_error(&jdsterr.pub);
     jdsterr.pub.error_exit = jpeg_error_exit_longjmp;
+    jdsterr.pub.output_message = jpeg_output_message_log;
     for (std::size_t i = 0; i < dstinfo.size(); ++i) {
         dstinfo[i].err = &jdsterr.pub;
         dest[i].out = &encoded[i];
@@ -213,6 +225,7 @@ bool decode_pixels(const std::span<const uint8_t> in, Pixels& px) {
     JpegErrorMgr jsrcerr{};
     cinfo.err = jpeg_std_error(&jsrcerr.pub);
     jsrcerr.pub.error_exit = jpeg_error_exit_longjmp;
+    jsrcerr.pub.output_message = jpeg_output_message_log;
 
     if (setjmp(jsrcerr.setjmp_buffer)) {
         jpeg_destroy_decompress(&cinfo);
