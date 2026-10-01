@@ -131,8 +131,9 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
         Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", "JpegProcessor");
         throw std::runtime_error("Libjpeg error");
     }
-    if (layout.primary_end < data.size() && !clean) {
-        Logger::log(LogLevel::Warning, "First image didn't end cleanly, leaving " + name + " unchanged", "JpegProcessor");
+    // damaged image data would be rewritten with libjpeg's guess for what's missing
+    if (!clean) {
+        Logger::log(LogLevel::Warning, "Damaged JPEG data, leaving " + name + " unchanged", "JpegProcessor");
         return {data.begin(), data.end()};
     }
 
@@ -183,7 +184,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
 
     std::vector<uint8_t> result;
     if (const auto layout = jpeg::parse_layout(data)) {
-        result = rebuild(data, *layout, options.preserve_metadata, input.filename().string());
+        result = rebuild(data, *layout, options.preserve_metadata, input.string());
     } else if (jpeg::first_image_end(data)) {
         Logger::log(LogLevel::Warning, "Inconsistent MPF data, leaving " + input.filename().string() + " unchanged",
                     get_name());
@@ -196,6 +197,11 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         if (!jpeg::transcode(data, policy, jpeg::ScanMode::Smallest, result, clean)) {
             Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", get_name());
             throw std::runtime_error("Libjpeg error");
+        }
+        if (!clean) {
+            Logger::log(LogLevel::Warning, "Damaged JPEG data, leaving " + input.string() + " unchanged",
+                        get_name());
+            result = data;
         }
     }
 
