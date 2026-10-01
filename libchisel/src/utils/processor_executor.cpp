@@ -373,7 +373,7 @@ namespace chisel {
         }
 
         if (procs.empty()) {
-            Logger::log(LogLevel::Warning, "No processor for " + path.string(), "Executor");
+            Logger::log(LogLevel::Debug, "No processor for " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Unsupported format"});
             return;
         }
@@ -412,7 +412,7 @@ namespace chisel {
                 scheduled_for_extraction = true;
             } else {
                 if (processor->can_recompress()) {
-                    Logger::log(LogLevel::Warning, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
+                    Logger::log(LogLevel::Debug, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .reason="Extraction resulted in no elements"});
                 } else {
                     Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
