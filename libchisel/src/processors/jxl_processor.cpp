@@ -82,6 +82,8 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     // this will store both the type and the content of each metadata box
     std::vector<std::pair<std::string, std::vector<uint8_t>>> metadata_boxes;
     bool has_pending_box_buffer = false;
+    // a "jbrd" box rebuilds the original jpeg, which a re-encode from pixels can't carry over
+    bool rebuilds_jpeg = false;
 
     // shrinks the last captured box down to the bytes the decoder actually wrote
     const auto release_pending_box_buffer = [&]() {
@@ -144,14 +146,17 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
             // a buffer set for the previously-seen box must be released before touching a new one
             release_pending_box_buffer();
 
-            if (!options.preserve_metadata) {
-                continue;
-            }
-
             JxlBoxType type;
             if (JXL_DEC_SUCCESS != JxlDecoderGetBoxType(dec, type, JXL_TRUE /* decompressed */)) {
                 ok = false;
                 break;
+            }
+            if (std::string_view(type, 4) == "jbrd") {
+                rebuilds_jpeg = true;
+            }
+
+            if (!options.preserve_metadata) {
+                continue;
             }
 
             // skip container/codestream structure boxes; only actual metadata is worth preserving
@@ -194,8 +199,9 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     if (!ok) throw std::runtime_error("JxlProcessor: decode failed");
 
     // false means the source was lossy (xyb_encoded); re-encoding lossless never shrinks it, so skip like webp/jpeg
-    if (!info.uses_original_profile) {
-        Logger::log(LogLevel::Info, "Input is a lossy JXL, skipping recompression", get_name());
+    if (!info.uses_original_profile || rebuilds_jpeg) {
+        Logger::log(LogLevel::Info, rebuilds_jpeg ? "Input can rebuild its original JPEG, skipping recompression"
+                                                  : "Input is a lossy JXL, skipping recompression", get_name());
         try {
             std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
         } catch (const std::exception& e) {
