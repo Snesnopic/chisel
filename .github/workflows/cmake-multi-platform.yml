@@ -254,7 +254,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: amd64
-          release: "15.0"
+          release: "15.1"
           usesh: true
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
@@ -322,7 +322,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: arm64
-          release: "15.0"
+          release: "15.1"
           usesh: true
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
@@ -726,7 +726,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: "15.0"
+          release: "15.1"
           usesh: true
           run: |
             echo "--- Starting FreeBSD Test ---"
@@ -1102,7 +1102,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: "15.0"
+          release: "15.1"
           usesh: true
           run: |
             echo "Checking dependencies for FreeBSD..."
