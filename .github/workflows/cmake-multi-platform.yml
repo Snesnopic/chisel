@@ -160,7 +160,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew remove --force $(brew list --formula)
+          brew remove --force --ignore-dependencies $(brew list --formula)
           brew remove --cask --force $(brew list)
           brew install autoconf automake libtool nasm yasm cmake ninja
 
