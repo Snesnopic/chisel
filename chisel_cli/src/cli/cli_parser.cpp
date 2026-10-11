@@ -43,6 +43,10 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
                    "CSV report export filename.")
                    ->take_last(); // if used multiple times, take the last one
 
+    app.add_option("--trace", settings.trace_path,
+                   "Write a timeline of every task (Chrome trace JSON, for Perfetto) to FILE.")
+                   ->take_last();
+
     app.add_option("--iterations", settings.options.iterations,
                    "Number of iterations for Zopfli based compression.")
                    ->default_val(settings.options.iterations);

@@ -12,11 +12,13 @@
 #include <fstream>
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <vector>
 #include "utils/color.hpp"
 #include "cli/CLI11.hpp"
 #include "cli/cli_parser.hpp"
 #include "report/report_generator.hpp"
+#include "report/trace_recorder.hpp"
 #include "../../libchisel/include/processor_registry.hpp"
 #include "../../libchisel/include/processor_executor.hpp"
 #include "../../libchisel/include/event_bus.hpp"
@@ -184,6 +186,12 @@ int main(int argc, char* argv[]) {
     // registry of processors and event bus
     ProcessorRegistry registry;
     EventBus bus;
+
+    std::optional<TraceRecorder> trace;
+    if (!settings.trace_path.empty()) {
+        trace.emplace();
+        trace->subscribe(bus);
+    }
 
     // results collected for reporting
     std::vector<Result> results;
@@ -548,6 +556,10 @@ int main(int argc, char* argv[]) {
         // pipe mode but with --dry-run, just clean up the temp file
         std::error_code ec;
         fs::remove(inputs.front(), ec);
+    }
+
+    if (trace && !trace->write(settings.trace_path)) {
+        Logger::log(LogLevel::Error, "Failed to write the trace to " + settings.trace_path.string(), "main");
     }
 
     // export CSV if requested

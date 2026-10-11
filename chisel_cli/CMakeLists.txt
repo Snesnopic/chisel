@@ -4,6 +4,8 @@ set(CHISEL_CLI_SOURCES
         src/cli/cli_parser.hpp
         src/report/report_generator.cpp
         src/report/report_generator.hpp
+        src/report/trace_recorder.cpp
+        src/report/trace_recorder.hpp
         src/utils/file_scanner.cpp
         src/utils/file_scanner.hpp
         src/utils/console_log_sink.hpp

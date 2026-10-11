@@ -142,6 +142,10 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
 -   `--report <FILE>`
     Export a final CSV report to the specified file.
 
+-   `--trace <FILE>`
+    Write a timeline of every analysis, recompression and finalization task (which thread ran it, when,
+    for how long) to FILE as Chrome trace JSON, viewable in [Perfetto](https://ui.perfetto.dev) or `chrome://tracing`.
+
 -   `-r, --recursive`
     Recursively scan input folders.
 
