@@ -920,7 +920,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         tmp_path += ".refinalized.pdf";
 
         QPDFWriter writer(pdf, tmp_path.string().c_str());
-        writer.setLinearization(true);
+        // linearizing a file that wasn't would add hint tables to it, and it makes qpdf write everything twice
+        writer.setLinearization(pdf.isLinearized());
         writer.setStaticID(true);
         writer.setDeterministicID(true);
         writer.setObjectStreamMode(qpdf_o_generate);

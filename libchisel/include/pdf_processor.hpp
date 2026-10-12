@@ -104,7 +104,7 @@ public:
      * 2. Re-compresses internal Flate streams (text, vector graphics)
      * using Zopfli for better compression.
      *
-     * Uses `QPDFWriter` to write a new, linearized, and optimized PDF.
+     * Uses `QPDFWriter` to write a new, optimized PDF, linearized only if the original was.
      *
      * @param content The ExtractedContent struct from `prepare_extraction`.
      * @param options Processing options (e.g. metadata preservation).
