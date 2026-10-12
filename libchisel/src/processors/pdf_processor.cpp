@@ -16,6 +16,7 @@
 #include <qpdf/Pl_Flate.hh>
 #include <qpdf/Pl_OStream.hh>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <map>
 #include <memory>
@@ -926,6 +927,12 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         writer.setDeterministicID(true);
         writer.setObjectStreamMode(qpdf_o_generate);
         writer.setStreamDataMode(qpdf_s_compress);
+        // qpdf deflates the object streams it generates with zopfli too
+        if (ThreadPool* pool = ThreadPool::current(); pool && pool->size() > 1) {
+            writer.setObjectStreamRunner([pool](const std::size_t n, const std::function<void(std::size_t)>& body) {
+                pool->parallel_for(n, body);
+            });
+        }
         writer.write();
 
         cleanup_temp_dir(st.temp_dir, get_name());
