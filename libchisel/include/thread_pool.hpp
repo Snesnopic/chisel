@@ -21,6 +21,7 @@
 #include <future>
 #include <thread>
 #include <atomic>
+#include <exception>
 
 namespace chisel {
 
@@ -44,7 +45,9 @@ public:
  *
  * @details This pool uses std::thread internally. It handles joining on
  * destruction and supports cooperative cancellation via a custom stop_token.
- * Tasks enqueued should accept a `stop_token` as their argument.
+ * Tasks enqueued should accept a `stop_token` as their argument. A running
+ * task can split its own work with parallel_for(): idle workers pick up those
+ * iterations before starting new tasks.
  */
 class ThreadPool {
 public:
@@ -95,6 +98,26 @@ public:
     void wait_idle();
 
     /**
+     * @brief Runs @p body(i) for every i in [0, n) and returns once all of them are done.
+     *
+     * @details Called from one of this pool's tasks, the iterations are shared with idle workers, and the
+     * caller runs iterations itself rather than block while any are left; it can be nested. Called from
+     * anywhere else, the iterations run in order on the calling thread. The first exception an iteration
+     * throws is rethrown after all of them are done.
+     */
+    void parallel_for(std::size_t n, const std::function<void(std::size_t)>& body);
+
+    /**
+     * @brief The pool whose worker is running the calling thread, or nullptr.
+     */
+    [[nodiscard]] static ThreadPool* current() noexcept;
+
+    /**
+     * @brief Number of worker threads.
+     */
+    [[nodiscard]] std::size_t size() const noexcept { return workers_.size(); }
+
+    /**
      * @brief Requests all worker threads to stop and clears the task queue.
      *
      * Pending tasks that have not started will be discarded.
@@ -103,13 +126,33 @@ public:
     void request_stop();
 
 private:
-    std::mutex queue_mutex_;                ///< Protects tasks_ and pending_
+    /**
+     * @brief The iterations of one parallel_for() call, owned by its caller's stack.
+     */
+    struct LoopGroup {
+        const std::function<void(std::size_t)>* body = nullptr;
+        std::size_t n = 0;
+        std::atomic<std::size_t> next{0}; ///< Next iteration to claim
+        std::size_t done = 0;             ///< Finished iterations, guarded by queue_mutex_
+        std::exception_ptr error;         ///< First exception thrown, guarded by queue_mutex_
+    };
+
+    /**
+     * @brief Runs one unclaimed iteration of the newest open loop, if there is one.
+     * @param lock A lock on queue_mutex_, released while the iteration runs.
+     * @return true if an iteration ran.
+     */
+    bool help_one(std::unique_lock<std::mutex>& lock);
+
+    std::mutex queue_mutex_;                ///< Protects tasks_, pending_ and groups_
     std::condition_variable condition_;     ///< Notifies workers of new tasks or stop requests
     std::condition_variable idle_cv_;       ///< Notifies wait_idle() when pending_ is zero
     std::queue<std::function<void(stop_token)>> tasks_; ///< The queue of tasks
     std::vector<std::thread> workers_;      ///< The worker threads
     std::size_t pending_{0};                     ///< Number of tasks enqueued or running
     std::atomic<bool> stop_flag_{false};    ///< Flag to signal workers to stop
+    std::vector<LoopGroup*> groups_;        ///< Open parallel_for() loops, newest last
+    std::condition_variable group_cv_;      ///< Notifies parallel_for() callers of finished or new iterations
 };
 
 } // namespace chisel
