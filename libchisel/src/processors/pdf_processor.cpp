@@ -19,6 +19,7 @@
 #include <sstream>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -33,6 +34,7 @@
 #include "zlib_container.h"
 #include "zopfli.h"
 #include "zopfli_compressor.hpp"
+#include "../../include/thread_pool.hpp"
 
 namespace chisel {
 
@@ -454,64 +456,237 @@ std::size_t parms_cost(QPDFObjectHandle parms) {
     return parms.isNull() ? 0 : std::string_view(" /DecodeParms ").size() + parms.unparse().size();
 }
 
+/**
+ * @brief An image stream as smallest_encoding() needs it, read from qpdf beforehand.
+ */
+struct ImageInput {
+    PdfImageLayout image;
+    std::vector<unsigned char> samples;
+    std::vector<unsigned char> raw;   ///< The stream as it is, kept when its own predictor rows are a candidate
+    std::size_t cost = 0;             ///< What the stream costs as it is, its /DecodeParms included
+    std::size_t own_parms_cost = 0;   ///< What its own /DecodeParms adds to the rows candidate
+    std::size_t predictor_parms_cost = 0;
+    std::filesystem::path png_file;   ///< The PNG the samples went out as
+    uintmax_t png_size = 0;           ///< Its size as written
+};
+
+enum class Parms { None, Own, Predictor };
+
 struct Encoding {
     std::vector<unsigned char> data;
-    QPDFObjectHandle decode_parms; ///< null for none
+    Parms parms = Parms::None;
 };
+
+/**
+ * @brief Reads what smallest_encoding() needs from an image stream.
+ * @param own_parms Set to the stream's own /DecodeParms when its rows are a candidate.
+ */
+ImageInput read_image(QPDFObjectHandle& stream, const PdfImageLayout& image, const std::filesystem::path& png_file,
+                      const uintmax_t png_size, QPDFObjectHandle& own_parms) {
+    ImageInput in{.image=image, .png_file=png_file, .png_size=png_size};
+    const std::shared_ptr<Buffer> raw = stream.getRawStreamData();
+    const std::shared_ptr<Buffer> decoded = stream.getStreamData(qpdf_dl_specialized);
+    in.samples.assign(decoded->getBuffer(), decoded->getBuffer() + decoded->getSize());
+
+    const QPDFObjectHandle dict = stream.getDict();
+    in.cost = raw->getSize() + parms_cost(dict.getKey("/DecodeParms"));
+    in.predictor_parms_cost = parms_cost(predictor_parms(image));
+    if (classify_single_filter(stream) == SingleFilterKind::Flate && dict.hasKey("/DecodeParms")) {
+        QPDFObjectHandle parms = dict.getKey("/DecodeParms");
+        if (parms.isArray() && parms.getArrayNItems() == 1) parms = parms.getArrayItem(0);
+        if (parms.isDictionary()) {
+            in.raw.assign(raw->getBuffer(), raw->getBuffer() + raw->getSize());
+            in.own_parms_cost = parms_cost(parms);
+            own_parms = parms;
+        }
+    }
+    return in;
+}
 
 /**
  * @brief The smallest Flate encoding of an image's samples, if it beats the stream as it is: the samples
  *        deflated as they are, the rows its own predictor made, or the rows the PNG pipeline filtered.
- * @param png_file The PNG the samples went out as, with png_size its size as written.
  */
-std::optional<Encoding> smallest_encoding(QPDFObjectHandle& stream, const PdfImageLayout& image,
-                                          const std::filesystem::path& png_file, const uintmax_t png_size,
-                                          const ProcessingOptions& options) {
-    const std::shared_ptr<Buffer> raw = stream.getRawStreamData();
-    const std::shared_ptr<Buffer> decoded = stream.getStreamData(qpdf_dl_specialized);
-    const std::vector<unsigned char> samples(decoded->getBuffer(), decoded->getBuffer() + decoded->getSize());
-
-    const QPDFObjectHandle dict = stream.getDict();
+std::optional<Encoding> smallest_encoding(const ImageInput& in, const ProcessingOptions& options) {
     std::optional<Encoding> best;
-    std::size_t best_cost = raw->getSize() + parms_cost(dict.getKey("/DecodeParms"));
-    const auto consider = [&](std::vector<unsigned char> data, QPDFObjectHandle parms) {
-        const std::size_t cost = data.size() + parms_cost(parms);
+    std::size_t best_cost = in.cost;
+    const auto consider = [&](std::vector<unsigned char> data, const std::size_t parms_cost, const Parms parms) {
+        const std::size_t cost = data.size() + parms_cost;
         if (cost >= best_cost) return;
         best_cost = cost;
-        best = Encoding{std::move(data), std::move(parms)};
+        best = Encoding{std::move(data), parms};
     };
 
-    consider(ZopfliCompressor::compress(samples, pick_iterations(samples.size(), options), ZopfliFormat::ZLIB),
-             QPDFObjectHandle::newNull());
+    consider(ZopfliCompressor::compress(in.samples, pick_iterations(in.samples.size(), options), ZopfliFormat::ZLIB),
+             0, Parms::None);
 
-    if (classify_single_filter(stream) == SingleFilterKind::Flate && dict.hasKey("/DecodeParms")) {
-        QPDFObjectHandle parms = dict.getKey("/DecodeParms");
-        if (parms.isArray() && parms.getArrayNItems() == 1) parms = parms.getArrayItem(0);
-        const auto rows = inflate_zlib(raw->getBuffer(), raw->getSize());
-        if (parms.isDictionary() && rows) {
+    if (!in.raw.empty()) {
+        if (const auto rows = inflate_zlib(in.raw.data(), in.raw.size())) {
             consider(ZopfliCompressor::compress(*rows, pick_iterations(rows->size(), options), ZopfliFormat::ZLIB),
-                     parms);
+                     in.own_parms_cost, Parms::Own);
         }
     }
 
     // only what the png pipeline shrank, and only if it decodes back to the very same samples
     std::error_code ec;
     std::vector<unsigned char> png;
-    if (const auto size = std::filesystem::file_size(png_file, ec); ec || size >= png_size || !read_file(png_file, png)) {
+    if (const auto size = std::filesystem::file_size(in.png_file, ec);
+        ec || size >= in.png_size || !read_file(in.png_file, png)) {
         return best;
     }
-    auto data = image_data(png, image);
+    auto data = image_data(png, in.image);
     const auto rows = data ? inflate_zlib(data->data(), data->size()) : std::nullopt;
-    if (const auto restored = rows ? unfilter(*rows, image) : std::nullopt; restored && *restored == samples) {
-        consider(std::move(*data), predictor_parms(image));
+    if (const auto restored = rows ? unfilter(*rows, in.image) : std::nullopt; restored && *restored == in.samples) {
+        consider(std::move(*data), in.predictor_parms_cost, Parms::Predictor);
     } else {
-        Logger::log(LogLevel::Warning, png_file.filename().string() + " came back with another layout or other samples, not used",
+        Logger::log(LogLevel::Warning, in.png_file.filename().string() + " came back with another layout or other samples, not used",
                     "PdfProcessor");
     }
     return best;
 }
 
 } // namespace pdf_image
+
+// streams read ahead of their compression, at most this much at a time
+constexpr std::size_t kStreamBatchBytes = std::size_t{256} << 20;
+
+/**
+ * @brief One stream's recompression. Its inputs are read from qpdf before and its result is applied after, on
+ *        the thread that owns the QPDF object, so that only the compression runs elsewhere.
+ */
+struct StreamJob {
+    enum class Kind {
+        Image,     ///< samples that went out as a PNG
+        Optimized, ///< a stream whose extracted file came back smaller
+        Plain,     ///< a Flate/LZW/ASCII85/ASCIIHex stream without /DecodeParms
+        Predicted  ///< a Flate stream with /DecodeParms, deflated again as it inflates
+    };
+    Kind kind = Kind::Plain;
+    QPDFObjectHandle obj;              ///< Only touched on the QPDF object's thread
+    int obj_id = 0;
+    std::vector<unsigned char> data;   ///< The file, the decoded stream, or the raw stream to inflate
+    std::size_t raw_size = 0;          ///< Plain and predicted: the stream as it is, to beat
+    bool deflate = false;              ///< Optimized: whether the file goes back deflated
+    bool to_flate = false;             ///< Plain: whether the filter becomes /FlateDecode
+    std::filesystem::path file;        ///< Optimized: the file it came back as
+    pdf_image::ImageInput image;
+    QPDFObjectHandle own_parms;        ///< Image: its own /DecodeParms, for its rows candidate
+    std::optional<std::vector<unsigned char>> result;
+    pdf_image::Parms parms = pdf_image::Parms::None;
+
+    [[nodiscard]] std::size_t bytes() const { return data.size() + image.samples.size() + image.raw.size(); }
+};
+
+/**
+ * @brief Computes a job's new stream data, if it has any; touches no qpdf object.
+ */
+void compress_stream(StreamJob& job, const ProcessingOptions& options) {
+    const auto deflate = [&options](const std::vector<unsigned char>& in) {
+        return ZopfliCompressor::compress(in, pick_iterations(in.size(), options), ZopfliFormat::ZLIB);
+    };
+    const std::string obj = std::to_string(job.obj_id);
+    switch (job.kind) {
+        case StreamJob::Kind::Image:
+            try {
+                if (auto encoding = pdf_image::smallest_encoding(job.image, options)) {
+                    job.result = std::move(encoding->data);
+                    job.parms = encoding->parms;
+                }
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Debug, "Image obj " + obj + " left as is: " + e.what(), "PdfProcessor");
+            }
+            break;
+        case StreamJob::Kind::Optimized:
+            // the extracted file holds *decoded* content (e.g. a full PNG file
+            // guessed from a FlateDecode Image stream); the original filter is
+            // being kept on the dict, so the bytes must be re-compressed to stay
+            // valid under it. DCTDecode/JPXDecode extractions are already in their
+            // final on-disk form and need no re-wrapping.
+            if (!job.deflate) {
+                job.result = std::move(job.data);
+                break;
+            }
+            try {
+                job.result = deflate(job.data);
+            } catch (const std::exception& e) {
+                Logger::log(LogLevel::Warning, "Failed to re-compress optimized stream for obj " + obj +
+                            ", skipping injection: " + e.what(), "PdfProcessor");
+            }
+            break;
+        case StreamJob::Kind::Plain:
+            try {
+                if (auto recompressed = deflate(job.data); recompressed.size() < job.raw_size) {
+                    job.result = std::move(recompressed);
+                }
+            } catch (const std::exception&) {
+                Logger::log(LogLevel::Debug, "zopfli skipped on obj " + obj, "PdfProcessor");
+            }
+            break;
+        case StreamJob::Kind::Predicted:
+            try {
+                if (const auto inflated = inflate_zlib(job.data.data(), job.data.size())) {
+                    if (auto recompressed = deflate(*inflated); recompressed.size() < job.raw_size) {
+                        job.result = std::move(recompressed);
+                    }
+                }
+            } catch (const std::exception&) {
+                Logger::log(LogLevel::Debug, "zopfli skipped on obj " + obj, "PdfProcessor");
+            }
+            break;
+    }
+    job.data = {};
+    job.image.samples = {};
+    job.image.raw = {};
+}
+
+/**
+ * @brief Puts a job's new stream data in its stream, keeping the stream's filters unless the job changed them.
+ */
+void apply_stream(StreamJob& job) {
+    if (!job.result || job.result->empty()) return;
+    auto provider = std::make_shared<raw_stream_provider>(std::move(*job.result));
+    const QPDFObjectHandle dict = job.obj.getDict();
+    switch (job.kind) {
+        case StreamJob::Kind::Image: {
+            // a /Filter name, not an array, is what makes QPDFWriter keep the data as it is
+            QPDFObjectHandle parms = QPDFObjectHandle::newNull();
+            if (job.parms == pdf_image::Parms::Own) parms = job.own_parms;
+            if (job.parms == pdf_image::Parms::Predictor) parms = pdf_image::predictor_parms(job.image.image);
+            job.obj.replaceStreamData(provider, QPDFObjectHandle::newName("/FlateDecode"), parms);
+            break;
+        }
+        case StreamJob::Kind::Optimized:
+            update_embedded_file_params(job.obj, job.file);
+            job.obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+            break;
+        case StreamJob::Kind::Plain:
+            if (job.to_flate) {
+                job.obj.replaceStreamData(provider, QPDFObjectHandle::newName("/FlateDecode"), QPDFObjectHandle::newNull());
+                break;
+            }
+            [[fallthrough]];
+        case StreamJob::Kind::Predicted:
+            job.obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+            break;
+    }
+}
+
+/**
+ * @brief Compresses a batch of jobs on the thread pool, biggest first, then applies them in their order.
+ */
+void run_stream_jobs(std::vector<StreamJob>& jobs, const ProcessingOptions& options) {
+    std::vector<std::size_t> order(jobs.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::ranges::stable_sort(order, std::ranges::greater{}, [&jobs](const std::size_t i) { return jobs[i].bytes(); });
+    const auto compress = [&](const std::size_t i) { compress_stream(jobs[order[i]], options); };
+    if (ThreadPool* pool = ThreadPool::current()) {
+        pool->parallel_for(order.size(), compress);
+    } else {
+        for (std::size_t i = 0; i < order.size(); ++i) compress(i);
+    }
+    for (auto& job : jobs) apply_stream(job);
+    jobs.clear();
+}
 
 /**
  * @brief Removes common metadata objects from a PDF.
@@ -646,6 +821,9 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
 
         auto objects = pdf.getAllObjects();
 
+        // qpdf objects are read and changed on this thread only; the compression in between runs on the pool
+        std::vector<StreamJob> jobs;
+        std::size_t batch_bytes = 0;
         for (auto& obj : objects) {
             if (!obj.isStream()) continue;
 
@@ -668,112 +846,70 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                  filter_kind == SingleFilterKind::AsciiHex);
             bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
 
+            StreamJob job{.obj=obj, .obj_id=obj_id};
             if (info.image) {
                 try {
-                    if (auto encoding = pdf_image::smallest_encoding(obj, *info.image, info.file, info.png_size, options)) {
-                        // a /Filter name, not an array, is what makes QPDFWriter keep the data as it is
-                        obj.replaceStreamData(std::make_shared<raw_stream_provider>(std::move(encoding->data)),
-                                              QPDFObjectHandle::newName("/FlateDecode"), encoding->decode_parms);
-                    }
+                    job.kind = StreamJob::Kind::Image;
+                    job.image = pdf_image::read_image(obj, *info.image, info.file, info.png_size, job.own_parms);
                 } catch (const std::exception& e) {
                     Logger::log(LogLevel::Debug, "Image obj " + std::to_string(obj_id) + " left as is: " + e.what(), get_name());
+                    continue;
                 }
-                continue;
-            }
+            } else {
+                std::error_code ec;
+                uintmax_t disk_size = info.file.empty() ? 0 : std::filesystem::file_size(info.file, ec);
+                bool file_was_optimized = (!ec && disk_size > 0 && disk_size < info.original_size);
 
-            std::error_code ec;
-            uintmax_t disk_size = info.file.empty() ? 0 : std::filesystem::file_size(info.file, ec);
-
-            bool file_was_optimized = (!ec && disk_size > 0 && disk_size < info.original_size);
-            std::vector<unsigned char> raw_data_to_inject;
-
-            bool replace_stream = false;
-            // only set when the injected data needs a different /Filter than
-            // the stream originally declared (the Lzw/Ascii85/AsciiHex ->
-            // Flate conversion below); left unset (empty) otherwise, meaning
-            // "keep the dict's own /Filter and /DecodeParms as they are"
-            QPDFObjectHandle new_filter;
-
-            // read externally optimized file if it exists (e.g. jpg optimized by Phase 2)
-            if (file_was_optimized) {
-                std::ifstream ifs(info.file, std::ios::binary | std::ios::ate);
-                if (ifs) {
+                // read externally optimized file if it exists (e.g. jpg optimized by Phase 2)
+                if (file_was_optimized) {
+                    std::ifstream ifs(info.file, std::ios::binary | std::ios::ate);
+                    if (!ifs) continue;
                     auto sz = ifs.tellg(); ifs.seekg(0);
-                    raw_data_to_inject.resize(sz);
-                    ifs.read(reinterpret_cast<char*>(raw_data_to_inject.data()), sz);
-
-                    // the extracted file holds *decoded* content (e.g. a full PNG file
-                    // guessed from a FlateDecode Image stream); the original filter is
-                    // being kept on the dict, so the bytes must be re-compressed to stay
-                    // valid under it. DCTDecode/JPXDecode extractions are already in their
-                    // final on-disk form and need no re-wrapping.
-                    if (is_flate) {
-                        try {
-                            raw_data_to_inject = ZopfliCompressor::compress(
-                                raw_data_to_inject, pick_iterations(raw_data_to_inject.size(), options),
-                                ZopfliFormat::ZLIB);
-                        } catch (const std::exception& e) {
-                            Logger::log(LogLevel::Warning,
-                                        "Failed to re-compress optimized stream for obj " +
-                                        std::to_string(obj_id) + ", skipping injection: " + e.what(),
-                                        get_name());
-                            raw_data_to_inject.clear();
-                        }
-                    }
-
-                    replace_stream = !raw_data_to_inject.empty();
+                    job.data.resize(sz);
+                    ifs.read(reinterpret_cast<char*>(job.data.data()), sz);
+                    job.kind = StreamJob::Kind::Optimized;
+                    job.deflate = is_flate;
+                    job.file = info.file;
                 }
-            }
-            // if no external file, but it's a plain flate/LZW/ASCII85/ASCIIHex stream
-            // with no Predictor complications, optimize with zopfli
-            else if ((is_flate || is_convertible_to_flate) && !has_decode_parms && info.decodable) {
-                try {
-                    const std::shared_ptr<Buffer> buf = obj.getStreamData(qpdf_dl_specialized);
-                    std::vector<unsigned char> decoded(buf->getBuffer(), buf->getBuffer() + buf->getSize());
-                    auto recompressed = ZopfliCompressor::compress(
-                        decoded, pick_iterations(decoded.size(), options), ZopfliFormat::ZLIB);
-
-                    if (recompressed.size() < obj.getRawStreamData()->getSize()) {
-                        raw_data_to_inject = std::move(recompressed);
-                        replace_stream = true;
-                        if (is_convertible_to_flate) {
-                            new_filter = QPDFObjectHandle::newName("/FlateDecode");
-                        }
+                // if no external file, but it's a plain flate/LZW/ASCII85/ASCIIHex stream
+                // with no Predictor complications, optimize with zopfli
+                else if ((is_flate || is_convertible_to_flate) && !has_decode_parms && info.decodable) {
+                    try {
+                        const std::shared_ptr<Buffer> buf = obj.getStreamData(qpdf_dl_specialized);
+                        job.data.assign(buf->getBuffer(), buf->getBuffer() + buf->getSize());
+                        job.raw_size = obj.getRawStreamData()->getSize();
+                    } catch (const std::exception&) {
+                        Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
+                        continue;
                     }
-                } catch (const std::exception& e) {
-                    Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
+                    job.kind = StreamJob::Kind::Plain;
+                    job.to_flate = is_convertible_to_flate;
                 }
-            }
-            // with /DecodeParms the inflated bytes are still the predictor's output, and deflating them
-            // again as they are keeps /DecodeParms valid
-            else if (is_flate && has_decode_parms && info.decodable) {
-                try {
-                    const std::shared_ptr<Buffer> raw = obj.getRawStreamData();
-                    if (const auto inflated = inflate_zlib(raw->getBuffer(), raw->getSize())) {
-                        auto recompressed = ZopfliCompressor::compress(
-                            *inflated, pick_iterations(inflated->size(), options), ZopfliFormat::ZLIB);
-                        if (recompressed.size() < raw->getSize()) {
-                            raw_data_to_inject = std::move(recompressed);
-                            replace_stream = true;
-                        }
+                // with /DecodeParms the inflated bytes are still the predictor's output, and deflating them
+                // again as they are keeps /DecodeParms valid
+                else if (is_flate && has_decode_parms && info.decodable) {
+                    try {
+                        const std::shared_ptr<Buffer> raw = obj.getRawStreamData();
+                        job.data.assign(raw->getBuffer(), raw->getBuffer() + raw->getSize());
+                        job.raw_size = raw->getSize();
+                    } catch (const std::exception&) {
+                        Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
+                        continue;
                     }
-                } catch (const std::exception& e) {
-                    Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
-                }
-            }
-
-            // inject the raw data, keeping the original dictionary filters
-            // intact unless new_filter says otherwise
-            if (replace_stream) {
-                if (file_was_optimized) update_embedded_file_params(obj, info.file);
-                auto provider = std::make_shared<raw_stream_provider>(std::move(raw_data_to_inject));
-                if (new_filter.isInitialized()) {
-                    obj.replaceStreamData(provider, new_filter, QPDFObjectHandle::newNull());
+                    job.kind = StreamJob::Kind::Predicted;
                 } else {
-                    obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+                    continue;
                 }
+            }
+
+            batch_bytes += job.bytes();
+            jobs.push_back(std::move(job));
+            if (batch_bytes >= kStreamBatchBytes) {
+                run_stream_jobs(jobs, options);
+                batch_bytes = 0;
             }
         }
+        run_stream_jobs(jobs, options);
 
         if (!options.preserve_metadata) {
             strip_metadata(pdf);
