@@ -3,6 +3,7 @@
 //
 
 #include "../../include/zopfli_compressor.hpp"
+#include "../../include/thread_pool.hpp"
 #include "zopfli.h"
 #include <cstdlib>
 #include "deflate.h"
@@ -11,6 +12,12 @@
 
 
 namespace chisel {
+
+    namespace {
+        void pool_parallel_for(void* ctx, const size_t n, void (*body)(void*, size_t), void* arg) {
+            static_cast<ThreadPool*>(ctx)->parallel_for(n, [body, arg](const std::size_t i) { body(arg, i); });
+        }
+    }
 
     std::vector<unsigned char> ZopfliCompressor::compress(const std::span<const unsigned char> input,
                                                           const unsigned iterations,
@@ -23,6 +30,13 @@ namespace chisel {
 
         // Default blocksplitting behavior
         opts.blocksplitting = 1;
+
+        // on a pool worker, inputs over zopfli's 1 MB master block share the pool; the output stays the same
+        if (ThreadPool* pool = ThreadPool::current(); pool && pool->size() > 1) {
+            opts.parallel_for = pool_parallel_for;
+            opts.parallel_ctx = pool;
+            opts.parallel_width = pool->size();
+        }
 
         unsigned char* out_data = nullptr;
         size_t out_size = 0;
