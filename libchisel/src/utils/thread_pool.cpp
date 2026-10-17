@@ -33,8 +33,8 @@ ThreadPool::ThreadPool(unsigned threads) {
                         return stop_flag_.load(std::memory_order_acquire) || !tasks_.empty() || !groups_.empty();
                     });
 
-                    // work already started comes before new tasks
-                    if (help_one(lock)) {
+                    // waiting tasks come first, so that each gets going; loops get the workers left over
+                    if (tasks_.empty() && help_one(lock)) {
                         continue;
                     }
 

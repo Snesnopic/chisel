@@ -46,8 +46,9 @@ public:
  * @details This pool uses std::thread internally. It handles joining on
  * destruction and supports cooperative cancellation via a custom stop_token.
  * Tasks enqueued should accept a `stop_token` as their argument. A running
- * task can split its own work with parallel_for(): idle workers pick up those
- * iterations before starting new tasks.
+ * task can split its own work with parallel_for(): workers with no task waiting
+ * pick up those iterations, since separate tasks keep the workers busier than
+ * the parts of one.
  */
 class ThreadPool {
 public:
