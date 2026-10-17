@@ -31,12 +31,13 @@ static bool is_stdout_a_tty() {
 unsigned get_terminal_width() {
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO csbi;
-    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi) && csbi.srWindow.Right > csbi.srWindow.Left)
         return csbi.srWindow.Right - csbi.srWindow.Left + 1;
     return 80;
 #else
+    // a terminal that never got a size reports 0 columns
     winsize w{};
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_col > 0)
         return w.ws_col;
     return 80;
 #endif
