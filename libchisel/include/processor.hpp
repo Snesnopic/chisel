@@ -59,6 +59,7 @@ struct ExtractedContent {
     std::any extras;
     std::filesystem::path original_path;                ///< Path to the original container file
     uintmax_t original_size = 0;                        ///< Original size before any processing
+    uintmax_t rebuild_cost = 0;                         ///< Rough work of finalize_extraction(), in bytes it recompresses; 0 if unknown
     std::filesystem::path temp_dir;                     ///< Temporary directory holding extracted files
     std::vector<std::filesystem::path> extracted_files; ///< Absolute paths to extracted files
     std::set<std::filesystem::path> fixed_pixel_format; ///< Extracted images whose color type and bit depth the container declares

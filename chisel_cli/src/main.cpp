@@ -208,41 +208,29 @@ int main(int argc, char* argv[]) {
     // overall discovered-file count (scheduled + extracted), used only for the
     // phase-1 "N files found" summary
     std::size_t total = 0;
-    // phase 2 (recompression) and phase 3 (finalization) each get their own
-    // done/total pair, so each phase's bar reaches 100% on its own work only
-    std::size_t phase2_total = 0;
-    std::atomic<std::size_t> phase2_done{0};
-    std::size_t phase3_total = 0;
-    std::atomic<std::size_t> phase3_done{0};
+    // recompressions (phase 2) and container rebuilds (phase 3) run together and share one bar
+    std::size_t work_total = 0;
+    std::atomic<std::size_t> work_done{0};
     auto start_total = std::chrono::steady_clock::now();
 
-    // true once finalization (phase 3) has started; switches the status label
-    // from "Processing: " to "Finalizing: " for the shared progress bar
-    std::atomic<bool> phase3_started{false};
-    // guards the one-time phase-1 summary line ("N files found"), printed
-    // right before whichever of phase 2/3 actually starts first
-    bool phase1_summary_printed = false;
-
-    // builds the "Processing: x.jpg" / "Finalizing: x.pdf" / "...: N files" status
-    // text from the currently active file/container list; caller holds g_console_mtx
+    // builds the "Processing: x.jpg" / "Processing: N files" status text from the
+    // currently active file/container list; caller holds g_console_mtx
     auto make_status_text = [&]() -> std::string {
         if (g_active_files.empty()) return "";
-        const std::string label = phase3_started ? "Finalizing: " : "Processing: ";
         if (g_active_files.size() > 1) {
-            return label + std::to_string(g_active_files.size()) + " files";
+            return "Processing: " + std::to_string(g_active_files.size()) + " files";
         }
-        return label + g_active_files.front();
+        return "Processing: " + g_active_files.front();
     };
 
-    // prints the "N files found" phase-1 summary exactly once; caller holds g_console_mtx
-    auto ensure_phase1_summary_printed = [&]() {
-        if (phase1_summary_printed) return;
-        phase1_summary_printed = true;
-        std::cerr << "\n" << total << " files found\n\n";
+    // prints the "N files found" summary and the "Processing files..." header
+    // once, before the first file or container starts; caller holds g_console_mtx
+    bool processing_header_printed = false;
+    auto ensure_processing_header = [&]() {
+        if (processing_header_printed) return;
+        processing_header_printed = true;
+        std::cerr << "\n" << total << " files found\n\nProcessing files...\n\n";
     };
-
-    // guards the one-time "Processing files..." phase header
-    bool phase2_header_printed = false;
 
     // subscribe to events: print progress and collect results
 
@@ -261,11 +249,11 @@ int main(int argc, char* argv[]) {
         std::scoped_lock lock(g_console_mtx);
         if (e.scheduled) {
             total++;
-            phase2_total++;
+            work_total++;
         }
         if (e.extracted) {
             total++;
-            phase3_total++;
+            work_total++;
         }
 
         if (settings.quiet || !(e.extracted && e.num_children > 0)) return;
@@ -301,23 +289,16 @@ int main(int argc, char* argv[]) {
         if (settings.quiet || e.is_container) return;
 
         std::scoped_lock lock(g_console_mtx);
-        if (!phase2_header_printed) {
-            phase2_header_printed = true;
-            ensure_phase1_summary_printed();
-            std::cerr << "Processing files...\n\n";
-        }
+        ensure_processing_header();
         g_active_files.push_back(e.path.filename().string());
 
         // Force an immediate redraw of the bar with the new status
-        print_progress_bar_internal(phase2_done.load(), phase2_total, make_status_text());
+        print_progress_bar_internal(work_done.load(), work_total, make_status_text());
     });
 
-    // generic handler for "finished" events to update progress bar; phase 2 and
-    // phase 3 completions share this handler but advance their own counter, so
-    // each phase's bar reaches N/N on its own work rather than the combined total
+    // generic handler for "finished" events of files and containers alike, to update the progress bar
     auto on_finish = [&](const std::string& finished_filename) {
-        const std::size_t current = phase3_started ? ++phase3_done : ++phase2_done;
-        const std::size_t phase_total = phase3_started ? phase3_total : phase2_total;
+        const std::size_t current = ++work_done;
         if (settings.quiet) return;
 
         std::scoped_lock lock(g_console_mtx);
@@ -327,22 +308,17 @@ int main(int argc, char* argv[]) {
             g_active_files.erase(it);
         }
 
-        print_progress_bar_internal(current, phase_total, make_status_text());
+        print_progress_bar_internal(current, work_total, make_status_text());
     };
 
-    // phase 3 (finalization): same status-bar mechanism as phase 2, with the
-    // "Finalizing: " label
+    // phase 3 (finalization): rebuilding a container shows up like a file being processed
     bus.subscribe<ContainerFinalizeStartEvent>([&](const ContainerFinalizeStartEvent& e) {
         if (settings.quiet) return;
 
         std::scoped_lock lock(g_console_mtx);
-        if (!phase3_started) {
-            phase3_started = true;
-            ensure_phase1_summary_printed();
-            std::cerr << "\n\nFinalizing opened containers...\n\n";
-        }
+        ensure_processing_header();
         g_active_files.push_back(e.path.filename().string());
-        print_progress_bar_internal(phase3_done.load(), phase3_total, make_status_text());
+        print_progress_bar_internal(work_done.load(), work_total, make_status_text());
     });
 
     bus.subscribe<FileProcessCompleteEvent>([&](const FileProcessCompleteEvent& e) {
@@ -516,12 +492,10 @@ int main(int argc, char* argv[]) {
     executor.process(inputs, roots);
     g_executor.store(nullptr);
 
-    // Final cleanup of the progress bar line: reflect whichever phase actually
-    // ran last (phase 3 if any containers were finalized, else phase 2)
+    // Final cleanup of the progress bar line
     if (!settings.quiet) {
         std::lock_guard<std::mutex> lock(g_console_mtx);
-        const std::size_t final_total = phase3_total > 0 ? phase3_total : phase2_total;
-        print_progress_bar_internal(final_total, final_total, "Completed.");
+        print_progress_bar_internal(work_total, work_total, "Completed.");
         std::cerr << std::endl;
     }
 

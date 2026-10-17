@@ -227,7 +227,7 @@ If multiple processors are registered for the same file type, two modes of opera
 If, at the end of this phase, the recompressed file is not strictly smaller than its original counterpart, the new file is discarded and the original is preserved.
 
 **Phase 3: Finalization**
-All files that were originally classified as containers, and whose contents were extracted in Phase 1, are now rebuilt. The `Processor` will repack the container using the newly optimized internal files, preserving the original structure.
+All files that were originally classified as containers, and whose contents were extracted in Phase 1, are rebuilt. The `Processor` will repack the container using the newly optimized internal files, preserving the original structure. Each container is rebuilt as soon as everything found inside it has been processed, while Phase 2 goes on with the other files.
 
 ---
 

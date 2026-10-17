@@ -51,9 +51,9 @@ namespace chisel {
  * - Phase 1: Analysis of input files and of the containers found in them, on the ThreadPool.
  * - Phase 2: Recompression of eligible files (in PIPE or PARALLEL mode)
  * using the ThreadPool.
- * - Phase 3: Finalization (re-assembly) of containers after their
- * contents have been processed, in parallel, each container once every
- * container found inside it is done.
+ * - Phase 3: Finalization (re-assembly) of containers, on the same ThreadPool
+ * and overlapping Phase 2: each container is rebuilt as soon as the files and
+ * containers found inside it, and its own recompression, are done.
  *
  * It uses a ProcessorRegistry to discover processors, a ThreadPool to
  * parallelize work, and an EventBus to publish progress and results.
@@ -153,22 +153,23 @@ private:
                            unsigned depth, bool keep_pixel_format, ContainerNode* parent_node, AnalysisRoot& root);
 
     /**
-     * @brief Phase 2: Recompress all files in work_list_ using the ThreadPool.
+     * @brief Phases 2 and 3: recompress all files in work_list_ and rebuild every container in
+     * containers_ on the ThreadPool, waiting for both.
      *
-     * Dispatches tasks according to the specified EncodeMode (PIPE or PARALLEL).
+     * Recompression follows the specified EncodeMode (PIPE or PARALLEL), the files that the most
+     * rebuilding work waits on first. A container is rebuilt as soon as it has nothing left to wait
+     * for, ahead of the files still waiting.
      */
     void process_work_list();
 
     /**
-     * @brief Phase 3: Finalize all containers in containers_ on the ThreadPool.
-     *
-     * Runs after all file processing is complete. A container is rebuilt once every container
-     * found inside it is, so the ones with none start first, the biggest of them first.
+     * @brief Queues a container's finalization, which releases its parent once done.
+     * @param front Whether it goes ahead of the tasks already waiting.
      */
-    void finalize_containers();
+    void schedule_finalize(ContainerNode& node, bool front = true);
 
-    /// @brief Queues a container's finalization, and its parent's once it's the last one inside it.
-    void schedule_finalize(ContainerNode& node);
+    /// @brief Marks one thing a container waits for as done, queuing its finalization if it was the last.
+    void release(ContainerNode* node);
 
     /// @brief Rebuilds one container from its processed contents and puts it in place.
     void finalize_container(ContainerNode& node);
@@ -191,12 +192,13 @@ private:
 
     ThreadPool pool_;                            ///< Thread pool for all three phases
     ProcessingOptions m_options;
-    /// @brief A container extracted in Phase 1, rebuilt in Phase 3 once every container found inside it is.
+    /// @brief A container extracted in Phase 1, rebuilt in Phase 3 once everything inside it is done.
     struct ContainerNode {
         ExtractedContent content;
         bool nested = false;                 ///< True if the container was itself extracted from another container
         ContainerNode* parent = nullptr;     ///< The container this one was extracted from, if any
-        std::atomic<std::size_t> pending{0}; ///< Containers found inside this one that aren't rebuilt yet
+        std::atomic<std::size_t> pending{0}; ///< Files and containers inside it, and its own recompression, not done yet
+        std::uintmax_t path_cost = 0;        ///< Estimated work of rebuilding it and every container it's in
         bool finalized = false;              ///< Set once Phase 3 has taken it up
     };
     std::deque<ContainerNode> containers_; ///< (Phase 1->3) Containers to be re-assembled; a deque keeps nodes in place
@@ -211,6 +213,8 @@ private:
         std::optional<std::filesystem::path> parent_container; ///< Path of the container this file was extracted from, if any
         bool is_container = false;                             ///< True if this item is the intermediate recompression of a container
         bool keep_pixel_format = false;                        ///< True if its container declares the image's color type and bit depth
+        ContainerNode* waiting = nullptr;                      ///< The container that waits for it: its own if is_container, else its parent
+        std::uintmax_t priority = 0;                           ///< Estimated work waiting on it: its containers' rebuilds, or its own size
     };
     std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
 

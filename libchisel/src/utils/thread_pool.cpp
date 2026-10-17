@@ -46,7 +46,7 @@ ThreadPool::ThreadPool(unsigned threads) {
                     }
 
                     task = std::move(tasks_.front());
-                    tasks_.pop();
+                    tasks_.pop_front();
                 }
 
                 struct PendingGuard {
@@ -142,7 +142,7 @@ void ThreadPool::request_stop() {
         std::unique_lock lock(queue_mutex_);
         stop_flag_.store(true, std::memory_order_release);
         while (!tasks_.empty()) {
-            tasks_.pop();
+            tasks_.pop_front();
             if (pending_ > 0) {
                 pending_--;
             }

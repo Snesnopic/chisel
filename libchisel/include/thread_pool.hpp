@@ -14,7 +14,7 @@
 #define CHISEL_THREAD_POOL_HPP
 
 #include <vector>
-#include <queue>
+#include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <functional>
@@ -77,20 +77,15 @@ public:
      */
     template<class F>
     auto enqueue(F&& f) -> std::future<std::invoke_result_t<F, stop_token>> {
-        using return_type = std::invoke_result_t<F, stop_token>;
-        auto task = std::make_shared<std::packaged_task<return_type(stop_token)>>(
-            std::forward<F>(f)
-        );
-        {
-            std::unique_lock lock(queue_mutex_);
-            if (stop_flag_.load(std::memory_order_acquire)) {
-                throw std::runtime_error("enqueue on stopped ThreadPool");
-            }
-            ++pending_;
-            tasks_.emplace([task](stop_token st) { (*task)(st); });
-        }
-        condition_.notify_one();
-        return task->get_future();
+        return push(std::forward<F>(f), false);
+    }
+
+    /**
+     * @brief Like enqueue(), but the task runs before the tasks already waiting.
+     */
+    template<class F>
+    auto enqueue_front(F&& f) -> std::future<std::invoke_result_t<F, stop_token>> {
+        return push(std::forward<F>(f), true);
     }
 
     /**
@@ -138,6 +133,29 @@ private:
         std::exception_ptr error;         ///< First exception thrown, guarded by queue_mutex_
     };
 
+    template<class F>
+    auto push(F&& f, const bool front) -> std::future<std::invoke_result_t<F, stop_token>> {
+        using return_type = std::invoke_result_t<F, stop_token>;
+        auto task = std::make_shared<std::packaged_task<return_type(stop_token)>>(
+            std::forward<F>(f)
+        );
+        {
+            std::unique_lock lock(queue_mutex_);
+            if (stop_flag_.load(std::memory_order_acquire)) {
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            }
+            ++pending_;
+            auto run = [task](stop_token st) { (*task)(st); };
+            if (front) {
+                tasks_.emplace_front(std::move(run));
+            } else {
+                tasks_.emplace_back(std::move(run));
+            }
+        }
+        condition_.notify_one();
+        return task->get_future();
+    }
+
     /**
      * @brief Runs one unclaimed iteration of the newest open loop, if there is one.
      * @param lock A lock on queue_mutex_, released while the iteration runs.
@@ -148,7 +166,7 @@ private:
     std::mutex queue_mutex_;                ///< Protects tasks_, pending_ and groups_
     std::condition_variable condition_;     ///< Notifies workers of new tasks or stop requests
     std::condition_variable idle_cv_;       ///< Notifies wait_idle() when pending_ is zero
-    std::queue<std::function<void(stop_token)>> tasks_; ///< The queue of tasks
+    std::deque<std::function<void(stop_token)>> tasks_; ///< The queue of tasks
     std::vector<std::thread> workers_;      ///< The worker threads
     std::size_t pending_{0};                     ///< Number of tasks enqueued or running
     std::atomic<bool> stop_flag_{false};    ///< Flag to signal workers to stop

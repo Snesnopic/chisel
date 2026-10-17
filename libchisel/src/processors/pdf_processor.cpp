@@ -756,6 +756,8 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
         }
 
         info.original_size = data.size();
+        // the rebuild deflates the decoded streams again
+        if (info.decodable) content.rebuild_cost += data.size();
         const std::string ext = file_extension(obj, info.decodable, names);
         if (ext.empty()) {
             // raw samples go through the png pipeline, which must keep the layout the dictionary declares

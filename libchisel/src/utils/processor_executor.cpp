@@ -199,8 +199,6 @@ namespace chisel {
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         process_work_list();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
-        finalize_containers();
-        if (stop_flag_.load(std::memory_order_relaxed)) return;
         copy_unchanged_inputs(inputs);
     }
 
@@ -421,6 +419,7 @@ namespace chisel {
         bool scheduled_for_extraction = false;
         bool scheduled_for_recompression = false;
         std::optional<ExtractedContent> content;
+        ContainerNode* node = nullptr;
         if (processor->can_extract_contents()) {
             try {
                 content = processor->prepare_extraction(current_path);
@@ -435,13 +434,15 @@ namespace chisel {
                 std::error_code ec;
                 content->original_size = fs::file_size(content->original_path, ec);
                 if (ec) content->original_size = 0;
-                ContainerNode* node;
                 {
                     std::lock_guard lock(analysis_mutex_);
                     node = &containers_.emplace_back();
                     node->content = *content;
                     node->nested = parent.has_value();
                     node->parent = parent_node;
+                    // what waits on a file inside it: rebuilding it, then each container around it
+                    node->path_cost = (content->rebuild_cost ? content->rebuild_cost : content->original_size) +
+                                      (parent_node ? parent_node->path_cost : 0);
                 }
                 if (parent_node) ++parent_node->pending;
                 for (const auto &child: content->extracted_files) {
@@ -459,9 +460,17 @@ namespace chisel {
             }
         }
         if (processor->can_recompress()) {
+            // a container rebuilds on its own recompressed bytes, and the rest goes into its container
+            ContainerNode* waiting = scheduled_for_extraction ? node : parent_node;
+            if (waiting) ++waiting->pending;
+            std::uintmax_t priority = waiting ? waiting->path_cost : 0;
+            if (!waiting) {
+                std::error_code ec;
+                priority = fs::file_size(current_path, ec);
+            }
             std::lock_guard lock(analysis_mutex_);
             work_list_.push_back({.path=current_path, .parent_container=parent, .is_container=scheduled_for_extraction,
-                                  .keep_pixel_format=keep_pixel_format});
+                                  .keep_pixel_format=keep_pixel_format, .waiting=waiting, .priority=priority});
             scheduled_for_recompression = true;
         }
         if (scheduled_for_extraction || scheduled_for_recompression) {
@@ -477,9 +486,27 @@ namespace chisel {
     }
 
     void ProcessorExecutor::process_work_list() {
+        // containers with nothing to wait for go first, the costliest of them first
+        std::vector<ContainerNode*> ready;
+        for (auto& node : containers_) {
+            if (node.pending.load() == 0) ready.push_back(&node);
+        }
+        std::ranges::stable_sort(ready, std::ranges::greater{}, &ContainerNode::path_cost);
+        for (auto* node : ready) {
+            schedule_finalize(*node, false);
+        }
+
+        // the files the most rebuilding waits on first, so that it can start while the rest is recompressed
+        std::ranges::stable_sort(work_list_, std::ranges::greater{}, &WorkItem::priority);
         for (const auto &item: work_list_) {
-            if (stop_flag_.load(std::memory_order_relaxed)) return;
+            if (stop_flag_.load(std::memory_order_relaxed)) break;
             pool_.enqueue([this, item](stop_token st) {
+                // the container waiting for this file can go on once it's done, whatever happened to it
+                struct ReleaseGuard {
+                    ProcessorExecutor* executor;
+                    ContainerNode* node;
+                    ~ReleaseGuard() { executor->release(node); }
+                } release_guard{.executor=this, .node=item.waiting};
                 const auto& file = item.path;
                 const auto& parent_container = item.parent_container;
                 const bool nested = parent_container.has_value();
@@ -723,31 +750,26 @@ namespace chisel {
         pool_.wait_idle();
     }
 
-    void ProcessorExecutor::finalize_containers() {
-        // leaves first, the biggest of them first since they take longest to rebuild
-        std::vector<ContainerNode*> ready;
-        for (auto& node : containers_) {
-            if (node.pending.load() == 0) ready.push_back(&node);
-        }
-        std::ranges::stable_sort(ready, std::ranges::greater{},
-                                 [](const ContainerNode* node) { return node->content.original_size; });
-        for (auto* node : ready) {
-            schedule_finalize(*node);
-        }
-        pool_.wait_idle();
-    }
-
-    void ProcessorExecutor::schedule_finalize(ContainerNode& node) {
+    void ProcessorExecutor::schedule_finalize(ContainerNode& node, const bool front) {
+        auto task = [this, &node](const stop_token st) {
+            if (st.stop_requested()) return;
+            finalize_container(node);
+            release(node.parent);
+        };
         try {
-            pool_.enqueue([this, &node](const stop_token st) {
-                if (st.stop_requested()) return;
-                finalize_container(node);
-                // the last container inside the parent to be rebuilt lets the parent go
-                if (node.parent && node.parent->pending.fetch_sub(1) == 1) schedule_finalize(*node.parent);
-            });
+            // a container ready to be rebuilt is what its parent, and the end of the run, wait for
+            if (front) {
+                pool_.enqueue_front(std::move(task));
+            } else {
+                pool_.enqueue(std::move(task));
+            }
         } catch (const std::runtime_error&) {
             // the pool is stopping: the containers left are cleaned up at the end of the run
         }
+    }
+
+    void ProcessorExecutor::release(ContainerNode* node) {
+        if (node && node->pending.fetch_sub(1) == 1) schedule_finalize(*node);
     }
 
     void ProcessorExecutor::finalize_container(ContainerNode& node) {
