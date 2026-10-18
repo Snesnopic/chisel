@@ -62,6 +62,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
+            extra_cmake_args: -DCMAKE_OSX_SYSROOT=$SDKROOT
             binary_path: bin/Release/chsl
             asset_name: "macos-x64"
 
@@ -70,6 +71,7 @@ jobs:
             build_type: Release
             c_compiler: clang
             cpp_compiler: clang++
+            extra_cmake_args: -DCMAKE_OSX_SYSROOT=$SDKROOT
             binary_path: bin/Release/chsl
             asset_name: "macos-arm64"
 
@@ -200,6 +202,10 @@ jobs:
 
       - name: Build
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+      - name: Show the link command (macOS)
+        if: failure() && runner.os == 'macOS'
+        run: cat "${{ steps.strings.outputs.build-output-dir }}/chisel_cli/CMakeFiles/chisel.dir/link.txt"
 
 
       - name: Determine Version
