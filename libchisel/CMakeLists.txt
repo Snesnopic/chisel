@@ -159,6 +159,10 @@ set(LIBCHISEL_SOURCES
 )
 if(ENABLE_OPTIVORBIS)
     corrosion_import_crate(MANIFEST_PATH "rust_bridge/Cargo.toml")
+    # corrosion points rust libraries at the command line tools' sdk, which can be newer than the selected xcode links
+    if(APPLE)
+        set_property(TARGET chisel_optivorbis_bridge-static PROPERTY INTERFACE_LINK_DIRECTORIES "")
+    endif()
 endif()
 
 add_library(libchisel STATIC ${LIBCHISEL_SOURCES})
