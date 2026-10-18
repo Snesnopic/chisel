@@ -82,14 +82,16 @@ bool ThreadPool::help_one(std::unique_lock<std::mutex>& lock) {
         }
         // the caller keeps the group alive until this iteration counts as done
         lock.unlock();
+        const bool skip = stop_requested();
         std::exception_ptr error;
         try {
-            (*group->body)(i);
+            if (!skip) (*group->body)(i);
         } catch (...) {
             error = std::current_exception();
         }
         lock.lock();
         if (error && !group->error) group->error = error;
+        group->skipped |= skip;
         ++group->done;
         group_cv_.notify_all();
         return true;
@@ -117,14 +119,16 @@ void ThreadPool::parallel_for(const std::size_t n, const std::function<void(std:
     while (group.done < n) {
         if (const std::size_t i = group.next.fetch_add(1); i < n) {
             lock.unlock();
+            const bool skip = stop_requested();
             std::exception_ptr error;
             try {
-                body(i);
+                if (!skip) body(i);
             } catch (...) {
                 error = std::current_exception();
             }
             lock.lock();
             if (error && !group.error) group.error = error;
+            group.skipped |= skip;
             ++group.done;
             continue;
         }
@@ -135,10 +139,19 @@ void ThreadPool::parallel_for(const std::size_t n, const std::function<void(std:
     std::erase(groups_, &group);
     lock.unlock();
     if (group.error) std::rethrow_exception(group.error);
+    if (group.skipped) throw Interrupted{};
 }
 
 void ThreadPool::parallel_for_c(void* pool, const std::size_t n, void (*body)(void*, std::size_t), void* arg) {
-    static_cast<ThreadPool*>(pool)->parallel_for(n, [body, arg](const std::size_t i) { body(arg, i); });
+    try {
+        static_cast<ThreadPool*>(pool)->parallel_for(n, [body, arg](const std::size_t i) { body(arg, i); });
+    } catch (const Interrupted&) {
+        // an exception can't cross the C library's frames; it checks stop_requested_c() on its own
+    }
+}
+
+int ThreadPool::stop_requested_c(void* pool) {
+    return static_cast<ThreadPool*>(pool)->stop_requested() ? 1 : 0;
 }
 
 void ThreadPool::request_stop() {

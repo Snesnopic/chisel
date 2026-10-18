@@ -581,6 +581,8 @@ namespace chisel {
                             try {
                                 candidates[i]->recompress(current, tmp, options);
                                 stage_ok = safe_size(tmp) > 0;
+                            } catch (const Interrupted&) {
+                                throw;
                             } catch (const std::exception& e) {
                                 Logger::log(LogLevel::Warning, "Pipeline stage " + std::to_string(i) + " (" +
                                             std::string(candidates[i]->get_name()) + ") failed for " + file.string() +
@@ -667,6 +669,11 @@ namespace chisel {
                                     std::error_code ec;
                                     fs::remove(tmp, ec);
                                 }
+                            } catch (const Interrupted&) {
+                                std::error_code ec;
+                                fs::remove(tmp, ec);
+                                for (const auto& done : results) fs::remove(done.tmp, ec);
+                                throw;
                             } catch (...) {
                                 std::error_code ec;
                                 fs::remove(tmp, ec);
@@ -738,6 +745,8 @@ namespace chisel {
                     } else if (st.stop_requested()) {
                         event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                     }
+                } catch (const Interrupted&) {
+                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .reason="Interrupted", .is_container=item.is_container});
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
                     event_bus_.publish(FileProcessErrorEvent{.path=file, .error_message=e.what(), .is_container=item.is_container});
@@ -861,6 +870,9 @@ namespace chisel {
                 event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Failed to finalize container file"});
             }
 
+        } catch (const Interrupted&) {
+            // left to be cleaned up with the containers the run didn't get to
+            node.finalized = false;
         } catch (const std::exception &e) {
             Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
             event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message=e.what()});

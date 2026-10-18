@@ -3,6 +3,7 @@
 //
 
 #include "../../include/swf_processor.hpp"
+#include "../../include/thread_pool.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/file_utils.hpp"
 #include "../../include/zopfli_compressor.hpp"
@@ -92,6 +93,10 @@ void SwfProcessor::recompress(const std::filesystem::path& input_path,
         out.close();
         if (out.fail()) throw std::runtime_error("can't write " + output_path.string());
 
+    } catch (const Interrupted&) {
+        std::error_code ec;
+        std::filesystem::remove(output_path, ec);
+        throw;
     } catch (...) {
         // a partial output would look like a smaller file
         std::error_code ec;

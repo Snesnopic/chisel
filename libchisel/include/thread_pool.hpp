@@ -41,6 +41,12 @@ public:
 };
 
 /**
+ * @brief Thrown out of a pool task's work once a stop is requested: what it was doing is incomplete
+ *        and must be discarded.
+ */
+struct Interrupted {};
+
+/**
  * @brief A simple fixed-size thread pool for executing tasks concurrently.
  *
  * @details This pool uses std::thread internally. It handles joining on
@@ -99,15 +105,26 @@ public:
      * @details Called from one of this pool's tasks, the iterations are shared with idle workers, and the
      * caller runs iterations itself rather than block while any are left; it can be nested. Called from
      * anywhere else, the iterations run in order on the calling thread. The first exception an iteration
-     * throws is rethrown after all of them are done.
+     * throws is rethrown after all of them are done; iterations not started when a stop is requested
+     * are skipped, and Interrupted is thrown.
      */
     void parallel_for(std::size_t n, const std::function<void(std::size_t)>& body);
 
     /**
      * @brief parallel_for() for C libraries: runs @p body(arg, i) for every i in [0, n) on the pool
-     *        @p pool points to.
+     *        @p pool points to. It doesn't throw Interrupted: the caller asks stop_requested_c() instead.
      */
     static void parallel_for_c(void* pool, std::size_t n, void (*body)(void* arg, std::size_t i), void* arg);
+
+    /**
+     * @brief Whether a stop was requested.
+     */
+    [[nodiscard]] bool stop_requested() const noexcept { return stop_flag_.load(std::memory_order_acquire); }
+
+    /**
+     * @brief stop_requested() for C libraries, on the pool @p pool points to: nonzero once a stop is requested.
+     */
+    static int stop_requested_c(void* pool);
 
     /**
      * @brief The pool whose worker is running the calling thread, or nullptr.
@@ -137,6 +154,7 @@ private:
         std::atomic<std::size_t> next{0}; ///< Next iteration to claim
         std::size_t done = 0;             ///< Finished iterations, guarded by queue_mutex_
         std::exception_ptr error;         ///< First exception thrown, guarded by queue_mutex_
+        bool skipped = false;             ///< Whether an iteration was skipped for a stop, guarded by queue_mutex_
     };
 
     template<class F>

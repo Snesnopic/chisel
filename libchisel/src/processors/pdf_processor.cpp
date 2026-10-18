@@ -922,6 +922,15 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         auto tmp_path = content.original_path;
         tmp_path += ".refinalized.pdf";
 
+        // a write that doesn't finish leaves nothing behind; declared first, it runs after the writer closes the file
+        struct PartialFileGuard {
+            const std::filesystem::path& path;
+            bool written = false;
+            ~PartialFileGuard() {
+                std::error_code ec;
+                if (!written) std::filesystem::remove(path, ec);
+            }
+        } partial{.path=tmp_path};
         QPDFWriter writer(pdf, tmp_path.string().c_str());
         // linearizing a file that wasn't would add hint tables to it, and it makes qpdf write everything twice
         writer.setLinearization(pdf.isLinearized());
@@ -936,6 +945,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             });
         }
         writer.write();
+        partial.written = true;
 
         cleanup_temp_dir(st.temp_dir, get_name());
 

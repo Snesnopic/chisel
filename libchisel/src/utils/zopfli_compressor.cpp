@@ -27,10 +27,15 @@ namespace chisel {
         opts.blocksplitting = 1;
 
         // on a pool worker, inputs over zopfli's 1 MB master block share the pool; the output stays the same
-        if (ThreadPool* pool = ThreadPool::current(); pool && pool->size() > 1) {
+        ThreadPool* pool = ThreadPool::current();
+        if (pool && pool->size() > 1) {
             opts.parallel_for = ThreadPool::parallel_for_c;
             opts.parallel_ctx = pool;
             opts.parallel_width = pool->size();
+        }
+        if (pool) {
+            opts.stop_requested = ThreadPool::stop_requested_c;
+            opts.stop_ctx = pool;
         }
 
         unsigned char* out_data = nullptr;
@@ -47,6 +52,12 @@ namespace chisel {
             case ZopfliFormat::GZIP:
                 ZopfliGzipCompress(&opts, input.data(), input.size(), &out_data, &out_size);
                 break;
+        }
+
+        // zopfli stopped early: what it wrote is incomplete
+        if (pool && pool->stop_requested()) {
+            free(out_data);
+            throw Interrupted{};
         }
 
         std::vector<unsigned char> result;
