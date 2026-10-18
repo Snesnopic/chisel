@@ -104,6 +104,12 @@ public:
     void parallel_for(std::size_t n, const std::function<void(std::size_t)>& body);
 
     /**
+     * @brief parallel_for() for C libraries: runs @p body(arg, i) for every i in [0, n) on the pool
+     *        @p pool points to.
+     */
+    static void parallel_for_c(void* pool, std::size_t n, void (*body)(void* arg, std::size_t i), void* arg);
+
+    /**
      * @brief The pool whose worker is running the calling thread, or nullptr.
      */
     [[nodiscard]] static ThreadPool* current() noexcept;

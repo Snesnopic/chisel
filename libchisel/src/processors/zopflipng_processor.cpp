@@ -5,6 +5,7 @@
 #include "../../include/zopflipng_processor.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/png_structure.hpp"
+#include "../../include/thread_pool.hpp"
 #include "zopflipng_lib.h"
 #include "zlib_container.h"
 #include <array>
@@ -175,6 +176,12 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
 
         // chunks such as bKGD or sBIT are written in terms of the source's color type, and a container may declare it
         opts.keep_colortype = animated || carried->color_bound || options.keep_pixel_format;
+        // on a pool worker, the filter strategies and zopfli's master blocks share the pool; the output stays the same
+        if (ThreadPool* pool = ThreadPool::current(); pool && pool->size() > 1) {
+            opts.parallel_for = ThreadPool::parallel_for_c;
+            opts.parallel_ctx = pool;
+            opts.parallel_width = pool->size();
+        }
 
         // optimize
         std::vector<unsigned char> resultpng;

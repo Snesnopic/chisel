@@ -137,6 +137,10 @@ void ThreadPool::parallel_for(const std::size_t n, const std::function<void(std:
     if (group.error) std::rethrow_exception(group.error);
 }
 
+void ThreadPool::parallel_for_c(void* pool, const std::size_t n, void (*body)(void*, std::size_t), void* arg) {
+    static_cast<ThreadPool*>(pool)->parallel_for(n, [body, arg](const std::size_t i) { body(arg, i); });
+}
+
 void ThreadPool::request_stop() {
     {
         std::unique_lock lock(queue_mutex_);
