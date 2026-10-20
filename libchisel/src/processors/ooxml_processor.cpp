@@ -7,6 +7,7 @@
 #include "../../include/random_utils.hpp"
 #include "../../include/file_type.hpp"
 #include "../../include/archive_manifest.hpp"
+#include "../../include/zip_rewriter.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -48,6 +49,13 @@ std::optional<ExtractedContent> OOXMLProcessor::prepare_extraction(const std::fi
     const fs::path temp_dir = make_temp_dir_for(input_path, prefix);
     content.temp_dir = temp_dir;
 
+    // rewritten with its headers as they were, which libarchive's writer can't do
+    if (auto zip = read_zip_manifest(input_path, temp_dir, get_name())) {
+        content.extracted_files = zip_manifest_files(*zip);
+        content.extras = std::move(*zip);
+        return content;
+    }
+
     auto manifest = read_archive_manifest(input_path, temp_dir, true, get_name());
     if (!manifest) {
         cleanup_temp_dir(temp_dir, get_name());
@@ -73,6 +81,18 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
     const fs::path src_path(content.original_path);
     const fs::path tmp_path = fs::temp_directory_path() /
                               (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + src_path.extension().string());
+
+    if (const auto* zip = std::any_cast<ZipManifest>(&content.extras)) {
+        try {
+            // opc has no stored-entry requirement, so every part may be deflated
+            rewrite_zip(*zip, tmp_path, options, {.deflate_stored = true}, get_name());
+        } catch (const std::exception&) {
+            cleanup_temp_dir(content.temp_dir);
+            throw;
+        }
+        cleanup_temp_dir(content.temp_dir);
+        return tmp_path;
+    }
 
     archive* out = archive_write_new();
     if (!out) {

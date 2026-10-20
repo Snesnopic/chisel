@@ -53,6 +53,13 @@ std::optional<ArchiveManifest> read_archive_manifest(const std::filesystem::path
                                                      bool zip_only,
                                                      std::string_view tag);
 
+/**
+ * @brief Where to extract an entry: its own path under dest_dir, or a folder of its own when that
+ * path is unsafe, already taken or too long.
+ */
+std::filesystem::path entry_extraction_path(std::string name, const std::filesystem::path& dest_dir,
+                                            std::size_t index);
+
 /// @brief Paths of the extracted entries, for the executor to process.
 std::vector<std::filesystem::path> manifest_files(const ArchiveManifest& manifest);
 

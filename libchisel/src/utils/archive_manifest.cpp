@@ -47,31 +47,9 @@ bool fits_path_limits(const fs::path& path) {
     return std::ranges::all_of(path, [](const fs::path& part) { return part.native().size() <= 255; });
 }
 
-// the entry's own path under dest_dir, or a folder of its own when that path is unsafe, taken or too long
 fs::path extraction_path(archive_entry* entry, const fs::path& dest_dir, const std::size_t index) {
     const char* raw = archive_entry_pathname(entry);
-    std::string name = raw != nullptr ? raw : "";
-    for (auto& c : name) {
-        if (c == '\\') c = '/';
-    }
-
-    std::error_code ec;
-    fs::path out;
-    if (sanitize_archive_entry_path(name, dest_dir, out) && out.has_filename() && fits_path_limits(out) &&
-        out != dest_dir.lexically_normal() && !fs::exists(fs::symlink_status(out, ec))) {
-        fs::create_directories(out.parent_path(), ec);
-        if (!ec && fs::is_directory(out.parent_path(), ec)) return out;
-    }
-
-    // keep the extension, processors may fall back on it
-    const auto extension = fs::path(name).extension().string();
-    const auto leaf = "entry" + (extension.size() <= 16 ? extension : std::string{});
-    for (std::size_t n = index;; ++n) {
-        const auto dir = dest_dir / (".chisel-" + std::to_string(n));
-        if (fs::exists(fs::symlink_status(dir, ec))) continue;
-        fs::create_directories(dir, ec);
-        return ec ? fs::path{} : dir / leaf;
-    }
+    return entry_extraction_path(raw != nullptr ? raw : "", dest_dir, index);
 }
 
 bool extract_data(archive* a, archive_entry* entry, const fs::path& out, const std::string_view tag) {
@@ -183,6 +161,30 @@ bool archive_is_signed(const fs::path& input) {
         if (const char* name = archive_entry_pathname(entry); name != nullptr && is_signature_entry(name)) return true;
     }
     return false;
+}
+
+fs::path entry_extraction_path(std::string name, const fs::path& dest_dir, const std::size_t index) {
+    for (auto& c : name) {
+        if (c == '\\') c = '/';
+    }
+
+    std::error_code ec;
+    fs::path out;
+    if (sanitize_archive_entry_path(name, dest_dir, out) && out.has_filename() && fits_path_limits(out) &&
+        out != dest_dir.lexically_normal() && !fs::exists(fs::symlink_status(out, ec))) {
+        fs::create_directories(out.parent_path(), ec);
+        if (!ec && fs::is_directory(out.parent_path(), ec)) return out;
+    }
+
+    // keep the extension, processors may fall back on it
+    const auto extension = fs::path(name).extension().string();
+    const auto leaf = "entry" + (extension.size() <= 16 ? extension : std::string{});
+    for (std::size_t n = index;; ++n) {
+        const auto dir = dest_dir / (".chisel-" + std::to_string(n));
+        if (fs::exists(fs::symlink_status(dir, ec))) continue;
+        fs::create_directories(dir, ec);
+        return ec ? fs::path{} : dir / leaf;
+    }
 }
 
 std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, const fs::path& dest_dir,

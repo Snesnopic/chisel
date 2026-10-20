@@ -4,6 +4,7 @@
 
 #include "../../include/archive_processor.hpp"
 #include "../../include/archive_manifest.hpp"
+#include "../../include/zip_rewriter.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/mime_detector.hpp"
 #include "../../include/file_type.hpp"
@@ -79,6 +80,24 @@ static bool append_rmskin_footer(const fs::path& path, const char flags) {
     out.write(footer.data(), footer.size());
     out.close();
     return !out.fail();
+}
+
+// the formats rebuilt as zips
+static bool writes_as_zip(const ContainerFormat fmt) {
+    switch (fmt) {
+        case ContainerFormat::Epub:
+        case ContainerFormat::Zip:
+        case ContainerFormat::Cbz:
+        case ContainerFormat::Jar:
+        case ContainerFormat::Xpi:
+        case ContainerFormat::Ora:
+        case ContainerFormat::Dwfx:
+        case ContainerFormat::Xps:
+        case ContainerFormat::Apk:
+            return true;
+        default:
+            return false;
+    }
 }
 
 // --- libarchive create ---
@@ -253,6 +272,16 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
         return std::nullopt;
     }
 
+    // zips are rewritten with their headers as they were, which libarchive's writer can't do
+    if (writes_as_zip(content.format)) {
+        if (auto zip = read_zip_manifest(input_path, content.temp_dir, get_name())) {
+            content.extracted_files = zip_manifest_files(*zip);
+            content.extras = std::move(*zip);
+            Logger::log(LogLevel::Info, "Extracted files: " + std::to_string(content.extracted_files.size()), get_name());
+            return content;
+        }
+    }
+
     auto manifest = read_archive_manifest(input_path, content.temp_dir, false, get_name());
     if (!manifest) {
         Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
@@ -283,6 +312,26 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
 
     const fs::path tmp_archive = fs::temp_directory_path() /
                                  (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + out_ext);
+
+    if (const auto* zip = std::any_cast<ZipManifest>(&content.extras)) {
+        const auto flags = read_rmskin_flags(src_path);
+        try {
+            // a .rmskin footer counts the zip's bytes, so it is written anew rather than copied
+            rewrite_zip(*zip, tmp_archive, options, {.keep_trailing = !flags}, get_name());
+        } catch (const std::exception&) {
+            fs::remove_all(content.temp_dir);
+            throw;
+        }
+        std::error_code ec;
+        if (flags && !append_rmskin_footer(tmp_archive, *flags)) {
+            fs::remove_all(content.temp_dir);
+            fs::remove(tmp_archive, ec);
+            throw std::runtime_error("ArchiveProcessor: rmskin footer not written");
+        }
+        chisel::cleanup_temp_dir(content.temp_dir, get_name());
+        Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_archive.string(), get_name());
+        return tmp_archive;
+    }
 
     const auto* manifest = std::any_cast<ArchiveManifest>(&content.extras);
     if (manifest == nullptr || !create_with_libarchive(*manifest, tmp_archive, out_fmt)) {
