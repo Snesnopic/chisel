@@ -348,23 +348,37 @@ std::optional<ZipManifest> parse_directory(std::ifstream& in, const fs::path& in
             if (slots->offset) offset = le64(&e.central[*slots->offset]);
             if (le16(&e.central[34]) != 0) { ok = false; break; }
 
+            // every bound is checked by subtraction, so that a forged 64-bit field can't wrap around
+            if (offset > cd_at - m.base || cd_at - m.base - offset < 30) {
+                ok = false;
+                break;
+            }
             e.local_at = m.base + offset;
             std::array<std::uint8_t, 30> head{};
-            if (e.local_at + 30 > cd_at || !read_at(in, e.local_at, head.data(), head.size()) || le32(head.data()) != kLocalSig) {
+            if (!read_at(in, e.local_at, head.data(), head.size()) || le32(head.data()) != kLocalSig) {
                 ok = false;
                 break;
             }
             const std::size_t local_n = le16(&head[26]), local_m = le16(&head[28]);
             e.local.resize(30 + local_n + local_m);
-            if (local_n != n || !read_at(in, e.local_at, e.local.data(), e.local.size()) ||
-                std::memcmp(&e.local[30], &e.central[46], n) != 0) {
+            // a local header that disagrees with the directory on anything a reader goes by is damage, not layout
+            if (local_n != n || le16(&head[6]) != e.flags || le16(&head[8]) != e.method ||
+                !read_at(in, e.local_at, e.local.data(), e.local.size()) || std::memcmp(&e.local[30], &e.central[46], n) != 0) {
                 ok = false;
                 break;
             }
             std::size_t z = 0;
             e.zip64_local = find_extra(e.local, 30 + n, local_m, kZip64Extra, z).has_value();
+            // with a data descriptor the local fields may be zero, without one they say what the directory says
+            const auto agrees = [&e](const std::uint32_t local, const std::uint64_t value) {
+                return local == value || (local == k32 && (e.zip64_local || (e.flags & 8))) || ((e.flags & 8) && local == 0);
+            };
+            if (!agrees(le32(&head[14]), e.crc) || !agrees(le32(&head[18]), e.compressed) || !agrees(le32(&head[22]), e.size)) {
+                ok = false;
+                break;
+            }
             e.data_at = e.local_at + e.local.size();
-            if (e.data_at + e.compressed > cd_at || ((e.flags & 8) && !read_descriptor(in, e, cd_at))) {
+            if (e.data_at > cd_at || e.compressed > cd_at - e.data_at || ((e.flags & 8) && !read_descriptor(in, e, cd_at))) {
                 ok = false;
                 break;
             }
@@ -531,8 +545,12 @@ bool patch_local(const ZipEntry& e, const Written& w, std::vector<std::uint8_t>&
     const auto z = find_extra(local, 30 + le16(&local[26]), le16(&local[28]), kZip64Extra, n);
     for (auto [at, extra_at, value] : {std::tuple{std::size_t{22}, std::size_t{0}, w.size}, {18, 8, w.compressed}}) {
         if (le32(&local[at]) == k32) {
-            if (!z || extra_at + 8 > n) return false;
-            put64(&local[*z + extra_at], value);
+            if (z && extra_at + 8 <= n) {
+                put64(&local[*z + extra_at], value);
+            } else if ((e.flags & 8) == 0) {
+                return false;
+            }
+            // with a data descriptor a placeholder without a zip64 field is left alone, readers go by the descriptor
         } else {
             if (value >= k32) return false;
             put32(&local[at], static_cast<std::uint32_t>(value));
