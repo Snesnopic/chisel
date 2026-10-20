@@ -5,8 +5,10 @@
 #include "jxl_processor.hpp"
 #include "c2pa_manifest.hpp"
 #include "logger.hpp"
+#include "thread_pool.hpp"
 #include <jxl/encode.h>
 #include <jxl/decode.h>
+#include <jxl/parallel_runner.h>
 #include "file_utils.hpp"
 #include <fstream>
 #include <vector>
@@ -15,6 +17,7 @@
 #include <string_view>
 #include <array>
 #include <algorithm>
+#include <atomic>
 
 
 namespace {
@@ -29,6 +32,28 @@ size_t get_bytes_per_channel(const JxlDataType data_type) {
 bool is_metadata_box_type(std::string_view type) {
     static constexpr std::array<std::string_view, 3> kMetadataTypes = {"Exif", "xml ", "jumb"};
     return std::find(kMetadataTypes.begin(), kMetadataTypes.end(), type) != kMetadataTypes.end();
+}
+
+/**
+ * @brief A JxlParallelRunner on chisel's pool.
+ * @details libjxl's thread ids name per-thread scratch, so each of up to pool-size slots is one pool item
+ * that takes the indices in turn from a shared counter; a slot never runs on two threads at once.
+ */
+JxlParallelRetCode run_on_pool(void* runner_opaque, void* jpegxl_opaque, const JxlParallelRunInit init,
+                               const JxlParallelRunFunction func, const uint32_t start_range, const uint32_t end_range) {
+    auto* pool = static_cast<chisel::ThreadPool*>(runner_opaque);
+    const std::size_t slots = std::clamp<std::size_t>(end_range - start_range, 1, pool->size());
+    if (const JxlParallelRetCode ret = init(jpegxl_opaque, slots); ret != JXL_PARALLEL_RET_SUCCESS) return ret;
+    std::atomic<uint32_t> next{start_range};
+    try {
+        pool->parallel_for(slots, [&](const std::size_t slot) {
+            for (uint32_t i = next++; i < end_range; i = next++) func(jpegxl_opaque, i, slot);
+        });
+    } catch (...) {
+        // nothing may unwind through libjxl: a stop fails the call, and the caller checks for it
+        return JXL_PARALLEL_RET_RUNNER_ERROR;
+    }
+    return JXL_PARALLEL_RET_SUCCESS;
 }
 
 } // namespace
@@ -49,6 +74,10 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     // decoder setup
     JxlDecoder* dec = JxlDecoderCreate(nullptr);
     if (!dec) throw std::runtime_error("JxlProcessor: cannot create decoder");
+    // on a pool worker, libjxl's parallel work shares the pool
+    ThreadPool* pool = ThreadPool::current();
+    const bool on_pool = pool && pool->size() > 1;
+    if (on_pool) JxlDecoderSetParallelRunner(dec, run_on_pool, pool);
 
     // boxes default to raw mode, so a compressed "brob" box would report its type as "brob" instead of e.g. "Exif"
     JxlDecoderSetDecompressBoxes(dec, JXL_TRUE);
@@ -196,6 +225,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
         }
     }
     JxlDecoderDestroy(dec);
+    if (!ok && pool && pool->stop_requested()) throw Interrupted{};
     if (!ok) throw std::runtime_error("JxlProcessor: decode failed");
 
     // false means the source was lossy (xyb_encoded); re-encoding lossless never shrinks it, so skip like webp/jpeg
@@ -214,6 +244,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     // encoder setup
     JxlEncoder* enc = JxlEncoderCreate(nullptr);
     if (!enc) throw std::runtime_error("JxlProcessor: cannot create encoder");
+    if (on_pool) JxlEncoderSetParallelRunner(enc, run_on_pool, pool);
 
     if (JXL_ENC_SUCCESS != JxlEncoderSetBasicInfo(enc, &info)) {
         JxlEncoderDestroy(enc);
@@ -270,6 +301,7 @@ void JxlProcessor::recompress(const std::filesystem::path& input,
     }
     if (enc_status != JXL_ENC_SUCCESS) {
         JxlEncoderDestroy(enc);
+        if (pool && pool->stop_requested()) throw Interrupted{};
         throw std::runtime_error("JxlProcessor: encode failed");
     }
     std::size_t out_size = next_out - out_buf.data();
