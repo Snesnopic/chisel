@@ -5,6 +5,7 @@
 #include "../../include/optigif_processor.hpp"
 #include "../../include/c2pa_manifest.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/thread_pool.hpp"
 #include "../../include/gif_animation_compare.hpp"
 #include "file_utils.hpp"
 #include <optigif/optigif.hpp>
@@ -23,9 +24,14 @@ void OptigifProcessor::recompress(const std::filesystem::path& input,
     opts.restructure = true;
     opts.search_restarts = true;
     opts.strip_metadata = !options.preserve_metadata;
-    // chisel already parallelizes across files via its own ThreadPool; running
-    // optigif's own search/restructure threads on top would oversubscribe.
+    // optigif's own threads would come on top of the pool's: on a pool worker its frames and searches share the pool
     opts.search.threads = 1;
+    if (ThreadPool* pool = ThreadPool::current()) {
+        opts.search.threads = pool->size();
+        opts.search.parallel_for = [pool](const std::size_t n, const std::function<void(std::size_t)>& body) {
+            pool->parallel_for(n, body);
+        };
+    }
     // search_restarts is O(n^2/alignment) per frame; the library default (160)
     // took 30+ min of single-thread CPU on this project's bench corpus without
     // finishing. 640 was measured on the same corpus (single thread, 51 files,
