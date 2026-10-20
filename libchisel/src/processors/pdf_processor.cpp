@@ -178,6 +178,15 @@ SingleFilterKind classify_single_filter(QPDFObjectHandle const& stream) {
     return SingleFilterKind::None;
 }
 
+/**
+ * @brief Whether a stream dictionary names no filter, so its data is stored as it is.
+ */
+bool is_unfiltered(QPDFObjectHandle const& dict) {
+    if (!dict.isDictionary()) return false;
+    const QPDFObjectHandle filter = dict.getKey("/Filter");
+    return filter.isNull() || (filter.isArray() && filter.getArrayNItems() == 0);
+}
+
 // zopflipng's own established convention for splitting effort between the
 // "iterations" and "iterations_large" budgets; reused here for the same
 // reason it exists there -- full effort on small streams is cheap, but
@@ -560,7 +569,8 @@ struct StreamJob {
         Image,     ///< samples that went out as a PNG
         Optimized, ///< a stream whose extracted file came back smaller
         Plain,     ///< a Flate/LZW/ASCII85/ASCIIHex stream without /DecodeParms
-        Predicted  ///< a Flate stream with /DecodeParms, deflated again as it inflates
+        Predicted, ///< a Flate stream with /DecodeParms, deflated again as it inflates
+        Unfiltered ///< a stream without a filter, which QPDFWriter would deflate on its own, on one thread
     };
     Kind kind = Kind::Plain;
     QPDFObjectHandle obj;              ///< Only touched on the QPDF object's thread
@@ -568,8 +578,8 @@ struct StreamJob {
     std::vector<unsigned char> data;   ///< The file, the decoded stream, or the raw stream to inflate
     std::size_t raw_size = 0;          ///< Plain and predicted: the stream as it is, to beat
     bool deflate = false;              ///< Optimized: whether the file goes back deflated
-    bool to_flate = false;             ///< Plain: whether the filter becomes /FlateDecode
-    std::filesystem::path file;        ///< Optimized: the file it came back as
+    bool to_flate = false;             ///< Plain and unfiltered: whether the filter becomes /FlateDecode
+    std::filesystem::path file;        ///< Optimized and unfiltered: the file it came back as, if any
     pdf_image::ImageInput image;
     QPDFObjectHandle own_parms;        ///< Image: its own /DecodeParms, for its rows candidate
     std::optional<std::vector<unsigned char>> result;
@@ -634,6 +644,20 @@ void compress_stream(StreamJob& job, const ProcessingOptions& options) {
                 Logger::log(LogLevel::Debug, "zopfli skipped on obj " + obj, "PdfProcessor");
             }
             break;
+        case StreamJob::Kind::Unfiltered:
+            try {
+                // QPDFWriter spends the full iterations whatever the size, so nothing comes out bigger than before
+                auto deflated = ZopfliCompressor::compress(job.data, static_cast<unsigned>(options.iterations), ZopfliFormat::ZLIB);
+                if (deflated.size() < job.data.size()) {
+                    job.result = std::move(deflated);
+                    job.to_flate = true;
+                } else {
+                    job.result = std::move(job.data);
+                }
+            } catch (const std::exception&) {
+                Logger::log(LogLevel::Debug, "zopfli skipped on obj " + obj, "PdfProcessor");
+            }
+            break;
     }
     job.data = {};
     job.image.samples = {};
@@ -668,6 +692,16 @@ void apply_stream(StreamJob& job) {
             [[fallthrough]];
         case StreamJob::Kind::Predicted:
             job.obj.replaceStreamData(provider, dict.getKey("/Filter"), dict.getKey("/DecodeParms"));
+            break;
+        case StreamJob::Kind::Unfiltered:
+            if (!job.file.empty()) update_embedded_file_params(job.obj, job.file);
+            if (job.to_flate) {
+                job.obj.replaceStreamData(provider, QPDFObjectHandle::newName("/FlateDecode"), QPDFObjectHandle::newNull());
+                break;
+            }
+            job.obj.replaceStreamData(provider, QPDFObjectHandle::newNull(), QPDFObjectHandle::newNull());
+            // deflating it would only make it bigger
+            job.obj.setFilterOnWrite(false);
             break;
     }
 }
@@ -848,6 +882,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                  filter_kind == SingleFilterKind::Ascii85 ||
                  filter_kind == SingleFilterKind::AsciiHex);
             bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
+            // QPDFWriter writes the root metadata uncompressed, and deflates every other stream without a filter
+            const bool unfiltered = is_unfiltered(dict) && !has_decode_parms && !obj.isRootMetadata();
 
             StreamJob job{.obj=obj, .obj_id=obj_id};
             if (info.image) {
@@ -870,7 +906,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                     auto sz = ifs.tellg(); ifs.seekg(0);
                     job.data.resize(sz);
                     ifs.read(reinterpret_cast<char*>(job.data.data()), sz);
-                    job.kind = StreamJob::Kind::Optimized;
+                    job.kind = unfiltered ? StreamJob::Kind::Unfiltered : StreamJob::Kind::Optimized;
                     job.deflate = is_flate;
                     job.file = info.file;
                 }
@@ -900,6 +936,18 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                         continue;
                     }
                     job.kind = StreamJob::Kind::Predicted;
+                }
+                // left to QPDFWriter, it would be deflated on one thread, and three times over when linearizing
+                else if (unfiltered && info.decodable) {
+                    try {
+                        const std::shared_ptr<Buffer> raw = obj.getRawStreamData();
+                        job.data.assign(raw->getBuffer(), raw->getBuffer() + raw->getSize());
+                    } catch (const std::exception&) {
+                        Logger::log(LogLevel::Debug, "zopfli skipped on obj " + std::to_string(obj_id), get_name());
+                        continue;
+                    }
+                    if (job.data.empty()) continue;
+                    job.kind = StreamJob::Kind::Unfiltered;
                 } else {
                     continue;
                 }
