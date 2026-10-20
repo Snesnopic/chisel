@@ -309,6 +309,13 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
         throw std::runtime_error("ArchiveProcessor: rmskin footer not written");
     }
 
+    // only an archive that reads back as its manifest may replace the original
+    if (const std::string diff = compare_archive_manifest(tmp_archive, *manifest, false); !diff.empty()) {
+        fs::remove_all(content.temp_dir);
+        fs::remove(tmp_archive, ec);
+        throw std::runtime_error("ArchiveProcessor: the rebuilt archive differs from its source at " + diff);
+    }
+
     chisel::cleanup_temp_dir(content.temp_dir, get_name());
 
     Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_archive.string(), get_name());

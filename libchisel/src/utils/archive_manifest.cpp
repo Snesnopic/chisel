@@ -8,6 +8,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cstring>
 #include <fstream>
@@ -105,6 +106,24 @@ bool extract_data(archive* a, archive_entry* entry, const fs::path& out, const s
 }
 
 // entries holding a package signature, or the digests it signs
+/**
+ * @brief Opens an archive for reading the way every manifest is read.
+ */
+int open_reader(archive* a, const fs::path& input, const bool zip_only) {
+    if (zip_only) {
+        archive_read_support_format_zip(a);
+    } else {
+        archive_read_support_filter_all(a);
+        archive_read_support_format_all(a);
+        archive_read_set_options(a, "hdrcharset=UTF-8");
+    }
+#ifdef _WIN32
+    return archive_read_open_filename_w(a, input.wstring().c_str(), 10240);
+#else
+    return archive_read_open_filename(a, input.string().c_str(), 10240);
+#endif
+}
+
 bool is_signature_entry(std::string name) {
     for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     if (name.starts_with("meta-inf/") && name.find('/', 9) == std::string::npos) {
@@ -170,18 +189,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
                                                      const bool zip_only, const std::string_view tag) {
     const std::unique_ptr<archive, decltype(&archive_read_free)> a(archive_read_new(), archive_read_free);
     if (!a) return std::nullopt;
-    if (zip_only) {
-        archive_read_support_format_zip(a.get());
-    } else {
-        archive_read_support_filter_all(a.get());
-        archive_read_support_format_all(a.get());
-        archive_read_set_options(a.get(), "hdrcharset=UTF-8");
-    }
-#ifdef _WIN32
-    int r = archive_read_open_filename_w(a.get(), input.wstring().c_str(), 10240);
-#else
-    int r = archive_read_open_filename(a.get(), input.string().c_str(), 10240);
-#endif
+    int r = open_reader(a.get(), input, zip_only);
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a.get()), tag);
     } else if (r != ARCHIVE_OK) {
@@ -218,6 +226,57 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
         manifest.items.push_back(std::move(item));
     }
     return manifest;
+}
+
+std::string compare_archive_manifest(const fs::path& rebuilt, const ArchiveManifest& manifest, const bool zip_only) {
+    const auto start = std::chrono::steady_clock::now();
+    const struct Timer {
+        const fs::path& path;
+        std::chrono::steady_clock::time_point start;
+        ~Timer() {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+            Logger::log(LogLevel::Debug, "Rebuild check of " + path.string() + " took " + std::to_string(ms.count()) + " ms",
+                        "ArchiveManifest");
+        }
+    } timer{rebuilt, start};
+    const std::unique_ptr<archive, decltype(&archive_read_free)> a(archive_read_new(), archive_read_free);
+    if (!a) return "no reader";
+    if (open_reader(a.get(), rebuilt, zip_only) < ARCHIVE_WARN) {
+        return std::string("does not open: ") + archive_error_string(a.get());
+    }
+    const auto text = [](const char* s) { return std::string(s ? s : ""); };
+    std::vector<char> got(64 * 1024);
+    std::vector<char> want(64 * 1024);
+    archive_entry* entry = nullptr;
+    std::size_t index = 0;
+    int r = ARCHIVE_OK;
+    while ((r = archive_read_next_header(a.get(), &entry)) != ARCHIVE_EOF) {
+        if (r < ARCHIVE_WARN) return "entry " + std::to_string(index) + ": " + text(archive_error_string(a.get()));
+        if (index >= manifest.items.size()) return text(archive_entry_pathname(entry)) + ": not in the source";
+        const ArchiveItem& item = manifest.items[index++];
+        const std::string name = text(archive_entry_pathname(item.entry.get()));
+        if (text(archive_entry_pathname(entry)) != name) return name + ": now named " + text(archive_entry_pathname(entry));
+        if (archive_entry_filetype(entry) != archive_entry_filetype(item.entry.get())) return name + ": different type";
+        if (text(archive_entry_symlink(entry)) != text(archive_entry_symlink(item.entry.get())) ||
+            text(archive_entry_hardlink(entry)) != text(archive_entry_hardlink(item.entry.get()))) {
+            return name + ": different link";
+        }
+        if (item.data.empty()) continue;
+        std::ifstream in(item.data, std::ios::binary);
+        if (!in) return name + ": can't read " + item.data.string();
+        for (;;) {
+            const la_ssize_t n = archive_read_data(a.get(), got.data(), got.size());
+            if (n < 0) return name + ": " + text(archive_error_string(a.get()));
+            in.read(want.data(), n);
+            if (in.gcount() != n || !std::equal(got.begin(), got.begin() + n, want.begin())) {
+                return name + ": different data";
+            }
+            if (n == 0) break;
+        }
+        if (in.peek() != std::ifstream::traits_type::eof()) return name + ": data cut short";
+    }
+    if (index != manifest.items.size()) return text(archive_entry_pathname(manifest.items[index].entry.get())) + ": missing";
+    return {};
 }
 
 std::vector<fs::path> manifest_files(const ArchiveManifest& manifest) {

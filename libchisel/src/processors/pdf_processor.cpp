@@ -26,6 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
@@ -667,8 +668,8 @@ void compress_stream(StreamJob& job, const ProcessingOptions& options) {
 /**
  * @brief Puts a job's new stream data in its stream, keeping the stream's filters unless the job changed them.
  */
-void apply_stream(StreamJob& job) {
-    if (!job.result || job.result->empty()) return;
+bool apply_stream(StreamJob& job) {
+    if (!job.result || job.result->empty()) return false;
     auto provider = std::make_shared<raw_stream_provider>(std::move(*job.result));
     const QPDFObjectHandle dict = job.obj.getDict();
     switch (job.kind) {
@@ -704,12 +705,14 @@ void apply_stream(StreamJob& job) {
             job.obj.setFilterOnWrite(false);
             break;
     }
+    return true;
 }
 
 /**
  * @brief Compresses a batch of jobs on the thread pool, biggest first, then applies them in their order.
  */
-void run_stream_jobs(std::vector<StreamJob>& jobs, const ProcessingOptions& options) {
+void run_stream_jobs(std::vector<StreamJob>& jobs, const ProcessingOptions& options,
+                     std::map<QPDFObjGen, std::filesystem::path>& injected) {
     std::vector<std::size_t> order(jobs.size());
     std::iota(order.begin(), order.end(), std::size_t{0});
     std::ranges::stable_sort(order, std::ranges::greater{}, [&jobs](const std::size_t i) { return jobs[i].bytes(); });
@@ -719,8 +722,140 @@ void run_stream_jobs(std::vector<StreamJob>& jobs, const ProcessingOptions& opti
     } else {
         for (std::size_t i = 0; i < order.size(); ++i) compress(i);
     }
-    for (auto& job : jobs) apply_stream(job);
+    for (auto& job : jobs) {
+        // a stream that now holds an extracted file decodes to that file, not to what it held before
+        if (apply_stream(job) && !job.file.empty()) injected.emplace(job.obj.getObjGen(), job.file);
+    }
     jobs.clear();
+}
+
+/**
+ * @brief A stream's data decoded as far as qpdf goes without lossy filters, or as it is stored when it can't.
+ */
+std::vector<unsigned char> stream_content(QPDFObjectHandle stream) {
+    std::shared_ptr<Buffer> buf;
+    try {
+        buf = stream.getStreamData(qpdf_dl_specialized);
+    } catch (const std::exception&) {
+        buf = stream.getRawStreamData();
+    }
+    return {buf->getBuffer(), buf->getBuffer() + buf->getSize()};
+}
+
+/**
+ * @brief Walks a rebuilt PDF beside the file it was rebuilt from, from the trailer down.
+ * @param injected Streams that now hold an extracted file, which they must decode to.
+ * @param linearized Whether the rebuild was linearized, which moves inherited page attributes onto the pages.
+ * @param stripped Whether /Info and the catalog's /Metadata were dropped on purpose.
+ * @return Empty when both are the same document, otherwise where they first differ.
+ */
+std::string compare_rebuild(const std::filesystem::path& source, const std::filesystem::path& rebuilt,
+                            const std::map<QPDFObjGen, std::filesystem::path>& injected,
+                            const bool linearized, const bool stripped) {
+    QPDF a;
+    QPDF b;
+    for (QPDF* q : {&a, &b}) {
+        auto quiet = QPDFLogger::create();
+        quiet->discard();
+        q->setLogger(quiet);
+    }
+    a.processFile(source.string().c_str());
+    try {
+        b.processFile(rebuilt.string().c_str());
+    } catch (const std::exception& e) {
+        return std::string("does not open: ") + e.what();
+    }
+    if (linearized) a.pushInheritedAttributesToPage();
+
+    struct Pair {
+        QPDFObjectHandle x;
+        QPDFObjectHandle y;
+        std::string where;
+    };
+    std::vector<Pair> todo;
+    std::map<QPDFObjGen, QPDFObjGen> seen;
+    const QPDFObjectHandle root = a.getRoot();
+    todo.push_back({root, b.getRoot(), "/Root"});
+    if (!stripped && a.getTrailer().hasKey("/Info")) {
+        todo.push_back({a.getTrailer().getKey("/Info"), b.getTrailer().getKey("/Info"), "/Info"});
+    }
+
+    while (!todo.empty()) {
+        auto [x, y, where] = std::move(todo.back());
+        todo.pop_back();
+        // dangling references read as null, and a writer may store them that way
+        if (x.isNull() || y.isNull()) {
+            if (x.isNull() != y.isNull()) return where + ": null on one side only";
+            continue;
+        }
+        if (x.isIndirect() != y.isIndirect()) return where + ": indirect on one side only";
+        if (x.isIndirect()) {
+            const auto [it, first] = seen.emplace(x.getObjGen(), y.getObjGen());
+            if (!first) {
+                if (it->second != y.getObjGen()) return where + ": points elsewhere";
+                continue;
+            }
+            where = x.getObjGen().unparse(' ') + " R";
+        }
+        if (x.getTypeCode() != y.getTypeCode()) return where + ": different type";
+
+        if (x.isArray()) {
+            if (x.getArrayNItems() != y.getArrayNItems()) return where + ": different length";
+            for (int i = 0; i < x.getArrayNItems(); ++i) {
+                todo.push_back({x.getArrayItem(i), y.getArrayItem(i), where + "[" + std::to_string(i) + "]"});
+            }
+            continue;
+        }
+        if (!x.isDictionary() && !x.isStream()) {
+            const bool same =
+                x.isString() ? x.getStringValue() == y.getStringValue() : x.unparseResolved() == y.unparseResolved();
+            if (!same) {
+                return where + ": " + x.unparseResolved().substr(0, 40) + " became " + y.unparseResolved().substr(0, 40);
+            }
+            continue;
+        }
+
+        const bool is_stream = x.isStream();
+        const auto file = is_stream ? injected.find(x.getObjGen()) : injected.end();
+        const bool is_injected = file != injected.end();
+        QPDFObjectHandle dx = is_stream ? x.getDict() : x;
+        QPDFObjectHandle dy = is_stream ? y.getDict() : y;
+        // what the rebuild changes on purpose: encoding keys, an embedded file's size and checksum, stripped metadata
+        const auto skipped = [&](const std::string& key) {
+            if (is_stream && (key == "/Length" || key == "/Filter" || key == "/DecodeParms" || key == "/DL")) return true;
+            if (is_injected && key == "/Params") return true;
+            return stripped && key == "/Metadata" && x.isSameObjectAs(root);
+        };
+        for (const auto& key : dx.getKeys()) {
+            if (skipped(key)) continue;
+            if (!dy.hasKey(key)) return where + ": " + key + " missing";
+            todo.push_back({dx.getKey(key), dy.getKey(key), where + " " + key});
+        }
+        for (const auto& key : dy.getKeys()) {
+            if (!skipped(key) && !dx.hasKey(key)) return where + ": " + key + " added";
+        }
+        if (is_injected) {
+            QPDFObjectHandle px = dx.getKey("/Params");
+            QPDFObjectHandle py = dy.getKey("/Params");
+            if (px.isDictionary() != py.isDictionary()) return where + ": /Params differs";
+            if (px.isDictionary()) {
+                for (const auto& key : px.getKeys()) {
+                    if (key == "/Size" || key == "/CheckSum") continue;
+                    todo.push_back({px.getKey(key), py.getKey(key), where + " /Params " + key});
+                }
+            }
+        }
+        if (!is_stream) continue;
+
+        std::vector<unsigned char> expected;
+        if (is_injected) {
+            if (!read_file(file->second, expected)) return where + ": can't read " + file->second.string();
+        } else {
+            expected = stream_content(x);
+        }
+        if (stream_content(y) != expected) return where + ": different stream data";
+    }
+    return {};
 }
 
 /**
@@ -860,6 +995,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
 
         // qpdf objects are read and changed on this thread only; the compression in between runs on the pool
         std::vector<StreamJob> jobs;
+        std::map<QPDFObjGen, std::filesystem::path> injected;
         std::size_t batch_bytes = 0;
         for (auto& obj : objects) {
             if (!obj.isStream()) continue;
@@ -956,11 +1092,11 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             batch_bytes += job.bytes();
             jobs.push_back(std::move(job));
             if (batch_bytes >= kStreamBatchBytes) {
-                run_stream_jobs(jobs, options);
+                run_stream_jobs(jobs, options, injected);
                 batch_bytes = 0;
             }
         }
-        run_stream_jobs(jobs, options);
+        run_stream_jobs(jobs, options, injected);
 
         if (!options.preserve_metadata) {
             strip_metadata(pdf);
@@ -993,6 +1129,17 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             });
         }
         writer.write();
+
+        // only a file that reads back as the same document may replace the original
+        const auto check_start = std::chrono::steady_clock::now();
+        if (const std::string diff = compare_rebuild(content.original_path, tmp_path, injected, pdf.isLinearized(),
+                                                     !options.preserve_metadata);
+            !diff.empty()) {
+            throw std::runtime_error("the rebuilt PDF differs from its source at " + diff);
+        }
+        Logger::log(LogLevel::Debug, "Rebuild check of " + content.original_path.string() + " took " +
+                    std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - check_start).count()) + " ms", get_name());
         partial.written = true;
 
         cleanup_temp_dir(st.temp_dir, get_name());
@@ -1002,6 +1149,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         return tmp_path;
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Error, std::string("Exception during pdf finalize: ") + e.what(), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
         throw;
     }
 }

@@ -124,11 +124,19 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: write_close failed");
     }
-    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
     archive_write_free(out);
+
+    // only a package that reads back as its manifest may replace the original
+    if (const std::string diff = compare_archive_manifest(tmp_path, *manifest, true); !diff.empty()) {
+        cleanup_temp_dir(content.temp_dir);
+        std::error_code rm_ec;
+        fs::remove(tmp_path, rm_ec);
+        throw std::runtime_error("OOXMLProcessor: the rebuilt package differs from its source at " + diff);
+    }
 
     cleanup_temp_dir(content.temp_dir);
 
+    Logger::log(LogLevel::Debug, "Exiting finalize_extraction for " + tmp_path.string(), get_name());
     return tmp_path;
 }
 

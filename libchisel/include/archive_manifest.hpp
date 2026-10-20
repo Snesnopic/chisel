@@ -11,6 +11,7 @@
 #define CHISEL_ARCHIVE_MANIFEST_HPP
 
 #include <filesystem>
+#include <string>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -62,6 +63,15 @@ std::vector<std::filesystem::path> manifest_files(const ArchiveManifest& manifes
  * parts of APPX/MSIX, NuGet, OPC (OOXML, XPS, VSIX), ODF, EPUB and iOS app packages.
  */
 bool archive_is_signed(const std::filesystem::path& input);
+
+/**
+ * @brief Reads a rebuilt archive back and compares it with the manifest it was written from.
+ * @param zip_only Read it as a zip only, as its source was read.
+ * @return Empty when every entry has the manifest's name, type, link and current data, in order;
+ * otherwise the first difference.
+ */
+std::string compare_archive_manifest(const std::filesystem::path& rebuilt, const ArchiveManifest& manifest,
+                                     bool zip_only);
 
 /**
  * @brief Writes the manifest's entries, in order, with their original headers and current data.
