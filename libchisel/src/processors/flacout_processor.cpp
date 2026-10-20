@@ -6,6 +6,7 @@
 #include "../../include/logger.hpp"
 #include "../../include/audio_metadata_util.hpp"
 #include "../../include/random_utils.hpp"
+#include "../../include/thread_pool.hpp"
 #include <flacoutcpp.hpp>
 #include <FLAC/all.h>
 #include <sstream>
@@ -28,6 +29,14 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
     flacoutcpp::Config cfg;
     cfg.copy_metadata = options.preserve_metadata;
     cfg.verbose = false;
+    // flacoutcpp would otherwise start a thread per core for every file, whatever --threads says
+    cfg.max_threads = 1;
+    if (ThreadPool* pool = ThreadPool::current()) {
+        cfg.max_threads = pool->size();
+        cfg.parallel_for = [pool](const std::size_t n, const std::function<void(std::size_t)>& body) {
+            pool->parallel_for(n, body);
+        };
+    }
 
     // flacoutcpp copies the metadata of a file that starts with the FLAC header: ID3v2 tags in front go back after
     const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(input);
@@ -37,11 +46,16 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
         source += ".flac";
         AudioMetadataUtil::writeWithHead(input, source, {}, id3.size());
     }
+    // the copy goes on every way out, a stop thrown from flacoutcpp's parallel steps included
+    const struct RemoveCopy {
+        const std::filesystem::path& source;
+        const std::filesystem::path& input;
+        ~RemoveCopy() {
+            std::error_code ec;
+            if (source != input) std::filesystem::remove(source, ec);
+        }
+    } remove_copy{source, input};
     const bool optimised = flacoutcpp::optimise(source.string(), output.string(), cfg);
-    if (source != input) {
-        std::error_code ec;
-        std::filesystem::remove(source, ec);
-    }
     if (!optimised) {
         Logger::log(LogLevel::Error, "flacoutcpp optimise failed", get_name());
         throw std::runtime_error("flacoutcpp: optimise failed");
