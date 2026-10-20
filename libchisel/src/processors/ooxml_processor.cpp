@@ -104,10 +104,10 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
     // set ZIP format and force deflate compression
     const int set_fmt = archive_write_set_format_zip(out);
     if (set_fmt == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(out), get_name());
     }
     if (set_fmt != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to set zip format: " + std::string(archive_error_string(out)), get_name());
+        Logger::log(LogLevel::Error, "Failed to set zip format: " + archive_error(out), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: set_format_zip failed");
@@ -117,10 +117,10 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
 
     const int open_w = archive_write_open_filename(out, tmp_path.string().c_str());
     if (open_w == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(out), get_name());
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(out), get_name());
     }
     if (open_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to open temp ooxml for writing: " + std::string(archive_error_string(out)), get_name());
+        Logger::log(LogLevel::Error, "Failed to open temp ooxml for writing: " + archive_error(out), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: open_filename failed");
@@ -139,7 +139,7 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
 
     const int close_w = archive_write_close(out);
     if (close_w != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Failed to close archive: " + std::string(archive_error_string(out)), get_name());
+        Logger::log(LogLevel::Error, "Failed to close archive: " + archive_error(out), get_name());
         archive_write_free(out);
         cleanup_temp_dir(content.temp_dir);
         throw std::runtime_error("OOXMLProcessor: write_close failed");

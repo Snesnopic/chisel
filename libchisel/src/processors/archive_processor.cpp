@@ -226,10 +226,10 @@ static bool create_with_libarchive(const ArchiveManifest& manifest, const fs::pa
             return false;
     }
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(a), "ArchiveProcessor");
     }
     if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
-        Logger::log(LogLevel::Error, "Setting format/filter failed: " + std::string(archive_error_string(a)), "ArchiveProcessor");
+        Logger::log(LogLevel::Error, "Setting format/filter failed: " + archive_error(a), "ArchiveProcessor");
         return false;
     }
 
@@ -239,16 +239,16 @@ static bool create_with_libarchive(const ArchiveManifest& manifest, const fs::pa
         r = archive_write_open_filename(a, out_path.string().c_str());
     #endif
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), "ArchiveProcessor");
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(a), "ArchiveProcessor");
     }
     if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
-        Logger::log(LogLevel::Error, "Archive_write_open_filename: " + std::string(archive_error_string(a)), "ArchiveProcessor");
+        Logger::log(LogLevel::Error, "Archive_write_open_filename: " + archive_error(a), "ArchiveProcessor");
         return false;
     }
 
     const bool written = write_archive_manifest(a, manifest, "ArchiveProcessor");
     if (archive_write_close(a) != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Archive_write_close: " + std::string(archive_error_string(a)), "ArchiveProcessor");
+        Logger::log(LogLevel::Error, "Archive_write_close: " + archive_error(a), "ArchiveProcessor");
         return false;
     }
     return written;

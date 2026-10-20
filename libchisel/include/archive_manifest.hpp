@@ -54,6 +54,11 @@ std::optional<ArchiveManifest> read_archive_manifest(const std::filesystem::path
                                                      std::string_view tag);
 
 /**
+ * @brief libarchive's message for its last error, or a placeholder when it gave none.
+ */
+std::string archive_error(archive* a);
+
+/**
  * @brief Where to extract an entry: its own path under dest_dir, or a folder of its own when that
  * path is unsafe, already taken or too long.
  */

@@ -163,6 +163,11 @@ bool archive_is_signed(const fs::path& input) {
     return false;
 }
 
+std::string archive_error(archive* a) {
+    const char* message = archive_error_string(a);
+    return message != nullptr ? message : "no reason given";
+}
+
 fs::path entry_extraction_path(std::string name, const fs::path& dest_dir, const std::size_t index) {
     for (auto& c : name) {
         if (c == '\\') c = '/';
@@ -193,9 +198,9 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
     if (!a) return std::nullopt;
     int r = open_reader(a.get(), input, zip_only);
     if (r == ARCHIVE_WARN) {
-        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a.get()), tag);
+        Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(a.get()), tag);
     } else if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Can't open archive: " + std::string(archive_error_string(a.get())), tag);
+        Logger::log(LogLevel::Error, "Can't open archive: " + archive_error(a.get()), tag);
         return std::nullopt;
     }
 
@@ -204,7 +209,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
     while ((r = archive_read_next_header(a.get(), &entry)) != ARCHIVE_EOF) {
         // a warning can mean a name or owner that didn't convert, which couldn't be written back
         if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Can't read entry: " + std::string(archive_error_string(a.get())), tag);
+            Logger::log(LogLevel::Error, "Can't read entry: " + archive_error(a.get()), tag);
             return std::nullopt;
         }
 
@@ -222,7 +227,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
             item.data = extraction_path(entry, dest_dir, manifest.items.size());
             if (item.data.empty() || !extract_data(a.get(), entry, item.data, tag)) return std::nullopt;
         } else if (archive_read_data_skip(a.get()) != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Can't skip entry: " + std::string(archive_error_string(a.get())), tag);
+            Logger::log(LogLevel::Error, "Can't skip entry: " + archive_error(a.get()), tag);
             return std::nullopt;
         }
         manifest.items.push_back(std::move(item));
@@ -244,7 +249,7 @@ std::string compare_archive_manifest(const fs::path& rebuilt, const ArchiveManif
     const std::unique_ptr<archive, decltype(&archive_read_free)> a(archive_read_new(), archive_read_free);
     if (!a) return "no reader";
     if (open_reader(a.get(), rebuilt, zip_only) < ARCHIVE_WARN) {
-        return std::string("does not open: ") + archive_error_string(a.get());
+        return std::string("does not open: ") + archive_error(a.get());
     }
     const auto text = [](const char* s) { return std::string(s ? s : ""); };
     std::vector<char> got(64 * 1024);
@@ -329,21 +334,21 @@ bool write_archive_manifest(archive* a, const ArchiveManifest& manifest, const s
 
         const int r = archive_write_header(a, entry.get());
         if (r == ARCHIVE_WARN) {
-            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error_string(a), tag);
+            Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(a), tag);
         } else if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Can't write entry header: " + std::string(archive_error_string(a)), tag);
+            Logger::log(LogLevel::Error, "Can't write entry header: " + archive_error(a), tag);
             return false;
         }
         while (in && in.is_open()) {
             in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
             if (const auto got = in.gcount(); got > 0 &&
                 archive_write_data(a, buffer.data(), static_cast<std::size_t>(got)) < 0) {
-                Logger::log(LogLevel::Error, "Can't write entry data: " + std::string(archive_error_string(a)), tag);
+                Logger::log(LogLevel::Error, "Can't write entry data: " + archive_error(a), tag);
                 return false;
             }
         }
         if (archive_write_finish_entry(a) < ARCHIVE_WARN) {
-            Logger::log(LogLevel::Error, "Can't finish entry: " + std::string(archive_error_string(a)), tag);
+            Logger::log(LogLevel::Error, "Can't finish entry: " + archive_error(a), tag);
             return false;
         }
     }

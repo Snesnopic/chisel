@@ -839,20 +839,20 @@ std::string compare_zip_manifest(const fs::path& rebuilt, const ZipManifest& m) 
 #else
     if (archive_read_open_filename(a.get(), rebuilt.string().c_str(), 10240) < ARCHIVE_WARN) {
 #endif
-        return std::string("libarchive can't open it: ") + archive_error_string(a.get());
+        return "libarchive can't open it: " + archive_error(a.get());
     }
     archive_entry* entry = nullptr;
     std::size_t count = 0;
     std::vector<char> sink(kChunk);
     int status = ARCHIVE_OK;
     while ((status = archive_read_next_header(a.get(), &entry)) != ARCHIVE_EOF) {
-        if (status < ARCHIVE_WARN) return std::string("libarchive: ") + archive_error_string(a.get());
+        if (status < ARCHIVE_WARN) return "libarchive: " + archive_error(a.get());
         ++count;
         // other methods and encrypted entries were copied as they were, and libarchive may not read them
         if (!plain) continue;
         la_ssize_t n = 0;
         while ((n = archive_read_data(a.get(), sink.data(), sink.size())) > 0) {}
-        if (n < 0) return std::string("libarchive: ") + archive_error_string(a.get());
+        if (n < 0) return "libarchive: " + archive_error(a.get());
     }
     if (count != m.entries.size()) return "libarchive sees " + std::to_string(count) + " entries";
     return {};
