@@ -84,17 +84,10 @@ namespace chisel {
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
         /**
-         * @brief Always reports equal: a real content checksum isn't practical for
-         * a container format (would need to demux and hash every track
-         * independently), and the file-size fallback used by the default
-         * IProcessor::raw_equal() is actively harmful here - mkclean only
-         * succeeds by shrinking the file, so a size-based comparison would
-         * reject every successful recompression as "corrupted".
-         * @return Always true.
+         * @brief Compares every track of both files frame by frame, see compare_mkv_tracks().
+         * @return False when the tracks differ or the first file can't be read, logging why.
          */
-        [[nodiscard]] bool raw_equal(const std::filesystem::path&, const std::filesystem::path&) const override {
-            return true;
-        }
+        [[nodiscard]] bool raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const override;
     };
 
 } // namespace chisel

@@ -7,6 +7,7 @@
 #include "../../include/audio_metadata_util.hpp"
 #include "../../include/random_utils.hpp"
 #include "../../include/file_utils.hpp"
+#include "../../include/mkv_tracks.hpp"
 #include <vector>
 #include <string>
 #include <stdexcept>
@@ -74,6 +75,11 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
         return;
     }
+
+    if (!raw_equal(input, output)) {
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
+    }
 #endif
     Logger::log(LogLevel::Debug, "exiting recompress for " + output.string(), get_name());
 }
@@ -134,6 +140,13 @@ std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &
         return {};
     }
 
+    // an empty result leaves the file as phase 2 made it, attachments included
+    if (!raw_equal(content.original_path, final_temp_path)) {
+        cleanup_temp_dir(content.temp_dir, get_name());
+        std::filesystem::remove(final_temp_path);
+        return {};
+    }
+
     cleanup_temp_dir(content.temp_dir, get_name());
     Logger::log(LogLevel::Debug, "exiting finalize_extraction for " + final_temp_path.string(), get_name());
 
@@ -145,6 +158,16 @@ std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &
 
 std::string MkvProcessor::get_raw_checksum(const std::filesystem::path& file_path) const {
     return "";
+}
+
+bool MkvProcessor::raw_equal(const std::filesystem::path& a, const std::filesystem::path& b) const {
+    const auto [source_read, difference] = compare_mkv_tracks(a, b);
+    if (!source_read) {
+        Logger::log(LogLevel::Warning, "tracks can't be verified, file left as it is: " + a.string() + " - " + difference, get_name());
+    } else if (!difference.empty()) {
+        Logger::log(LogLevel::Error, "rewritten tracks differ, file left as it is: " + a.string() + " - " + difference, get_name());
+    }
+    return difference.empty();
 }
 
 } // namespace chisel
