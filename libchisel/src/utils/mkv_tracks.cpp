@@ -541,11 +541,20 @@ Tracks read_tracks(const fs::path& path, const bool verify_index) {
         return tracks;
     }
     const std::uint64_t segment_end = size == kUnknownSize ? file.size() : std::min(file.size(), at + size);
+    // a rewrite keeps one segment: anything after it would be lost
+    if (segment_end < file.size()) {
+        tracks.error = "data after the segment";
+        return tracks;
+    }
     bool have_tracks = false;
     std::vector<std::uint8_t> buffer;
 
     while (at < segment_end) {
-        if (!file.header(at, id, size, head)) break;
+        // what can't be read can't be compared either, and a rewrite would drop it
+        if (!file.header(at, id, size, head)) {
+            tracks.error = "unreadable data at offset " + std::to_string(at);
+            return tracks;
+        }
         const std::uint64_t data = at + head;
         if (id == kCluster && size == kUnknownSize) {
             // children up to the next top level element
@@ -553,7 +562,11 @@ Tracks read_tracks(const fs::path& path, const bool verify_index) {
             while (child < segment_end) {
                 std::uint32_t cid = 0;
                 std::uint64_t csize = 0, chead = 0;
-                if (!file.header(child, cid, csize, chead) || is_level1(cid)) break;
+                if (!file.header(child, cid, csize, chead)) {
+                    tracks.error = "unreadable data at offset " + std::to_string(child);
+                    return tracks;
+                }
+                if (is_level1(cid)) break;
                 if (chead > segment_end - child || csize == kUnknownSize || csize > segment_end - child - chead || csize > kMaxElement) {
                     tracks.error = "unreadable cluster";
                     return tracks;
