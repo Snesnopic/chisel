@@ -14,10 +14,12 @@
 #include <system_error>
 #include <filesystem>
 #include <mutex>
+#include <cstring>
+#include <sstream>
 
 #ifdef HAVE_MATROSKA
 // forward declaration of mkclean API
-extern "C" int mkclean_optimize(int argc, char* argv[]);
+extern "C" int mkclean_optimize_ex(int argc, char* argv[], char* messages, size_t messages_size);
 #endif
 
 namespace chisel {
@@ -62,23 +64,39 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     }
 
     int return_code = -1;
+    // mkclean's messages go to the log, not to the console
+    std::string messages(16 * 1024, '\0');
+    const auto run = [&] {
+        return mkclean_optimize_ex(static_cast<int>(argv.size()), argv.data(), messages.data(), messages.size());
+    };
     try {
         // the first run fills libmatroska2's global tables unguarded, so it runs alone
         static std::once_flag tables_ready;
         bool ran = false;
         std::call_once(tables_ready, [&] {
-            return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
+            return_code = run();
             ran = true;
         });
-        if (!ran) return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
+        if (!ran) return_code = run();
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Warning, "mkclean_optimize exception (likely corrupt): " + std::string(e.what()), get_name());
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
         return;
     }
 
+    messages.resize(std::strlen(messages.c_str()));
+    std::istringstream lines(messages);
+    std::string line, last_line;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        Logger::log(LogLevel::Debug, "mkclean on " + input.string() + ": " + line, get_name());
+        last_line = line;
+    }
+
     if (return_code != 0) {
-        Logger::log(LogLevel::Warning, "mkclean failed (likely corrupt file) with exit code " + std::to_string(return_code), get_name());
+        Logger::log(LogLevel::Warning, "mkclean failed (likely corrupt file) with exit code " + std::to_string(return_code) +
+                    (last_line.empty() ? "" : ": " + last_line), get_name());
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
         return;
     }
