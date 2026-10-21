@@ -84,6 +84,7 @@ public:
      * @return true
      */
     [[nodiscard]] bool can_extract_contents() const noexcept override { return true; }
+    [[nodiscard]] bool checks_own_rebuild() const noexcept override { return true; }
 
     // --- operations ---
 

@@ -160,6 +160,14 @@ public:
     [[nodiscard]] virtual bool is_signed(const std::filesystem::path& file_path) const {
         return false;
     }
+
+    /**
+     * @brief Whether finalize_extraction() reads its own result back before returning it.
+     *
+     * The executor reads every other rebuilt container back with prepare_extraction() and compares what
+     * comes out with what went in, before the rebuilt file may replace the original.
+     */
+    [[nodiscard]] virtual bool checks_own_rebuild() const noexcept { return false; }
 };
 
 } // namespace chisel

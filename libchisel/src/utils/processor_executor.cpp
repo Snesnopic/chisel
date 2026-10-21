@@ -17,12 +17,72 @@
 #include <chrono>
 #include <fstream>
 #include "random_utils.hpp"
+#include "file_utils.hpp"
+#include <zlib.h>
 
 
 namespace fs = std::filesystem;
 
 namespace chisel {
     namespace {
+        /**
+         * @brief A file's size and two independent checksums, enough to tell different contents apart.
+         */
+        struct Fingerprint {
+            std::uintmax_t size = 0;
+            std::uint32_t crc = 0;
+            std::uint64_t fnv = 1469598103934665603ull;
+            auto operator<=>(const Fingerprint&) const = default;
+        };
+
+        std::optional<Fingerprint> fingerprint(const fs::path& path) {
+            std::ifstream in(path, std::ios::binary);
+            if (!in) return std::nullopt;
+            Fingerprint f;
+            std::vector<char> buffer(1 << 20);
+            while (in) {
+                in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                const auto n = static_cast<std::size_t>(in.gcount());
+                f.crc = static_cast<std::uint32_t>(crc32(f.crc, reinterpret_cast<const Bytef*>(buffer.data()), static_cast<uInt>(n)));
+                for (std::size_t i = 0; i < n; ++i) {
+                    f.fnv = (f.fnv ^ static_cast<unsigned char>(buffer[i])) * 1099511628211ull;
+                }
+                f.size += n;
+            }
+            return f;
+        }
+
+        /**
+         * @brief Reads a rebuilt container back the way its contents were read, and compares them with what went in.
+         * @return Empty when the same contents come out, otherwise how they differ.
+         */
+        std::string compare_reextraction(IProcessor& processor, const fs::path& rebuilt, std::vector<Fingerprint> before) {
+            std::optional<ExtractedContent> again;
+            try {
+                again = processor.prepare_extraction(rebuilt);
+            } catch (const std::exception& e) {
+                return std::string("it can't be read back: ") + e.what();
+            }
+            if (!again) return before.empty() ? std::string{} : "it can't be read back";
+            std::vector<Fingerprint> after;
+            bool readable = true;
+            for (const auto& file : again->extracted_files) {
+                const auto f = fingerprint(file);
+                readable = readable && f.has_value();
+                if (f) after.push_back(*f);
+            }
+            cleanup_temp_dir(again->temp_dir, "Executor");
+            if (!readable) return "what it holds can't be read back";
+            if (after.size() != before.size()) {
+                return std::to_string(after.size()) + " items read back instead of " + std::to_string(before.size());
+            }
+            std::ranges::sort(before);
+            std::ranges::sort(after);
+            const auto [b, a] = std::ranges::mismatch(before, after);
+            if (b == before.end()) return {};
+            return "an item of " + std::to_string(b->size) + " bytes read back as " + std::to_string(a->size) + " other bytes";
+        }
+
         bool is_junk(const fs::path& path) {
             auto name = path.filename().string();
             std::transform(name.begin(), name.end(), name.begin(), ::tolower);
@@ -812,6 +872,16 @@ namespace chisel {
                 }
             }
 
+            // what goes in, to compare with what the rebuilt file gives back
+            std::vector<Fingerprint> contents;
+            bool checkable = !procs.front()->checks_own_rebuild();
+            for (const auto& file : effective_content.extracted_files) {
+                if (!checkable) break;
+                const auto f = fingerprint(file);
+                checkable = f.has_value();
+                if (f) contents.push_back(*f);
+            }
+
             auto start = std::chrono::steady_clock::now();
             std::filesystem::path new_temp_file = procs.front()->finalize_extraction(effective_content, m_options);
             auto end = std::chrono::steady_clock::now();
@@ -853,6 +923,21 @@ namespace chisel {
                 std::filesystem::remove(new_temp_file, ec);
                 event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
                 return;
+            }
+
+            // only a file that reads back as what went in may replace the original
+            if (checkable) {
+                const auto check_start = std::chrono::steady_clock::now();
+                if (const std::string diff = compare_reextraction(*procs.front(), new_temp_file, std::move(contents)); !diff.empty()) {
+                    Logger::log(LogLevel::Error, "Rebuilt container differs from its source, original kept: " +
+                                content.original_path.string() + " - " + diff, "Executor");
+                    std::filesystem::remove(new_temp_file, ec);
+                    event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="the rebuilt file differs from its source: " + diff});
+                    return;
+                }
+                Logger::log(LogLevel::Debug, "Rebuild check of " + content.original_path.string() + " took " +
+                            std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - check_start).count()) + " ms", "Executor");
             }
 
             // use the helper and publish the specific Phase 3 event
