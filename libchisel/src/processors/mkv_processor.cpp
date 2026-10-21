@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <filesystem>
+#include <mutex>
 
 #ifdef HAVE_MATROSKA
 // forward declaration of mkclean API
@@ -62,8 +63,14 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
 
     int return_code = -1;
     try {
-        // mkclean works fine reading from input and writing to output directly
-        return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
+        // the first run fills libmatroska2's global tables unguarded, so it runs alone
+        static std::once_flag tables_ready;
+        bool ran = false;
+        std::call_once(tables_ready, [&] {
+            return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
+            ran = true;
+        });
+        if (!ran) return_code = mkclean_optimize(static_cast<int>(argv.size()), argv.data());
     } catch (const std::exception& e) {
         Logger::log(LogLevel::Warning, "mkclean_optimize exception (likely corrupt): " + std::string(e.what()), get_name());
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
