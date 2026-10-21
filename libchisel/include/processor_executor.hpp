@@ -181,11 +181,12 @@ private:
     [[nodiscard]] std::filesystem::path destination_for(const std::filesystem::path& input) const;
 
     /**
-     * @brief Keeps a container's Phase 2 result under its own file name, for Phase 3 to rebuild on.
+     * @brief Keeps a container's Phase 2 result next to its temp file, under a name ending in the
+     * container's own, for Phase 3 to rebuild on.
      * @return The kept file, or std::nullopt on failure.
      */
     std::optional<std::filesystem::path> keep_for_finalize(const std::filesystem::path& file,
-                                                           const std::filesystem::path& temp_file) const;
+                                                           const std::filesystem::path& temp_file);
     /// @brief Removes a container's kept Phase 2 result, once Phase 3 no longer needs it.
     void drop_kept(const std::filesystem::path& file);
 
@@ -226,18 +227,18 @@ private:
      *
      * For "mixed" processors (can_recompress() && can_extract_contents(), e.g.
      * FlacProcessor, ApeProcessor, OggProcessor, MkvProcessor, XmlProcessor),
-     * Phase 3's finalize_extraction() rebuilds on Phase 2's result, which waits in kept_dir_
+     * Phase 3's finalize_extraction() rebuilds on Phase 2's result, which waits in kept_files_
      * instead of replacing the original: only what Phase 3 makes of it, read back and smaller
      * than the original, may replace it. Without this map, Phase 3 would rebuild from the
      * untouched original, discarding Phase 2's recompression outright.
      */
     std::unordered_map<std::string, std::filesystem::path> recompressed_paths_;
     std::unordered_set<std::string> outputs_written_; ///< Destinations already written under the output path
-    mutable std::mutex recompressed_paths_mutex_; ///< Guards recompressed_paths_ and outputs_written_ (written concurrently by Phase 2's thread pool)
+    std::unordered_set<std::string> kept_files_;  ///< Phase 2 results of containers waiting for Phase 3, removed at the end
+    mutable std::mutex recompressed_paths_mutex_; ///< Guards recompressed_paths_, kept_files_ and outputs_written_ (written concurrently by Phase 2's thread pool)
 
     std::filesystem::path output_dir_;            ///< Optional output directory
     std::filesystem::path output_base_;           ///< Folder the output directory mirrors
-    std::filesystem::path kept_dir_;              ///< Phase 2 results of containers waiting for Phase 3, removed at the end
     EventBus& event_bus_;                         ///< Bus for publishing events
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry
     EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression

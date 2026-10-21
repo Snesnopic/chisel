@@ -205,13 +205,17 @@ namespace chisel {
            }
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs, const std::vector<fs::path> &roots) {
-        struct KeptDirGuard {
-            const fs::path& dir;
-            ~KeptDirGuard() {
+        // Phase 2 results that Phase 3 never took up (the run stopped early)
+        struct KeptFilesGuard {
+            std::unordered_set<std::string>& files;
+            std::mutex& mutex;
+            ~KeptFilesGuard() {
+                std::lock_guard<std::mutex> lock(mutex);
                 std::error_code ec;
-                if (!dir.empty()) fs::remove_all(dir, ec);
+                for (const auto& file : files) fs::remove(file, ec);
+                files.clear();
             }
-        } kept_dir_guard{.dir=kept_dir_};
+        } kept_files_guard{.files=kept_files_, .mutex=recompressed_paths_mutex_};
         // containers Phase 3 never took up (the run stopped early) still have their extracted files in temp
         struct PendingContainersGuard {
             std::deque<ContainerNode>& containers;
@@ -224,7 +228,6 @@ namespace chisel {
             }
         } pending_containers_guard{.containers=containers_};
 
-        kept_dir_ = fs::temp_directory_path() / ("chisel-kept-" + RandomUtils::random_suffix());
         if (has_output_dir_ && !dry_run_) {
             const auto& layout_roots = roots.empty() ? inputs : roots;
             output_is_directory_ = layout_roots.size() != 1 || !fs::is_regular_file(layout_roots.front()) ||
@@ -371,17 +374,20 @@ namespace chisel {
         return output_dir_ / relative;
     }
 
-    std::optional<fs::path> ProcessorExecutor::keep_for_finalize(const fs::path& file, const fs::path& temp_file) const {
-        // own folder per file: finalizers may pick the format from the extension
-        const auto kept = kept_dir_ / RandomUtils::random_suffix() / file.filename();
+    std::optional<fs::path> ProcessorExecutor::keep_for_finalize(const fs::path& file, const fs::path& temp_file) {
+        // a rename can't cross file systems, and the temp file may sit next to the input; finalizers may pick the format from the extension
+        const auto name = file.filename().string();
+        const auto tail = name.size() <= 200 ? "-" + name : file.extension().string();
+        const auto kept = temp_file.parent_path() / (".chisel-kept-" + RandomUtils::random_suffix() + tail);
         std::error_code ec;
-        fs::create_directories(kept.parent_path(), ec);
-        if (!ec) fs::rename(temp_file, kept, ec);
+        fs::rename(temp_file, kept, ec);
         if (ec) {
             Logger::log(LogLevel::Warning, "Failed to keep the Phase 2 result of " + file.string() + " (" + ec.message() + ")", "Executor");
             fs::remove(temp_file, ec);
             return std::nullopt;
         }
+        std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+        kept_files_.insert(kept.string());
         return kept;
     }
 
@@ -391,6 +397,7 @@ namespace chisel {
         if (it == recompressed_paths_.end()) return;
         std::error_code ec;
         fs::remove(it->second, ec);
+        kept_files_.erase(it->second.string());
         recompressed_paths_.erase(it);
     }
 
