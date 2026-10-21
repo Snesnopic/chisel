@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!settings.quiet) {
-        auto consoleSink = std::make_unique<ConsoleLogSink>();
+        auto consoleSink = std::make_unique<ConsoleLogSink>(g_console_mtx);
         consoleSink->log_level = Logger::string_to_level(settings.log_level);
         Logger::add_sink(std::move(consoleSink));
     }
@@ -360,11 +360,8 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<FileProcessErrorEvent>([&](const FileProcessErrorEvent& e) {
-        {
-            std::scoped_lock lock(g_console_mtx);
-            clear_line_internal();
-            Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
-        }
+        // the console sink takes g_console_mtx itself and clears the progress bar line
+        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
 
         Result r;
         r.path = e.path;
@@ -445,11 +442,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<ContainerFinalizeErrorEvent>([&](const ContainerFinalizeErrorEvent& e) {
-        {
-            std::lock_guard<std::mutex> lock(g_console_mtx);
-            clear_line_internal();
-            Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
-        }
+        Logger::log(LogLevel::Error, e.path.filename().string() + " " + e.error_message, "main");
 
         ContainerResult c;
         c.filename = e.path;

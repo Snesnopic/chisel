@@ -7,10 +7,16 @@
 
 #include "../../libchisel/include/log_sink.hpp"
 #include <iostream>
+#include <mutex>
 
 class ConsoleLogSink final : public chisel::ILogSink {
 public:
     chisel::LogLevel log_level = chisel::LogLevel::Error;
+
+    /**
+     * @param console_mtx The mutex everything else writing to the console holds.
+     */
+    explicit ConsoleLogSink(std::mutex& console_mtx) : console_mtx_(console_mtx) {}
 
     void log(const chisel::LogLevel level,
              const std::string_view message,
@@ -21,6 +27,7 @@ public:
             return;
         }
 
+        std::scoped_lock lock(console_mtx_);
         std::cerr << "\r\033[K";
 
         switch (level) {
@@ -40,6 +47,9 @@ public:
                 break;
         }
     }
+
+private:
+    std::mutex& console_mtx_;
 };
 
 #endif // CHISEL_CONSOLE_LOG_SINK_HPP
