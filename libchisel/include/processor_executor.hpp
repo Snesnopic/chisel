@@ -181,11 +181,13 @@ private:
     [[nodiscard]] std::filesystem::path destination_for(const std::filesystem::path& input) const;
 
     /**
-     * @brief Dry run: keeps a container's Phase 2 result under its own file name, for Phase 3 to rebuild on.
+     * @brief Keeps a container's Phase 2 result under its own file name, for Phase 3 to rebuild on.
      * @return The kept file, or std::nullopt on failure.
      */
     std::optional<std::filesystem::path> keep_for_finalize(const std::filesystem::path& file,
                                                            const std::filesystem::path& temp_file) const;
+    /// @brief Removes a container's kept Phase 2 result, once Phase 3 no longer needs it.
+    void drop_kept(const std::filesystem::path& file);
 
     /// @brief Copies the inputs that weren't written to the output path, unchanged.
     void copy_unchanged_inputs(const std::vector<std::filesystem::path>& inputs) const;
@@ -224,13 +226,10 @@ private:
      *
      * For "mixed" processors (can_recompress() && can_extract_contents(), e.g.
      * FlacProcessor, ApeProcessor, OggProcessor, MkvProcessor, XmlProcessor),
-     * Phase 3's finalize_extraction() rebuilds starting from ExtractedContent::original_path.
-     * In the default in-place mode Phase 2 overwrites that same path, so this is a
-     * no-op; but with --output-dir (or in a dry run, which keeps the result in
-     * dry_run_dir_), Phase 2 writes the recompressed result to a different path
-     * entirely, leaving original_path pointing at the untouched pristine file.
-     * Without this map, Phase 3 would silently rebuild from that stale original,
-     * discarding Phase 2's recompression outright.
+     * Phase 3's finalize_extraction() rebuilds on Phase 2's result, which waits in kept_dir_
+     * instead of replacing the original: only what Phase 3 makes of it, read back and smaller
+     * than the original, may replace it. Without this map, Phase 3 would rebuild from the
+     * untouched original, discarding Phase 2's recompression outright.
      */
     std::unordered_map<std::string, std::filesystem::path> recompressed_paths_;
     std::unordered_set<std::string> outputs_written_; ///< Destinations already written under the output path
@@ -238,7 +237,7 @@ private:
 
     std::filesystem::path output_dir_;            ///< Optional output directory
     std::filesystem::path output_base_;           ///< Folder the output directory mirrors
-    std::filesystem::path dry_run_dir_;           ///< Kept Phase 2 results of a dry run, removed at the end
+    std::filesystem::path kept_dir_;              ///< Phase 2 results of containers waiting for Phase 3, removed at the end
     EventBus& event_bus_;                         ///< Bus for publishing events
     ProcessorRegistry& registry_;                 ///< Reference to the processor registry
     EncodeMode mode_;                             ///< (Phase 2) Strategy for recompression

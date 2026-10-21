@@ -205,13 +205,13 @@ namespace chisel {
            }
 
     void ProcessorExecutor::process(const std::vector<fs::path> &inputs, const std::vector<fs::path> &roots) {
-        struct DryRunDirGuard {
+        struct KeptDirGuard {
             const fs::path& dir;
-            ~DryRunDirGuard() {
+            ~KeptDirGuard() {
                 std::error_code ec;
                 if (!dir.empty()) fs::remove_all(dir, ec);
             }
-        } dry_run_dir_guard{.dir=dry_run_dir_};
+        } kept_dir_guard{.dir=kept_dir_};
         // containers Phase 3 never took up (the run stopped early) still have their extracted files in temp
         struct PendingContainersGuard {
             std::deque<ContainerNode>& containers;
@@ -224,9 +224,8 @@ namespace chisel {
             }
         } pending_containers_guard{.containers=containers_};
 
-        if (dry_run_) {
-            dry_run_dir_ = fs::temp_directory_path() / ("chisel-dry-run-" + RandomUtils::random_suffix());
-        } else if (has_output_dir_) {
+        kept_dir_ = fs::temp_directory_path() / ("chisel-kept-" + RandomUtils::random_suffix());
+        if (has_output_dir_ && !dry_run_) {
             const auto& layout_roots = roots.empty() ? inputs : roots;
             output_is_directory_ = layout_roots.size() != 1 || !fs::is_regular_file(layout_roots.front()) ||
                                    fs::is_directory(output_dir_) || !output_dir_.has_filename();
@@ -374,16 +373,25 @@ namespace chisel {
 
     std::optional<fs::path> ProcessorExecutor::keep_for_finalize(const fs::path& file, const fs::path& temp_file) const {
         // own folder per file: finalizers may pick the format from the extension
-        const auto kept = dry_run_dir_ / RandomUtils::random_suffix() / file.filename();
+        const auto kept = kept_dir_ / RandomUtils::random_suffix() / file.filename();
         std::error_code ec;
         fs::create_directories(kept.parent_path(), ec);
         if (!ec) fs::rename(temp_file, kept, ec);
         if (ec) {
-            Logger::log(LogLevel::Warning, "Failed to keep the dry run result of " + file.string() + " (" + ec.message() + ")", "Executor");
+            Logger::log(LogLevel::Warning, "Failed to keep the Phase 2 result of " + file.string() + " (" + ec.message() + ")", "Executor");
             fs::remove(temp_file, ec);
             return std::nullopt;
         }
         return kept;
+    }
+
+    void ProcessorExecutor::drop_kept(const fs::path& file) {
+        std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
+        const auto it = recompressed_paths_.find(file.string());
+        if (it == recompressed_paths_.end()) return;
+        std::error_code ec;
+        fs::remove(it->second, ec);
+        recompressed_paths_.erase(it);
     }
 
     void ProcessorExecutor::copy_unchanged_inputs(const std::vector<fs::path>& inputs) const {
@@ -775,8 +783,8 @@ namespace chisel {
                     if (success) {
                         std::optional<std::pair<fs::path, bool>> move_result;
                         fs::path result_path;
-                        if (dry_run_ && !nested && item.is_container) {
-                            // a dry run keeps a container's result for Phase 3 to rebuild on
+                        if (item.is_container) {
+                            // Phase 3 rebuilds on it and decides what, if anything, replaces the original
                             if (auto kept = keep_for_finalize(file, final_temp_path)) {
                                 result_path = *kept;
                                 move_result.emplace(file, false);
@@ -892,35 +900,31 @@ namespace chisel {
 
             if (new_temp_file.empty()) {
                 Logger::log(LogLevel::Debug, "Container finalize skipped (empty): " + content.original_path.string(), "Executor");
-                // publish explicit Phase 3 complete event even if skipped, phase 2's result being the final one
-                auto final_size = orig_size;
-                if (recompressed) {
-                    if (const auto size = std::filesystem::file_size(effective_content.original_path, ec); !ec) final_size = size;
+                // nothing to put back: Phase 2's result, already smaller, is the final one
+                if (!recompressed) {
+                    event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
+                    return;
                 }
-                const bool replaced = recompressed && !dry_run_;
-                event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=replaced ? effective_content.original_path : content.original_path, .original_size=orig_size, .final_size=final_size, .replaced=replaced, .duration=duration});
+                const auto final_size = std::filesystem::file_size(effective_content.original_path, ec);
+                const auto moved = move_to_destination(content.original_path, effective_content.original_path, nested);
+                drop_kept(content.original_path);
+                if (!moved) {
+                    event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Failed to finalize container file"});
+                    return;
+                }
+                event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=moved->first, .original_size=orig_size, .final_size=final_size, .replaced=moved->second, .duration=duration});
                 return;
             }
 
             auto new_size = std::filesystem::file_size(new_temp_file, ec);
 
-            // Only enforce "must be strictly smaller" for processors that are
-            // *pure* containers (can_recompress() == false), e.g. ArchiveProcessor,
-            // OdfProcessor, OOXMLProcessor: for these, Phase 2 never touches the
-            // original file, so falling back to it on a non-improving finalize is
-            // always safe. Mixed processors (e.g. FlacProcessor, ApeProcessor,
-            // MkvProcessor) already rebuild on top of Phase 2's recompressed bytes
-            // (effective_content.original_path, redirected above via
-            // recompressed_paths_) as part of reinserting an extracted resource
-            // (like cover art) - discarding this result would mean serving Phase 2's
-            // intermediate output with the pre-reinsertion resource still in place,
-            // not losing anything, but the extraction/reinsertion round-trip itself
-            // is treated as always worth keeping rather than re-compared by size.
-            if (!procs.front()->can_recompress() && !ec && new_size >= orig_size) {
+            // the rebuilt file has to beat the original itself; Phase 2's result alone may lack what Phase 3 puts back
+            if (!ec && new_size >= orig_size) {
                 Logger::log(LogLevel::Debug,
                             "Container finalize discarded (no size improvement): " + content.original_path.string(),
                             "Executor");
                 std::filesystem::remove(new_temp_file, ec);
+                drop_kept(content.original_path);
                 event_bus_.publish(ContainerFinalizeCompleteEvent{.path=content.original_path, .destination=content.original_path, .original_size=orig_size, .final_size=orig_size, .replaced=false, .duration=duration});
                 return;
             }
@@ -932,6 +936,7 @@ namespace chisel {
                     Logger::log(LogLevel::Error, "Rebuilt container differs from its source, original kept: " +
                                 content.original_path.string() + " - " + diff, "Executor");
                     std::filesystem::remove(new_temp_file, ec);
+                    drop_kept(content.original_path);
                     event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="the rebuilt file differs from its source: " + diff});
                     return;
                 }
@@ -942,6 +947,7 @@ namespace chisel {
 
             // use the helper and publish the specific Phase 3 event
             auto move_result = move_to_destination(content.original_path, new_temp_file, nested);
+            drop_kept(content.original_path);
             if (move_result) {
                 event_bus_.publish(ContainerFinalizeCompleteEvent{
                     .path=content.original_path,
@@ -959,9 +965,11 @@ namespace chisel {
             // left to be cleaned up with the containers the run didn't get to
             node.finalized = false;
         } catch (const std::exception &e) {
+            drop_kept(content.original_path);
             Logger::log(LogLevel::Error, "Finalize error: " + content.original_path.string() + " - " + std::string(e.what()), "Executor");
             event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message=e.what()});
         } catch (...) {
+            drop_kept(content.original_path);
             Logger::log(LogLevel::Error, "Unknown finalize error: " + content.original_path.string(), "Executor");
             event_bus_.publish(ContainerFinalizeErrorEvent{.path=content.original_path, .error_message="Unknown non-standard exception"});
         }
