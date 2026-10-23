@@ -390,11 +390,17 @@ void GzProcessor::recompress(const std::filesystem::path& input_path,
     w.buf.reserve(in_data.size());
 
     const bool preserve_meta = options.preserve_metadata;
+    bool keep_as_is = false;
 
     try {
         while (r.remaining() >= 10 &&
                r.data[r.pos]     == kGzId1 &&
                r.data[r.pos + 1] == kGzId2) {
+            // BGZF (htslib), dictzip and the like keep block sizes in the extra field, and indexes point into the blocks
+            if (r.data[r.pos + 3] & kFlgFextra) {
+                keep_as_is = true;
+                break;
+            }
             process_member(r, w, preserve_meta, comp);
         }
     } catch (...) {
@@ -403,6 +409,15 @@ void GzProcessor::recompress(const std::filesystem::path& input_path,
     }
 
     libdeflate_free_compressor(comp);
+
+    if (keep_as_is) {
+        Logger::log(LogLevel::Info, "Skipping " + input_path.filename().string() +
+                    ": gzip with an extra field (BGZF, dictzip...), whose block sizes and indexes recompression would break",
+                    get_name());
+        if (!write_file(output_path, in_data))
+            throw std::runtime_error("GzProcessor: failed to write output to " + output_path.string());
+        return;
+    }
 
     if (w.buf.empty()) {
         throw std::runtime_error("GzProcessor: produced empty output");
