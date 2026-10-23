@@ -157,6 +157,7 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
 
 -   `--no-meta`
     Don't preserve files metadata. (Metadata is preserved by default).
+    PDF/A files keep their XMP metadata, which declares their conformance.
 
 -   `--verify-checksums`
     Verify raw checksums before replacing files.

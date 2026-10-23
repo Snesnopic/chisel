@@ -188,6 +188,43 @@ bool is_unfiltered(QPDFObjectHandle const& dict) {
     return filter.isNull() || (filter.isArray() && filter.getArrayNItems() == 0);
 }
 
+/**
+ * @brief Whether a stream holds XMP metadata, which PDF/A wants stored without a filter.
+ */
+bool is_metadata_stream(QPDFObjectHandle const& dict) {
+    return dict.isDictionary() && dict.getKey("/Type").isNameAndEquals("/Metadata");
+}
+
+/**
+ * @brief The PDF/A part (1 to 4) the catalog's XMP metadata declares, 0 when it declares none.
+ */
+int pdfa_part(QPDF& pdf) {
+    QPDFObjectHandle root = pdf.getRoot();
+    if (!root.isDictionary() || !root.getKey("/Metadata").isStream()) return 0;
+    std::string xmp;
+    try {
+        const std::shared_ptr<Buffer> buf = root.getKey("/Metadata").getStreamData(qpdf_dl_generalized);
+        xmp.assign(reinterpret_cast<const char*>(buf->getBuffer()), buf->getSize());
+    } catch (const std::exception&) {
+        return 0;
+    }
+    // the prefix bound to the PDF/A identification schema, pdfaid in practice
+    std::string prefix = "pdfaid";
+    if (const auto ns = xmp.find("http://www.aiim.org/pdfa/ns/id/"); ns != std::string::npos) {
+        if (const auto decl = xmp.rfind("xmlns:", ns); decl != std::string::npos) {
+            if (const auto eq = xmp.find('=', decl); eq != std::string::npos && eq < ns) prefix = xmp.substr(decl + 6, eq - decl - 6);
+        }
+    }
+    // as an attribute (pdfaid:part="1") or as an element (<pdfaid:part>1</pdfaid:part>)
+    const std::string key = prefix + ":part";
+    for (auto at = xmp.find(key); at != std::string::npos; at = xmp.find(key, at + 1)) {
+        std::size_t i = at + key.size();
+        while (i < xmp.size() && (xmp[i] == ' ' || xmp[i] == '=' || xmp[i] == '"' || xmp[i] == '\'' || xmp[i] == '>')) ++i;
+        if (i < xmp.size() && xmp[i] >= '1' && xmp[i] <= '9') return xmp[i] - '0';
+    }
+    return 0;
+}
+
 // zopflipng's own established convention for splitting effort between the
 // "iterations" and "iterations_large" budgets; reused here for the same
 // reason it exists there -- full effort on small streams is cheap, but
@@ -861,15 +898,16 @@ std::string compare_rebuild(const std::filesystem::path& source, const std::file
 /**
  * @brief Removes common metadata objects from a PDF.
  * @param pdf The QPDF instance to modify.
+ * @param keep_xmp Keep the catalog's XMP metadata, where a PDF/A file declares its conformance.
  */
-void strip_metadata(QPDF& pdf) {
+void strip_metadata(QPDF& pdf, const bool keep_xmp) {
     QPDFObjectHandle trailer = pdf.getTrailer();
     if (trailer.isDictionary()) {
         if (trailer.hasKey("/Info")) trailer.removeKey("/Info");
         if (trailer.hasKey("/Metadata")) trailer.removeKey("/Metadata");
     }
     QPDFObjectHandle root = pdf.getRoot();
-    if (root.isDictionary() && root.hasKey("/Metadata")) {
+    if (!keep_xmp && root.isDictionary() && root.hasKey("/Metadata")) {
         root.removeKey("/Metadata");
     }
 }
@@ -991,6 +1029,10 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
 
         pdf.processFile(content.original_path.string().c_str());
 
+        // PDF/A: part 1 predates object streams, and no part allows a filter on XMP metadata streams
+        const int pdfa = pdfa_part(pdf);
+        if (pdfa != 0) Logger::log(LogLevel::Debug, "PDF/A-" + std::to_string(pdfa) + ": " + content.original_path.string(), get_name());
+
         auto objects = pdf.getAllObjects();
 
         // qpdf objects are read and changed on this thread only; the compression in between runs on the pool
@@ -1019,7 +1061,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                  filter_kind == SingleFilterKind::AsciiHex);
             bool has_decode_parms = dict.isDictionary() && dict.hasKey("/DecodeParms");
             // QPDFWriter writes the root metadata uncompressed, and deflates every other stream without a filter
-            const bool unfiltered = is_unfiltered(dict) && !has_decode_parms && !obj.isRootMetadata();
+            const bool unfiltered = is_unfiltered(dict) && !has_decode_parms && !obj.isRootMetadata() &&
+                                    !(pdfa != 0 && is_metadata_stream(dict));
 
             StreamJob job{.obj=obj, .obj_id=obj_id};
             if (info.image) {
@@ -1099,7 +1142,15 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         run_stream_jobs(jobs, options, injected);
 
         if (!options.preserve_metadata) {
-            strip_metadata(pdf);
+            strip_metadata(pdf, pdfa != 0);
+        }
+        if (pdfa != 0) {
+            // QPDFWriter deflates every unfiltered stream but the catalog's metadata
+            for (auto& obj : objects) {
+                if (obj.isStream() && !obj.isRootMetadata() && is_metadata_stream(obj.getDict()) && is_unfiltered(obj.getDict())) {
+                    obj.setFilterOnWrite(false);
+                }
+            }
         }
 
         // Always write to a new temporary file
@@ -1120,7 +1171,9 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         writer.setLinearization(pdf.isLinearized());
         writer.setStaticID(true);
         writer.setDeterministicID(true);
-        writer.setObjectStreamMode(qpdf_o_generate);
+        writer.setObjectStreamMode(pdfa == 1 ? qpdf_o_disable : qpdf_o_generate);
+        // PDF/A wants an end of line before every endstream, which qpdf otherwise leaves out after data ending in one
+        if (pdfa != 0) writer.setNewlineBeforeEndstream(true);
         writer.setStreamDataMode(qpdf_s_compress);
         // qpdf deflates the object streams it generates with zopfli too
         if (ThreadPool* pool = ThreadPool::current(); pool && pool->size() > 1) {
