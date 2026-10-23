@@ -419,6 +419,9 @@ void GzProcessor::recompress(const std::filesystem::path& input_path,
         return;
     }
 
+    // whatever follows the last member (padding, appended data) stays as it is
+    if (r.remaining() > 0) w.bytes(r.cur(), r.remaining());
+
     if (w.buf.empty()) {
         throw std::runtime_error("GzProcessor: produced empty output");
     }
