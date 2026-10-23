@@ -19,6 +19,19 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
                                  const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
+    // an app still has it open, or didn't close it: its -wal or -journal would be replayed onto the rewritten file
+    for (const char* suffix : {"-wal", "-shm", "-journal"}) {
+        std::filesystem::path sidecar = input;
+        sidecar += suffix;
+        std::error_code ec;
+        if (std::filesystem::exists(sidecar, ec)) {
+            Logger::log(LogLevel::Info, "Skipping " + input.filename().string() + ": in use, with a " +
+                        std::string(suffix) + " file next to it", get_name());
+            std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+            return;
+        }
+    }
+
     // open the ORIGINAL (not a filesystem copy) so a live WAL journal is
     // transparently merged in by the normal SQLite read path; a plain
     // copy_file() of just the main .db file would silently drop any
