@@ -54,20 +54,14 @@ namespace chisel {
         // --- operations ---
 
         /**
-         * @brief Recompresses a TIFF file using libtiff.
+         * @brief Recompresses the image data of a TIFF with Deflate, keeping every other entry byte for byte.
          *
-         * Reads the input image (handling decompression of various
-         * formats) into a standard RGBA8 pixel buffer using
-         * `TIFFReadRGBAImageOriented`.
-         *
-         * It then re-encodes this buffer into a new TIFF using
-         * `COMPRESSION_ADOBE_DEFLATE` (Zip) at maximum level (9).
-         * This handles multi-page TIFFs by iterating through directories.
+         * See rewrite_tiff(). A file that can't be rewritten safely, or whose rewrite doesn't read back as
+         * the original, is copied unchanged.
          *
          * @param input Path to the source TIFF file.
          * @param output Path to write the optimized TIFF file.
          * @param options Processing options.
-         * @throws std::runtime_error if libtiff encounters a fatal error.
          */
         void recompress(const std::filesystem::path& input,
                         const std::filesystem::path& output, const ProcessingOptions &options) override;
@@ -95,14 +89,11 @@ namespace chisel {
         [[nodiscard]] std::string get_raw_checksum(const std::filesystem::path& file_path) const override;
 
         /**
-         * @brief Compares two TIFF files by decoding them to raw RGBA8 and comparing.
-         *
-         * Handles multi-page TIFFs by comparing each page sequentially.
+         * @brief Compares the decoded image data of every IFD, see compare_tiff().
          *
          * @param a First TIFF file.
          * @param b Second TIFF file.
-         * @return true if the decoded pixel data, dimensions, and page
-         * count are identical.
+         * @return true if every IFD holds the same samples.
          */
         [[nodiscard]] bool raw_equal(const std::filesystem::path &a, const std::filesystem::path &b) const override;
 

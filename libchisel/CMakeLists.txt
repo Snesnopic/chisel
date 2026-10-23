@@ -86,6 +86,8 @@ set(LIBCHISEL_SOURCES
         src/utils/archive_manifest.cpp
         src/utils/zip_rewriter.cpp
         include/mkv_tracks.hpp
+        include/tiff_rewriter.hpp
+        src/utils/tiff_rewriter.cpp
         src/utils/mkv_tracks.cpp
         include/audio_metadata_util.hpp
         src/utils/audio_metadata_util.cpp
