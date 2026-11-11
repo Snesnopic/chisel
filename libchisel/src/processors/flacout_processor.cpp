@@ -38,30 +38,10 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
         };
     }
 
-    // flacoutcpp copies the metadata of a file that starts with the FLAC header: ID3v2 tags in front go back after
-    const std::vector<uint8_t> id3 = AudioMetadataUtil::foreignId3v2Tags(input);
-    std::filesystem::path source = input;
-    if (!id3.empty()) {
-        source = output;
-        source += ".flac";
-        AudioMetadataUtil::writeWithHead(input, source, {}, id3.size());
-    }
-    // the copy goes on every way out, a stop thrown from flacoutcpp's parallel steps included
-    const struct RemoveCopy {
-        const std::filesystem::path& source;
-        const std::filesystem::path& input;
-        ~RemoveCopy() {
-            std::error_code ec;
-            if (source != input) std::filesystem::remove(source, ec);
-        }
-    } remove_copy{source, input};
-    const bool optimised = flacoutcpp::optimise(source.string(), output.string(), cfg);
+    const bool optimised = flacoutcpp::optimise(input.string(), output.string(), cfg);
     if (!optimised) {
         Logger::log(LogLevel::Error, "flacoutcpp optimise failed", get_name());
         throw std::runtime_error("flacoutcpp: optimise failed");
-    }
-    if (!id3.empty() && options.preserve_metadata) {
-        AudioMetadataUtil::writeWithHead(output, output, id3, 0);
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
