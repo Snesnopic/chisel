@@ -37,8 +37,10 @@ enum class ScanMode {
 };
 
 /**
- * @brief Losslessly re-encodes one JPEG image held in memory. Under ScanMode::Smallest it keeps the smaller of a
- *        progressive and a baseline encoding: on small images the headers of the progressive scans outweigh their gain.
+ * @brief Losslessly re-encodes one JPEG image held in memory. Under ScanMode::Smallest it keeps the smallest of a
+ *        progressive encoding with mozjpeg's scans, one with the scans jpegultrascan finds, and a baseline one: on
+ *        small images the headers of the progressive scans outweigh their gain.
+ * @throws Interrupted when a stop is requested during the scan search.
  * @param clean Set when libjpeg ended the image exactly at the end of @p in, without warnings.
  * @return False on a libjpeg error.
  */

@@ -110,3 +110,6 @@
 [submodule "third_party/rehuff_theora"]
 	path = third_party/rehuff_theora
 	url = https://github.com/Snesnopic/rehuff_theora
+[submodule "third_party/jpegultrascancpp"]
+	path = third_party/jpegultrascancpp
+	url = https://github.com/Snesnopic/jpegultrascancpp

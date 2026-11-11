@@ -5,7 +5,9 @@
 #include "../../include/jpeg_transcode.hpp"
 #include "../../include/jpeg_structure.hpp"
 #include "../../include/logger.hpp"
+#include "../../include/thread_pool.hpp"
 #include <jpeglib.h>
+#include <jpegultrascan/jpegultrascan.hpp>
 #include <array>
 #include <csetjmp>
 #include <cstddef>
@@ -140,15 +142,37 @@ void write_markers(const j_decompress_ptr srcinfo, const j_compress_ptr dstinfo,
     }
 }
 
+// most memory the scan search may take for one image: bigger images keep mozjpeg's scans
+constexpr std::size_t kScanSearchMemory = std::size_t{1} << 30;
+
+/**
+ * @brief Searches the smallest progressive scan script for the coefficients @p srcinfo read, on the pool of
+ *        the calling task when there is one.
+ */
+jpegultrascan::ScriptResult find_scans(const j_decompress_ptr srcinfo, jvirt_barray_ptr* coef_arrays) {
+    jpegultrascan::Options options;
+    options.memory_limit = kScanSearchMemory;
+    options.threads = 1;
+    if (ThreadPool* pool = ThreadPool::current()) {
+        options.threads = static_cast<unsigned>(pool->size());
+        options.parallel_for = [pool](const std::size_t n, const std::function<void(std::size_t)>& body) {
+            pool->parallel_for(n, body);
+        };
+        options.stop_requested = [pool] { return pool->stop_requested(); };
+    }
+    return jpegultrascan::find_best_script(srcinfo, coef_arrays, options);
+}
+
 } // namespace
 
 bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, const ScanMode mode,
                std::vector<uint8_t>& out, bool& clean) {
     jpeg_decompress_struct srcinfo{};
-    // progressive, then baseline
-    std::array<jpeg_compress_struct, 2> dstinfo{};
-    std::array<std::vector<uint8_t>, 2> encoded;
-    std::array<VectorDest, 2> dest{};
+    // progressive with mozjpeg's scans, baseline, then progressive with jpegultrascan's scans
+    std::array<jpeg_compress_struct, 3> dstinfo{};
+    std::array<std::vector<uint8_t>, 3> encoded;
+    std::array<VectorDest, 3> dest{};
+    jpegultrascan::ScriptResult found;
     JpegErrorMgr jsrcerr{}, jdsterr{};
 
     srcinfo.err = jpeg_std_error(&jsrcerr.pub);
@@ -189,22 +213,41 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
     Logger::log(LogLevel::Debug,
                 std::string("Jpeg ") + (srcinfo.progressive_mode ? "progressive" : "baseline"), "libjpeg");
     // a container that declares the scan layout keeps it
-    const std::array<bool, 2> wanted = {mode == ScanMode::Smallest || srcinfo.progressive_mode,
-                                        mode == ScanMode::Smallest || !srcinfo.progressive_mode};
+    const bool progressive = mode == ScanMode::Smallest || srcinfo.progressive_mode;
+    std::array<bool, 3> wanted = {progressive, mode == ScanMode::Smallest || !srcinfo.progressive_mode, progressive};
 
     jvirt_barray_ptr *coef_arrays = jpeg_read_coefficients(&srcinfo);
     clean = srcinfo.src->bytes_in_buffer == 0 && jsrcerr.pub.num_warnings == 0;
+    // callers keep damaged images as they are, so the slow search would be wasted on them
+    wanted[2] = wanted[2] && clean;
+    if (wanted[2]) {
+        try {
+            found = find_scans(&srcinfo, coef_arrays);
+            if (found.status == jpegultrascan::Status::Interrupted) throw Interrupted{};
+        } catch (...) {
+            for (auto& d : dstinfo) jpeg_destroy_compress(&d);
+            jpeg_destroy_decompress(&srcinfo);
+            throw;
+        }
+        if (found.status != jpegultrascan::Status::Optimized) {
+            Logger::log(LogLevel::Debug, "jpegultrascan found no scan script: " + found.error, "libjpeg");
+            wanted[2] = false;
+        }
+    }
     for (std::size_t i = 0; i < dstinfo.size(); ++i) {
         if (!wanted[i]) continue;
-        const bool baseline = i == 1;
-        // libjpeg's own defaults: a single sequential scan
-        if (baseline) jpeg_c_set_int_param(&dstinfo[i], JINT_COMPRESS_PROFILE, JCP_FASTEST);
+        // baseline: libjpeg's own defaults, a single sequential scan; found scans: without mozjpeg's own search
+        if (i != 0) jpeg_c_set_int_param(&dstinfo[i], JINT_COMPRESS_PROFILE, JCP_FASTEST);
         jpeg_copy_critical_parameters(&srcinfo, &dstinfo[i]);
         // the source's own jfif and adobe segments are copied with the rest; without metadata a bare jfif stands in
         dstinfo[i].write_JFIF_header = !policy.keep_all && srcinfo.saw_JFIF_marker;
         dstinfo[i].write_Adobe_marker = FALSE;
-        if (!baseline && srcinfo.progressive_mode) {
+        if (i == 0 && srcinfo.progressive_mode) {
             jpeg_simple_progression(&dstinfo[i]);
+        }
+        if (i == 2) {
+            dstinfo[i].scan_info = found.script.scans.data();
+            dstinfo[i].num_scans = static_cast<int>(found.script.scans.size());
         }
         dstinfo[i].optimize_coding = TRUE;
         dstinfo[i].dest = &dest[i].pub;
@@ -215,8 +258,11 @@ bool transcode(const std::span<const uint8_t> in, const MarkerPolicy& policy, co
     // Do NOT call jpeg_finish_decompress(&srcinfo) when using jpeg_read_coefficients
     for (auto& d : dstinfo) jpeg_destroy_compress(&d);
     jpeg_destroy_decompress(&srcinfo);
-    const bool pick_baseline = !wanted[0] || (wanted[1] && encoded[1].size() < encoded[0].size());
-    out = std::move(pick_baseline ? encoded[1] : encoded[0]);
+    std::size_t pick = wanted[0] ? 0 : 1;
+    for (std::size_t i = pick + 1; i < encoded.size(); ++i) {
+        if (wanted[i] && encoded[i].size() < encoded[pick].size()) pick = i;
+    }
+    out = std::move(encoded[pick]);
     return true;
 }
 

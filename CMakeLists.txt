@@ -463,6 +463,11 @@ set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
+# jpegultrascancpp: links the JPEG::JPEG target just defined above
+set(JPEGULTRASCAN_BUILD_CLI OFF CACHE BOOL "" FORCE)
+set(JPEGULTRASCAN_MOZJPEG ON CACHE STRING "" FORCE)
+add_subdirectory(third_party/jpegultrascancpp EXCLUDE_FROM_ALL)
+
 # libwebp
 set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
@@ -653,6 +658,7 @@ set(CHISEL_LIBS
         archive_static
         ogg
         mozjpeg_static
+        jpegultrascan_core
         wavpack
         optigif_core
         thirdparty_webp
