@@ -1561,7 +1561,7 @@ void AudioMetadataUtil::placeholderCopyRecompress(
     const std::filesystem::path& output,
     const std::string_view tag) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), tag);
-    Logger::log(LogLevel::Warning, "Recompress called with a copy-only placeholder", tag);
+    Logger::log(LogLevel::Debug, "Recompress called with a copy-only placeholder", tag);
 
     std::error_code ec;
     std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing, ec);
