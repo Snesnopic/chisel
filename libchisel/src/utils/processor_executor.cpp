@@ -600,7 +600,7 @@ namespace chisel {
                 }
                 if (candidates.empty()) {
                     Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Unsupported, .message="Unsupported format"});
+                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Unsupported, .message="Unsupported format", .is_container=item.is_container});
                     return;
                 }
 
