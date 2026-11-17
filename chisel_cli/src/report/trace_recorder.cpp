@@ -46,11 +46,10 @@ std::string json_string(const std::string_view s) {
 
 void TraceRecorder::subscribe(EventBus& bus) {
     bus.subscribe<FileAnalyzeStartEvent>([this](const FileAnalyzeStartEvent& e) {
-        begin("analyze", e.path);
+        begin("analyze", e.path, e.parent_container);
     });
     bus.subscribe<FileAnalyzeCompleteEvent>([this](const FileAnalyzeCompleteEvent& e) {
-        end("analyze", e.path, e.extracted ? "extracted " + std::to_string(e.num_children) + " files" : "scheduled",
-            std::nullopt, e.parent);
+        end("analyze", e.path, e.extracted ? "extracted " + std::to_string(e.num_children) + " files" : "scheduled");
     });
     bus.subscribe<FileAnalyzeSkippedEvent>([this](const FileAnalyzeSkippedEvent& e) {
         end("analyze", e.path, e.reason);
@@ -73,7 +72,7 @@ void TraceRecorder::subscribe(EventBus& bus) {
     });
 
     bus.subscribe<ContainerFinalizeStartEvent>([this](const ContainerFinalizeStartEvent& e) {
-        begin("finalize", e.path);
+        begin("finalize", e.path, e.parent_container);
     });
     bus.subscribe<ContainerFinalizeCompleteEvent>([this](const ContainerFinalizeCompleteEvent& e) {
         end("finalize", e.path, e.replaced ? "replaced" : "kept", e.final_size);
@@ -100,7 +99,7 @@ void TraceRecorder::begin(const char* phase, const std::filesystem::path& path,
 }
 
 void TraceRecorder::end(const char* phase, const std::filesystem::path& path, std::string outcome,
-                        const std::optional<std::uintmax_t> new_size, std::optional<std::filesystem::path> parent) {
+                        const std::optional<std::uintmax_t> new_size) {
     const auto stop = now_us();
     std::scoped_lock lock(mtx_);
     // skips and errors can also come for tasks that never started
@@ -111,7 +110,6 @@ void TraceRecorder::end(const char* phase, const std::filesystem::path& path, st
     span.duration_us = stop - span.start_us;
     span.outcome = std::move(outcome);
     span.new_size = new_size;
-    if (parent) span.parent = std::move(parent);
     spans_.push_back(std::move(span));
 }
 

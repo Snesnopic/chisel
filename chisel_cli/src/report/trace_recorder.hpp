@@ -46,8 +46,7 @@ private:
     void begin(const char* phase, const std::filesystem::path& path,
                std::optional<std::filesystem::path> parent = std::nullopt);
     void end(const char* phase, const std::filesystem::path& path, std::string outcome,
-             std::optional<std::uintmax_t> new_size = std::nullopt,
-             std::optional<std::filesystem::path> parent = std::nullopt);
+             std::optional<std::uintmax_t> new_size = std::nullopt);
     [[nodiscard]] std::int64_t now_us() const;
 
     const std::chrono::steady_clock::time_point origin_ = std::chrono::steady_clock::now();

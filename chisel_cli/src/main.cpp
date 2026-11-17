@@ -257,7 +257,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (settings.quiet || !(e.extracted && e.num_children > 0)) return;
-        found_by_input[e.root][e.parent.value_or(std::filesystem::path{})].push_back(
+        found_by_input[e.root][e.parent_container.value_or(std::filesystem::path{})].push_back(
             {.path=e.path, .num_children=e.num_children});
     });
 

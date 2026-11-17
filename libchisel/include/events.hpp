@@ -35,6 +35,7 @@ namespace chisel {
  */
 struct FileAnalyzeStartEvent {
     std::filesystem::path path; ///< Path of the file being analyzed
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
 };
 
 /**
@@ -42,11 +43,11 @@ struct FileAnalyzeStartEvent {
  */
 struct FileAnalyzeCompleteEvent {
     std::filesystem::path path;     ///< Path of the analyzed file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     bool extracted = false;         ///< True if the file was a container and extracted
     bool scheduled = false;         ///< True if the file was scheduled for recompression
     std::size_t num_children = 0;   ///< Number of files found if extracted
     unsigned depth = 0;              ///< Nesting depth (0 = direct input, >0 = found inside another container)
-    std::optional<std::filesystem::path> parent; ///< Container the file was extracted from, if any
     std::filesystem::path root;      ///< Top-level input the file was found in
 };
 
@@ -64,6 +65,7 @@ struct InputAnalyzeCompleteEvent {
  */
 struct FileAnalyzeErrorEvent {
     std::filesystem::path path; ///< Path of the file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::string error_message;  ///< Error description
 };
 
@@ -72,6 +74,7 @@ struct FileAnalyzeErrorEvent {
  */
 struct FileAnalyzeSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::string reason;         ///< Reason for skipping
     bool is_signed = false;     ///< Left untouched to keep its digital signature valid
 };
@@ -83,7 +86,7 @@ struct FileAnalyzeSkippedEvent {
  */
 struct FileProcessStartEvent {
     std::filesystem::path path; ///< Path of the file being processed
-    std::optional<std::filesystem::path> parent_container = std::nullopt; ///< Path of the container this file was extracted from, if any
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
@@ -92,12 +95,12 @@ struct FileProcessStartEvent {
  */
 struct FileProcessCompleteEvent {
     std::filesystem::path path;             ///< Path of the processed file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::filesystem::path destination;      ///< Final path where the file was saved
     uintmax_t original_size = 0;            ///< Original file size in bytes
     uintmax_t new_size = 0;                 ///< New file size in bytes
     bool replaced = false;                  ///< True if the original file was replaced/written
     std::chrono::milliseconds duration{0};  ///< Processing duration
-    std::optional<std::filesystem::path> parent_container = std::nullopt; ///< Path of the container this file was extracted from, if any
     bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 
@@ -106,6 +109,7 @@ struct FileProcessCompleteEvent {
  */
 struct FileProcessErrorEvent {
     std::filesystem::path path; ///< Path of the file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::string error_message;                                            ///< Error description
     bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
@@ -115,6 +119,7 @@ struct FileProcessErrorEvent {
  */
 struct FileProcessSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::string reason;                                                   ///< Reason for skipping
     bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
@@ -126,6 +131,7 @@ struct FileProcessSkippedEvent {
  */
 struct ContainerFinalizeStartEvent {
     std::filesystem::path path; ///< Path of the container being finalized
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
 };
 
 /**
@@ -133,6 +139,7 @@ struct ContainerFinalizeStartEvent {
  */
 struct ContainerFinalizeCompleteEvent {
     std::filesystem::path path;             ///< path of the container (input)
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::filesystem::path destination;      ///< final path of the container
     uintmax_t original_size = 0;
     uintmax_t final_size = 0;
@@ -145,6 +152,7 @@ struct ContainerFinalizeCompleteEvent {
  */
 struct ContainerFinalizeErrorEvent {
     std::filesystem::path path; ///< Path of the container
+    std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
     std::string error_message;  ///< Error description
 };
 
