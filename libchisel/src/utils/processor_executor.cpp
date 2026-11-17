@@ -451,19 +451,19 @@ namespace chisel {
                         "Maximum container nesting depth (" + std::to_string(kMaxNestingDepth) +
                         ") exceeded, refusing to descend further into: " + path.string(),
                         "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Maximum nesting depth exceeded"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::NestingTooDeep, .message="Maximum nesting depth exceeded"});
             return;
         }
 
         if (is_junk(path)) {
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Junk file"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::Junk, .message="Junk file"});
 
             return;
         }
 
         // nothing can shrink an empty file, and processors take an empty output for a failure
         if (std::error_code size_ec; fs::file_size(path, size_ec) == 0 && !size_ec) {
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Empty file"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::Empty, .message="Empty file"});
             return;
         }
 
@@ -477,7 +477,7 @@ namespace chisel {
 
         if (procs.empty()) {
             Logger::log(LogLevel::Debug, "No processor for " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Unsupported format"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::Unsupported, .message="Unsupported format"});
             return;
         }
 
@@ -486,7 +486,7 @@ namespace chisel {
         if (!m_options.break_signatures &&
             std::ranges::any_of(procs, [&path](const IProcessor* p) { return p->is_signed(path); })) {
             Logger::log(LogLevel::Warning, "Digitally signed, left untouched: " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Digitally signed", .is_signed=true});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::Signed, .message="Digitally signed"});
             return;
         }
 
@@ -556,7 +556,7 @@ namespace chisel {
             event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .parent_container=parent, .extracted=false, .scheduled=true, .num_children=0, .depth=depth, .root=root.path});
         } else {
             Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="No operations available"});
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::NothingToDo, .message="No operations available"});
         }
     }
 
@@ -588,7 +588,7 @@ namespace chisel {
                 ProcessingOptions options = m_options;
                 options.keep_pixel_format = item.keep_pixel_format;
                 if (st.stop_requested()) {
-                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason="Interrupted", .is_container=item.is_container});
+                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Interrupted, .message="Interrupted", .is_container=item.is_container});
                     return;
                 }
                 event_bus_.publish(FileProcessStartEvent{.path=file, .parent_container=parent_container, .is_container=item.is_container});
@@ -600,7 +600,7 @@ namespace chisel {
                 }
                 if (candidates.empty()) {
                     Logger::log(LogLevel::Warning, "No processor for " + file.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=file, .parent_container=parent_container, .reason="Unsupported format"});
+                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Unsupported, .message="Unsupported format"});
                     return;
                 }
 
@@ -712,7 +712,7 @@ namespace chisel {
                                     event_bus_.publish(FileProcessErrorEvent{.path=file, .parent_container=parent_container, .error_message="INTEGRITY CHECK FAILED: Data corruption detected", .is_container=item.is_container});
                                 } else {
                                     Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
-                                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason="No size improvement", .is_container=item.is_container});
+                                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::NoImprovement, .message="No size improvement", .is_container=item.is_container});
                                 }
                             }
                         } else if (!st.stop_requested()) {
@@ -779,7 +779,7 @@ namespace chisel {
                             }
                             if (!st.stop_requested()) {
                                 Logger::log(LogLevel::Debug, "No size improvement, keeping original: " + file.string(), "Executor");
-                                event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason="No size improvement", .is_container=item.is_container});
+                                event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::NoImprovement, .message="No size improvement", .is_container=item.is_container});
                             }
                         }
                     }
@@ -818,10 +818,10 @@ namespace chisel {
                             event_bus_.publish(FileProcessErrorEvent{.path=file, .parent_container=parent_container, .error_message="Failed to move optimized file", .is_container=item.is_container});
                         }
                     } else if (st.stop_requested()) {
-                        event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason="Interrupted", .is_container=item.is_container});
+                        event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Interrupted, .message="Interrupted", .is_container=item.is_container});
                     }
                 } catch (const Interrupted&) {
-                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason="Interrupted", .is_container=item.is_container});
+                    event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::Interrupted, .message="Interrupted", .is_container=item.is_container});
                 } catch (const std::exception &e) {
                     Logger::log(LogLevel::Error, "Error on " + file.string() + ": " + std::string(e.what()), "Executor");
                     event_bus_.publish(FileProcessErrorEvent{.path=file, .parent_container=parent_container, .error_message=e.what(), .is_container=item.is_container});

@@ -52,7 +52,7 @@ void TraceRecorder::subscribe(EventBus& bus) {
         end("analyze", e.path, e.extracted ? "extracted " + std::to_string(e.num_children) + " files" : "scheduled");
     });
     bus.subscribe<FileAnalyzeSkippedEvent>([this](const FileAnalyzeSkippedEvent& e) {
-        end("analyze", e.path, e.reason);
+        end("analyze", e.path, e.message);
     });
     bus.subscribe<FileAnalyzeErrorEvent>([this](const FileAnalyzeErrorEvent& e) {
         end("analyze", e.path, "error: " + e.error_message);
@@ -65,7 +65,7 @@ void TraceRecorder::subscribe(EventBus& bus) {
         end("process", e.path, e.replaced ? "replaced" : "kept", e.new_size);
     });
     bus.subscribe<FileProcessSkippedEvent>([this](const FileProcessSkippedEvent& e) {
-        end("process", e.path, e.reason);
+        end("process", e.path, e.message);
     });
     bus.subscribe<FileProcessErrorEvent>([this](const FileProcessErrorEvent& e) {
         end("process", e.path, "error: " + e.error_message);

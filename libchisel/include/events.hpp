@@ -28,6 +28,20 @@ namespace chisel {
  * They are simple data carriers without behavior.
  */
 
+/**
+ * @brief Why a file was left as it is.
+ */
+enum class SkipReason {
+    Junk,           ///< System or metadata file, e.g. .DS_Store or Thumbs.db
+    Empty,          ///< Zero bytes long
+    Unsupported,    ///< No processor handles its format
+    Signed,         ///< Left untouched to keep its digital signature valid
+    NestingTooDeep, ///< Found inside more containers than allowed
+    NothingToDo,    ///< Its processor can't recompress it and found nothing inside it
+    NoImprovement,  ///< Recompressing it gave nothing smaller
+    Interrupted     ///< A stop was requested before it was done
+};
+
 // --- Phase 1: Analysis ---
 
 /**
@@ -75,8 +89,8 @@ struct FileAnalyzeErrorEvent {
 struct FileAnalyzeSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
     std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
-    std::string reason;         ///< Reason for skipping
-    bool is_signed = false;     ///< Left untouched to keep its digital signature valid
+    SkipReason reason;          ///< Why it was skipped
+    std::string message;        ///< The reason as text, for display
 };
 
 // --- Phase 2: Processing ---
@@ -120,7 +134,8 @@ struct FileProcessErrorEvent {
 struct FileProcessSkippedEvent {
     std::filesystem::path path; ///< Path of the skipped file
     std::optional<std::filesystem::path> parent_container; ///< Container the file was extracted from, if any
-    std::string reason;                                                   ///< Reason for skipping
+    SkipReason reason;          ///< Why it was skipped
+    std::string message;        ///< The reason as text, for display
     bool is_container = false;                                            ///< True if this event refers to the intermediate recompression of a container
 };
 

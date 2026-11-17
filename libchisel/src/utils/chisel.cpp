@@ -78,7 +78,7 @@ struct Chisel::Impl {
         });
 
         eventBus.subscribe<FileAnalyzeSkippedEvent>([this](const FileAnalyzeSkippedEvent& e) {
-            if (observer != nullptr) observer->onFileSkipped(e.path, e.reason);
+            if (observer != nullptr) observer->onFileSkipped(e.path, e.message);
         });
 
         eventBus.subscribe<ContainerFinalizeStartEvent>([this](const ContainerFinalizeStartEvent& e) {

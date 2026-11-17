@@ -381,7 +381,7 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<FileAnalyzeSkippedEvent>([&](const FileAnalyzeSkippedEvent& e) {
-        if (!e.is_signed) return;
+        if (e.reason != SkipReason::Signed) return;
         if (!settings.quiet) {
             std::scoped_lock lock(g_console_mtx);
             clear_line_internal();
