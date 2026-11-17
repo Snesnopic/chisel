@@ -174,6 +174,9 @@ private:
     /// @brief Rebuilds one container from its processed contents and puts it in place.
     void finalize_container(ContainerNode& node);
 
+    /// @brief Publishes a skip for every container Phase 3 didn't rebuild, once the pool is idle.
+    void report_unfinished_containers();
+
     /// @brief Directory for a file's Phase 2 temp outputs, on the same mount point as their destination.
     [[nodiscard]] std::filesystem::path temp_dir_for(const std::filesystem::path& file, bool nested) const;
 

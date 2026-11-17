@@ -258,10 +258,22 @@ namespace chisel {
             schedule_analysis(root.path, std::nullopt, 0, false, nullptr, root);
         }
         pool_.wait_idle();
-        if (stop_flag_.load(std::memory_order_relaxed)) return;
-        process_work_list();
+        if (!stop_flag_.load(std::memory_order_relaxed)) process_work_list();
+        report_unfinished_containers();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         copy_unchanged_inputs(inputs);
+    }
+
+    void ProcessorExecutor::report_unfinished_containers() {
+        for (const auto& node : containers_) {
+            if (node.finalized) continue;
+            event_bus_.publish(ContainerFinalizeSkippedEvent{
+                .path=node.content.original_path,
+                .parent_container=node.parent ? std::optional{node.parent->content.original_path} : std::nullopt,
+                .reason=SkipReason::Interrupted,
+                .message="Interrupted"
+            });
+        }
     }
 
     std::optional<std::pair<fs::path, bool>> ProcessorExecutor::move_to_destination(

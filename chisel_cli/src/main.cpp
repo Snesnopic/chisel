@@ -380,6 +380,10 @@ int main(int argc, char* argv[]) {
         on_finish(e.path.filename().string());
     });
 
+    bus.subscribe<ContainerFinalizeSkippedEvent>([&](const ContainerFinalizeSkippedEvent& e) {
+        on_finish(e.path.filename().string());
+    });
+
     bus.subscribe<FileAnalyzeSkippedEvent>([&](const FileAnalyzeSkippedEvent& e) {
         if (e.reason != SkipReason::Signed) return;
         if (!settings.quiet) {

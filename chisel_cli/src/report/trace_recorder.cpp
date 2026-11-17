@@ -80,6 +80,9 @@ void TraceRecorder::subscribe(EventBus& bus) {
     bus.subscribe<ContainerFinalizeErrorEvent>([this](const ContainerFinalizeErrorEvent& e) {
         end("finalize", e.path, "error: " + e.error_message);
     });
+    bus.subscribe<ContainerFinalizeSkippedEvent>([this](const ContainerFinalizeSkippedEvent& e) {
+        end("finalize", e.path, e.message);
+    });
 }
 
 std::int64_t TraceRecorder::now_us() const {

@@ -171,6 +171,19 @@ struct ContainerFinalizeErrorEvent {
     std::string error_message;  ///< Error description
 };
 
+/**
+ * @brief Emitted when a container is left as it was without being rebuilt, e.g. because a stop was requested.
+ *
+ * Every container that was extracted ends with exactly one of ContainerFinalizeCompleteEvent,
+ * ContainerFinalizeErrorEvent or this event.
+ */
+struct ContainerFinalizeSkippedEvent {
+    std::filesystem::path path; ///< Path of the container
+    std::optional<std::filesystem::path> parent_container; ///< Container it was extracted from, if any
+    SkipReason reason;          ///< Why it wasn't rebuilt
+    std::string message;        ///< The reason as text, for display
+};
+
 } // namespace chisel
 
 #endif // CHISEL_EVENTS_HPP

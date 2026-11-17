@@ -92,6 +92,10 @@ struct Chisel::Impl {
         eventBus.subscribe<ContainerFinalizeErrorEvent>([this](const ContainerFinalizeErrorEvent& e) {
             if (observer != nullptr) observer->onFileError(e.path, "Container finalize error: " + e.error_message);
         });
+
+        eventBus.subscribe<ContainerFinalizeSkippedEvent>([this](const ContainerFinalizeSkippedEvent& e) {
+            if (observer != nullptr) observer->onFileSkipped(e.path, e.message);
+        });
     }
 };
 
