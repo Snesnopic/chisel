@@ -520,6 +520,8 @@ namespace chisel {
                                       (parent_node ? parent_node->path_cost : 0);
                 }
                 if (parent_node) ++parent_node->pending;
+                // announced before its contents, whose analysis starts on other threads right away
+                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .parent_container=parent, .extracted=true, .scheduled=processor->can_recompress(), .num_children=content->extracted_files.size(), .depth=depth, .root=root.path});
                 for (const auto &child: content->extracted_files) {
                     schedule_analysis(child, path, depth + 1, content->fixed_pixel_format.contains(child), node, root);
                 }
@@ -548,12 +550,10 @@ namespace chisel {
                                   .keep_pixel_format=keep_pixel_format, .waiting=waiting, .priority=priority});
             scheduled_for_recompression = true;
         }
-        if (scheduled_for_extraction || scheduled_for_recompression) {
-            if (scheduled_for_extraction) {
-                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .parent_container=parent, .extracted=true, .scheduled=scheduled_for_recompression, .num_children=content->extracted_files.size(), .depth=depth, .root=root.path});
-            } else {
-                event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .parent_container=parent, .extracted=false, .scheduled=scheduled_for_recompression, .num_children=0, .depth=depth, .root=root.path});
-            }
+        // a container was announced before its contents
+        if (scheduled_for_extraction) return;
+        if (scheduled_for_recompression) {
+            event_bus_.publish(FileAnalyzeCompleteEvent{.path=path, .parent_container=parent, .extracted=false, .scheduled=true, .num_children=0, .depth=depth, .root=root.path});
         } else {
             Logger::log(LogLevel::Debug, "File ignored: " + path.string(), "Executor");
             event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="No operations available"});
