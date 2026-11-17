@@ -528,8 +528,8 @@ namespace chisel {
                 scheduled_for_extraction = true;
             } else {
                 if (processor->can_recompress()) {
+                    // not a skip: the file itself is still recompressed below
                     Logger::log(LogLevel::Debug, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason="Extraction resulted in no elements"});
                 } else {
                     Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
                     event_bus_.publish(FileAnalyzeErrorEvent{.path=path, .parent_container=parent, .error_message="Extraction failed or skipped"});
