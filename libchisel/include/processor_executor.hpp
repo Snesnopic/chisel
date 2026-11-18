@@ -16,6 +16,7 @@
 
 #include "processor.hpp"
 #include "processor_registry.hpp"
+#include <cstdint>
 #include <filesystem>
 #include <vector>
 #include <deque>
@@ -174,6 +175,9 @@ private:
     /// @brief Rebuilds one container from its processed contents and puts it in place.
     void finalize_container(ContainerNode& node);
 
+    /// @brief Publishes a skip for every file Phase 2 never took up (a stop dropped it), once the pool is idle.
+    void report_unprocessed_files();
+
     /// @brief Publishes a skip for every container Phase 3 didn't rebuild, once the pool is idle.
     void report_unfinished_containers();
 
@@ -223,6 +227,7 @@ private:
         std::uintmax_t priority = 0;                           ///< Estimated work waiting on it: its containers' rebuilds, or its own size
     };
     std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
+    std::vector<std::uint8_t> work_started_; ///< (Phase 2) Set by each file's task once it runs, by index in work_list_
 
     /**
      * @brief (Phase 2->3) Actual on-disk location of each successfully recompressed

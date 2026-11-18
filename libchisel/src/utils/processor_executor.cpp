@@ -259,9 +259,20 @@ namespace chisel {
         }
         pool_.wait_idle();
         if (!stop_flag_.load(std::memory_order_relaxed)) process_work_list();
+        report_unprocessed_files();
         report_unfinished_containers();
         if (stop_flag_.load(std::memory_order_relaxed)) return;
         copy_unchanged_inputs(inputs);
+    }
+
+    void ProcessorExecutor::report_unprocessed_files() {
+        for (std::size_t index = 0; index < work_list_.size(); ++index) {
+            if (index < work_started_.size() && work_started_[index]) continue;
+            const auto& item = work_list_[index];
+            event_bus_.publish(FileProcessSkippedEvent{.path=item.path, .parent_container=item.parent_container,
+                                                       .reason=SkipReason::Interrupted, .message="Interrupted",
+                                                       .is_container=item.is_container});
+        }
     }
 
     void ProcessorExecutor::report_unfinished_containers() {
@@ -589,9 +600,12 @@ namespace chisel {
 
         // the files the most rebuilding waits on first, so that it can start while the rest is recompressed
         std::ranges::stable_sort(work_list_, std::ranges::greater{}, &WorkItem::priority);
-        for (const auto &item: work_list_) {
+        work_started_.assign(work_list_.size(), 0);
+        for (std::size_t index = 0; index < work_list_.size(); ++index) {
             if (stop_flag_.load(std::memory_order_relaxed)) break;
-            pool_.enqueue([this, item](stop_token st) {
+            const auto& item = work_list_[index];
+            pool_.enqueue([this, item, index](stop_token st) {
+                work_started_[index] = 1;
                 // the container waiting for this file can go on once it's done, whatever happened to it
                 struct ReleaseGuard {
                     ProcessorExecutor* executor;
