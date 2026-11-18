@@ -934,6 +934,20 @@ std::optional<ExtractedContent> PdfProcessor::prepare_extraction(const std::file
     pdf.setLogger(qlogger);
     pdf.processFile(input_path.string().c_str());
 
+    // qpdf writes a version 4 security handler with AES whatever cipher its crypt filters named
+    int revision = 0;
+    int permissions = 0;
+    int version = 0;
+    QPDF::encryption_method_e stream_method = QPDF::e_none;
+    QPDF::encryption_method_e string_method = QPDF::e_none;
+    QPDF::encryption_method_e file_method = QPDF::e_none;
+    if (pdf.isEncrypted(revision, permissions, version, stream_method, string_method, file_method) && version >= 4 &&
+        (stream_method == QPDF::e_rc4 || string_method == QPDF::e_rc4 || file_method == QPDF::e_rc4)) {
+        Logger::log(LogLevel::Info, "RC4 crypt filters would become AES, left as is: " + input_path.string(), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
+        return std::nullopt;
+    }
+
     auto objects = pdf.getAllObjects();
     const auto names = embedded_file_names(pdf);
     PdfState st;
