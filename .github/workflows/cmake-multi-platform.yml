@@ -285,6 +285,8 @@ jobs:
         with:
           name: chsl-${{ matrix.asset_name }}${{ runner.os == 'Windows' && '.zip' || '.tar.gz' }}
           path: ${{ env.BIN_DIR }}
+          # the zip is the release asset itself: keep it as it was uploaded
+          skip-decompress: true
 
       - name: Extract binary
         if: runner.os != 'Windows'
@@ -533,6 +535,7 @@ jobs:
         with:
           pattern: chsl-*
           path: binaries
+          skip-decompress: true
 
       - name: Download logs
         uses: actions/download-artifact@v8
@@ -619,6 +622,8 @@ jobs:
         with:
           name: chsl-${{ matrix.asset_name }}${{ runner.os == 'Windows' && '.zip' || '.tar.gz' }}
           path: ${{ env.BIN_DIR }}
+          # the zip is the release asset itself: keep it as it was uploaded
+          skip-decompress: true
 
       - name: Extract binary
         if: runner.os != 'Windows'
