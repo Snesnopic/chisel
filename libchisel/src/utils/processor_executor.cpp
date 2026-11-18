@@ -508,13 +508,16 @@ namespace chisel {
         std::optional<ExtractedContent> content;
         ContainerNode* node = nullptr;
         if (processor->can_extract_contents()) {
+            std::optional<std::string> extraction_error;
             try {
                 content = processor->prepare_extraction(current_path);
             } catch (const std::exception& e) {
                 Logger::log(LogLevel::Error, "Exception during prepare_extraction for " + path.string() + ": " + e.what(), "Executor");
+                extraction_error = e.what();
                 content = std::nullopt;
             } catch (...) {
                 Logger::log(LogLevel::Error, "Unknown exception during prepare_extraction for " + path.string(), "Executor");
+                extraction_error = "Unknown non-standard exception";
                 content = std::nullopt;
             }
             if (content) {
@@ -538,14 +541,15 @@ namespace chisel {
                     schedule_analysis(child, path, depth + 1, content->fixed_pixel_format.contains(child), node, root);
                 }
                 scheduled_for_extraction = true;
+            } else if (processor->can_recompress()) {
+                // not a skip: the file itself is still recompressed below
+                Logger::log(LogLevel::Debug, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
+            } else if (extraction_error) {
+                event_bus_.publish(FileAnalyzeErrorEvent{.path=path, .parent_container=parent, .error_message="Extraction failed: " + *extraction_error});
+                return;
             } else {
-                if (processor->can_recompress()) {
-                    // not a skip: the file itself is still recompressed below
-                    Logger::log(LogLevel::Debug, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
-                } else {
-                    Logger::log(LogLevel::Warning, "Prepare_extraction skipped or resulted in no elements for " + path.string(), "Executor");
-                    event_bus_.publish(FileAnalyzeErrorEvent{.path=path, .parent_container=parent, .error_message="Extraction failed or skipped"});
-                }
+                // nothing inside it, e.g. a WAV without cover art: skipped below like any file with nothing to do
+                Logger::log(LogLevel::Debug, "Prepare_extraction resulted in no elements for " + path.string(), "Executor");
             }
         }
         if (processor->can_recompress()) {
