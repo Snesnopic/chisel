@@ -1169,8 +1169,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         QPDFWriter writer(pdf, tmp_path.string().c_str());
         // linearizing a file that wasn't would add hint tables to it, and it makes qpdf write everything twice
         writer.setLinearization(pdf.isLinearized());
-        writer.setStaticID(true);
-        writer.setDeterministicID(true);
+        // an ID derived from the written content keeps the output reproducible; qpdf can't derive one for an encrypted file
+        writer.setDeterministicID(!pdf.isEncrypted());
         writer.setObjectStreamMode(pdfa == 1 ? qpdf_o_disable : qpdf_o_generate);
         // PDF/A wants an end of line before every endstream, which qpdf otherwise leaves out after data ending in one
         if (pdfa != 0) writer.setNewlineBeforeEndstream(true);
