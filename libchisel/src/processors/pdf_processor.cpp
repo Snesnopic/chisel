@@ -1166,7 +1166,9 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
                 if (!written) std::filesystem::remove(path, ec);
             }
         } partial{.path=tmp_path};
-        QPDFWriter writer(pdf, tmp_path.string().c_str());
+        // qpdf keeps the pointer, and reads it again when it derives an encrypted file's ID
+        const std::string tmp_name = tmp_path.string();
+        QPDFWriter writer(pdf, tmp_name.c_str());
         // linearizing a file that wasn't would add hint tables to it, and it makes qpdf write everything twice
         writer.setLinearization(pdf.isLinearized());
         // an ID derived from the written content keeps the output reproducible; qpdf can't derive one for an encrypted file
