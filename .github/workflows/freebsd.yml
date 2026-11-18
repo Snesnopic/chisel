@@ -1,0 +1,331 @@
+name: FreeBSD build
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  FORBIDDEN_LIBS: "jpeg|png|flac|archive|zlib|jxl|tiff|qpdf|webp|wavpack|sqlite|magic|mseed|ebml|matroska|mkclean|zopfli|ape|gif|mac|flexigif|tag"
+
+jobs:
+  build-x64:
+    name: build (freebsd-x64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Build and verify static linking on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          arch: amd64
+          release: "15.1"
+          usesh: true
+          prepare: |
+            pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
+          run: |
+            set -e
+            echo "--- Starting FreeBSD Build ---"
+            export MAKE=gmake
+            mkdir -p $HOME/bin
+            ln -s /usr/local/bin/gmake $HOME/bin/make
+            export PATH=$HOME/bin:$PATH
+
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                  -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+
+            cmake --build build --config Release
+            echo "--- Build Complete ---"
+
+            echo "Checking dependencies for FreeBSD..."
+            ldd bin/Release/chsl
+            matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
+            if [ -n "$matches" ]; then
+              echo "::error::Found forbidden dynamic libraries!"
+              echo "$matches"
+              exit 1
+            fi
+            echo "OK: No forbidden dynamic libraries found."
+
+      - name: Package binary
+        run: |
+          mkdir -p package
+          cp bin/Release/chsl package/chsl
+          chmod 755 package/chsl
+          tar -czf chsl-freebsd-x64.tar.gz -C package chsl
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: chsl-freebsd-x64.tar.gz
+          archive: false
+          if-no-files-found: error
+
+  build-arm64:
+    name: build (freebsd-arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          lfs: true
+
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Build and verify static linking on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          arch: arm64
+          release: "15.1"
+          usesh: true
+          prepare: |
+            pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
+          run: |
+            set -e
+            echo "--- Starting FreeBSD Build ---"
+            export MAKE=gmake
+            mkdir -p $HOME/bin
+            ln -s /usr/local/bin/gmake $HOME/bin/make
+            export PATH=$HOME/bin:$PATH
+
+            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                  -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+
+            cmake --build build --config Release
+            echo "--- Build Complete ---"
+
+            echo "Checking dependencies for FreeBSD..."
+            ldd bin/Release/chsl
+            matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
+            if [ -n "$matches" ]; then
+              echo "::error::Found forbidden dynamic libraries!"
+              echo "$matches"
+              exit 1
+            fi
+            echo "OK: No forbidden dynamic libraries found."
+
+      - name: Package binary
+        run: |
+          mkdir -p package
+          cp bin/Release/chsl package/chsl
+          chmod 755 package/chsl
+          tar -czf chsl-freebsd-arm64.tar.gz -C package chsl
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: chsl-freebsd-arm64.tar.gz
+          archive: false
+          if-no-files-found: error
+
+  test-x64:
+    name: test (freebsd-x64)
+    needs: build-x64
+    runs-on: ubuntu-latest
+    env:
+      TEST_ARCHIVE_NAME: chisel_samples.zip
+      TEST_DIR: test-data
+      BIN_DIR: bin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: chsl-freebsd-x64.tar.gz
+          path: ${{ env.BIN_DIR }}
+
+      - name: Extract binary
+        run: |
+          cd ${{ env.BIN_DIR }}
+          tar -xzf "$(find . -name 'chsl-*.tar.gz' | head -1)"
+          ls -la
+
+      - name: Install test dependencies (Linux Host for GDrive)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip unzip
+          pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Cache test data archive
+        id: cache-test-archive
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.TEST_ARCHIVE_NAME }}
+          key: ${{ runner.os }}-testarchive-v8-${{ secrets.GDRIVE_FILE_ID }}
+
+      - name: Authenticate and Download Test Data from Google Drive
+        if: steps.cache-test-archive.outputs.cache-hit != 'true'
+        env:
+          GDRIVE_CREDENTIALS_JSON: ${{ secrets.GDRIVE_CREDENTIALS_JSON }}
+          GDRIVE_FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
+        run: |
+          python3 -c "
+          import os, io, json, sys
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          creds_json_string = os.environ.get('GDRIVE_CREDENTIALS_JSON')
+          if not creds_json_string: sys.exit(1)
+          try:
+            creds_info = json.loads(creds_json_string)
+            creds = service_account.Credentials.from_service_account_info(creds_info)
+          except: sys.exit(1)
+          file_id = os.environ.get('GDRIVE_FILE_ID')
+          output_filename = os.environ.get('TEST_ARCHIVE_NAME')
+          if not file_id or not output_filename: sys.exit(1)
+          try: service = build('drive', 'v3', credentials=creds)
+          except: sys.exit(1)
+          try: request = service.files().get_media(fileId=file_id)
+          except: sys.exit(1)
+          try: fh = io.FileIO(output_filename, 'wb')
+          except: sys.exit(1)
+          downloader = MediaIoBaseDownload(fh, request)
+          done = False
+          try:
+            while done is False: status, done = downloader.next_chunk()
+          except:
+            if not fh.closed: fh.close()
+            try:
+              if os.path.exists(output_filename): os.remove(output_filename)
+            except: pass
+            sys.exit(1)
+          finally:
+            if not fh.closed: fh.close()
+          "
+        shell: bash
+
+      - name: Run Chisel Tests (in FreeBSD VM)
+        uses: vmactions/freebsd-vm@v1
+        with:
+          arch: amd64
+          release: "15.1"
+          usesh: true
+          run: |
+            echo "--- Starting FreeBSD Test ---"
+            echo "Extracting test data inside VM..."
+            mkdir -p ${{ env.TEST_DIR }}
+            unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+            CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
+            echo "Running chisel from: $CHISEL_EXE"
+            echo "Processing files in: ${{ env.TEST_DIR }}"
+            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --log-level=ALL --log-file chisel.log
+            echo "--- Test Run Complete ---"
+
+      - name: Check for errors in Chisel Log
+        if: always()
+        run: |
+          LOG_FILE="chisel.log"
+          if grep -q '\[ERROR\]' "$LOG_FILE"; then
+            echo "::error::Errors detected in chisel.log!"
+            grep '\[ERROR\]' "$LOG_FILE"
+            exit 1
+          else
+            echo "No [ERROR] lines found in chisel.log."
+            exit 0
+          fi
+        shell: bash
+
+      - name: Upload Chisel Log File
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: chisel-log-freebsd-x64
+          path: chisel.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  # the main workflow recreates the nightly release once its own tests pass; each binary is added to it after that
+  nightly-x64:
+    name: nightly (freebsd-x64)
+    needs: test-x64
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: chsl-freebsd-x64.tar.gz
+          path: assets
+
+      - name: Add to the nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          asset=$(find assets -name 'chsl-*.tar.gz' | head -1)
+          # up to 3 hours for the nightly release to be recreated at this commit, unless a newer push replaces it
+          for _ in $(seq 1 90); do
+            if [ "$(gh api "repos/$GH_REPO/git/ref/tags/development-latest" --jq .object.sha 2>/dev/null)" = "$GITHUB_SHA" ]; then
+              gh release upload development-latest "$asset" --clobber
+              exit 0
+            fi
+            if [ "$(gh api "repos/$GH_REPO/commits/development" --jq .sha)" != "$GITHUB_SHA" ]; then
+              echo "::notice::A newer push to development replaces this nightly"
+              exit 0
+            fi
+            sleep 120
+          done
+          echo "::notice::The nightly release wasn't recreated at this commit, $asset not added"
+
+  nightly-arm64:
+    name: nightly (freebsd-arm64)
+    needs: build-arm64
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: chsl-freebsd-arm64.tar.gz
+          path: assets
+
+      - name: Add to the nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          asset=$(find assets -name 'chsl-*.tar.gz' | head -1)
+          # up to 3 hours for the nightly release to be recreated at this commit, unless a newer push replaces it
+          for _ in $(seq 1 90); do
+            if [ "$(gh api "repos/$GH_REPO/git/ref/tags/development-latest" --jq .object.sha 2>/dev/null)" = "$GITHUB_SHA" ]; then
+              gh release upload development-latest "$asset" --clobber
+              exit 0
+            fi
+            if [ "$(gh api "repos/$GH_REPO/commits/development" --jq .sha)" != "$GITHUB_SHA" ]; then
+              echo "::notice::A newer push to development replaces this nightly"
+              exit 0
+            fi
+            sleep 120
+          done
+          echo "::notice::The nightly release wasn't recreated at this commit, $asset not added"
