@@ -877,6 +877,7 @@ jobs:
           git push origin --delete development-latest || echo "No previous nightly tag to delete."
           
           gh release create development-latest \
+            --target "$GITHUB_SHA" \
             --prerelease \
             --title "Nightly Build" \
             --notes "Latest successful build from 'development' branch. Not a stable release." \
