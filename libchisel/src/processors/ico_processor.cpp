@@ -46,19 +46,22 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
     content.original_path = input_path;
     content.temp_dir = make_temp_dir_for(input_path, "ico");
 
+    // a damaged icon can't be rebuilt entry for entry, so it's left as it is
+    const auto damaged = [&](const std::string& why) -> std::optional<ExtractedContent> {
+        Logger::log(LogLevel::Warning, "Damaged ICO/CUR (" + why + "), left as is: " + input_path.string(), get_name());
+        cleanup_temp_dir(content.temp_dir, get_name());
+        return std::nullopt;
+    };
+
     const auto data = read_file(input_path);
-    if (data.size() < 6) throw std::runtime_error("FILE TOO SMALL TO BE ICO/CUR");
+    if (data.size() < 6) return damaged("too small");
 
     const uint16_t reserved = read_le16(data.data());
     const uint16_t type = read_le16(data.data() + 2);
     const uint16_t count = read_le16(data.data() + 4);
 
-    if (reserved != 0 || (type != 1 && type != 2) || count == 0) {
-        throw std::runtime_error("INVALID ICO/CUR HEADER");
-    }
-    if (data.size() < 6 + static_cast<std::size_t>(count) * 16) {
-        throw std::runtime_error("TRUNCATED ICO/CUR DIRECTORY");
-    }
+    if (reserved != 0 || (type != 1 && type != 2) || count == 0) return damaged("invalid header");
+    if (data.size() < 6 + static_cast<std::size_t>(count) * 16) return damaged("truncated directory");
 
     const uint8_t png_magic[] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     auto metas = std::make_shared<std::vector<IcoEntryMeta>>();
@@ -68,9 +71,8 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
         const uint32_t bytes_in_res = read_le32(data.data() + dir_offset + 8);
         const uint32_t image_offset = read_le32(data.data() + dir_offset + 12);
 
-        if (image_offset + bytes_in_res > data.size() || bytes_in_res == 0) {
-            Logger::log(LogLevel::Warning, "SKIPPING CORRUPT ICO ENTRY " + std::to_string(i), get_name());
-            continue;
+        if (bytes_in_res == 0 || image_offset > data.size() || bytes_in_res > data.size() - image_offset) {
+            return damaged("entry " + std::to_string(i) + " lies outside the file");
         }
 
         const uint8_t* payload = data.data() + image_offset;
