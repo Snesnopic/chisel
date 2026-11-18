@@ -635,8 +635,8 @@ jobs:
             build/chisel.log
             ${{ github.workspace }}/chisel.log
             chisel.log
-            if-no-files-found: warn
-            retention-days: 7
+          if-no-files-found: warn
+          retention-days: 7
 
   test-freebsd:
     name: test (${{ matrix.asset_name }})
