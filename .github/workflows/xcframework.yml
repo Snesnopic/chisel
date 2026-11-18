@@ -294,9 +294,10 @@ jobs:
           cd build_xcframework
           zip -r Chisel.xcframework.zip Chisel.xcframework
 
+      # uploaded without a zip around it, so the artifact is the release asset itself
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: chisel-xcframework
           path: build_xcframework/Chisel.xcframework.zip
+          archive: false
           if-no-files-found: error

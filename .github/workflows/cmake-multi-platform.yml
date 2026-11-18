@@ -208,38 +208,34 @@ jobs:
         run: cat "${{ steps.strings.outputs.build-output-dir }}/chisel_cli/CMakeFiles/chisel.dir/link.txt"
 
 
-      - name: Determine Version
-        shell: bash
+      - name: Package binary
+        if: runner.os != 'Windows'
         run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          mkdir -p package
+          cp "${{ matrix.binary_path }}" package/chsl
+          chmod 755 package/chsl
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            tar --no-mac-metadata -czf "chsl-${{ matrix.asset_name }}.tar.gz" -C package chsl
           else
-            echo "VERSION=dev" >> $GITHUB_ENV
+            tar -czf "chsl-${{ matrix.asset_name }}.tar.gz" -C package chsl
           fi
+          echo "ASSET=chsl-${{ matrix.asset_name }}.tar.gz" >> "$GITHUB_ENV"
 
-      - name: Rename Binary
-        shell: bash
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          EXT=""
-          SRC="${{ matrix.binary_path }}"
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item "${{ matrix.binary_path }}" package/chsl.exe
+          Compress-Archive -Path package/chsl.exe -DestinationPath "chsl-${{ matrix.asset_name }}.zip"
+          "ASSET=chsl-${{ matrix.asset_name }}.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            EXT=".exe"
-            if [[ "$SRC" != *".exe" ]]; then SRC="$SRC.exe"; fi
-          fi
-
-          DEST="chsl-${{ matrix.asset_name }}-${{ env.VERSION }}$EXT"
-
-          echo "Renaming $SRC to $DEST"
-          mv "$SRC" "$DEST"
-
-          echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
-
+      # uploaded without a zip around it, so the artifact is the release asset itself
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7
         with:
-          name: binary-${{ matrix.asset_name }}
-          path: ${{ env.ARTIFACT_PATH }}
+          path: ${{ env.ASSET }}
+          archive: false
           if-no-files-found: error
 
   build-freebsd-x64:
@@ -285,29 +281,19 @@ jobs:
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
-      - name: Determine Version
-        shell: bash
+      - name: Package binary
         run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          else
-            echo "VERSION=dev" >> $GITHUB_ENV
-          fi
+          mkdir -p package
+          cp bin/Release/chsl package/chsl
+          chmod 755 package/chsl
+          tar -czf chsl-freebsd-x64.tar.gz -C package chsl
 
-      - name: Rename Binary
-        shell: bash
-        run: |
-          SRC="bin/Release/chsl"
-          DEST="chsl-freebsd-x64-${{ env.VERSION }}"
-          echo "Renaming $SRC to $DEST"
-          mv "$SRC" "$DEST"
-          echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
-
+      # uploaded without a zip around it, so the artifact is the release asset itself
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7
         with:
-          name: binary-freebsd-x64
-          path: ${{ env.ARTIFACT_PATH }}
+          path: chsl-freebsd-x64.tar.gz
+          archive: false
           if-no-files-found: error
 
   build-freebsd-arm64:
@@ -353,29 +339,19 @@ jobs:
             cmake --build build --config Release
             echo "--- Build Complete ---"
 
-      - name: Determine Version
-        shell: bash
+      - name: Package binary
         run: |
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          else
-            echo "VERSION=dev" >> $GITHUB_ENV
-          fi
+          mkdir -p package
+          cp bin/Release/chsl package/chsl
+          chmod 755 package/chsl
+          tar -czf chsl-freebsd-arm64.tar.gz -C package chsl
 
-      - name: Rename Binary
-        shell: bash
-        run: |
-          SRC="bin/Release/chsl"
-          DEST="chsl-freebsd-arm64-${{ env.VERSION }}"
-          echo "Renaming $SRC to $DEST"
-          mv "$SRC" "$DEST"
-          echo "ARTIFACT_PATH=$DEST" >> $GITHUB_ENV
-
+      # uploaded without a zip around it, so the artifact is the release asset itself
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7
         with:
-          name: binary-freebsd-arm64
-          path: ${{ env.ARTIFACT_PATH }}
+          path: chsl-freebsd-arm64.tar.gz
+          archive: false
           if-no-files-found: error
 
   test:
@@ -431,24 +407,23 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v8
         with:
-          name: binary-${{ matrix.asset_name }}
+          name: chsl-${{ matrix.asset_name }}${{ runner.os == 'Windows' && '.zip' || '.tar.gz' }}
           path: ${{ env.BIN_DIR }}
-      - name: Restore Binary Name
-        shell: bash
-        run: |
-              cd ${{ env.BIN_DIR }}
-              find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" ! -name "chsl.exe" -exec mv {} chsl \; || true
 
-              if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chsl" ]; then
-              mv chsl chsl.exe
-              fi
-
-              ls -la
-
-      - name: Make binary executable
+      - name: Extract binary
         if: runner.os != 'Windows'
-        run: chmod +x ${{ env.BIN_DIR }}/chsl
-        shell: bash
+        run: |
+          cd ${{ env.BIN_DIR }}
+          tar -xzf "$(find . -name 'chsl-*.tar.gz' | head -1)"
+          ls -la
+
+      - name: Extract binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -Path "${{ env.BIN_DIR }}" -Recurse -Filter "chsl-*.zip" | Select-Object -First 1
+          Expand-Archive -Path $archive.FullName -DestinationPath "${{ env.BIN_DIR }}" -Force
+          Get-ChildItem "${{ env.BIN_DIR }}"
 
       - name: Install test dependencies (Linux)
         if: runner.os == 'Linux'
@@ -665,18 +640,14 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v8
         with:
-          name: binary-${{ matrix.asset_name }}
+          name: chsl-${{ matrix.asset_name }}.tar.gz
           path: ${{ env.BIN_DIR }}
 
-      - name: Restore Binary Name
-        shell: bash
+      - name: Extract binary
         run: |
           cd ${{ env.BIN_DIR }}
-          find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" -exec mv {} chsl \; || true
+          tar -xzf "$(find . -name 'chsl-*.tar.gz' | head -1)"
           ls -la
-
-      - name: Make binary executable (Host)
-        run: chmod +x ${{ env.BIN_DIR }}/chsl
 
       - name: Install test dependencies (Linux Host for GDrive)
         run: |
@@ -815,58 +786,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Download all build and log artifacts
+      - name: Download binaries
         uses: actions/download-artifact@v8
         with:
-          path: artifacts/
+          pattern: chsl-*
+          path: binaries
+
+      - name: Download logs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: chisel-log-*
+          path: logs
 
       - name: Prepare assets for release
         run: |
-          mkdir release_assets
-          
-          function package_unix {
-            SRC_DIR="artifacts/$1"
-            OUT_NAME="$2"
-            # skip if freebsd artifact is missing
-            if [ ! -d "$SRC_DIR" ]; then return; fi
-            mv "$SRC_DIR"/* "release_assets/chsl"
-            chmod +x "release_assets/chsl"
-          
-            tar -czf "release_assets/$OUT_NAME.tar.gz" -C release_assets "chsl"
-          
-            rm "release_assets/chsl"
-          }
-            
-          function package_windows {
-            SRC_DIR="artifacts/$1"
-            OUT_NAME="$2"
-          
-            mv "$SRC_DIR"/*.exe "release_assets/chsl.exe"
-          
-            zip -j "release_assets/$OUT_NAME.zip" "release_assets/chsl.exe"
-          
-            rm "release_assets/chsl.exe"
-          }
-          # --- FreeBSD ---
-          package_unix "binary-freebsd-x64"     "chsl-freebsd-x64"
-          package_unix "binary-freebsd-arm64"   "chsl-freebsd-arm64"
-          
-          # --- Linux ---
-          package_unix "binary-linux-x64-gcc"   "chsl-linux-x64-gcc"
-          package_unix "binary-linux-x64-clang" "chsl-linux-x64-clang"
-          package_unix "binary-linux-arm64"     "chsl-linux-arm64"
-          package_unix "binary-linux-x86"       "chsl-linux-x86"
-
-          # --- macOS ---
-          package_unix "binary-macos-x64"       "chsl-macos-x64"
-          package_unix "binary-macos-arm64"     "chsl-macos-arm64"
-
-          # --- Windows ---
-          package_windows "binary-windows-x64"    "chsl-windows-x64"
-          package_windows "binary-windows-arm64"  "chsl-windows-arm64"
-          
-          # --- Logs ---
-          find artifacts/ -type f -name '*.log' -exec cp {} release_assets/ \;
+          mkdir -p release_assets
+          find binaries -type f \( -name 'chsl-*.tar.gz' -o -name 'chsl-*.zip' \) -exec cp {} release_assets/ \;
+          find logs -type f -name '*.log' -exec cp {} release_assets/ \;
+          ls -la release_assets
 
       - name: Delete and recreate 'development-latest' release
         env:
@@ -938,24 +875,23 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v8
         with:
-          name: binary-${{ matrix.asset_name }}
+          name: chsl-${{ matrix.asset_name }}${{ runner.os == 'Windows' && '.zip' || '.tar.gz' }}
           path: ${{ env.BIN_DIR }}
 
-      - name: Restore Binary Name
-        shell: bash
+      - name: Extract binary
+        if: runner.os != 'Windows'
         run: |
           cd ${{ env.BIN_DIR }}
-          find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" ! -name "chsl.exe" -exec mv {} chsl \; || true
-          
-          if [[ "${{ runner.os }}" == "Windows" ]] && [ -f "chsl" ]; then
-          mv chsl chsl.exe
-          fi
-          
+          tar -xzf "$(find . -name 'chsl-*.tar.gz' | head -1)"
           ls -la
 
-      - name: Make binary executable
-        if: runner.os != 'Windows'
-        run: chmod +x ${{ env.BIN_DIR }}/chsl
+      - name: Extract binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -Path "${{ env.BIN_DIR }}" -Recurse -Filter "chsl-*.zip" | Select-Object -First 1
+          Expand-Archive -Path $archive.FullName -DestinationPath "${{ env.BIN_DIR }}" -Force
+          Get-ChildItem "${{ env.BIN_DIR }}"
 
       - name: Verify Linux (ldd)
         if: runner.os == 'Linux'
@@ -1027,17 +963,14 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v8
         with:
-          name: binary-${{ matrix.asset_name }}
+          name: chsl-${{ matrix.asset_name }}.tar.gz
           path: ${{ env.BIN_DIR }}
 
-      - name: Restore Binary Name
-        shell: bash
+      - name: Extract binary
         run: |
           cd ${{ env.BIN_DIR }}
-          find . -maxdepth 1 -type f -name "chsl-*" ! -name "chsl" -exec mv {} chsl \; || true
-
-      - name: Make binary executable (Host)
-        run: chmod +x ${{ env.BIN_DIR }}/chsl
+          tar -xzf "$(find . -name 'chsl-*.tar.gz' | head -1)"
+          ls -la
 
       - name: Verify FreeBSD (ldd)
         uses: vmactions/freebsd-vm@v1
