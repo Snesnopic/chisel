@@ -5,6 +5,7 @@
 #include <vector>
 #include <string_view>
 #include <cstdint>
+#include <optional>
 
 namespace chisel {
 
@@ -26,6 +27,13 @@ public:
      * @return base64 encoded string.
      */
     static std::string encode(const std::vector<uint8_t>& bytes_to_encode);
+
+    /**
+     * @brief Decodes base64 only if encoding the result gives back exactly the same text.
+     * @param compact Base64 text without whitespace.
+     * @return The decoded bytes, or nothing for empty, malformed or non-canonical input.
+     */
+    static std::optional<std::vector<uint8_t>> decode_canonical(std::string_view compact);
 };
 
 } // namespace chisel

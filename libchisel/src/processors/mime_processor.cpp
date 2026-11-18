@@ -37,12 +37,12 @@ std::vector<MemChunk> parse_mime_memory(const std::filesystem::path& input_path)
                     clean_b64.push_back(c);
                 }
             }
-            if (!clean_b64.empty()) {
+            if (auto bytes = Base64Utils::decode_canonical(clean_b64)) {
                 if (!current_text.empty()) {
                     chunks.push_back(MemChunk{current_text});
                     current_text.clear();
                 }
-                chunks.push_back(MemChunk{Base64Utils::decode(clean_b64)});
+                chunks.push_back(MemChunk{std::move(*bytes)});
             } else {
                 current_text += b64_buffer;
             }
@@ -147,11 +147,11 @@ std::optional<ExtractedContent> MimeProcessor::prepare_extraction(const std::fil
                 }
             }
 
-            if (!clean_b64.empty()) {
-                const std::vector<uint8_t> binary_data = Base64Utils::decode(clean_b64);
+            // a part that doesn't encode back to the same text (stray characters, padding in the middle) stays as it is
+            if (const auto binary_data = Base64Utils::decode_canonical(clean_b64)) {
                 const std::filesystem::path tmp_file = content.temp_dir /
                                                 ("mime_asset_" + RandomUtils::random_suffix() + ".bin");
-                if (!chisel::write_file(tmp_file, binary_data)) {
+                if (!chisel::write_file(tmp_file, *binary_data)) {
                     write_failed = true;
                     return;
                 }

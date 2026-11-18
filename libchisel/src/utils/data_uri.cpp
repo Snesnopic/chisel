@@ -84,14 +84,6 @@ std::string without_spaces(const std::string_view payload) {
     return compact;
 }
 
-// decodes base64 only when encoding the result gives back the same text
-std::optional<std::vector<uint8_t>> decode_canonical(const std::string& compact) {
-    if (compact.size() % 4 != 0) return std::nullopt;
-    auto bytes = Base64Utils::decode(compact);
-    if (bytes.empty() || Base64Utils::encode(bytes) != compact) return std::nullopt;
-    return bytes;
-}
-
 // extension of the extracted file, or empty for media types chisel has no use for
 std::string extension_for(const std::string_view media_type) {
     const auto slash = media_type.find('/');
@@ -127,7 +119,7 @@ std::vector<DataUriAsset> extract_data_uris(const std::string_view text,
             })) {
             continue;
         }
-        const auto bytes = decode_canonical(compact);
+        const auto bytes = Base64Utils::decode_canonical(compact);
         if (!bytes) continue;
 
         if (dir.empty()) {

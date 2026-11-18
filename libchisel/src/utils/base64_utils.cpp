@@ -71,4 +71,11 @@ std::string Base64Utils::encode(const std::vector<uint8_t>& bytes_to_encode) {
     return ret;
 }
 
+std::optional<std::vector<uint8_t>> Base64Utils::decode_canonical(const std::string_view compact) {
+    if (compact.empty() || compact.size() % 4 != 0) return std::nullopt;
+    auto bytes = decode(compact);
+    if (bytes.empty() || encode(bytes) != compact) return std::nullopt;
+    return bytes;
+}
+
 } // namespace chisel
