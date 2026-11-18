@@ -31,8 +31,15 @@ struct IcoEntryMeta {
     std::vector<uint8_t> raw_payload; // Opaque: original bytes, re-embedded verbatim
 };
 
-uint32_t bmp_row_size(const uint32_t width, const uint32_t bitcount) {
+uint64_t bmp_row_size(const uint64_t width, const uint64_t bitcount) {
     return ((width * bitcount + 31) / 32) * 4;
+}
+
+// a BITMAPINFOHEADER-family header whose sizes can't overflow the arithmetic below
+bool plausible_dib(const uint32_t header_size, const uint32_t width, const uint32_t height, const uint16_t bitcount) {
+    constexpr uint32_t kMaxSide = 1u << 16;
+    const bool known_depth = bitcount == 1 || bitcount == 4 || bitcount == 8 || bitcount == 16 || bitcount == 24 || bitcount == 32;
+    return header_size >= 40 && width != 0 && width <= kMaxSide && height != 0 && height <= kMaxSide && known_depth;
 }
 
 } // namespace
@@ -96,21 +103,20 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
             const uint16_t biBitCount = read_le16(payload + 14);
             const uint32_t biClrUsed = read_le32(payload + 32);
 
-            uint32_t palette_colors = 0;
+            uint64_t palette_colors = 0;
             if (biBitCount <= 8) {
                 palette_colors = (biClrUsed == 0) ? (1u << biBitCount) : biClrUsed;
             }
-            const uint32_t palette_size = palette_colors * 4;
+            const uint64_t palette_size = palette_colors * 4;
             const uint32_t true_height = doubled_height / 2;
-            const uint32_t row_size = bmp_row_size(width, biBitCount);
-            const uint64_t xor_data_size = static_cast<uint64_t>(row_size) * true_height;
+            const uint64_t xor_data_size = bmp_row_size(width, biBitCount) * true_height;
 
             // sanity check: only attempt the fix-up if the math is internally
             // consistent (even height, non-zero dimensions, color data actually
             // fits within the payload); otherwise this isn't the layout we
             // expect, and guessing further risks corrupting it instead
-            const bool plausible = doubled_height != 0 && (doubled_height % 2 == 0) &&
-                width != 0 && biBitCount != 0 &&
+            const bool plausible = doubled_height % 2 == 0 && plausible_dib(biSize, width, true_height, biBitCount) &&
+                (biBitCount > 8 || palette_colors <= (1u << biBitCount)) &&
                 (static_cast<uint64_t>(biSize) + palette_size + xor_data_size <= bytes_in_res);
 
             if (!plausible) {
@@ -152,8 +158,7 @@ std::optional<ExtractedContent> IcoProcessor::prepare_extraction(const std::file
             uint32_t palette_colors = 0;
             if (biBitCount <= 8) palette_colors = (biClrUsed == 0) ? (1u << biBitCount) : biClrUsed;
             const uint32_t palette_size = palette_colors * 4;
-            const uint32_t row_size = bmp_row_size(width, biBitCount);
-            const uint32_t xor_data_size = row_size * true_height;
+            const auto xor_data_size = static_cast<uint32_t>(bmp_row_size(width, biBitCount) * true_height);
 
             std::vector<uint8_t> dib_header(payload, payload + biSize);
             write_le32(dib_header.data() + 8, true_height);
@@ -260,13 +265,14 @@ std::filesystem::path IcoProcessor::finalize_extraction(const ExtractedContent& 
                 const uint32_t true_height = read_le32(bmp.data() + 14 + 8);
                 const uint16_t bitcount = read_le16(bmp.data() + 14 + 14);
                 const uint32_t compression = dib_size >= 20 ? read_le32(bmp.data() + 14 + 16) : 0;
-                const uint32_t row_size = bmp_row_size(width, bitcount);
-                const uint64_t xor_data_size = static_cast<uint64_t>(row_size) * true_height;
+                const uint64_t xor_data_size = bmp_row_size(width, bitcount) * true_height;
 
                 // only BI_RGB/BI_RLE8/BI_RLE4/BI_BITFIELDS are safe inside an ICO
                 const bool compression_safe = compression <= 3;
+                const bool layout_ok = plausible_dib(dib_size, width, true_height, bitcount) &&
+                    14ull + dib_size <= bf_off_bits && bf_off_bits + xor_data_size <= bmp.size();
 
-                if (compression_safe && bf_off_bits + xor_data_size <= bmp.size()) {
+                if (compression_safe && layout_ok) {
                     std::vector<uint8_t> dib_header(bmp.data() + 14, bmp.data() + 14 + dib_size);
                     write_le32(dib_header.data() + 8, true_height * 2); // restore ICO's doubled-height convention
                     if (dib_size >= 24 && read_le32(dib_header.data() + 20) != 0) {
