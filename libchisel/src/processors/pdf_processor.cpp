@@ -803,6 +803,14 @@ std::string compare_rebuild(const std::filesystem::path& source, const std::file
         return std::string("does not open: ") + e.what();
     }
     if (linearized) a.pushInheritedAttributesToPage();
+    // qpdf writes the catalog's /Extensions and its /ADBE direct, as the specification wants
+    if (QPDFObjectHandle extensions = a.getRoot().getKey("/Extensions"); extensions.isDictionary()) {
+        if (extensions.isIndirect()) extensions = a.getRoot().replaceKeyAndGetNew("/Extensions", extensions.shallowCopy());
+        if (QPDFObjectHandle adbe = extensions.getKey("/ADBE"); adbe.isIndirect()) {
+            adbe.makeDirect();
+            extensions.replaceKey("/ADBE", adbe);
+        }
+    }
 
     struct Pair {
         QPDFObjectHandle x;
