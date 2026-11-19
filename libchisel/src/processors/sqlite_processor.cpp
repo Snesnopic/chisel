@@ -11,57 +11,117 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <utility>
 
 
 namespace chisel {
+
+namespace {
+
+// sqlite takes file names as utf-8
+std::string utf8(const std::filesystem::path& file) {
+    const std::u8string name = file.u8string();
+    return {name.begin(), name.end()};
+}
+
+// immutable: sqlite takes no locks and creates no -wal or -shm next to the file
+std::string immutable_uri(const std::filesystem::path& file) {
+    std::error_code ec;
+    const std::u8string name = std::filesystem::absolute(file, ec).generic_u8string();
+    std::string uri = "file://";
+    if (name.empty() || name.front() != u8'/') uri += '/'; // file:///C:/...
+    static const char hex[] = "0123456789ABCDEF";
+    for (const char8_t c : name) {
+        const auto b = static_cast<unsigned char>(c);
+        if ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || std::strchr("-._~/:", b)) {
+            uri += static_cast<char>(b);
+        } else {
+            uri += '%';
+            uri += hex[b >> 4];
+            uri += hex[b & 0xF];
+        }
+    }
+    return uri + "?immutable=1";
+}
+
+bool has_sidecar(const std::filesystem::path& file, std::string* found = nullptr) {
+    for (const char* suffix : {"-wal", "-shm", "-journal"}) {
+        std::filesystem::path sidecar = file;
+        sidecar += suffix;
+        std::error_code ec;
+        if (std::filesystem::exists(sidecar, ec)) {
+            if (found) *found = suffix;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<std::pair<std::uintmax_t, std::filesystem::file_time_type>> stamp_of(const std::filesystem::path& file) {
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(file, ec);
+    if (ec) return std::nullopt;
+    const auto mtime = std::filesystem::last_write_time(file, ec);
+    if (ec) return std::nullopt;
+    return std::pair{size, mtime};
+}
+
+} // namespace
 
 void SqliteProcessor::recompress(const std::filesystem::path& input,
                                  const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
-    // an app still has it open, or didn't close it: its -wal or -journal would be replayed onto the rewritten file
-    for (const char* suffix : {"-wal", "-shm", "-journal"}) {
-        std::filesystem::path sidecar = input;
-        sidecar += suffix;
+    const auto passthrough = [&](const std::string& reason) {
+        Logger::log(LogLevel::Warning, reason, get_name());
         std::error_code ec;
-        if (std::filesystem::exists(sidecar, ec)) {
-            Logger::log(LogLevel::Info, "Skipping " + input.filename().string() + ": in use, with a " +
-                        std::string(suffix) + " file next to it", get_name());
-            std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
-            return;
-        }
+        std::filesystem::remove(output, ec);
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+    };
+
+    // an app still has it open, or didn't close it: its -wal or -journal would be replayed onto the rewritten file
+    if (std::string suffix; has_sidecar(input, &suffix)) {
+        Logger::log(LogLevel::Info, "Skipping " + input.filename().string() + ": in use, with a " +
+                    suffix + " file next to it", get_name());
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
     }
 
-    // open the ORIGINAL (not a filesystem copy) so a live WAL journal is
-    // transparently merged in by the normal SQLite read path; a plain
-    // copy_file() of just the main .db file would silently drop any
-    // committed data still sitting in an uncheckpointed -wal file
+    const auto stamp = stamp_of(input);
+
+    // with no -wal or -journal next to it, the main file holds every committed change
     sqlite3* src_db = nullptr;
-    int rc = sqlite3_open_v2(input.string().c_str(), &src_db, SQLITE_OPEN_READONLY, nullptr);
+    int rc = sqlite3_open_v2(immutable_uri(input).c_str(), &src_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr);
     if (rc != SQLITE_OK) {
         const std::string err_msg = src_db ? sqlite3_errmsg(src_db) : "unknown error";
         if (src_db) sqlite3_close(src_db);
-        Logger::log(LogLevel::Warning, "Cannot open database (likely corrupt): " + err_msg, get_name());
-        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
-        return; // act as passthrough
+        passthrough("Cannot open database (likely corrupt): " + err_msg);
+        return;
     }
 
-    // VACUUM INTO reads through the same WAL-aware path as any normal query,
-    // so it produces a complete, already-vacuumed copy in one step
     std::error_code rm_ec;
     std::filesystem::remove(output, rm_ec); // VACUUM INTO refuses to overwrite an existing file
-    char* vacuum_sql = sqlite3_mprintf("VACUUM INTO %Q;", output.string().c_str());
+    char* vacuum_sql = sqlite3_mprintf("VACUUM INTO %Q;", utf8(output).c_str());
     rc = sqlite3_exec(src_db, vacuum_sql, nullptr, nullptr, nullptr);
     sqlite3_free(vacuum_sql);
     if (rc != SQLITE_OK) {
         const std::string err_msg = sqlite3_errmsg(src_db);
         sqlite3_close(src_db);
-        Logger::log(LogLevel::Warning, "Vacuum failed (likely corrupt): " + err_msg, get_name());
-        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
-        return; // act as passthrough
+        passthrough("Vacuum failed (likely corrupt): " + err_msg);
+        return;
     }
     sqlite3_close(src_db);
     Logger::log(LogLevel::Debug, "Vacuum completed", get_name());
+
+    // immutable reads take no locks, so a write in the meantime would go unnoticed
+    if (!stamp || stamp_of(input) != stamp || has_sidecar(input)) {
+        passthrough("Changed while being read, left as is: " + input.filename().string());
+        return;
+    }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
@@ -120,7 +180,7 @@ static void dump_table_rows(sqlite3* db, const std::string& table, std::vector<s
 // helper function to dump a database (schema + actual row data) to a string
 std::string dump_sqlite_db(const std::filesystem::path &file) {
     sqlite3 *db = nullptr;
-    int rc = sqlite3_open_v2(file.string().c_str(), &db, SQLITE_OPEN_READONLY, nullptr);
+    int rc = sqlite3_open_v2(immutable_uri(file).c_str(), &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr);
     if (rc != SQLITE_OK) {
         if (db) sqlite3_close(db);
         Logger::log(LogLevel::Warning, "Raw_equal: Cannot open database: " + file.string(), "SqliteProcessor");
