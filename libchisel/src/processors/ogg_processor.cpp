@@ -19,7 +19,7 @@
 
 #ifdef HAVE_OPTIVORBIS
 extern "C" {
-    int chisel_optimize_vorbis(const char* input, const char* output);
+    int chisel_optimize_vorbis(const char* input, const char* output, int keep_comments);
 }
 #endif
 namespace chisel {
@@ -486,7 +486,7 @@ void OggProcessor::recompress(const fs::path& input,
         const std::string input_str = input.string();
         const std::string output_str = output.string();
 
-        const int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str());
+        const int result = chisel_optimize_vorbis(input_str.c_str(), output_str.c_str(), options.preserve_metadata ? 1 : 0);
         if (result != 0) {
             const std::string msg = "Optivorbis failed with error code: " + std::to_string(result);
             Logger::log(LogLevel::Error, msg, get_name());

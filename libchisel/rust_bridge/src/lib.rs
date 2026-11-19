@@ -5,12 +5,13 @@ use std::os::raw::{c_char, c_int};
 use std::panic;
 
 use optivorbis::remuxer::ogg_to_ogg::Settings;
-use optivorbis::{OggToOgg, Remuxer, VorbisOptimizerSettings, VorbisVendorStringAction};
+use optivorbis::{OggToOgg, Remuxer, VorbisCommentFieldsAction, VorbisOptimizerSettings, VorbisVendorStringAction};
 
 #[no_mangle]
 pub extern "C" fn chisel_optimize_vorbis(
     input_path: *const c_char,
-    output_path: *const c_char
+    output_path: *const c_char,
+    keep_comments: c_int
 ) -> c_int {
     // catch unwinding panics from optivorbis to prevent c++ abi corruption
     let result = panic::catch_unwind(|| {
@@ -53,6 +54,9 @@ pub extern "C" fn chisel_optimize_vorbis(
         // keep the vendor string as it is: by default optivorbis appends its own tag to it
         let mut optimizer_settings = VorbisOptimizerSettings::default();
         optimizer_settings.vendor_string_action = VorbisVendorStringAction::Copy;
+        // without metadata the comments go, pictures included: chisel puts those back afterwards
+        optimizer_settings.comment_fields_action =
+            if keep_comments != 0 { VorbisCommentFieldsAction::Copy } else { VorbisCommentFieldsAction::Delete };
         let remuxer = OggToOgg::new(remuxer_settings, optimizer_settings);
 
         match remuxer.remux(&mut input_file, &mut output_file) {
