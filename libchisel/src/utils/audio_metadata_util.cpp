@@ -1474,12 +1474,33 @@ std::vector<uint8_t> AudioMetadataUtil::foreignId3v2Tags(const std::filesystem::
 }
 
 bool AudioMetadataUtil::removeTextTags(const std::filesystem::path& file) {
-    TagLib::Ogg::Opus::File opus(file.c_str());
-    if (!opus.isValid() || !opus.tag()) return false;
-    if (opus.tag()->fieldListMap().isEmpty()) return true;
-    // the pictures are kept apart from the fields
-    opus.tag()->removeAllFields();
-    return opus.save();
+    if (startsWith(file, "OggS")) {
+        TagLib::Ogg::Opus::File opus(file.c_str());
+        if (!opus.isValid() || !opus.tag()) return false;
+        if (opus.tag()->fieldListMap().isEmpty()) return true;
+        // the pictures are kept apart from the fields
+        opus.tag()->removeAllFields();
+        return opus.save();
+    }
+
+    TagLib::MPEG::File mpeg(file.c_str());
+    if (!mpeg.isValid()) return false;
+    TagLib::ID3v2::Tag* id3 = mpeg.ID3v2Tag();
+    const auto version = id3v2Version(id3);
+    if (id3) {
+        // a copy of TagLib's list would share its auto-delete and free the frames again
+        std::vector<TagLib::ID3v2::Frame*> text;
+        for (auto* frame : id3->frameList()) {
+            if (frame->frameID() != "APIC") text.push_back(frame);
+        }
+        for (auto* frame : text) id3->removeFrame(frame, true);
+    }
+    if (id3 && !id3->frameList().isEmpty()) {
+        // only the pictures are left: the tag keeps its version, the ID3v1 and APE tags go
+        return mpeg.save(TagLib::MPEG::File::ID3v2, TagLib::File::StripOthers, version, TagLib::File::DoNotDuplicate);
+    }
+    if (!mpeg.hasID3v2Tag() && !mpeg.hasID3v1Tag() && !mpeg.hasAPETag()) return true;
+    return mpeg.strip(TagLib::MPEG::File::AllTags);
 }
 
 void AudioMetadataUtil::writeWithHead(const std::filesystem::path& src, const std::filesystem::path& dst,

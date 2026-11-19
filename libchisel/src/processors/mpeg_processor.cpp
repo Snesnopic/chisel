@@ -115,6 +115,9 @@ void MpegProcessor::recompress(const fs::path& input,
         Logger::log(LogLevel::Debug, std::string("MPEG audio layer ") + (layer == 1 ? "I" : "II") +
                     ", left as is: " + input.filename().string(), get_name());
         fs::copy_file(input, output);
+        if (!options.preserve_metadata && !AudioMetadataUtil::removeTextTags(output)) {
+            throw std::runtime_error("MpegProcessor: cannot remove the tags");
+        }
         return;
     }
 
@@ -135,6 +138,10 @@ void MpegProcessor::recompress(const fs::path& input,
         packer.process(input.string(), output.string());
     } catch (const std::exception& e) {
         throw std::runtime_error("Exception during mp3packercpp execution: " + std::string(e.what()));
+    }
+    // the tags around the audio come through mp3packer as they are; the pictures stay, as in the other formats
+    if (!options.preserve_metadata && !AudioMetadataUtil::removeTextTags(output)) {
+        throw std::runtime_error("MpegProcessor: cannot remove the tags");
     }
 
     Logger::log(LogLevel::Debug, "Compression successful.", get_name());

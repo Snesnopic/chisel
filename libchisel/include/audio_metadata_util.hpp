@@ -122,10 +122,11 @@ public:
     static std::vector<uint8_t> foreignId3v2Tags(const std::filesystem::path& file);
 
     /**
-     * @brief Removes the comment fields of an Ogg Opus file, keeping its vendor string and pictures.
+     * @brief Removes the text metadata of an Ogg Opus or MPEG audio file, keeping its pictures.
      *
-     * The audio stays as it is.
-     * @param file Ogg Opus file.
+     * Opus keeps its vendor string and the pictures of its comment header; MPEG loses its ID3v1 and APE tags and
+     * every ID3v2 frame but the pictures, the tag keeping its version. The audio stays as it is.
+     * @param file Ogg Opus file (told by its OggS signature) or MPEG audio file.
      * @return false if the file couldn't be read or saved.
      */
     static bool removeTextTags(const std::filesystem::path& file);
