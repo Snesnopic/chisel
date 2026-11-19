@@ -33,6 +33,15 @@ static void info_callback(const char* msg, void* /*client_data*/) {
     Logger::log(LogLevel::Debug, "OpenJPEG Info: " + std::string(msg), "Jp2Processor");
 }
 
+// while decoding, an error is about the input: kept for the warning that leaves the file as it is
+static void decode_error_callback(const char* msg, void* client_data) {
+    std::string text(msg);
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) text.pop_back();
+    Logger::log(LogLevel::Debug, "OpenJPEG Error: " + text, "Jp2Processor");
+    auto* last = static_cast<std::string*>(client_data);
+    if (last->empty()) *last = text;
+}
+
 // content-based detection (extension-based broke on the executor's .tmp-renamed pipeline files)
 static OPJ_CODEC_FORMAT detect_codec_format(const std::filesystem::path& path) {
     std::ifstream f(path, std::ios::binary);
@@ -166,8 +175,8 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
     const OPJ_CODEC_FORMAT format = detect_codec_format(input_path);
     const std::vector<uint8_t> input = read_file(input_path);
     const std::span<const uint8_t> data(input);
-    const auto leave_as_is = [&](const std::string& why) {
-        Logger::log(LogLevel::Debug, why + ", left as is: " + input_path.string(), get_name());
+    const auto leave_as_is = [&](const std::string& why, const LogLevel level = LogLevel::Debug) {
+        Logger::log(level, why + ", left as is: " + input_path.string(), get_name());
         std::filesystem::copy_file(input_path, output_path, std::filesystem::copy_options::overwrite_existing);
     };
 
@@ -183,11 +192,11 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
             return leave_as_is("Fragment table");
         }
         const auto jp2c = std::ranges::find_if(boxes, [](const Jp2Box& b) { return b.type == "jp2c"; });
-        if (jp2c == boxes.end()) return leave_as_is("No codestream box");
+        if (jp2c == boxes.end()) return leave_as_is("No complete codestream box", LogLevel::Warning);
         codestream = data.subspan(jp2c->start + jp2c->header, jp2c->size - jp2c->header);
     }
     const auto header = main_header(codestream);
-    if (!header) return leave_as_is("Unreadable codestream header");
+    if (!header) return leave_as_is("Unreadable codestream header", LogLevel::Warning);
 
     // --- DECODER SETUP ---
     opj_dparameters_t dparam;
@@ -201,9 +210,10 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
     }
 
     opj_codec_t* decoder = opj_create_decompress(format);
+    std::string decode_error;
     opj_set_info_handler(decoder, info_callback, nullptr);
     opj_set_warning_handler(decoder, warning_callback, nullptr);
-    opj_set_error_handler(decoder, error_callback, nullptr);
+    opj_set_error_handler(decoder, decode_error_callback, &decode_error);
 
     if (!opj_setup_decoder(decoder, &dparam)) {
         opj_stream_destroy(in_stream);
@@ -212,17 +222,12 @@ void Jp2Processor::recompress(const std::filesystem::path& input_path,
     }
 
     opj_image_t* image = nullptr;
-    if (!opj_read_header(in_stream, decoder, &image)) {
+    if (!opj_read_header(in_stream, decoder, &image) || !opj_decode(decoder, in_stream, image)) {
+        if (image) opj_image_destroy(image);
         opj_stream_destroy(in_stream);
         opj_destroy_codec(decoder);
-        throw std::runtime_error("Jp2Processor: failed to read header");
-    }
-
-    if (!opj_decode(decoder, in_stream, image)) {
-        opj_image_destroy(image);
-        opj_stream_destroy(in_stream);
-        opj_destroy_codec(decoder);
-        throw std::runtime_error("Jp2Processor: failed to decode image");
+        return leave_as_is("Damaged JPEG 2000 data (" + (decode_error.empty() ? "unreadable" : decode_error) + ")",
+                           LogLevel::Warning);
     }
 
     opj_end_decompress(decoder, in_stream);
