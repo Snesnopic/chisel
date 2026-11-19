@@ -244,16 +244,24 @@ void export_csv_report(const std::vector<Result>& results,
     std::ofstream out(output_path);
     if (!out) return;
 
-    out << "File,Container,MIME,Before(KB),After(KB),Delta(%),Time(s),Result,Codecs,Error\n";
+    const auto delta = [](const uintmax_t before, const uintmax_t after) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2)
+            << (before ? 100.0 * (1.0 - static_cast<double>(after) / static_cast<double>(before)) : 0.0);
+        return oss.str();
+    };
+    const auto outcome = [](const bool success, const bool replaced, const std::string& skip_reason) {
+        return !success ? "FAIL" : !skip_reason.empty() ? "SKIPPED" : replaced ? "OK (replaced)" : "OK (kept)";
+    };
+    const auto name = [](const std::optional<std::filesystem::path>& p) {
+        return p ? p->filename().string() : std::string();
+    };
 
-    for (const auto& r : results) {
-        const double pct = r.success && r.size_before
-                         ? 100.0 * (1.0 - static_cast<double>(r.size_after) / static_cast<double>(r.size_before))
-                         : 0.0;
-        const std::string outcome = !r.success ? "FAIL"
-                                         : r.replaced ? "OK (replaced)"
-                                                      : "OK (skipped)";
+    out << "File,Container,MIME,Before(bytes),After(bytes),Delta(%),Time(s),Result,Codecs,Details\n";
 
+    auto sorted = results;
+    std::ranges::stable_sort(sorted, [](const Result& a, const Result& b) { return a.path < b.path; });
+    for (const auto& r : sorted) {
         std::string codecs_str;
         for (size_t i = 0; i < r.codecs_used.size(); ++i) {
             std::ostringstream ossc;
@@ -267,37 +275,34 @@ void export_csv_report(const std::vector<Result>& results,
             }
         }
 
-        out << csv_escape(r.path.filename().string()) << ","
-            << csv_escape(r.container_origin ? r.container_origin->filename().string() : "") << ","
-            << csv_escape(r.mime) << ","
-            << (r.size_before / 1024) << ","
-            << (r.size_after / 1024) << ",";
-
-        std::ostringstream osspct;
-        osspct << std::fixed << std::setprecision(2) << pct;
-        out << osspct.str() << ",";
-
         std::ostringstream osstime;
         osstime << std::fixed << std::setprecision(2) << r.seconds;
-        out << osstime.str() << ","
-            << csv_escape(outcome) << ","
+        out << csv_escape(r.path.filename().string()) << ","
+            << csv_escape(r.inside.empty() ? name(r.container_origin) : r.inside) << ","
+            << csv_escape(r.mime) << ","
+            << r.size_before << ","
+            << r.size_after << ","
+            << (r.success ? delta(r.size_before, r.size_after) : "0.00") << ","
+            << osstime.str() << ","
+            << csv_escape(outcome(r.success, r.replaced, r.skip_reason)) << ","
             << csv_escape(codecs_str) << ","
-            << csv_escape(r.error_msg) << "\n";
+            << csv_escape(r.success ? r.skip_reason : r.error_msg) << "\n";
     }
     if (!container_results.empty()) {
-        out << "\n\nContainer,Format,Before(KB),After(KB),Delta(%),Error\n";
-        for (const auto& c : container_results) {
-            double pct = c.success && c.size_before
-                         ? 100.0 * (1.0 - static_cast<double>(c.size_after) / static_cast<double>(c.size_before))
-                         : 0.0;
+        out << "\n\nContainer,Inside,Format,Before(bytes),After(bytes),Delta(%),Result,Details\n";
+        auto containers = container_results;
+        std::ranges::stable_sort(containers, [](const ContainerResult& a, const ContainerResult& b) {
+            return a.filename < b.filename;
+        });
+        for (const auto& c : containers) {
             out << csv_escape(c.filename.filename().string()) << ","
+                << csv_escape(c.inside.empty() ? name(c.parent) : c.inside) << ","
                 << csv_escape(c.format) << ","
-                << (c.size_before / 1024) << ","
-                << (c.size_after / 1024) << ",";
-            std::ostringstream osspct;
-            osspct << std::fixed << std::setprecision(2) << (c.success ? pct : 0.0);
-            out << osspct.str() << ","
-                << csv_escape(c.error_msg) << "\n";
+                << c.size_before << ","
+                << c.size_after << ","
+                << (c.success ? delta(c.size_before, c.size_after) : "0.00") << ","
+                << csv_escape(outcome(c.success, c.size_after < c.size_before, c.skip_reason)) << ","
+                << csv_escape(c.success ? c.skip_reason : c.error_msg) << "\n";
         }
     }
 

@@ -22,15 +22,20 @@ struct Result {
     double seconds{};           // processing time
     std::vector<std::pair<std::string,double>> codecs_used; // codec name + % reduction
     std::string error_msg;      // if !success, reason of failure
+    std::string skip_reason;    // set when the run left it as it is
+    std::string inside;         // the containers around it, outermost first
 };
 
 struct ContainerResult {
     std::filesystem::path filename;
+    std::optional<std::filesystem::path> parent;
     std::string format;
     uintmax_t size_before{};
     uintmax_t size_after{};
     bool success{};
     std::string error_msg;
+    std::string skip_reason;
+    std::string inside;
 };
 
 void print_console_report(const std::vector<Result>& results,

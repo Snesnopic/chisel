@@ -14,6 +14,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <unordered_map>
 #include "utils/color.hpp"
 #include "cli/CLI11.hpp"
 #include "cli/cli_parser.hpp"
@@ -196,6 +197,34 @@ int main(int argc, char* argv[]) {
     // results collected for reporting
     std::vector<Result> results;
     std::vector<ContainerResult> container_results;
+    // the container each extracted container came from, so a report can name the whole chain
+    std::unordered_map<std::string, std::filesystem::path> container_parents;
+    // a file the run leaves as it is still gets its row, with the reason
+    const auto add_skipped = [&](const std::filesystem::path& path,
+                                 const std::optional<std::filesystem::path>& parent, const std::string& message) {
+        Result r;
+        r.path = path;
+        r.container_origin = parent;
+        r.mime = MimeDetector::detect(path);
+        std::error_code ec;
+        r.size_before = std::filesystem::file_size(path, ec);
+        r.size_after = r.size_before;
+        r.success = true;
+        r.skip_reason = message;
+        std::scoped_lock lock(g_results_mtx);
+        results.push_back(std::move(r));
+    };
+    // a container's own row: phase 2 may have made it already, or it was never recompressed
+    const auto container_row = [&](const std::filesystem::path& path,
+                                   const std::optional<std::filesystem::path>& parent) -> Result& {
+        const auto it = std::ranges::find_if(results, [&](const Result& r) { return r.path == path; });
+        if (it != results.end()) return *it;
+        Result r;
+        r.path = path;
+        r.container_origin = parent;
+        r.mime = MimeDetector::detect(path);
+        return results.emplace_back(std::move(r));
+    };
 
     // collect input files
     auto inputs = collect_input_files(settings.inputs, settings, settings.is_pipe);
@@ -246,6 +275,10 @@ int main(int argc, char* argv[]) {
     // per input, the containers found under each parent (an empty path for the input itself)
     std::map<std::filesystem::path, std::map<std::filesystem::path, std::vector<FoundContainer>>> found_by_input;
     bus.subscribe<FileAnalyzeCompleteEvent>([&](const FileAnalyzeCompleteEvent& e) {
+        if (e.parent_container) {
+            std::scoped_lock lock(g_results_mtx);
+            container_parents[e.path.string()] = *e.parent_container;
+        }
         std::scoped_lock lock(g_console_mtx);
         if (e.scheduled) {
             total++;
@@ -345,6 +378,7 @@ int main(int argc, char* argv[]) {
         }
         Result r;
         r.path = e.path;
+        r.container_origin = e.parent_container;
         r.mime = MimeDetector::detect(e.path);
         r.size_before = e.original_size;
         r.size_after = e.new_size;
@@ -365,6 +399,7 @@ int main(int argc, char* argv[]) {
 
         Result r;
         r.path = e.path;
+        r.container_origin = e.parent_container;
         r.mime = MimeDetector::detect(e.path);
         r.success = false;
         r.error_msg = e.error_message;
@@ -377,15 +412,39 @@ int main(int argc, char* argv[]) {
     });
 
     bus.subscribe<FileProcessSkippedEvent>([&](const FileProcessSkippedEvent& e) {
+        add_skipped(e.path, e.parent_container, e.message);
         on_finish(e.path.filename().string());
     });
 
     bus.subscribe<ContainerFinalizeSkippedEvent>([&](const ContainerFinalizeSkippedEvent& e) {
+        {
+            std::scoped_lock lock(g_results_mtx);
+            Result& row = container_row(e.path, e.parent_container);
+            row.success = true;
+            row.replaced = false;
+            row.skip_reason = e.message;
+            std::error_code ec;
+            row.size_before = std::filesystem::file_size(e.path, ec);
+            row.size_after = row.size_before;
+
+            ContainerResult c;
+            c.filename = e.path;
+            c.parent = e.parent_container;
+            c.format = MimeDetector::detect(e.path);
+            c.success = true;
+            c.size_before = row.size_before;
+            c.size_after = row.size_before;
+            c.skip_reason = e.message;
+            container_results.push_back(std::move(c));
+        }
         on_finish(e.path.filename().string());
     });
 
     bus.subscribe<FileAnalyzeSkippedEvent>([&](const FileAnalyzeSkippedEvent& e) {
-        if (e.reason != SkipReason::Signed) return;
+        if (e.reason != SkipReason::Signed) {
+            add_skipped(e.path, e.parent_container, e.message);
+            return;
+        }
         if (!settings.quiet) {
             std::scoped_lock lock(g_console_mtx);
             clear_line_internal();
@@ -393,16 +452,7 @@ int main(int argc, char* argv[]) {
                       << " (digitally signed, --break-signatures to optimize it anyway)" << RESET << std::endl;
         }
 
-        Result r;
-        r.path = e.path;
-        r.mime = MimeDetector::detect(e.path);
-        std::error_code ec;
-        r.size_before = std::filesystem::file_size(e.path, ec);
-        r.size_after = r.size_before;
-        r.success = true;
-        r.error_msg = "Digitally signed, left untouched";
-        std::scoped_lock lock(g_results_mtx);
-        results.push_back(std::move(r));
+        add_skipped(e.path, e.parent_container, "Digitally signed, left untouched");
     });
 
     bus.subscribe<ContainerFinalizeCompleteEvent>([&](const ContainerFinalizeCompleteEvent& e) {
@@ -430,13 +480,19 @@ int main(int argc, char* argv[]) {
 
         {
             std::scoped_lock lock(g_results_mtx);
-            const auto it = std::find_if(results.begin(), results.end(), [&](const Result& r){ return r.path == e.path; });
-            if (it != results.end()) {
-                it->size_after = e.final_size;
-            }
+            Result& row = container_row(e.path, e.parent_container);
+            // a phase 2 row keeps its own starting size, before the container was recompressed
+            if (row.size_before == 0) row.size_before = e.original_size;
+            row.size_after = e.final_size;
+            row.success = true;
+            row.replaced = e.replaced;
+            row.skip_reason.clear();
+            row.seconds += static_cast<double>(e.duration.count()) / 1000.0;
 
             ContainerResult c;
             c.filename = e.path;
+            c.parent = e.parent_container;
+            c.format = MimeDetector::detect(e.path);
             c.success = true;
             c.size_before = e.original_size;
             c.size_after = e.final_size;
@@ -450,10 +506,16 @@ int main(int argc, char* argv[]) {
 
         ContainerResult c;
         c.filename = e.path;
+        c.parent = e.parent_container;
+        c.format = MimeDetector::detect(e.path);
         c.success = false;
         c.error_msg = e.error_message;
         {
             std::scoped_lock lock(g_results_mtx);
+            Result& row = container_row(e.path, e.parent_container);
+            row.success = false;
+            row.replaced = false;
+            row.error_msg = e.error_message;
             container_results.push_back(std::move(c));
         }
 
@@ -535,6 +597,17 @@ int main(int argc, char* argv[]) {
 
     // export CSV if requested
     if (!settings.report_path.empty()) {
+        const auto chain = [&](std::optional<std::filesystem::path> container) {
+            std::string label;
+            for (std::size_t depth = 0; container && depth < 64; ++depth) {
+                label = container->filename().string() + (label.empty() ? "" : " > " + label);
+                const auto it = container_parents.find(container->string());
+                container = it == container_parents.end() ? std::nullopt : std::optional(it->second);
+            }
+            return label;
+        };
+        for (auto& r : results) r.inside = chain(r.container_origin);
+        for (auto& c : container_results) c.inside = chain(c.parent);
         export_csv_report(results,
                           container_results,
                           settings.report_path,
