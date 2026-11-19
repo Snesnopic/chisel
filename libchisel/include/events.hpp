@@ -40,7 +40,8 @@ enum class SkipReason {
     NothingToDo,    ///< Its processor can't recompress it and found nothing inside it
     NoImprovement,  ///< Recompressing it gave nothing smaller
     Interrupted,    ///< A stop was requested before it was done
-    ReadOnly        ///< It, or the folder it's in, can't be written, and it would be replaced in place
+    ReadOnly,       ///< It, or the folder it's in, can't be written, and it would be replaced in place
+    ChangedDuringRun ///< Something else changed it while it was being processed
 };
 
 // --- Phase 1: Analysis ---

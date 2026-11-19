@@ -175,8 +175,24 @@ private:
     /// @brief Rebuilds one container from its processed contents and puts it in place.
     void finalize_container(ContainerNode& node);
 
+    /// @brief A file's size and modification time, to tell whether something else changed it.
+    struct FileStamp {
+        std::uintmax_t size = 0;
+        std::filesystem::file_time_type mtime{};
+        bool operator==(const FileStamp&) const = default;
+    };
+
+    /// @brief The size and modification time of a file, if it can be read.
+    static std::optional<FileStamp> stamp_of(const std::filesystem::path& file);
+
+    /// @brief Whether an input that would be replaced in place is no longer as analysis found it.
+    [[nodiscard]] bool changed_since_analysis(const std::filesystem::path& file) const;
+
     /// @brief Publishes a skip for every file Phase 2 never took up (a stop dropped it), once the pool is idle.
     void report_unprocessed_files();
+
+    /// @brief Publishes the skip of a container that something else changed during the run.
+    void report_changed(const ContainerNode& node);
 
     /// @brief Publishes a skip for every container Phase 3 didn't rebuild, once the pool is idle.
     void report_unfinished_containers();
@@ -228,6 +244,7 @@ private:
     };
     std::vector<WorkItem> work_list_;///< (Phase 1->2) Files to be recompressed
     std::vector<std::uint8_t> work_started_; ///< (Phase 2) Set by each file's task once it runs, by index in work_list_
+    std::unordered_map<std::string, FileStamp> input_stamps_; ///< (Phase 1->3) Inputs to replace in place, as analysis found them; guarded by analysis_mutex_ in Phase 1
 
     /**
      * @brief (Phase 2->3) Actual on-disk location of each successfully recompressed

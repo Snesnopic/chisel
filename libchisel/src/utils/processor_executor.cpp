@@ -248,6 +248,7 @@ namespace chisel {
             }
         }
 
+        input_stamps_.clear();
         // inputs and everything found inside them are analyzed on the pool; a deque keeps the roots in place
         std::deque<AnalysisRoot> analysis_roots;
         for (const auto &path: inputs) {
@@ -265,6 +266,23 @@ namespace chisel {
         copy_unchanged_inputs(inputs);
     }
 
+    std::optional<ProcessorExecutor::FileStamp> ProcessorExecutor::stamp_of(const fs::path& file) {
+        std::error_code ec;
+        const auto size = fs::file_size(file, ec);
+        if (ec) return std::nullopt;
+        const auto mtime = fs::last_write_time(file, ec);
+        if (ec) return std::nullopt;
+        return FileStamp{.size=size, .mtime=mtime};
+    }
+
+    bool ProcessorExecutor::changed_since_analysis(const fs::path& file) const {
+        if (has_output_dir_ || dry_run_) return false;
+        const auto it = input_stamps_.find(file.string());
+        if (it == input_stamps_.end()) return false;
+        const auto now = stamp_of(file);
+        return !now || *now != it->second;
+    }
+
     void ProcessorExecutor::report_unprocessed_files() {
         for (std::size_t index = 0; index < work_list_.size(); ++index) {
             if (index < work_started_.size() && work_started_[index]) continue;
@@ -273,6 +291,16 @@ namespace chisel {
                                                        .reason=SkipReason::Interrupted, .message="Interrupted",
                                                        .is_container=item.is_container});
         }
+    }
+
+    void ProcessorExecutor::report_changed(const ContainerNode& node) {
+        Logger::log(LogLevel::Warning, "Changed during the run, left as is: " + node.content.original_path.string(), "Executor");
+        event_bus_.publish(ContainerFinalizeSkippedEvent{
+            .path=node.content.original_path,
+            .parent_container=node.parent ? std::optional{node.parent->content.original_path} : std::nullopt,
+            .reason=SkipReason::ChangedDuringRun,
+            .message="Changed during the run"
+        });
     }
 
     void ProcessorExecutor::report_unfinished_containers() {
@@ -491,10 +519,17 @@ namespace chisel {
         }
 
         // a file the run would write over must be one its owner lets it write
-        if (depth == 0 && !has_output_dir_ && !dry_run_ && !replaceable_in_place(path)) {
-            Logger::log(LogLevel::Warning, "Read-only, left as is: " + path.string(), "Executor");
-            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::ReadOnly, .message="Read-only"});
-            return;
+        if (depth == 0 && !has_output_dir_ && !dry_run_) {
+            if (!replaceable_in_place(path)) {
+                Logger::log(LogLevel::Warning, "Read-only, left as is: " + path.string(), "Executor");
+                event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::ReadOnly, .message="Read-only"});
+                return;
+            }
+            // taken before anything reads it, so a change made at any later point is caught before replacing it
+            if (const auto stamp = stamp_of(path)) {
+                std::lock_guard lock(analysis_mutex_);
+                input_stamps_[path.string()] = *stamp;
+            }
         }
 
         event_bus_.publish(FileAnalyzeStartEvent{.path=path, .parent_container=parent});
@@ -827,16 +862,24 @@ namespace chisel {
                     if (success) {
                         std::optional<std::pair<fs::path, bool>> move_result;
                         fs::path result_path;
+                        bool changed = false;
                         if (item.is_container) {
                             // Phase 3 rebuilds on it and decides what, if anything, replaces the original
                             if (auto kept = keep_for_finalize(file, final_temp_path)) {
                                 result_path = *kept;
                                 move_result.emplace(file, false);
                             }
+                        } else if (!nested && changed_since_analysis(file)) {
+                            changed = true;
+                            std::error_code rm_ec;
+                            fs::remove(final_temp_path, rm_ec);
                         } else if ((move_result = move_to_destination(file, final_temp_path, nested))) {
                             result_path = move_result->first;
                         }
-                        if (move_result) {
+                        if (changed) {
+                            Logger::log(LogLevel::Warning, "Changed during the run, left as is: " + file.string(), "Executor");
+                            event_bus_.publish(FileProcessSkippedEvent{.path=file, .parent_container=parent_container, .reason=SkipReason::ChangedDuringRun, .message="Changed during the run", .is_container=item.is_container});
+                        } else if (move_result) {
                             {
                                 std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
                                 recompressed_paths_[file.string()] = result_path;
@@ -951,6 +994,11 @@ namespace chisel {
                     return;
                 }
                 const auto final_size = std::filesystem::file_size(effective_content.original_path, ec);
+                if (!nested && changed_since_analysis(content.original_path)) {
+                    drop_kept(content.original_path);
+                    report_changed(node);
+                    return;
+                }
                 const auto moved = move_to_destination(content.original_path, effective_content.original_path, nested);
                 drop_kept(content.original_path);
                 if (!moved) {
@@ -990,6 +1038,12 @@ namespace chisel {
                                 std::chrono::steady_clock::now() - check_start).count()) + " ms", "Executor");
             }
 
+            if (!nested && changed_since_analysis(content.original_path)) {
+                std::filesystem::remove(new_temp_file, ec);
+                drop_kept(content.original_path);
+                report_changed(node);
+                return;
+            }
             // use the helper and publish the specific Phase 3 event
             auto move_result = move_to_destination(content.original_path, new_temp_file, nested);
             drop_kept(content.original_path);
