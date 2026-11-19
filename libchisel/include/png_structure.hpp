@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace chisel::png {
@@ -60,6 +61,25 @@ std::optional<CarriedChunks> carried_chunks(const std::vector<unsigned char>& pn
  * @return false for a malformed image.
  */
 bool insert_chunks(std::vector<unsigned char>& png, const CarriedChunks& chunks);
+
+/**
+ * @brief What a full read of an image with libpng found.
+ */
+struct ImageCheck {
+    /// every frame decoded, with no CRC mismatch in any chunk
+    bool readable = false;
+    /// libpng's message when it couldn't read the image
+    std::string error;
+    /// a palette image uses an index past the end of its palette, in some frame; decoders
+    /// disagree on such pixels (most show opaque black, some refuse the file)
+    bool palette_out_of_range = false;
+};
+
+/**
+ * @brief Reads every frame of an image, without transforms, to tell whether it's intact.
+ * @param png The whole image, trailing data excluded.
+ */
+ImageCheck check_image(std::span<const unsigned char> png);
 
 } // namespace chisel::png
 

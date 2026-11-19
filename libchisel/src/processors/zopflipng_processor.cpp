@@ -7,6 +7,7 @@
 #include "../../include/png_structure.hpp"
 #include "../../include/thread_pool.hpp"
 #include "zopflipng_lib.h"
+#include "lodepng/lodepng.h"
 #include "zlib_container.h"
 #include <array>
 #include <filesystem>
@@ -149,7 +150,16 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         }
 
         const auto end = png::image_end(origpng);
-        if (!end) throw std::runtime_error("ZopflipngProcessor: malformed PNG");
+        const auto check = end ? png::check_image(std::span(origpng).first(*end))
+                               : png::ImageCheck{.error = "chunks end before IEND"};
+        // PngProcessor, which comes first, already warned about these
+        if (!check.readable || check.palette_out_of_range) {
+            Logger::log(LogLevel::Debug, (check.readable ? std::string("Palette index out of range") :
+                        "Damaged PNG data (" + check.error + ")") + ", left as is: " + input.filename().string(),
+                        get_name());
+            fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+            return;
+        }
         // data after IEND isn't part of the image, but it's kept
         const std::vector<unsigned char> tail(origpng.begin() + static_cast<std::ptrdiff_t>(*end), origpng.end());
         origpng.resize(*end);
@@ -194,6 +204,15 @@ void ZopfliPngProcessor::recompress(const fs::path& input,
         // zopfli stopped early: the result is incomplete
         if (pool && pool->stop_requested()) throw Interrupted{};
         if (error != 0) {
+            // lodepng refuses some images libpng reads
+            std::vector<unsigned char> pixels;
+            unsigned width = 0, height = 0;
+            if (const unsigned decode_error = lodepng::decode(pixels, width, height, origpng)) {
+                Logger::log(LogLevel::Warning, std::string("PNG lodepng can't read (") +
+                            lodepng_error_text(decode_error) + "), left as is: " + input.filename().string(), get_name());
+                fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+                return;
+            }
             Logger::log(LogLevel::Error, "Zopflipng optimization failed for: " + input.string(), get_name());
             throw std::runtime_error("ZopflipngProcessor: optimization failed");
         }

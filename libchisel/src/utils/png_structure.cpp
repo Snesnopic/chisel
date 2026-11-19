@@ -4,8 +4,11 @@
 
 #include "../../include/png_structure.hpp"
 #include "../../include/file_utils.hpp"
+#include <png.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
+#include <memory>
 #include <string_view>
 
 namespace chisel::png {
@@ -127,6 +130,100 @@ bool insert_chunks(std::vector<unsigned char>& png, const CarriedChunks& chunks)
         png.insert(png.begin() + static_cast<std::ptrdiff_t>(at[g]), block.begin(), block.end());
     }
     return true;
+}
+
+namespace {
+
+// owned through a pointer taken before setjmp, so a longjmp leaves it intact
+struct ImageScan {
+    std::span<const unsigned char> data;
+    std::size_t pos = 0;
+    std::string error;
+    std::vector<unsigned char> row;
+    std::vector<png_bytep> rows;
+};
+
+void image_scan_read(png_structp png, png_bytep out, const png_size_t size) {
+    auto* scan = static_cast<ImageScan*>(png_get_io_ptr(png));
+    if (size > scan->data.size() - scan->pos) png_error(png, "truncated");
+    std::memcpy(out, scan->data.data() + scan->pos, size);
+    scan->pos += size;
+}
+
+[[noreturn]] void image_scan_error(png_structp png, png_const_charp msg) {
+    static_cast<ImageScan*>(png_get_error_ptr(png))->error = msg ? msg : "unknown error";
+    png_longjmp(png, 1);
+}
+
+void image_scan_warning(png_structp, png_const_charp) {}
+
+} // namespace
+
+ImageCheck check_image(const std::span<const unsigned char> data) {
+    ImageCheck result;
+    const auto scan = std::make_unique<ImageScan>();
+    scan->data = data;
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, scan.get(), image_scan_error, image_scan_warning);
+    if (!png) {
+        result.error = "out of memory";
+        return result;
+    }
+    png_infop info = png_create_info_struct(png);
+    struct Destroy {
+        png_structp& png;
+        png_infop& info;
+        ~Destroy() { png_destroy_read_struct(&png, info ? &info : nullptr, nullptr); }
+    } destroy{png, info};
+    if (!info) {
+        result.error = "out of memory";
+        return result;
+    }
+    if (setjmp(png_jmpbuf(png))) {
+        result.error = scan->error;
+        return result;
+    }
+
+    png_set_read_fn(png, scan.get(), image_scan_read);
+    png_set_benign_errors(png, 1);
+    png_set_crc_action(png, PNG_CRC_ERROR_QUIT, PNG_CRC_ERROR_QUIT);
+    // libpng tracks the largest index itself, as long as no transform expands the palette first
+    png_set_check_for_invalid_index(png, 1);
+    png_read_info(png, info);
+    png_set_interlace_handling(png);
+    png_read_update_info(png, info);
+    // every row lands in the same buffer: only the reading and the indices matter
+    scan->row.resize(png_get_rowbytes(png, info));
+
+    png_uint_32 images = 1;
+    bool animated = false;
+#ifdef PNG_APNG_SUPPORTED
+    if (png_get_valid(png, info, PNG_INFO_acTL)) {
+        png_uint_32 frames = 0, plays = 0;
+        png_get_acTL(png, info, &frames, &plays);
+        animated = true;
+        images = frames + (png_get_first_frame_is_hidden(png, info) ? 1 : 0);
+    }
+#endif
+    for (png_uint_32 i = 0; i < images; ++i) {
+        png_uint_32 height = png_get_image_height(png, info);
+#ifdef PNG_READ_APNG_SUPPORTED
+        if (animated) {
+            png_read_frame_head(png, info);
+            if (png_get_valid(png, info, PNG_INFO_fcTL)) height = png_get_next_frame_height(png, info);
+        }
+#endif
+        scan->rows.assign(height, scan->row.data());
+        png_read_image(png, scan->rows.data());
+    }
+    png_read_end(png, nullptr);
+
+    png_colorp palette = nullptr;
+    int palette_size = 0;
+    result.readable = true;
+    result.palette_out_of_range = png_get_color_type(png, info) == PNG_COLOR_TYPE_PALETTE &&
+                                  png_get_PLTE(png, info, &palette, &palette_size) &&
+                                  png_get_palette_max(png, info) >= palette_size;
+    return result;
 }
 
 } // namespace chisel::png

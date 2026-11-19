@@ -231,15 +231,29 @@ namespace chisel {
         Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
         using namespace png_rewrite;
 
+        std::vector<unsigned char> source = chisel::read_file(input);
+        const auto end = png::image_end(source);
+        const auto check = end ? png::check_image(std::span(source).first(*end))
+                               : png::ImageCheck{.error = "chunks end before IEND"};
+        if (!check.readable) {
+            Logger::log(LogLevel::Warning, "Damaged PNG data (" + check.error + "), left as is: " +
+                        input.filename().string(), get_name());
+            copy_unchanged(input, output, "Damaged PNG data", get_name());
+            return;
+        }
+        // decoders disagree on such pixels, so a re-encoding would have to choose what they look like
+        if (check.palette_out_of_range) {
+            Logger::log(LogLevel::Warning, "Palette index out of range, left as is: " + input.filename().string(),
+                        get_name());
+            copy_unchanged(input, output, "Palette index out of range", get_name());
+            return;
+        }
+
         // this encoder picks its own color type, so it can't serve an image whose format is declared outside
         if (options.keep_pixel_format) {
             copy_unchanged(input, output, "Color type fixed by the container", get_name());
             return;
         }
-
-        std::vector<unsigned char> source = chisel::read_file(input);
-        const auto end = png::image_end(source);
-        if (!end) throw std::runtime_error("Malformed PNG: " + input.string());
         // data after IEND isn't part of the image, but it's kept
         const std::vector<unsigned char> tail(source.begin() + static_cast<std::ptrdiff_t>(*end), source.end());
         source.resize(*end);
