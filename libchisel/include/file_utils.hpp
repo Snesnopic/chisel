@@ -19,6 +19,7 @@
 #include <vector>
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <memory>
 
 namespace chisel {
@@ -164,6 +165,20 @@ namespace chisel {
      * @brief Whether a file can be replaced where it is: the file and its folder are writable.
      */
     bool replaceable_in_place(const std::filesystem::path& file);
+
+    /**
+     * @brief Gives @p to the permissions, owner, group and extended attributes of @p from, as far as the system allows.
+     * @details Times are left alone: a file whose content changes gets a new modification time. On macOS access control
+     *          lists aren't copied: one that denies deleting would keep the copy from being cleaned up, see
+     *          keep_access_control_list().
+     */
+    void copy_file_metadata(const std::filesystem::path& from, const std::filesystem::path& to);
+
+    /**
+     * @brief Reads a file's macOS access control list, to put it back on whatever replaces the file.
+     * @return What puts it on a path; does nothing for a file without one, and on other systems.
+     */
+    std::function<void(const std::filesystem::path&)> keep_access_control_list(const std::filesystem::path& file);
 
 } // namespace chisel
 

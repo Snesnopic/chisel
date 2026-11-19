@@ -171,6 +171,7 @@ namespace chisel {
             std::error_code ec;
             const auto sibling = target.parent_path() / (".chisel-" + RandomUtils::random_suffix() + ".tmp");
             if (fs::copy_file(temp, sibling, fs::copy_options::overwrite_existing, ec) && !ec) {
+                copy_file_metadata(temp, sibling);
                 fs::rename(sibling, target, ec);
                 if (!ec) {
                     fs::remove(temp, ec);
@@ -364,7 +365,9 @@ namespace chisel {
             std::lock_guard<std::mutex> lock(recompressed_paths_mutex_);
             outputs_written_.insert(dest.string());
         } else {
-            // in-place
+            // in-place: the new file takes the original's permissions, owner, attributes and access control list
+            const auto restore_acl = keep_access_control_list(original_file);
+            copy_file_metadata(original_file, temp_file);
             int retries = 10;
             while (retries > 0) {
                 fs::rename(temp_file, original_file, ec);
@@ -394,6 +397,7 @@ namespace chisel {
                 fs::remove(temp_file, ec);
                 return std::nullopt;
             }
+            restore_acl(original_file);
         }
 
         // a dry run still updates extracted files, so containers report their real size

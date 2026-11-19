@@ -13,7 +13,14 @@
 #include <cstring>
 #include <system_error>
 #ifndef _WIN32
+#include <sys/stat.h>
 #include <unistd.h>
+#endif
+#ifdef __APPLE__
+#include <sys/acl.h>
+#endif
+#if defined(__APPLE__) || defined(__linux__)
+#include <sys/xattr.h>
 #endif
 
 
@@ -252,6 +259,63 @@ namespace chisel {
         // access() also accounts for the user the run is under, groups and ACLs
         const auto folder = file.has_parent_path() ? file.parent_path() : fs::path(".");
         return ::access(file.c_str(), W_OK) == 0 && ::access(folder.c_str(), W_OK) == 0;
+#endif
+    }
+
+    void copy_file_metadata(const std::filesystem::path& from, const std::filesystem::path& to) {
+#ifndef _WIN32
+        struct stat st{};
+        if (::stat(from.c_str(), &st) != 0) return;
+        // the owner only if allowed; the group alone is allowed for any group the user is in
+        if (::chown(to.c_str(), st.st_uid, st.st_gid) != 0) {
+            [[maybe_unused]] const int ignored = ::chown(to.c_str(), static_cast<uid_t>(-1), st.st_gid);
+        }
+        // after chown, which may clear the set-user-ID and set-group-ID bits
+        ::chmod(to.c_str(), st.st_mode & 07777);
+#endif
+#if defined(__APPLE__) || defined(__linux__)
+        // Finder tags and comments, quarantine, where it came from; on Linux also the access control list
+#ifdef __APPLE__
+        const auto list = [](const char* path, char* buf, std::size_t size) { return ::listxattr(path, buf, size, 0); };
+        const auto get = [](const char* path, const char* name, void* buf, std::size_t size) {
+            return ::getxattr(path, name, buf, size, 0, 0);
+        };
+        const auto set = [](const char* path, const char* name, const void* buf, std::size_t size) {
+            return ::setxattr(path, name, buf, size, 0, 0);
+        };
+#else
+        const auto list = [](const char* path, char* buf, std::size_t size) { return ::listxattr(path, buf, size); };
+        const auto get = [](const char* path, const char* name, void* buf, std::size_t size) {
+            return ::getxattr(path, name, buf, size);
+        };
+        const auto set = [](const char* path, const char* name, const void* buf, std::size_t size) {
+            return ::setxattr(path, name, buf, size, 0);
+        };
+#endif
+        const ssize_t names_size = list(from.c_str(), nullptr, 0);
+        if (names_size <= 0) return;
+        std::vector<char> names(static_cast<std::size_t>(names_size));
+        const ssize_t got = list(from.c_str(), names.data(), names.size());
+        if (got <= 0) return;
+        for (std::size_t at = 0; at < static_cast<std::size_t>(got); at += std::strlen(names.data() + at) + 1) {
+            const char* name = names.data() + at;
+            const ssize_t value_size = get(from.c_str(), name, nullptr, 0);
+            if (value_size < 0) continue;
+            std::vector<char> value(static_cast<std::size_t>(value_size));
+            if (get(from.c_str(), name, value.data(), value.size()) != value_size) continue;
+            set(to.c_str(), name, value.data(), value.size());
+        }
+#endif
+    }
+
+    std::function<void(const std::filesystem::path&)> keep_access_control_list(const std::filesystem::path& file) {
+#ifdef __APPLE__
+        acl_t acl = acl_get_file(file.c_str(), ACL_TYPE_EXTENDED);
+        if (acl == nullptr) return [](const std::filesystem::path&) {};
+        std::shared_ptr<std::remove_pointer_t<acl_t>> owned(acl, [](const acl_t a) { acl_free(a); });
+        return [owned](const std::filesystem::path& target) { acl_set_file(target.c_str(), ACL_TYPE_EXTENDED, owned.get()); };
+#else
+        return [](const std::filesystem::path&) {};
 #endif
     }
 
