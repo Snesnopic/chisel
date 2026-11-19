@@ -27,41 +27,72 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Build and verify static linking on FreeBSD
+      - name: Start the FreeBSD VM
         uses: vmactions/freebsd-vm@v1
         with:
           arch: amd64
           release: "15.1"
-          usesh: true
+          sync: no
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
-          run: |
-            set -e
-            echo "--- Starting FreeBSD Build ---"
-            export MAKE=gmake
-            mkdir -p $HOME/bin
-            ln -s /usr/local/bin/gmake $HOME/bin/make
-            export PATH=$HOME/bin:$PATH
 
-            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
-                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
-                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
-                  -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
-
-            cmake --build build --config Release
-            echo "--- Build Complete ---"
-
-            echo "Checking dependencies for FreeBSD..."
-            ldd bin/Release/chsl
-            matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
-            if [ -n "$matches" ]; then
-              echo "::error::Found forbidden dynamic libraries!"
-              echo "$matches"
-              exit 1
+      # the action's own copy into the VM has no retry and fails now and then: this one resumes where it stopped
+      - name: Copy the workspace into the VM
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if ssh freebsd "mkdir -p '$HOME/work'" &&
+               rsync -a --rsync-path="$rsync_path" --exclude _actions --exclude _PipelineMapping \
+                     -e "ssh" "$HOME/work/" "freebsd:$HOME/work/"; then
+              exit 0
             fi
-            echo "OK: No forbidden dynamic libraries found."
+            echo "::warning::Copy into the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
+
+      - name: Build and verify static linking on FreeBSD
+        shell: freebsd {0}
+        run: |
+          set -e
+          cd "${{ github.workspace }}"
+          echo "--- Starting FreeBSD Build ---"
+          export MAKE=gmake
+          mkdir -p $HOME/bin
+          ln -s /usr/local/bin/gmake $HOME/bin/make
+          export PATH=$HOME/bin:$PATH
+
+          cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+                -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+
+          cmake --build build --config Release
+          echo "--- Build Complete ---"
+
+          echo "Checking dependencies for FreeBSD..."
+          ldd bin/Release/chsl
+          matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: No forbidden dynamic libraries found."
+
+      - name: Copy the binary back from the VM
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if rsync -a --rsync-path="$rsync_path" -e "ssh" "freebsd:${{ github.workspace }}/bin/" "${{ github.workspace }}/bin/"; then
+              exit 0
+            fi
+            echo "::warning::Copy back from the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
 
       - name: Package binary
         run: |
@@ -93,41 +124,72 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Build and verify static linking on FreeBSD
+      - name: Start the FreeBSD VM
         uses: vmactions/freebsd-vm@v1
         with:
           arch: arm64
           release: "15.1"
-          usesh: true
+          sync: no
           prepare: |
             pkg install -y cmake ninja pkgconf autoconf automake libtool m4 nasm yasm gmake git llvm20 rust
-          run: |
-            set -e
-            echo "--- Starting FreeBSD Build ---"
-            export MAKE=gmake
-            mkdir -p $HOME/bin
-            ln -s /usr/local/bin/gmake $HOME/bin/make
-            export PATH=$HOME/bin:$PATH
 
-            cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
-                  -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
-                  -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
-                  -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
-                  -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
-
-            cmake --build build --config Release
-            echo "--- Build Complete ---"
-
-            echo "Checking dependencies for FreeBSD..."
-            ldd bin/Release/chsl
-            matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
-            if [ -n "$matches" ]; then
-              echo "::error::Found forbidden dynamic libraries!"
-              echo "$matches"
-              exit 1
+      # the action's own copy into the VM has no retry and fails now and then: this one resumes where it stopped
+      - name: Copy the workspace into the VM
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if ssh freebsd "mkdir -p '$HOME/work'" &&
+               rsync -a --timeout 1800 --rsync-path="$rsync_path" --exclude _actions --exclude _PipelineMapping \
+                     -e "ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=60 -o ConnectTimeout=120" "$HOME/work/" "freebsd:$HOME/work/"; then
+              exit 0
             fi
-            echo "OK: No forbidden dynamic libraries found."
+            echo "::warning::Copy into the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
+
+      - name: Build and verify static linking on FreeBSD
+        shell: freebsd {0}
+        run: |
+          set -e
+          cd "${{ github.workspace }}"
+          echo "--- Starting FreeBSD Build ---"
+          export MAKE=gmake
+          mkdir -p $HOME/bin
+          ln -s /usr/local/bin/gmake $HOME/bin/make
+          export PATH=$HOME/bin:$PATH
+
+          cmake -G Ninja -DCMAKE_CXX_STANDARD=20 \
+                -DCMAKE_C_COMPILER=/usr/local/bin/clang20 \
+                -DCMAKE_CXX_COMPILER=/usr/local/bin/clang++20 \
+                -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fexperimental-library" \
+                -B build -DCMAKE_BUILD_TYPE=Release -S ${{ github.workspace }}
+
+          cmake --build build --config Release
+          echo "--- Build Complete ---"
+
+          echo "Checking dependencies for FreeBSD..."
+          ldd bin/Release/chsl
+          matches=$(ldd bin/Release/chsl | grep -iE "(${{ env.FORBIDDEN_LIBS }})" || true)
+          if [ -n "$matches" ]; then
+            echo "::error::Found forbidden dynamic libraries!"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK: No forbidden dynamic libraries found."
+
+      - name: Copy the binary back from the VM
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if rsync -a --timeout 1800 --rsync-path="$rsync_path" -e "ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=60 -o ConnectTimeout=120" "freebsd:${{ github.workspace }}/bin/" "${{ github.workspace }}/bin/"; then
+              exit 0
+            fi
+            echo "::warning::Copy back from the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
 
       - name: Package binary
         run: |
@@ -169,6 +231,8 @@ jobs:
 
       - name: Install test dependencies (Linux Host for GDrive)
         run: |
+          # a mirror that drops a connection makes apt give up the whole install
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
           sudo apt-get update
           sudo apt-get install -y python3-pip unzip
           pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
@@ -221,22 +285,54 @@ jobs:
           "
         shell: bash
 
-      - name: Run Chisel Tests (in FreeBSD VM)
+      - name: Start the FreeBSD VM
         uses: vmactions/freebsd-vm@v1
         with:
           arch: amd64
           release: "15.1"
-          usesh: true
-          run: |
-            echo "--- Starting FreeBSD Test ---"
-            echo "Extracting test data inside VM..."
-            mkdir -p ${{ env.TEST_DIR }}
-            unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
-            CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
-            echo "Running chisel from: $CHISEL_EXE"
-            echo "Processing files in: ${{ env.TEST_DIR }}"
-            $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --log-level=ALL --log-file chisel.log
-            echo "--- Test Run Complete ---"
+          sync: no
+
+      # the action's own copy into the VM has no retry and fails now and then: this one resumes where it stopped
+      - name: Copy the workspace into the VM
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if ssh freebsd "mkdir -p '$HOME/work'" &&
+               rsync -a --rsync-path="$rsync_path" --exclude _actions --exclude _PipelineMapping \
+                     -e "ssh" "$HOME/work/" "freebsd:$HOME/work/"; then
+              exit 0
+            fi
+            echo "::warning::Copy into the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
+
+      - name: Run Chisel Tests (in FreeBSD VM)
+        shell: freebsd {0}
+        run: |
+          cd "${{ github.workspace }}"
+          echo "--- Starting FreeBSD Test ---"
+          echo "Extracting test data inside VM..."
+          mkdir -p ${{ env.TEST_DIR }}
+          unzip -q ${{ env.TEST_ARCHIVE_NAME }} -d ${{ env.TEST_DIR }}
+          CHISEL_EXE="./${{ env.BIN_DIR }}/chsl"
+          echo "Running chisel from: $CHISEL_EXE"
+          echo "Processing files in: ${{ env.TEST_DIR }}"
+          $CHISEL_EXE "${{ env.TEST_DIR }}" --recursive --threads 4 --log-level=ALL --log-file chisel.log
+          echo "--- Test Run Complete ---"
+
+      - name: Copy the log back from the VM
+        if: always()
+        run: |
+          rsync_path="sh -c 'PATH=\$PATH:/usr/local/bin exec rsync \"\$@\"' rsync"
+          for attempt in 1 2 3 4 5; do
+            if rsync -a --rsync-path="$rsync_path" -e "ssh" "freebsd:${{ github.workspace }}/chisel.log" "${{ github.workspace }}/chisel.log"; then
+              exit 0
+            fi
+            echo "::warning::Copy back from the VM failed (attempt $attempt of 5)"
+            sleep 30
+          done
+          exit 1
 
       - name: Check for errors in Chisel Log
         if: always()

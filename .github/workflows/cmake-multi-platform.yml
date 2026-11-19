@@ -115,6 +115,8 @@ jobs:
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          # a mirror that drops a connection makes apt give up the whole install
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config \
             autoconf automake libtool m4 nasm yasm curl unzip tar gzip python3-pip
@@ -123,6 +125,8 @@ jobs:
         if: matrix.id == 'ubuntu-x86'
         run: |
           sudo dpkg --add-architecture i386
+          # a mirror that drops a connection makes apt give up the whole install
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
           sudo apt-get update
           sudo apt-get install -y gcc-multilib g++-multilib libc6:i386 libc6-dev:i386
 
@@ -306,6 +310,8 @@ jobs:
       - name: Install test dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          # a mirror that drops a connection makes apt give up the whole install
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
           sudo apt-get update
           sudo apt-get install -y python3-pip unzip
           pip3 install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
