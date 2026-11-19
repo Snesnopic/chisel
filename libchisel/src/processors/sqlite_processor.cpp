@@ -63,27 +63,6 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     sqlite3_close(src_db);
     Logger::log(LogLevel::Debug, "Vacuum completed", get_name());
 
-    // run ANALYZE on the new output
-    sqlite3* db = nullptr;
-    rc = sqlite3_open_v2(output.string().c_str(), &db, SQLITE_OPEN_READWRITE, nullptr);
-    if (rc != SQLITE_OK) {
-        const std::string err_msg = db ? sqlite3_errmsg(db) : "unknown error";
-        if (db) sqlite3_close(db);
-        Logger::log(LogLevel::Warning, "Cannot open vacuumed database: " + err_msg, get_name());
-        return; // act as passthrough (vacuumed file already written)
-    }
-
-    rc = sqlite3_exec(db, "ANALYZE;", nullptr, nullptr, nullptr);
-    if (rc != SQLITE_OK) {
-        const std::string err_msg = sqlite3_errmsg(db);
-        sqlite3_close(db);
-        Logger::log(LogLevel::Warning, "Analyze failed (likely corrupt): " + err_msg, get_name());
-        return; // act as passthrough (vacuumed file already written, just not analyzed)
-    }
-    Logger::log(LogLevel::Debug, "Analyze completed", get_name());
-
-    sqlite3_close(db);
-
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
 }
 
@@ -98,14 +77,22 @@ static int sqlite_dump_callback(void *user_data, const int argc, char **argv, ch
     return 0;
 }
 
-// dumps every row of one table into out_rows, one string per row (column
-// values joined by '|'); BLOBs are hex-encoded (sqlite3_exec's text-only
+// dumps every row of one table into out_rows, one string per row (rowid and
+// column values joined by '|'); BLOBs are hex-encoded (sqlite3_exec's text-only
 // callback interface would silently truncate them at the first embedded
 // NUL byte instead)
 static void dump_table_rows(sqlite3* db, const std::string& table, std::vector<std::string>& out_rows) {
-    const std::string sql = "SELECT * FROM \"" + table + "\";";
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return;
+    // a WITHOUT ROWID table has no rowid to select
+    for (const char* columns : {"rowid, *", "*"}) {
+        char* sql = sqlite3_mprintf("SELECT %s FROM \"%w\";", columns, table.c_str());
+        const int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+        sqlite3_free(sql);
+        if (rc == SQLITE_OK) break;
+        sqlite3_finalize(stmt);
+        stmt = nullptr;
+    }
+    if (!stmt) return;
 
     const int ncols = sqlite3_column_count(stmt);
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -143,13 +130,10 @@ std::string dump_sqlite_db(const std::filesystem::path &file) {
     std::stringstream dump_stream;
     char *err_msg = nullptr;
 
-    // integrity check, plus schema dump excluding internal sqlite_* objects
-    // (ANALYZE creates sqlite_stat1/sqlite_stat4, which would otherwise make
-    // every correctly-recompressed database look "different" from its source)
+    // integrity check, plus schema dump (sqlite_sequence and sqlite_stat* included)
     rc = sqlite3_exec(db,
         "PRAGMA integrity_check; "
-        "SELECT type, name, tbl_name, sql FROM sqlite_master "
-        "WHERE name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name;",
+        "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name;",
         sqlite_dump_callback, &dump_stream, &err_msg);
 
     if (rc != SQLITE_OK) {
@@ -160,13 +144,12 @@ std::string dump_sqlite_db(const std::filesystem::path &file) {
         return ""; // return empty on error
     }
 
-    // actual row data per user table, sorted per-table for order-independence
+    // actual row data per table, sorted per-table for order-independence
     // (VACUUM can physically reorder rows without changing their content)
     std::vector<std::string> table_names;
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db,
-            "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name;",
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;",
             -1, &stmt, nullptr) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             const auto* name = sqlite3_column_text(stmt, 0);
