@@ -40,6 +40,8 @@
 #include "ape/apetag.h"
 #include "wav/wavfile.h"
 #include "matroska/matroskafile.h"
+#include "matroska/matroskaattachments.h"
+#include "matroska/matroskaattachedfile.h"
 #include "wavpack/wavpackfile.h"
 #include "mpc/mpcfile.h"
 #include "trueaudio/trueaudiofile.h"
@@ -368,6 +370,13 @@ bool setFlacBlockLength(TagLib::ByteVector& block) {
 
 // marks the covers of an Ogg FLAC stream that come from its PICTURE blocks rather than its comments
 struct OggFlacPictureBlock {};
+
+// which Matroska attachment an extracted file came from
+struct MatroskaAttachment {
+    unsigned long long uid = 0;
+    TagLib::String file_name;
+    TagLib::String media_type;
+};
 
 // the header packets of an Ogg FLAC stream that hold a PICTURE block TagLib can read
 std::vector<unsigned int> oggFlacPicturePackets(TagLib::Ogg::File& file) {
@@ -989,51 +998,39 @@ AudioExtractionState AudioMetadataUtil::extractCovers(const std::filesystem::pat
 
     // mkv (matroska / webm)
     if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
-        int idx = 0;
+        const auto *attachments = mkvFile->attachments();
+        if (!attachments) return state;
+        // TagLib would write a random uid in place of a missing one, so they all stay as they are
+        if (std::ranges::any_of(attachments->attachedFileList(),
+                                [](const TagLib::Matroska::AttachedFile &file) { return file.uid() == 0; })) {
+            Logger::log(LogLevel::Debug, "Attachment without a UID, attachments left as they are: " +
+                        input_path.filename().string(), "AudioMetadataUtil");
+            return state;
+        }
+        std::size_t idx = 0;
+        for (const auto &file : attachments->attachedFileList()) {
+            const TagLib::ByteVector &data = file.data();
+            if (data.isEmpty()) continue;
+            const std::string mime = file.mediaType().to8Bit(true);
+            const std::string file_name = file.fileName().to8Bit(true);
 
-        // TagLib::Matroska::File::complexProperties("ATTACHMENT") is *not* a generic
-        // "all non-picture attachments" query: it only matches attachments whose
-        // filename/mimeType/uid is literally the string "ATTACHMENT", which real
-        // files never have. complexPropertyKeys() is the correct way to enumerate
-        // every attachment (it yields "PICTURE" for images, and each attachment's
-        // own filename otherwise), so fonts/xml/etc. are picked up too.
-        for (const auto &key : mkvFile->complexPropertyKeys()) {
-            for (const auto &attMap : mkvFile->complexProperties(key)) {
-                if (!attMap.contains("data") || !attMap.contains("mimeType")) continue;
+            // the attachment's own extension (font.woff2) gets it to the matching processor; the type is the fallback
+            std::string ext = std::filesystem::path(file_name).extension().string();
+            if (ext.empty()) ext = extFromMime(mime);
+            std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx++) + ext);
 
-                TagLib::ByteVector data = attMap["data"].toByteVector();
-                std::string mime = attMap["mimeType"].toString().to8Bit(true);
-                std::string original_fileName = attMap.contains("fileName") ? attMap["fileName"].toString().to8Bit(true) : "";
-
-                // prefer the attachment's own filename extension (e.g. font.woff2)
-                // so it gets picked up by the matching processor; fall back to a
-                // mime-based guess only if the filename has none
-                std::string ext = std::filesystem::path(original_fileName).extension().string();
-                if (ext.empty()) ext = extFromMime(mime);
-                std::filesystem::path outPath = temp_dir / ("attachment_" + std::to_string(idx) + ext);
-
-                if (!write_file(outPath, data.data(), data.size())) {
-                    throw std::runtime_error("Can't write cover art to " + outPath.string());
-                }
-
-                AudioCoverInfo info;
-                info.temp_file_path = outPath;
-                info.mime_type = mime;
-                info.picture_type = defaultFrontCoverType();
-
-                if (attMap.contains("description")) {
-                    info.description = attMap["description"].toString().to8Bit(true);
-                }
-
-                // store the original TagLib complex-property key and filename so
-                // finalize can group entries back under the same key on rebuild
-                // (multiple pictures all share the "PICTURE" key; every other
-                // attachment is keyed by its own filename)
-                info.format_specific = std::make_any<std::pair<std::string, std::string>>(key.to8Bit(true), original_fileName);
-
-                state.extracted_covers.push_back(std::move(info));
-                ++idx;
+            if (!write_file(outPath, data.data(), data.size())) {
+                throw std::runtime_error("Can't write cover art to " + outPath.string());
             }
+
+            AudioCoverInfo info;
+            info.temp_file_path = outPath;
+            info.mime_type = mime;
+            info.picture_type = defaultFrontCoverType();
+            info.description = file.description().to8Bit(true);
+            info.format_specific = MatroskaAttachment{.uid = file.uid(), .file_name = file.fileName(),
+                                                      .media_type = file.mediaType()};
+            state.extracted_covers.push_back(std::move(info));
         }
         return state;
     }
@@ -1216,36 +1213,37 @@ bool AudioMetadataUtil::rebuildCovers(const std::filesystem::path &input_path,
 
     // mkv (matroska / webm)
     if (auto *mkvFile = dynamic_cast<TagLib::Matroska::File*>(file_ref)) {
-        // group by original TagLib complex-property key: setComplexProperties(key, list)
-        // replaces *all* attachments under that key in one call, so entries sharing a
-        // key (e.g. every picture shares "PICTURE") must be batched into a single call
-        // rather than one call per attachment, or each call would wipe the previous one
-        std::map<std::string, TagLib::List<TagLib::VariantMap>> grouped;
-
-        for (const auto &info : state.extracted_covers) {
-            TagLib::ByteVector data = readFileToByteVector(info.temp_file_path);
-            if (data.isEmpty()) continue;
-
-            std::string key = "PICTURE";
-            std::string fileName = "attachment" + std::string(extFromMime(info.mime_type));
-
-            if (info.format_specific.has_value() && info.format_specific.type() == typeid(std::pair<std::string, std::string>)) {
-                auto meta = std::any_cast<std::pair<std::string, std::string>>(info.format_specific);
-                if (!meta.first.empty()) key = meta.first;
-                if (!meta.second.empty()) fileName = meta.second;
+        auto *attachments = mkvFile->attachments();
+        if (!attachments) return true;
+        const TagLib::Matroska::Attachments::AttachedFileList files = attachments->attachedFileList();
+        const auto same_attachment = [](const TagLib::Matroska::AttachedFile &file, const MatroskaAttachment &source) {
+            return file.uid() == source.uid && file.fileName() == source.file_name && file.mediaType() == source.media_type;
+        };
+        // every attachment goes back in its place, with its uid, name, type and description; only the data changes
+        attachments->clear();
+        for (const auto &file : files) {
+            TagLib::ByteVector data = file.data();
+            const MatroskaAttachment self{.uid = file.uid(), .file_name = file.fileName(), .media_type = file.mediaType()};
+            // mkclean may have moved it: it's found by uid, name and type, and only when that's unambiguous
+            const AudioCoverInfo *source = nullptr;
+            std::size_t found = 0;
+            for (const auto &info : state.extracted_covers) {
+                const auto *attachment = std::any_cast<MatroskaAttachment>(&info.format_specific);
+                if (attachment && same_attachment(file, *attachment)) {
+                    source = &info;
+                    ++found;
+                }
             }
-
-            TagLib::VariantMap attMap;
-            attMap.insert("data", data);
-            attMap.insert("mimeType", TagLib::String(info.mime_type, TagLib::String::UTF8));
-            attMap.insert("description", TagLib::String(info.description, TagLib::String::UTF8));
-            attMap.insert("fileName", TagLib::String(fileName, TagLib::String::UTF8));
-
-            grouped[key].append(attMap);
-        }
-
-        for (const auto &[key, list] : grouped) {
-            mkvFile->setComplexProperties(TagLib::String(key, TagLib::String::UTF8), list);
+            const auto twins = std::ranges::count_if(files, [&](const TagLib::Matroska::AttachedFile &other) {
+                return same_attachment(other, self);
+            });
+            if (found == 1 && twins == 1) {
+                if (TagLib::ByteVector rewritten = readFileToByteVector(source->temp_file_path); !rewritten.isEmpty()) {
+                    data = rewritten;
+                }
+            }
+            attachments->addAttachedFile(TagLib::Matroska::AttachedFile(data, file.fileName(), file.mediaType(),
+                                                                         file.uid(), file.description()));
         }
         return mkvFile->save();
     }
