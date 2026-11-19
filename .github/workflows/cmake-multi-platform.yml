@@ -483,7 +483,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: chisel-log-${{ matrix.id }}
+          name: chisel-log-${{ matrix.asset_name }}
           path: |
             build/chisel.log
             ${{ github.workspace }}/chisel.log
@@ -547,7 +547,12 @@ jobs:
         run: |
           mkdir -p release_assets
           find binaries -type f \( -name 'chsl-*.tar.gz' -o -name 'chsl-*.zip' \) -exec cp {} release_assets/ \;
-          find logs -type f -name '*.log' -exec cp {} release_assets/ \;
+          # every platform's log is called chisel.log: each one goes out under its platform's name
+          for dir in logs/chisel-log-*/; do
+            platform=$(basename "$dir"); platform=${platform#chisel-log-}
+            log=$(find "$dir" -type f -name '*.log' | head -1)
+            [ -n "$log" ] && cp "$log" "release_assets/chisel-$platform.log"
+          done
           ls -la release_assets
 
       - name: Delete and recreate 'development-latest' release
