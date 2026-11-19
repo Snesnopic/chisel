@@ -12,6 +12,9 @@
 #include <algorithm>
 #include <cstring>
 #include <system_error>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 
 namespace chisel {
@@ -239,5 +242,18 @@ namespace chisel {
         }
         return buffer;
     }
+    bool replaceable_in_place(const std::filesystem::path& file) {
+#ifdef _WIN32
+        // the read-only attribute; folders on Windows don't stop a file in them from being replaced
+        std::error_code ec;
+        const auto perms = fs::status(file, ec).permissions();
+        return !ec && (perms & fs::perms::owner_write) != fs::perms::none;
+#else
+        // access() also accounts for the user the run is under, groups and ACLs
+        const auto folder = file.has_parent_path() ? file.parent_path() : fs::path(".");
+        return ::access(file.c_str(), W_OK) == 0 && ::access(folder.c_str(), W_OK) == 0;
+#endif
+    }
+
 } // namespace chisel
 

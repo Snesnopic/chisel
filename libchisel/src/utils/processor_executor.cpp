@@ -490,6 +490,13 @@ namespace chisel {
             return;
         }
 
+        // a file the run would write over must be one its owner lets it write
+        if (depth == 0 && !has_output_dir_ && !dry_run_ && !replaceable_in_place(path)) {
+            Logger::log(LogLevel::Warning, "Read-only, left as is: " + path.string(), "Executor");
+            event_bus_.publish(FileAnalyzeSkippedEvent{.path=path, .parent_container=parent, .reason=SkipReason::ReadOnly, .message="Read-only"});
+            return;
+        }
+
         event_bus_.publish(FileAnalyzeStartEvent{.path=path, .parent_container=parent});
 
         const auto mime = MimeDetector::detect(path);

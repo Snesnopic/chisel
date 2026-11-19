@@ -39,7 +39,8 @@ enum class SkipReason {
     NestingTooDeep, ///< Found inside more containers than allowed
     NothingToDo,    ///< Its processor can't recompress it and found nothing inside it
     NoImprovement,  ///< Recompressing it gave nothing smaller
-    Interrupted     ///< A stop was requested before it was done
+    Interrupted,    ///< A stop was requested before it was done
+    ReadOnly        ///< It, or the folder it's in, can't be written, and it would be replaced in place
 };
 
 // --- Phase 1: Analysis ---

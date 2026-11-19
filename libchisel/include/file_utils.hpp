@@ -160,6 +160,11 @@ namespace chisel {
     bool file_contains(const std::filesystem::path& path, std::initializer_list<std::string_view> needles,
                        std::uint64_t limit = std::numeric_limits<std::uint64_t>::max());
 
+    /**
+     * @brief Whether a file can be replaced where it is: the file and its folder are writable.
+     */
+    bool replaceable_in_place(const std::filesystem::path& file);
+
 } // namespace chisel
 
 #endif // CHISEL_FILE_UTILS_HPP
