@@ -14,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <optional>
 #include <utility>
 
@@ -48,6 +49,19 @@ std::string immutable_uri(const std::filesystem::path& file) {
     return uri + "?immutable=1";
 }
 
+// the first 100 bytes of the file: page size, journal mode, schema format, encoding, ...
+std::optional<std::array<unsigned char, 100>> read_header(const std::filesystem::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    std::array<unsigned char, 100> header{};
+    if (!in.read(reinterpret_cast<char*>(header.data()), header.size())) return std::nullopt;
+    return header;
+}
+
+std::uint32_t header_u32(const std::array<unsigned char, 100>& header, const std::size_t offset) {
+    return static_cast<std::uint32_t>(header[offset]) << 24 | static_cast<std::uint32_t>(header[offset + 1]) << 16 |
+           static_cast<std::uint32_t>(header[offset + 2]) << 8 | header[offset + 3];
+}
+
 bool has_sidecar(const std::filesystem::path& file, std::string* found = nullptr) {
     for (const char* suffix : {"-wal", "-shm", "-journal"}) {
         std::filesystem::path sidecar = file;
@@ -76,8 +90,8 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
                                  const std::filesystem::path& output, const ProcessingOptions &options) {
     Logger::log(LogLevel::Debug, "Entering recompress for " + input.string(), get_name());
 
-    const auto passthrough = [&](const std::string& reason) {
-        Logger::log(LogLevel::Warning, reason, get_name());
+    const auto passthrough = [&](const std::string& reason, const LogLevel level = LogLevel::Warning) {
+        Logger::log(level, reason, get_name());
         std::error_code ec;
         std::filesystem::remove(output, ec);
         std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
@@ -91,6 +105,24 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
         return;
     }
 
+    const auto header = read_header(input);
+    if (!header) {
+        passthrough("Too short to be rewritten: " + input.filename().string(), LogLevel::Debug);
+        return;
+    }
+    if (std::memcmp(header->data(), "SQLite format 3", 16) != 0) {
+        passthrough("Not an SQLite database: " + input.filename().string());
+        return;
+    }
+    const bool wal_mode = (*header)[18] == 2 && (*header)[19] == 2;
+    const std::uint32_t schema_format = header_u32(*header, 44);
+    // VACUUM writes format 4, or 1 in legacy mode; 2 and 3 have no way back
+    if (schema_format == 2 || schema_format == 3) {
+        Logger::log(LogLevel::Info, "Skipping " + input.filename().string() + ": schema format " +
+                    std::to_string(schema_format), get_name());
+        std::filesystem::copy_file(input, output, std::filesystem::copy_options::overwrite_existing);
+        return;
+    }
     const auto stamp = stamp_of(input);
 
     // with no -wal or -journal next to it, the main file holds every committed change
@@ -101,6 +133,9 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
         if (src_db) sqlite3_close(src_db);
         passthrough("Cannot open database (likely corrupt): " + err_msg);
         return;
+    }
+    if (schema_format == 1) {
+        sqlite3_db_config(src_db, SQLITE_DBCONFIG_LEGACY_FILE_FORMAT, 1, nullptr);
     }
 
     std::error_code rm_ec;
@@ -121,6 +156,21 @@ void SqliteProcessor::recompress(const std::filesystem::path& input,
     if (!stamp || stamp_of(input) != stamp || has_sidecar(input)) {
         passthrough("Changed while being read, left as is: " + input.filename().string());
         return;
+    }
+
+    // VACUUM INTO always writes a rollback-journal database
+    if (wal_mode) {
+        sqlite3* db = nullptr;
+        rc = sqlite3_open_v2(utf8(output).c_str(), &db, SQLITE_OPEN_READWRITE, nullptr);
+        if (rc == SQLITE_OK) {
+            rc = sqlite3_exec(db, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
+        }
+        if (db) sqlite3_close(db);
+        const auto out_header = read_header(output);
+        if (rc != SQLITE_OK || !out_header || (*out_header)[18] != 2 || (*out_header)[19] != 2 || has_sidecar(output)) {
+            passthrough("Cannot put the database back in WAL mode");
+            return;
+        }
     }
 
     Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
@@ -179,8 +229,10 @@ static void dump_table_rows(sqlite3* db, const std::string& table, std::vector<s
 
 // helper function to dump a database (schema + actual row data) to a string
 std::string dump_sqlite_db(const std::filesystem::path &file) {
+    const auto header = read_header(file);
     sqlite3 *db = nullptr;
-    int rc = sqlite3_open_v2(immutable_uri(file).c_str(), &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr);
+    int rc = header ? sqlite3_open_v2(immutable_uri(file).c_str(), &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr)
+                    : SQLITE_CANTOPEN;
     if (rc != SQLITE_OK) {
         if (db) sqlite3_close(db);
         Logger::log(LogLevel::Warning, "Raw_equal: Cannot open database: " + file.string(), "SqliteProcessor");
@@ -188,6 +240,11 @@ std::string dump_sqlite_db(const std::filesystem::path &file) {
     }
 
     std::stringstream dump_stream;
+    // header fields VACUUM INTO must carry over: page size, journal mode, schema format, encoding, versions, ids
+    const auto& h = *header;
+    dump_stream << "header = " << header_u32(h, 16) << " " << header_u32(h, 20) << " " << header_u32(h, 44) << " "
+                << header_u32(h, 48) << " " << (header_u32(h, 52) != 0) << " " << header_u32(h, 56) << " "
+                << header_u32(h, 60) << " " << header_u32(h, 64) << " " << header_u32(h, 68) << "\n";
     char *err_msg = nullptr;
 
     // integrity check, plus schema dump (sqlite_sequence and sqlite_stat* included)
