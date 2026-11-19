@@ -122,6 +122,15 @@ public:
     static std::vector<uint8_t> foreignId3v2Tags(const std::filesystem::path& file);
 
     /**
+     * @brief Removes the comment fields of an Ogg Opus file, keeping its vendor string and pictures.
+     *
+     * The audio stays as it is.
+     * @param file Ogg Opus file.
+     * @return false if the file couldn't be read or saved.
+     */
+    static bool removeTextTags(const std::filesystem::path& file);
+
+    /**
      * @brief Returns the metadata blocks of an Ogg FLAC stream as stored, except STREAMINFO.
      * @param file Ogg FLAC file, with the current or the pre-1.1.1 mapping.
      * @return Each block with its 4-byte header, in stream order, or std::nullopt if the stream can't be read.

@@ -16,6 +16,8 @@
 #include <FLAC/all.h>
 #include <rehuff_theora.hpp>
 #include <map>
+#include <optional>
+#include <utility>
 
 #ifdef HAVE_OPTIVORBIS
 extern "C" {
@@ -328,6 +330,67 @@ namespace {
         return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
     }
 
+    /// The packets of a single-stream Ogg file, and the granule position at the end of each page.
+    struct OggPackets {
+        bool ok = false;
+        std::vector<std::vector<unsigned char>> packets;
+        /// packets completed so far, and the page's granule position
+        std::vector<std::pair<std::size_t, long long>> granules;
+    };
+
+    OggPackets read_packets(const fs::path& p) {
+        OggPackets result;
+        const std::vector<unsigned char> data = read_file(p);
+        std::size_t pos = 0;
+        std::optional<unsigned long> serial;
+        std::vector<unsigned char> partial;
+        while (pos + 27 <= data.size()) {
+            if (std::memcmp(&data[pos], "OggS", 4) != 0) return result;
+            const unsigned long page_serial = static_cast<unsigned long>(data[pos + 14]) |
+                static_cast<unsigned long>(data[pos + 15]) << 8 | static_cast<unsigned long>(data[pos + 16]) << 16 |
+                static_cast<unsigned long>(data[pos + 17]) << 24;
+            // another logical stream or a chained link: not a single stream
+            if (serial && *serial != page_serial) return result;
+            serial = page_serial;
+            long long granule = 0;
+            for (int i = 7; i >= 0; --i) granule = granule << 8 | data[pos + 6 + static_cast<std::size_t>(i)];
+            const std::size_t segments = data[pos + 26];
+            std::size_t body = pos + 27 + segments;
+            if (body > data.size()) return result;
+            for (std::size_t i = 0; i < segments; ++i) {
+                const std::size_t lacing = data[pos + 27 + i];
+                if (body + lacing > data.size()) return result;
+                partial.insert(partial.end(), data.begin() + static_cast<std::ptrdiff_t>(body),
+                               data.begin() + static_cast<std::ptrdiff_t>(body + lacing));
+                body += lacing;
+                if (lacing < 255) result.packets.push_back(std::exchange(partial, {}));
+            }
+            result.granules.emplace_back(result.packets.size(), granule);
+            pos = body;
+        }
+        result.ok = pos == data.size() && partial.empty();
+        return result;
+    }
+
+    /// The audio of two single-stream Opus files is the same when every packet but the comment header is, and
+    /// each page ends at the same point in the audio
+    bool opus_audio_equal(const fs::path& a, const fs::path& b) {
+        const OggPackets pa = read_packets(a);
+        const OggPackets pb = read_packets(b);
+        if (!pa.ok || !pb.ok || pa.packets.size() != pb.packets.size() || pa.packets.size() < 2) return false;
+        if (pa.packets[0] != pb.packets[0]) return false;
+        if (!std::equal(pa.packets.begin() + 2, pa.packets.end(), pb.packets.begin() + 2)) return false;
+        // the header pages hold no audio: their layout may change with the comments
+        const auto audio = [](const OggPackets& p) {
+            std::vector<std::pair<std::size_t, long long>> pages;
+            for (const auto& page : p.granules) {
+                if (page.first > 2) pages.push_back(page);
+            }
+            return pages;
+        };
+        return audio(pa) == audio(pb);
+    }
+
     bool files_byte_equal(const fs::path& a, const fs::path& b) {
         std::error_code ec_a, ec_b;
         const auto size_a = fs::file_size(a, ec_a);
@@ -497,14 +560,20 @@ void OggProcessor::recompress(const fs::path& input,
         return;
     }
 
-    // handle opus with direct copy
+    // opus has no recompressor here: only its comments can go
     if (codecs.opus) {
+        const bool chained = is_chained(f_in);
         fclose(f_in);
-        Logger::log(LogLevel::Warning, "Unsupported opus stream, falling back to direct copy", get_name());
+        Logger::log(LogLevel::Debug, "Opus stream, copied as is: " + input.string(), get_name());
         try {
             fs::copy_file(input, output, fs::copy_options::overwrite_existing);
         } catch (const fs::filesystem_error&) {
             throw std::runtime_error("OggProcessor: direct copy for Opus failed");
+        }
+        // TagLib edits the first logical stream only
+        if (!options.preserve_metadata && codecs.streams == 1 && !chained &&
+            !AudioMetadataUtil::removeTextTags(output)) {
+            throw std::runtime_error("OggProcessor: cannot remove the Opus comments");
         }
         Logger::log(LogLevel::Debug, "Exiting recompress for " + output.string(), get_name());
         return;
@@ -698,8 +767,8 @@ bool OggProcessor::raw_equal(const fs::path& a, const fs::path& b) const {
     }
 
     if (codecs_a.opus && codecs_b.opus) {
-        // recompress() always falls back to a direct copy for opus, so bytes must match exactly
-        return files_byte_equal(a, b);
+        // recompress() copies opus, at most without its comments
+        return files_byte_equal(a, b) || opus_audio_equal(a, b);
     }
 
     if (codecs_a.vorbis && codecs_b.vorbis) {

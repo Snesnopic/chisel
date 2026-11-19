@@ -1473,6 +1473,15 @@ std::vector<uint8_t> AudioMetadataUtil::foreignId3v2Tags(const std::filesystem::
     return tags;
 }
 
+bool AudioMetadataUtil::removeTextTags(const std::filesystem::path& file) {
+    TagLib::Ogg::Opus::File opus(file.c_str());
+    if (!opus.isValid() || !opus.tag()) return false;
+    if (opus.tag()->fieldListMap().isEmpty()) return true;
+    // the pictures are kept apart from the fields
+    opus.tag()->removeAllFields();
+    return opus.save();
+}
+
 void AudioMetadataUtil::writeWithHead(const std::filesystem::path& src, const std::filesystem::path& dst,
                                       const std::span<const uint8_t> head, const std::size_t skip) {
     // written next to dst first, so that src can be dst itself
