@@ -40,26 +40,34 @@ jobs:
           class Chsl < Formula
             desc "Lossless file optimizer, supporting 160+ types, multithreading and recursive optimization (files inside other files)"
             homepage "https://github.com/Snesnopic/chisel"
-            version "${CLEAN_VER}"
             license "MIT"
 
-            head "https://github.com/Snesnopic/chisel.git", branch: "main"
-          
-            depends_on "cmake" => :build
-            depends_on "rust" => :build
+            head do
+              url "https://github.com/Snesnopic/chisel.git", branch: "main"
+              depends_on "cmake" => :build
+              depends_on "rust" => :build
+            end
 
-            if OS.mac? && Hardware::CPU.arm?
-              url "${BASE_URL}/chsl-macos-arm64.tar.gz"
-              sha256 "${SHA_MAC_ARM}"
-            elsif OS.mac? && Hardware::CPU.intel?
-              url "${BASE_URL}/chsl-macos-x64.tar.gz"
-              sha256 "${SHA_MAC_INTEL}"
-            elsif OS.linux? && Hardware::CPU.intel?
-              url "${BASE_URL}/chsl-linux-x64-gcc.tar.gz"
-              sha256 "${SHA_LINUX_INTEL}"
-            elsif OS.linux? && Hardware::CPU.arm?
-              url "${BASE_URL}/chsl-linux-arm64.tar.gz"
-              sha256 "${SHA_LINUX_ARM}"
+            on_macos do
+              on_arm do
+                url "${BASE_URL}/chsl-macos-arm64.tar.gz"
+                sha256 "${SHA_MAC_ARM}"
+              end
+              on_intel do
+                url "${BASE_URL}/chsl-macos-x64.tar.gz"
+                sha256 "${SHA_MAC_INTEL}"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "${BASE_URL}/chsl-linux-x64-gcc.tar.gz"
+                sha256 "${SHA_LINUX_INTEL}"
+              end
+              on_arm do
+                url "${BASE_URL}/chsl-linux-arm64.tar.gz"
+                sha256 "${SHA_LINUX_ARM}"
+              end
             end
 
             def install
@@ -69,6 +77,11 @@ jobs:
                 bin.install "bin/Release/chsl"
               else
                 bin.install "chsl"
+                if OS.mac?
+                  # the release tarballs carry a quarantine flag that makes macOS kill the binary
+                  chmod "u+w", bin/"chsl"
+                  quiet_system "/usr/bin/xattr", "-d", "com.apple.quarantine", bin/"chsl"
+                end
               end
             end
 
