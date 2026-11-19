@@ -55,9 +55,7 @@ std::filesystem::path DataUriProcessor::finalize_extraction(const ExtractedConte
         return {};
     }
 
-    const fs::path out_path = fs::temp_directory_path() /
-                              (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() +
-                               content.original_path.extension().string());
+    const fs::path out_path = fs::temp_directory_path() / temp_name(content.original_path, "_tmp");
     if (!write_file(out_path, std::vector<uint8_t>(rebuilt->begin(), rebuilt->end()))) {
         Logger::log(LogLevel::Error, "Can't write " + out_path.string(), get_name());
         std::error_code ec;

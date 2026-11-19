@@ -182,7 +182,7 @@ std::filesystem::path VcfProcessor::finalize_extraction(const ExtractedContent& 
     new_content.append(content_view.substr(last_pos));
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".vcf");
+        temp_name(content.original_path, "_final", ".vcf");
 
     const bool written = write_file(output_path, new_content.data(), new_content.size());
     cleanup_temp_dir(content.temp_dir, get_name());

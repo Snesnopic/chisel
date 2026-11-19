@@ -1176,8 +1176,7 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
         }
 
         // Always write to a new temporary file
-        auto tmp_path = content.original_path;
-        tmp_path += ".refinalized.pdf";
+        const auto tmp_path = content.original_path.parent_path() / temp_name(content.original_path, ".refinalized", ".pdf");
 
         // a write that doesn't finish leaves nothing behind; declared first, it runs after the writer closes the file
         struct PartialFileGuard {

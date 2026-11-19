@@ -314,7 +314,7 @@ std::filesystem::path IcoProcessor::finalize_extraction(const ExtractedContent& 
     }
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + content.original_path.extension().string());
+        temp_name(content.original_path, "_final");
 
     std::ofstream out_file(output_path, std::ios::binary);
     if (!out_file) throw std::runtime_error("CANNOT OPEN OUTPUT FILE: " + output_path.string());

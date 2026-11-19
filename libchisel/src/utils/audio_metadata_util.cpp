@@ -561,8 +561,7 @@ bool replaceId3Chunk(const std::filesystem::path& file, const TagLib::ByteVector
     const uint64_t container = get32(head.data() + 4) + (newSize + (newSize & 1)) - (oldEnd - chunk - 8);
     if (container > UINT32_MAX) return false;
 
-    std::filesystem::path tmp = file;
-    tmp += ".id3" + RandomUtils::random_suffix();
+    const std::filesystem::path tmp = file.parent_path() / temp_name(file, ".id3");
     bool written = false;
     {
         std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
@@ -1385,8 +1384,7 @@ std::filesystem::path AudioMetadataUtil::finalizeCoverExtraction(
     }
 
     const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() +
-         content.original_path.extension().string());
+        temp_name(content.original_path, "_final");
 
     // TagLib would rewrite or drop ID3v2 tags in front of a format that doesn't define them: they go back as they are
     std::vector<uint8_t> id3;
@@ -1480,8 +1478,7 @@ std::vector<uint8_t> AudioMetadataUtil::foreignId3v2Tags(const std::filesystem::
 void AudioMetadataUtil::writeWithHead(const std::filesystem::path& src, const std::filesystem::path& dst,
                                       const std::span<const uint8_t> head, const std::size_t skip) {
     // written next to dst first, so that src can be dst itself
-    std::filesystem::path tmp = dst;
-    tmp += ".head" + RandomUtils::random_suffix();
+    const std::filesystem::path tmp = dst.parent_path() / temp_name(dst, ".head");
     bool written = false;
     {
         std::ifstream in(src, std::ios::binary);

@@ -400,9 +400,7 @@ std::filesystem::path XmlProcessor::finalize_extraction(const ExtractedContent& 
         return {};
     }
 
-    const fs::path out_path = fs::temp_directory_path() /
-                              (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() +
-                               content.original_path.extension().string());
+    const fs::path out_path = fs::temp_directory_path() / temp_name(content.original_path, "_tmp");
     if (!write_bytes(out_path, *rebuilt)) {
         Logger::log(LogLevel::Error, "Can't write " + out_path.string(), get_name());
         std::error_code ec;

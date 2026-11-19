@@ -69,11 +69,11 @@ std::optional<ExtractedContent> BrotliProcessor::prepare_extraction(const std::f
     const auto raw_data = decode_brotli(input_data);
 
     // strip .br to expose inner extension to mime detector
-    std::string inner_name = input_path.filename().string();
-    if (inner_name.ends_with(".br")) {
-        inner_name = inner_name.substr(0, inner_name.size() - 3);
+    std::filesystem::path inner_name = input_path.filename();
+    if (inner_name.extension() == ".br") {
+        inner_name.replace_extension();
     } else {
-        inner_name += ".dec";
+        inner_name = short_name(input_path) += ".dec";
     }
 
     std::filesystem::path inner_path = content.temp_dir / inner_name;
@@ -120,7 +120,7 @@ std::filesystem::path BrotliProcessor::finalize_extraction(const ExtractedConten
     output_data.resize(out_size);
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".br");
+        temp_name(content.original_path, "_final", ".br");
 
     std::ofstream out_file(output_path, std::ios::binary);
     if (!out_file) throw std::runtime_error("Can't open output file: " + output_path.string());

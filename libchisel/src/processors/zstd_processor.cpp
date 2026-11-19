@@ -54,11 +54,11 @@ std::optional<ExtractedContent> ZstdProcessor::prepare_extraction(const std::fil
     const auto raw_data = decode_zstd(input_data);
 
     // strip extension to expose inner format
-    std::string inner_name = input_path.filename().string();
-    if (inner_name.ends_with(".zst")) {
-        inner_name = inner_name.substr(0, inner_name.size() - 4);
+    std::filesystem::path inner_name = input_path.filename();
+    if (inner_name.extension() == ".zst") {
+        inner_name.replace_extension();
     } else {
-        inner_name += ".dec";
+        inner_name = short_name(input_path) += ".dec";
     }
 
     std::filesystem::path inner_path = content.temp_dir / inner_name;
@@ -96,7 +96,7 @@ std::filesystem::path ZstdProcessor::finalize_extraction(const ExtractedContent&
     compressed.resize(result);
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".zst");
+        temp_name(content.original_path, "_final", ".zst");
 
     std::ofstream out_file(output_path, std::ios::binary);
     if (!out_file) throw std::runtime_error("CANNOT OPEN OUTPUT FILE: " + output_path.string());

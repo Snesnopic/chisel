@@ -64,7 +64,7 @@ std::filesystem::path GftProcessor::finalize_extraction(const ExtractedContent& 
     const auto opt_payload = read_file(content.extracted_files.front());
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".gft");
+        temp_name(content.original_path, "_final", ".gft");
 
     std::ofstream out_file(output_path, std::ios::binary);
     if (!out_file) throw std::runtime_error("cannot open output gft file");

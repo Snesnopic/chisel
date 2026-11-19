@@ -474,7 +474,7 @@ std::filesystem::path PeProcessor::finalize_extraction(const ExtractedContent& c
     }
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + content.original_path.extension().string());
+        temp_name(content.original_path, "_final");
 
     if (!write_file(output_path, raw_data)) {
         std::error_code ec;

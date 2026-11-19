@@ -69,11 +69,11 @@ std::optional<ExtractedContent> Bzip2Processor::prepare_extraction(const std::fi
     const auto raw_data = decode_bzip2(input_data);
 
     // strip extension to expose inner format
-    std::string inner_name = input_path.filename().string();
-    if (inner_name.ends_with(".bz2")) {
-        inner_name = inner_name.substr(0, inner_name.size() - 4);
+    std::filesystem::path inner_name = input_path.filename();
+    if (inner_name.extension() == ".bz2") {
+        inner_name.replace_extension();
     } else {
-        inner_name += ".dec";
+        inner_name = short_name(input_path) += ".dec";
     }
 
     std::filesystem::path inner_path = content.temp_dir / inner_name;
@@ -130,7 +130,7 @@ std::filesystem::path Bzip2Processor::finalize_extraction(const ExtractedContent
     BZ2_bzCompressEnd(&strm);
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".bz2");
+        temp_name(content.original_path, "_final", ".bz2");
 
     std::ofstream out_file(output_path, std::ios::binary);
     if (!out_file) throw std::runtime_error("CANNOT OPEN OUTPUT FILE: " + output_path.string());

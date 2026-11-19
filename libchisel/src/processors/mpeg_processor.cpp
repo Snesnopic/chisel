@@ -178,7 +178,7 @@ std::filesystem::path MpegProcessor::finalize_extraction(const ExtractedContent 
     }
 
     fs::path final_temp_path = fs::temp_directory_path() /
-                                     (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".mp3");
+                                     temp_name(content.original_path, "_final", ".mp3");
 
     try {
         fs::copy_file(content.original_path, final_temp_path, fs::copy_options::overwrite_existing);

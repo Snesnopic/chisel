@@ -147,7 +147,7 @@ std::filesystem::path MkvProcessor::finalize_extraction(const ExtractedContent &
 
     // create a temporary file for the reconstruction
     const std::filesystem::path final_temp_path = std::filesystem::temp_directory_path() /
-                                     (content.original_path.stem().string() + "_rebuilt" + RandomUtils::random_suffix() + ".mkv");
+                                     temp_name(content.original_path, "_rebuilt", ".mkv");
 
     try {
         // we start from the original file, rebuildCovers will replace attachments

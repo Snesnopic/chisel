@@ -310,8 +310,7 @@ std::filesystem::path ArchiveProcessor::finalize_extraction(const ExtractedConte
     const fs::path src_path(content.original_path);
     const std::string out_ext = "." + container_format_to_string(out_fmt);
 
-    const fs::path tmp_archive = fs::temp_directory_path() /
-                                 (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + out_ext);
+    const fs::path tmp_archive = fs::temp_directory_path() / temp_name(src_path, "_tmp", out_ext);
 
     if (const auto* zip = std::any_cast<ZipManifest>(&content.extras)) {
         const auto flags = read_rmskin_flags(src_path);

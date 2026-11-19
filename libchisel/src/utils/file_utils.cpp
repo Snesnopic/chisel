@@ -118,6 +118,42 @@ namespace chisel {
 #endif
     }
 
+    namespace {
+        // at most max bytes of text, not splitting a utf-8 sequence
+        std::u8string utf8_prefix(std::u8string text, const std::size_t max) {
+            if (text.size() <= max) return text;
+            std::size_t cut = max;
+            while (cut > 0 && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80) --cut;
+            text.resize(cut);
+            return text;
+        }
+
+        std::filesystem::path short_stem(const std::filesystem::path &file) {
+            return utf8_prefix(file.stem().u8string(), 32);
+        }
+
+        std::filesystem::path short_extension(const std::filesystem::path &file) {
+            auto extension = file.extension().u8string();
+            if (extension.size() > 16) extension.clear();
+            return extension;
+        }
+    } // namespace
+
+    std::filesystem::path short_name(const std::filesystem::path &file) {
+        auto name = short_stem(file);
+        name += short_extension(file);
+        return name;
+    }
+
+    std::filesystem::path temp_name(const std::filesystem::path &file, const std::string_view tag,
+                                    const std::string_view extension) {
+        auto name = short_stem(file);
+        name += std::string(tag) + RandomUtils::random_suffix();
+        if (extension.empty()) name += short_extension(file);
+        else name += std::string(extension);
+        return name;
+    }
+
     std::filesystem::path make_temp_dir_for(const std::filesystem::path &input_path, const std::string &prefix) {
         // use a common base dir inside temp
         const auto base_tmp = std::filesystem::temp_directory_path() /
@@ -127,13 +163,9 @@ namespace chisel {
         std::filesystem::create_directories(base_tmp, ec);
 
         // the stem only makes the folder recognizable, and a long one eats into path length limits
-        std::string stem = input_path.stem().string();
-        if (stem.size() > 32) {
-            std::size_t cut = 32;
-            while (cut > 0 && (static_cast<unsigned char>(stem[cut]) & 0xC0) == 0x80) --cut;
-            stem.resize(cut);
-        }
-        const std::string dir_name = prefix + "_" + stem + "_" + RandomUtils::random_suffix();
+        std::filesystem::path dir_name = prefix + "_";
+        dir_name += short_stem(input_path);
+        dir_name += "_" + RandomUtils::random_suffix();
         auto dir = base_tmp / dir_name;
 
         std::filesystem::create_directories(dir, ec);

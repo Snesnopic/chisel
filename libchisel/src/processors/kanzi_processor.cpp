@@ -62,7 +62,7 @@ std::filesystem::path KanziProcessor::finalize_extraction(const ExtractedContent
 
     const std::filesystem::path& processed_bin = content.extracted_files.front();
     std::filesystem::path out_knz = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + ".knz");
+        temp_name(content.original_path, "_tmp", ".knz");
 
     try {
         kanzi::Context ctx;

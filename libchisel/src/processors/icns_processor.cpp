@@ -116,7 +116,7 @@ std::filesystem::path IcnsProcessor::finalize_extraction(const ExtractedContent&
     write_be32(new_icns.data() + 4, static_cast<uint32_t>(new_icns.size()));
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".icns");
+        temp_name(content.original_path, "_final", ".icns");
 
     const bool written = write_file(output_path, new_icns);
     cleanup_temp_dir(content.temp_dir, get_name());

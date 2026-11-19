@@ -79,8 +79,7 @@ std::filesystem::path OOXMLProcessor::finalize_extraction(const ExtractedContent
     namespace fs = std::filesystem;
 
     const fs::path src_path(content.original_path);
-    const fs::path tmp_path = fs::temp_directory_path() /
-                              (src_path.stem().string() + "_tmp" + RandomUtils::random_suffix() + src_path.extension().string());
+    const fs::path tmp_path = fs::temp_directory_path() / temp_name(src_path, "_tmp");
 
     if (const auto* zip = std::any_cast<ZipManifest>(&content.extras)) {
         try {

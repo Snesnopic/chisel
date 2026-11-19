@@ -5,6 +5,7 @@
 #include "../../include/ape_processor.hpp"
 #include "../../include/logger.hpp"
 #include "../../include/audio_metadata_util.hpp"
+#include "../../include/file_utils.hpp"
 #include <MACLib.h>
 #include "CharacterHelper.h"
 #include <APETag.h>
@@ -79,11 +80,17 @@ public:
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".ape" || ext == ".mac" || ext == ".apl") return;
 
-        temp_link_ = original.parent_path() / (original.filename().string() + ".ape");
+        const auto name = chisel::temp_name(original, "_link", ".ape");
         std::error_code ec;
+        // a hard link in the temp folder, else next to the file (another volume), else a copy
+        temp_link_ = std::filesystem::temp_directory_path() / name;
         std::filesystem::create_hard_link(original, temp_link_, ec);
         if (ec) {
-            // cross-filesystem or unsupported hardlink; fall back to a copy
+            temp_link_ = original.parent_path() / name;
+            std::filesystem::create_hard_link(original, temp_link_, ec);
+        }
+        if (ec) {
+            temp_link_ = std::filesystem::temp_directory_path() / name;
             std::filesystem::copy_file(original, temp_link_, std::filesystem::copy_options::overwrite_existing, ec);
         }
         if (ec) {

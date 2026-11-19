@@ -144,8 +144,7 @@ namespace chisel {
         // overwrites target in place, putting it back from a backup if that fails halfway
         std::error_code overwrite_keeping_backup(const fs::path& temp, const fs::path& target) {
             std::error_code ec;
-            const auto backup = fs::temp_directory_path() /
-                                (target.filename().string() + ".chisel-backup-" + RandomUtils::random_suffix());
+            const auto backup = fs::temp_directory_path() / temp_name(target, ".chisel-backup-");
             if (!fs::copy_file(target, backup, fs::copy_options::overwrite_existing, ec) || ec) {
                 std::error_code rm_ec;
                 fs::remove(backup, rm_ec);
@@ -431,9 +430,9 @@ namespace chisel {
 
     std::optional<fs::path> ProcessorExecutor::keep_for_finalize(const fs::path& file, const fs::path& temp_file) {
         // a rename can't cross file systems, and the temp file may sit next to the input; finalizers may pick the format from the extension
-        const auto name = file.filename().string();
-        const auto tail = name.size() <= 200 ? "-" + name : file.extension().string();
-        const auto kept = temp_file.parent_path() / (".chisel-kept-" + RandomUtils::random_suffix() + tail);
+        fs::path kept_name = ".chisel-kept-" + RandomUtils::random_suffix() + "-";
+        kept_name += short_name(file);
+        const auto kept = temp_file.parent_path() / kept_name;
         std::error_code ec;
         fs::rename(temp_file, kept, ec);
         if (ec) {
@@ -716,7 +715,7 @@ namespace chisel {
                                 break;
                             }
 
-                            fs::path tmp = temp_dir_for(file, nested) / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            fs::path tmp = temp_dir_for(file, nested) / (short_name(file) += "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             struct TempFileGuard {
                                 fs::path path;
                                 bool release = false;
@@ -808,7 +807,7 @@ namespace chisel {
                         for (std::size_t i = 0; i < candidates.size(); ++i) {
                             if (st.stop_requested()) break;
 
-                            fs::path tmp = temp_dir_for(file, nested) / (file.filename().string() + "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
+                            fs::path tmp = temp_dir_for(file, nested) / (short_name(file) += "_" + job_suffix + ".pipe." + std::to_string(i) + ".tmp");
                             Result r{.tmp=tmp, .size=0, .success=false};
                             try {
                                 candidates[i]->recompress(file, tmp, options);

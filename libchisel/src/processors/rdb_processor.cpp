@@ -125,7 +125,7 @@ std::filesystem::path RdbProcessor::finalize_extraction(const ExtractedContent& 
     }
 
     std::filesystem::path output_path = std::filesystem::temp_directory_path() /
-        (content.original_path.stem().string() + "_final" + RandomUtils::random_suffix() + ".rdb");
+        temp_name(content.original_path, "_final", ".rdb");
 
     const bool written = write_file(output_path, new_rdb);
     cleanup_temp_dir(content.temp_dir, get_name());

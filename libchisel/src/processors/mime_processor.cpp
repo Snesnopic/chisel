@@ -234,8 +234,7 @@ std::filesystem::path MimeProcessor::finalize_extraction(const ExtractedContent&
 
     // outside temp_dir, which goes away with the extracted files
     const std::filesystem::path output_file = std::filesystem::temp_directory_path() /
-                                              (content.original_path.stem().string() + "_tmp" + RandomUtils::random_suffix() +
-                                               content.original_path.extension().string());
+                                              temp_name(content.original_path, "_tmp");
     std::ofstream out(output_file, std::ios::binary);
 
     for (const auto& chunk : state->chunks) {

@@ -62,6 +62,22 @@ namespace chisel {
     FILE *open_file(const std::filesystem::path &path, const char *mode);
 
     /**
+     * @brief A short form of a file's name to build temporary names from.
+     *
+     * The first 32 bytes of the stem, cut on a UTF-8 boundary, and the extension if it's at most
+     * 16 bytes: a temporary name then stays far below the 255-byte limit of a file name, leaving
+     * room for what libraries append to it (a -journal, their own temporary suffix).
+     */
+    std::filesystem::path short_name(const std::filesystem::path &file);
+
+    /**
+     * @brief A unique temporary file name made from a file's short name.
+     * @return The short stem, the tag, random digits and the extension (the file's own when none is given).
+     */
+    std::filesystem::path temp_name(const std::filesystem::path &file, std::string_view tag,
+                                    std::string_view extension = {});
+
+    /**
      * @brief Creates a unique temporary directory for processing.
      *
      * Creates a directory inside the system temp path using a
