@@ -16,6 +16,7 @@
 #include "packer.hpp"
 #include "decoder.hpp"
 #include "file_type.hpp"
+#include "mp3_reader.hpp"
 
 
 namespace chisel {
@@ -87,6 +88,18 @@ int audio_layer(const fs::path& file) {
 }
 
 } // namespace mpeg_layer
+
+// a frame the file cuts off would come out whole, playing longer than the original in most players
+bool last_frame_cut_off(const fs::path& file) {
+    mp3packer::Mp3Reader reader(file.string());
+    std::size_t end = 0;
+    while (const auto frame = reader.read_next_frame()) {
+        end = frame->frame_offset + frame->header.bitrate.frame_size;
+    }
+    // the frames end past the data, or before a few bytes the reader neither parsed nor kept as junk
+    return end != 0 && end != reader.data().size() - reader.get_end_junk().size();
+}
+
 } // namespace
 
 void MpegProcessor::recompress(const fs::path& input,
@@ -101,6 +114,12 @@ void MpegProcessor::recompress(const fs::path& input,
     if (const int layer = mpeg_layer::audio_layer(input); layer == 1 || layer == 2) {
         Logger::log(LogLevel::Debug, std::string("MPEG audio layer ") + (layer == 1 ? "I" : "II") +
                     ", left as is: " + input.filename().string(), get_name());
+        fs::copy_file(input, output);
+        return;
+    }
+
+    if (last_frame_cut_off(input)) {
+        Logger::log(LogLevel::Warning, "Last frame cut off, left as is: " + input.filename().string(), get_name());
         fs::copy_file(input, output);
         return;
     }
