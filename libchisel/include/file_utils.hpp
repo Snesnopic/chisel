@@ -16,6 +16,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 #include <cstdint>
 #include <fstream>
@@ -179,6 +180,12 @@ namespace chisel {
      * @return What puts it on a path; does nothing for a file without one, and on other systems.
      */
     std::function<void(const std::filesystem::path&)> keep_access_control_list(const std::filesystem::path& file);
+
+    /**
+     * @brief Moves @p replacement over @p replaced. On Windows it keeps the replaced file's attributes, access control
+     *        list and alternate streams, such as the one recording where it was downloaded from.
+     */
+    std::error_code replace_file(const std::filesystem::path& replacement, const std::filesystem::path& replaced);
 
 } // namespace chisel
 

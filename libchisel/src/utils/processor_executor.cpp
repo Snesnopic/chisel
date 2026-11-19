@@ -370,7 +370,7 @@ namespace chisel {
             copy_file_metadata(original_file, temp_file);
             int retries = 10;
             while (retries > 0) {
-                fs::rename(temp_file, original_file, ec);
+                ec = replace_file(temp_file, original_file);
 #ifdef __APPLE__
                 // the temp file sits on the system volume, and sandboxed apps may not rename into the folder
                 if (ec) ec = replace_via_copy(temp_file, original_file);

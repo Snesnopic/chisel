@@ -12,7 +12,15 @@
 #include <algorithm>
 #include <cstring>
 #include <system_error>
-#ifndef _WIN32
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -317,6 +325,18 @@ namespace chisel {
 #else
         return [](const std::filesystem::path&) {};
 #endif
+    }
+
+    std::error_code replace_file(const std::filesystem::path& replacement, const std::filesystem::path& replaced) {
+        std::error_code ec;
+#ifdef _WIN32
+        if (ReplaceFileW(replaced.c_str(), replacement.c_str(), nullptr,
+                         REPLACEFILE_IGNORE_MERGE_ERRORS | REPLACEFILE_IGNORE_ACL_ERRORS, nullptr, nullptr)) {
+            return ec;
+        }
+#endif
+        fs::rename(replacement, replaced, ec);
+        return ec;
     }
 
 } // namespace chisel
