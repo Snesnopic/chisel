@@ -173,28 +173,6 @@ void print_console_report(const std::vector<Result>& results,
                   << std::setw(max_result)<< outcome
                   << std::setw(max_error) << r.error_msg
                   << "\n";
-
-        if (!r.codecs_used.empty()) {
-            if (mode == chisel::EncodeMode::PIPE) {
-                std::cerr << "    Pipeline: ";
-                for (std::size_t i = 0; i < r.codecs_used.size(); ++i) {
-                    std::ostringstream ossc;
-                    ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
-                    std::cerr << r.codecs_used[i].first << " (" << ossc.str() << "%)";
-                    if (i + 1 < r.codecs_used.size()) std::cerr << " -> ";
-                }
-                std::cerr << "\n";
-            } else {
-                std::cerr << "    Tried: ";
-                for (size_t i = 0; i < r.codecs_used.size(); ++i) {
-                    std::ostringstream ossc;
-                    ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
-                    std::cerr << r.codecs_used[i].first << " (" << ossc.str() << "%)";
-                    if (i + 1 < r.codecs_used.size()) std::cerr << "; ";
-                }
-                std::cerr << "\n";
-            }
-        }
     }
 
     if (!container_results.empty()) {
@@ -257,24 +235,11 @@ void export_csv_report(const std::vector<Result>& results,
         return p ? p->filename().string() : std::string();
     };
 
-    out << "File,Container,MIME,Before(bytes),After(bytes),Delta(%),Time(s),Result,Codecs,Details\n";
+    out << "File,Container,MIME,Before(bytes),After(bytes),Delta(%),Time(s),Result,Details\n";
 
     auto sorted = results;
     std::ranges::stable_sort(sorted, [](const Result& a, const Result& b) { return a.path < b.path; });
     for (const auto& r : sorted) {
-        std::string codecs_str;
-        for (size_t i = 0; i < r.codecs_used.size(); ++i) {
-            std::ostringstream ossc;
-            ossc << std::fixed << std::setprecision(2) << r.codecs_used[i].second;
-            codecs_str += r.codecs_used[i].first + ":" + ossc.str() + "%";
-            if (i + 1 < r.codecs_used.size()) {
-                if (mode == chisel::EncodeMode::PIPE)
-                    codecs_str += " -> ";
-                else
-                    codecs_str += "; ";
-            }
-        }
-
         std::ostringstream osstime;
         osstime << std::fixed << std::setprecision(2) << r.seconds;
         out << csv_escape(r.path.filename().string()) << ","
@@ -285,7 +250,6 @@ void export_csv_report(const std::vector<Result>& results,
             << (r.success ? delta(r.size_before, r.size_after) : "0.00") << ","
             << osstime.str() << ","
             << csv_escape(outcome(r.success, r.replaced, r.skip_reason)) << ","
-            << csv_escape(codecs_str) << ","
             << csv_escape(r.success ? r.skip_reason : r.error_msg) << "\n";
     }
     if (!container_results.empty()) {

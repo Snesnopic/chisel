@@ -20,7 +20,6 @@ struct Result {
     bool success{};             // operation succeeded
     bool replaced{};            // file was replaced or skipped
     double seconds{};           // processing time
-    std::vector<std::pair<std::string,double>> codecs_used; // codec name + % reduction
     std::string error_msg;      // if !success, reason of failure
     std::string skip_reason;    // set when the run left it as it is
     std::string inside;         // the containers around it, outermost first
