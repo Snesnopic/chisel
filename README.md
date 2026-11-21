@@ -18,6 +18,12 @@ brew tap snesnopic/tools
 brew install chsl
 ```
 
+On macOS, the native app ([ChiselSwift](https://github.com/Snesnopic/ChiselSwift), macOS 14 or later) is available as a cask, which installs the app and `chsl` together:
+```bash
+brew install --cask snesnopic/tools/chisel
+```
+`brew install chsl` installs only the command-line tool, and shows this command when it's done.
+
 It is also available on [winget](https://github.com/microsoft/winget-cli):
 ```powershell
 winget update
