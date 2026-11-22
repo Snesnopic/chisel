@@ -167,10 +167,17 @@ public:
     /**
      * @brief Set a separate output directory, mirroring the inputs' folder structure.
      * A single input file is written to this path as a file, unless it's an existing directory.
-     * Files that can't be improved are copied unchanged.
+     * Files that can't be improved are copied unchanged, unless copyUnchanged(false).
      * Default: empty (in-place).
      */
     Chisel& outputDirectory(const std::filesystem::path& dir);
+
+    /**
+     * @brief With an output directory, copy the files that can't be improved there as they are.
+     * When false, the output directory gets only the files that got smaller.
+     * Default: true.
+     */
+    Chisel& copyUnchanged(bool val);
 
     // --- Observability ---
 

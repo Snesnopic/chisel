@@ -189,6 +189,11 @@ Chisel& Chisel::outputDirectory(const std::filesystem::path& dir) {
     return *this;
 }
 
+Chisel& Chisel::copyUnchanged(const bool val) {
+    impl_->options.copy_unchanged = val;
+    return *this;
+}
+
 void Chisel::setObserver(ChiselObserver* observer) const {
     impl_->observer = observer;
 }

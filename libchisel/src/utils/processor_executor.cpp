@@ -456,7 +456,7 @@ namespace chisel {
     }
 
     void ProcessorExecutor::copy_unchanged_inputs(const std::vector<fs::path>& inputs) const {
-        if (!has_output_dir_ || dry_run_) return;
+        if (!has_output_dir_ || dry_run_ || !m_options.copy_unchanged) return;
         for (const auto &input: inputs) {
             if (stop_flag_.load(std::memory_order_relaxed)) return;
             const auto dest = destination_for(input);

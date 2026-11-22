@@ -86,7 +86,7 @@ public:
      * This function executes the 3-phase processing pipeline. With an output path, it is the
      * output file when the only root is a file (unless it names a directory); otherwise it is a
      * directory where results keep their paths relative to the deepest folder holding all roots.
-     * Inputs that aren't improved are copied there unchanged.
+     * Inputs that aren't improved are copied there unchanged, unless ProcessingOptions::copy_unchanged is false.
      * @param inputs Vector of filesystem paths to process.
      * @param roots Files and folders the inputs were collected from; defaults to the inputs.
      */

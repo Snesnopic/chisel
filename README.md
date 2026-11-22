@@ -143,7 +143,10 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
     Write optimized files to PATH instead of modifying them in-place.
     If the input is `stdin` (-) or a single file, PATH is the output file (unless it's an existing directory).
     Otherwise, PATH is a directory mirroring the inputs' folder structure.
-    Files that can't be improved are copied unchanged.
+    Files that can't be improved are copied unchanged, unless `--only-improved` is given.
+
+-   `--only-improved`
+    With `-o`, write only the files that got smaller, without copying the others.
 
 -   `--report <FILE>`
     Export a final CSV report to the specified file.

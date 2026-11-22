@@ -37,7 +37,12 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
                    "Write optimized files to PATH instead of modifying in-place.\n"
                    "For stdin, PATH is the output file; so it is for a single input file, unless\n"
                    "PATH is an existing directory. Otherwise PATH is a directory mirroring the\n"
-                   "inputs' folder structure. Files that can't be improved are copied unchanged.");
+                   "inputs' folder structure. Files that can't be improved are copied unchanged,\n"
+                   "unless --only-improved is given.");
+
+    app.add_flag("--only-improved", [&](const int count) {
+        settings.options.copy_unchanged = (count == 0);
+    }, "With -o, write only the files that got smaller, without copying the others.");
 
     app.add_option("--report", settings.report_path,
                    "CSV report export filename.")
