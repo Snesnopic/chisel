@@ -90,7 +90,8 @@ jobs:
             build_type: Release
             c_compiler: cl
             cpp_compiler: cl
-            extra_cmake_args: -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static
+            # the Visual Studio generator builds for the host (x64) unless told otherwise
+            extra_cmake_args: -A Win32 -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static -DRust_RUSTUP_INSTALL_MISSING_TARGET=ON
             binary_path: bin/Release/chsl.exe
             asset_name: "windows-x86"
 
@@ -198,6 +199,22 @@ jobs:
 
       - name: Build
         run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+      # a binary built for the wrong platform still links and passes the x64 tests
+      - name: Check binary architecture (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $expected = @{ 'windows-x64' = 'x64'; 'windows-x86' = 'x86'; 'windows-arm' = 'ARM64' }['${{ matrix.id }}']
+          foreach ($exe in @('${{ matrix.binary_path }}', 'bin/Release/Chisel.exe')) {
+            if (-not (Test-Path $exe)) { continue }
+            $machine = (dumpbin /headers $exe | Select-String 'machine \((.+)\)').Matches[0].Groups[1].Value
+            Write-Output "${exe}: ${machine}"
+            if ($machine -ne $expected) {
+              Write-Error "${exe} is built for ${machine}, expected ${expected}"
+              exit 1
+            }
+          }
 
       - name: Show the link command (macOS)
         if: failure() && runner.os == 'macOS'
