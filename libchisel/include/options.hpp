@@ -24,6 +24,8 @@ namespace chisel {
         bool preserve_metadata = true;           /// Don't discard metadata during recompression
         bool break_signatures = false;           /// Optimize digitally signed files too, invalidating their signatures
         bool copy_unchanged = true;              /// With an output directory, copy the inputs that weren't improved there as they are
+        bool jpeg_progressive = true;            /// A JPEG may switch between baseline and progressive, whichever is smaller; false keeps each one's scan type
+        bool flac_exhaustive = false;            /// FLAC: encode every block size and predictor exactly (far slower) instead of from flacoutcpp's estimates
         bool keep_pixel_format = false;          /// Set by the executor, not by users: keep an image's color type and bit depth, which its container declares (e.g. a PDF image)
     };
 

@@ -30,6 +30,13 @@ void setup_cli_parser(CLI::App& app, Settings& settings) {
     app.add_flag("--verify-checksums", settings.options.verify_checksums,
                  "Verify raw checksums before replacing files.");
 
+    app.add_flag("--no-progressive", [&](const int count) {
+        settings.options.jpeg_progressive = (count == 0);
+    }, "Keep each JPEG baseline or progressive as it was, even when switching would be smaller.");
+
+    app.add_flag("--flac-exhaustive", settings.options.flac_exhaustive,
+                 "Search FLAC encodings exhaustively: smaller files, at many times the time.");
+
     app.add_flag("--break-signatures", settings.options.break_signatures,
                  "Optimize digitally signed files too, invalidating their signatures.");
 

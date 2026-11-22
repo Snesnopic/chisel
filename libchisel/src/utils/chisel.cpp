@@ -194,6 +194,16 @@ Chisel& Chisel::copyUnchanged(const bool val) {
     return *this;
 }
 
+Chisel& Chisel::progressiveJpeg(const bool val) {
+    impl_->options.jpeg_progressive = val;
+    return *this;
+}
+
+Chisel& Chisel::exhaustiveFlac(const bool val) {
+    impl_->options.flac_exhaustive = val;
+    return *this;
+}
+
 void Chisel::setObserver(ChiselObserver* observer) const {
     impl_->observer = observer;
 }

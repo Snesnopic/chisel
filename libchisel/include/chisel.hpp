@@ -179,6 +179,20 @@ public:
      */
     Chisel& copyUnchanged(bool val);
 
+    /**
+     * @brief Let a JPEG switch between baseline and progressive, whichever is smaller.
+     * When false, each JPEG keeps its scan type: baseline stays baseline, progressive stays progressive.
+     * Default: true.
+     */
+    Chisel& progressiveJpeg(bool val);
+
+    /**
+     * @brief Search FLAC encodings exhaustively, encoding every block size and predictor exactly.
+     * Smaller files, at many times the time. When false, flacoutcpp works from its estimates.
+     * Default: false.
+     */
+    Chisel& exhaustiveFlac(bool val);
+
     // --- Observability ---
 
     /**

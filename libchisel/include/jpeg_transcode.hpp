@@ -33,7 +33,7 @@ struct MarkerPolicy {
  */
 enum class ScanMode {
     Smallest, ///< progressive or sequential, whichever is smaller
-    AsSource  ///< progressive only if the source was, for containers that declare it (JNG)
+    AsSource  ///< progressive only if the source was: for containers that declare it (JNG), and when asked to keep it
 };
 
 /**

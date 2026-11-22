@@ -180,6 +180,13 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
     DKIM signatures don't count: nearly every received email has one, and it stops verifying once
     the email's attachments are optimized.
 
+-   `--no-progressive`
+    Keep each JPEG baseline or progressive as it was. By default a JPEG becomes whichever of the two is smaller.
+
+-   `--flac-exhaustive`
+    Search FLAC encodings exhaustively, encoding every block size and predictor exactly (flacout's `-e`).
+    Smaller files, at many times the time.
+
 -   `--threads <N>`
     Number of worker threads to use (default: half of available cores).
 

@@ -109,6 +109,13 @@ void FlacoutProcessor::recompress(const std::filesystem::path &input,
     flacoutcpp::Config cfg;
     cfg.copy_metadata = options.preserve_metadata;
     cfg.verbose = false;
+    if (options.flac_exhaustive) {
+        // what flacout's own -e means given alone: exact pricing, the full predictor sweep, its own window set
+        cfg.exhaustive = true;
+        cfg.max_candidates = 0;
+        cfg.precision_rungs = 0;
+        cfg.adaptive_windows = false;
+    }
     // only ever called on this thread
     std::vector<std::string> errors;
     cfg.on_message = [&](const flacoutcpp::MessageLevel level, const std::string_view text) {

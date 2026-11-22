@@ -53,7 +53,7 @@ bool patch_mpf(std::vector<uint8_t>& primary, const jpeg::Layout& layout,
  * from the end of the file (motion photo video) keeps its position relative to the end.
  */
 std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::Layout& layout,
-                             const bool preserve_metadata, const std::string& name) {
+                             const bool preserve_metadata, const jpeg::ScanMode scans, const std::string& name) {
     const auto primary = data.first(layout.primary_end);
     const auto body = data.subspan(layout.trailing_start, layout.trailers_start - layout.trailing_start);
     const auto trailers = data.subspan(layout.trailers_start);
@@ -85,7 +85,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
         bool clean = false;
         const bool resizable = !declares_gain_map || layout.images.size() == 1;
         if (resizable && jpeg::first_image_end(src) == src.size() &&
-            jpeg::transcode(src, policy, jpeg::ScanMode::Smallest, out, clean) && clean && out.size() < src.size()) {
+            jpeg::transcode(src, policy, scans, out, clean) && clean && out.size() < src.size()) {
             images.push_back(std::move(out));
         } else {
             images.emplace_back(src.begin(), src.end());
@@ -127,7 +127,7 @@ std::vector<uint8_t> rebuild(const std::span<const uint8_t> data, const jpeg::La
 
     std::vector<uint8_t> out;
     bool clean = false;
-    if (!jpeg::transcode(primary, policy, jpeg::ScanMode::Smallest, out, clean)) {
+    if (!jpeg::transcode(primary, policy, scans, out, clean)) {
         Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", "JpegProcessor");
         throw std::runtime_error("Libjpeg error");
     }
@@ -182,9 +182,10 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         throw std::runtime_error("Cannot open JPEG input");
     }
 
+    const auto scans = options.jpeg_progressive ? jpeg::ScanMode::Smallest : jpeg::ScanMode::AsSource;
     std::vector<uint8_t> result;
     if (const auto layout = jpeg::parse_layout(data)) {
-        result = rebuild(data, *layout, options.preserve_metadata, input.string());
+        result = rebuild(data, *layout, options.preserve_metadata, scans, input.string());
     } else if (jpeg::first_image_end(data)) {
         Logger::log(LogLevel::Warning, "Inconsistent MPF data, leaving " + input.filename().string() + " unchanged",
                     get_name());
@@ -194,7 +195,7 @@ void JpegProcessor::recompress(const std::filesystem::path& input,
         bool clean = false;
         const jpeg::MarkerPolicy policy{.keep_all = options.preserve_metadata, .keep_links = false, .xmp = std::nullopt,
                                   .exif = std::nullopt};
-        if (!jpeg::transcode(data, policy, jpeg::ScanMode::Smallest, result, clean)) {
+        if (!jpeg::transcode(data, policy, scans, result, clean)) {
             Logger::log(LogLevel::Error, "Recompression failed due to libjpeg error", get_name());
             throw std::runtime_error("Libjpeg error");
         }
