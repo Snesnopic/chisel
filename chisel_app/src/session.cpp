@@ -4,7 +4,6 @@
 
 #include "event_bus.hpp"
 #include "events.hpp"
-#include "file_utils.hpp"
 #include "logger.hpp"
 #include "mime_detector.hpp"
 #include "options.hpp"
@@ -136,6 +135,7 @@ namespace chisel_app {
             std::vector<fs::path> inputs;
             std::vector<fs::path> layout_roots;
             fs::path output_dir;
+            fs::path target_folder; // OutputFolder: where the smaller files go, the temp folder being inside it
             bool temp_output = false;
         };
 
@@ -648,11 +648,11 @@ namespace chisel_app {
         // a queued file's final, smaller result: put it where the output mode wants it
         void finish_root_or_child(const fs::path& path, const std::optional<fs::path>& parent, const std::uint64_t before,
                                   const std::uint64_t after, const bool is_container_self, const fs::path& destination,
-                                  const bool temp_output) {
+                                  const Group& group) {
             Placement placement;
             const RootInfo* root = parent ? nullptr : run_root(path);
             if (root && !is_container_self && before > after && !dry_run) {
-                if (!temp_output) {
+                if (!group.temp_output) {
                     placement.result = destination;
                 } else {
                     // chisel doesn't guard inputs it doesn't replace: check here, as it does in place
@@ -664,7 +664,10 @@ namespace chisel_app {
                         on_skipped(path, parent, chisel::SkipReason::ChangedDuringRun, "Changed during the run", false);
                         return;
                     }
-                    const auto placed = place_result(mode, destination, path);
+                    // in the output folder, the result keeps its path relative to the temp folder chisel laid it out in
+                    const auto placed = group.target_folder.empty()
+                        ? place_result(mode, destination, path)
+                        : place_in_folder(destination, path, group.target_folder / destination.lexically_relative(group.output_dir));
                     placement.result = placed.result;
                     placement.error = placed.error;
                     if (!placed.error.empty()) {
@@ -675,7 +678,7 @@ namespace chisel_app {
             on_finish(path, parent, before, after, is_container_self, placement);
         }
 
-        void subscribe(chisel::EventBus& bus, const bool temp_output) {
+        void subscribe(chisel::EventBus& bus, const Group& group) {
             bus.subscribe<chisel::FileAnalyzeStartEvent>([this](const chisel::FileAnalyzeStartEvent& e) {
                 on_analyze_start(e.path);
             });
@@ -691,8 +694,8 @@ namespace chisel_app {
             bus.subscribe<chisel::FileProcessStartEvent>([this](const chisel::FileProcessStartEvent& e) {
                 on_start(e.path, e.parent_container);
             });
-            bus.subscribe<chisel::FileProcessCompleteEvent>([this, temp_output](const chisel::FileProcessCompleteEvent& e) {
-                finish_root_or_child(e.path, e.parent_container, e.original_size, e.new_size, e.is_container, e.destination, temp_output);
+            bus.subscribe<chisel::FileProcessCompleteEvent>([this, &group](const chisel::FileProcessCompleteEvent& e) {
+                finish_root_or_child(e.path, e.parent_container, e.original_size, e.new_size, e.is_container, e.destination, group);
             });
             bus.subscribe<chisel::FileProcessErrorEvent>([this](const chisel::FileProcessErrorEvent& e) {
                 on_error(e.path, e.parent_container, e.error_message, e.is_container);
@@ -704,8 +707,8 @@ namespace chisel_app {
                 on_finalize_start(e.path);
             });
             // a container's rebuild is its final result
-            bus.subscribe<chisel::ContainerFinalizeCompleteEvent>([this, temp_output](const chisel::ContainerFinalizeCompleteEvent& e) {
-                finish_root_or_child(e.path, e.parent_container, e.original_size, e.final_size, false, e.destination, temp_output);
+            bus.subscribe<chisel::ContainerFinalizeCompleteEvent>([this, &group](const chisel::ContainerFinalizeCompleteEvent& e) {
+                finish_root_or_child(e.path, e.parent_container, e.original_size, e.final_size, false, e.destination, group);
             });
             bus.subscribe<chisel::ContainerFinalizeErrorEvent>([this](const chisel::ContainerFinalizeErrorEvent& e) {
                 on_error(e.path, e.parent_container, e.error_message, false);
@@ -728,10 +731,12 @@ namespace chisel_app {
             for (auto& group : plan.groups) {
                 if (stop_requested.load()) break;
                 if (group.temp_output) {
-                    group.output_dir = temp_folder_for(group.inputs);
+                    group.output_dir = group.target_folder.empty() ? temp_folder_for(group.inputs)
+                                                                   : make_temp_folder(group.target_folder, "chisel-" + run_id);
                     if (group.output_dir.empty()) {
                         for (const auto& path : group.inputs) {
-                            on_error(path, std::nullopt, "Can't create a temporary folder next to it", false);
+                            on_error(path, std::nullopt, group.target_folder.empty() ? "Can't create a temporary folder next to it"
+                                                                                     : "Can't create a temporary folder in the output folder", false);
                         }
                         continue;
                     }
@@ -739,7 +744,7 @@ namespace chisel_app {
                 }
                 {
                     chisel::EventBus bus;
-                    subscribe(bus, group.temp_output);
+                    subscribe(bus, group);
                     chisel::ProcessorExecutor current(*registry, plan.options, chisel::EncodeMode::PIPE, dry_run,
                                                       group.output_dir, bus, plan.threads);
                     {
@@ -967,7 +972,8 @@ namespace chisel_app {
         plan.threads = std::max(1u, settings.threads);
         const auto mode = settings.output_mode;
         const bool dry = options.dry_run;
-        const bool temp_output = !dry && (mode == OutputMode::SideBySide || mode == OutputMode::KeepOriginal);
+        // everything but Overwrite: chisel writes into a temp folder and only the smaller files are placed
+        const bool temp_output = !dry && mode != OutputMode::Overwrite;
 
         {
             std::thread finished;
@@ -1010,14 +1016,14 @@ namespace chisel_app {
             if (!base.empty() && fs::equivalent(base, settings.output_folder, ec)) return StartError::OutputFolderIsInputFolder;
         }
 
-        // what chisel checks only for files it replaces in place, checked here for the modes that change the original's folder
+        // what chisel checks only for files it replaces in place: a change during the run in every placing mode, and a
+        // writable folder where the result goes next to the original (a read-only original is kept under its new name)
         std::unordered_map<Key, Impl::RootInfo> run_roots;
         std::vector<fs::path> runnable;
         for (const auto& p : pending) {
             Impl::RootInfo info{.id = p.id, .stamp = std::nullopt};
             if (temp_output) {
-                const bool writable = mode == OutputMode::KeepOriginal ? chisel::replaceable_in_place(p.path)
-                                                                        : folder_writable(p.path.parent_path());
+                const bool writable = mode == OutputMode::OutputFolder || folder_writable(p.path.parent_path());
                 if (!writable) {
                     plan.read_only.push_back(p.path);
                 } else {
@@ -1030,7 +1036,16 @@ namespace chisel_app {
             run_roots[p.path.native()] = info;
         }
 
-        if (temp_output) {
+        if (temp_output && mode == OutputMode::OutputFolder) {
+            if (!runnable.empty()) {
+                Impl::Group group;
+                group.inputs = runnable;
+                group.layout_roots = layout_roots;
+                group.target_folder = settings.output_folder;
+                group.temp_output = true;
+                plan.groups.push_back(std::move(group));
+            }
+        } else if (temp_output) {
             // one run per volume, each with its temp folder on that volume
             std::vector<std::string> order;
             std::unordered_map<std::string, Impl::Group> by_volume;
@@ -1049,8 +1064,7 @@ namespace chisel_app {
         } else if (!runnable.empty()) {
             Impl::Group group;
             group.inputs = runnable;
-            group.layout_roots = layout_roots.empty() ? runnable : layout_roots;
-            if (mode == OutputMode::OutputFolder && !dry) group.output_dir = settings.output_folder;
+            group.layout_roots = runnable;
             plan.groups.push_back(std::move(group));
         }
 

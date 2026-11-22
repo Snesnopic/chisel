@@ -27,6 +27,10 @@ namespace chisel_app {
     // puts chisel's result for original where SideBySide or KeepOriginal want it; produced is consumed either way
     PlaceResult place_result(OutputMode mode, const std::filesystem::path& produced, const std::filesystem::path& original);
 
+    // OutputFolder: moves produced to target, under a free name if target is taken, with original's metadata
+    PlaceResult place_in_folder(const std::filesystem::path& produced, const std::filesystem::path& original,
+                                const std::filesystem::path& target);
+
     // whether a file in this folder may be created: access(W_OK) on posix; on windows only a write test tells, so true
     bool folder_writable(const std::filesystem::path& folder);
 

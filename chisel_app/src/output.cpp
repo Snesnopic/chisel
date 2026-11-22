@@ -170,6 +170,26 @@ namespace chisel_app {
         return r;
     }
 
+    PlaceResult place_in_folder(const fs::path& produced, const fs::path& original, const fs::path& target) {
+        PlaceResult r;
+        std::error_code ec;
+        fs::create_directories(target.parent_path(), ec);
+        chisel::copy_file_metadata(original, produced);
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            r.result = unique_path(target);
+            ec = rename_no_replace(produced, r.result);
+            if (!ec) return r;
+            if (!fs::exists(fs::symlink_status(r.result))) break;
+        }
+        // the temp folder sits in the output folder, so this is for file systems a rename can't serve
+        if (!fs::exists(fs::symlink_status(r.result)) && !(ec = move_file(produced, r.result))) return r;
+        std::error_code rm_ec;
+        fs::remove(produced, rm_ec);
+        r.error = "can't save " + to_utf8(target.filename()) + " (" + ec.message() + ")";
+        r.result.clear();
+        return r;
+    }
+
     bool folder_writable(const fs::path& folder) {
 #ifdef _WIN32
         (void)folder;

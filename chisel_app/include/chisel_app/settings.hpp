@@ -15,7 +15,7 @@ namespace chisel_app {
         Overwrite,    // chisel replaces the original in place
         SideBySide,   // the result is saved as name.compressed.ext next to the original
         KeepOriginal, // the original is renamed name.original.ext and the result takes its name
-        OutputFolder  // chisel writes into the output folder, keeping paths relative to the inputs' common folder
+        OutputFolder  // only the smaller files go to the output folder, keeping their paths below the folders they were added from
     };
 
     std::string_view to_string(OutputMode mode);
