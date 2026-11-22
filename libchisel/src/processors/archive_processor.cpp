@@ -284,7 +284,7 @@ std::optional<ExtractedContent> ArchiveProcessor::prepare_extraction(const std::
 
     auto manifest = read_archive_manifest(input_path, content.temp_dir, false, get_name());
     if (!manifest) {
-        Logger::log(LogLevel::Error, "Extraction failed for: " + input_path.filename().string(), get_name());
+        Logger::log(LogLevel::Warning, "Extraction failed, left as it is: " + input_path.filename().string(), get_name());
         cleanup_temp_dir(content.temp_dir, get_name());
         return std::nullopt;
     }

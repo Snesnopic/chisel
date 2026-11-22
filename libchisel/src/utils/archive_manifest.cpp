@@ -70,9 +70,13 @@ bool extract_data(archive* a, archive_entry* entry, const fs::path& out, const s
         end = offset + static_cast<la_int64_t>(size);
     }
     os.close();
-    if (r != ARCHIVE_EOF || !os) {
-        Logger::log(LogLevel::Error, "Can't extract " + out.filename().string() + ": " +
-                    (archive_error_string(a) != nullptr ? archive_error_string(a) : "write error"), tag);
+    // a damaged archive is the input's fault, a failed write is chisel's
+    if (r != ARCHIVE_EOF) {
+        Logger::log(LogLevel::Warning, "Can't extract " + out.filename().string() + ", left as it is: " + archive_error(a), tag);
+        return false;
+    }
+    if (!os) {
+        Logger::log(LogLevel::Error, "Can't write " + out.string(), tag);
         return false;
     }
     if (archive_entry_size_is_set(entry) && end < archive_entry_size(entry)) {
@@ -200,7 +204,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
     if (r == ARCHIVE_WARN) {
         Logger::log(LogLevel::Warning, std::string("LIBARCHIVE WARN: ") + archive_error(a.get()), tag);
     } else if (r != ARCHIVE_OK) {
-        Logger::log(LogLevel::Error, "Can't open archive: " + archive_error(a.get()), tag);
+        Logger::log(LogLevel::Warning, "Can't open archive, left as it is: " + archive_error(a.get()), tag);
         return std::nullopt;
     }
 
@@ -209,7 +213,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
     while ((r = archive_read_next_header(a.get(), &entry)) != ARCHIVE_EOF) {
         // a warning can mean a name or owner that didn't convert, which couldn't be written back
         if (r != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Can't read entry: " + archive_error(a.get()), tag);
+            Logger::log(LogLevel::Warning, "Can't read entry, left as it is: " + archive_error(a.get()), tag);
             return std::nullopt;
         }
 
@@ -227,7 +231,7 @@ std::optional<ArchiveManifest> read_archive_manifest(const fs::path& input, cons
             item.data = extraction_path(entry, dest_dir, manifest.items.size());
             if (item.data.empty() || !extract_data(a.get(), entry, item.data, tag)) return std::nullopt;
         } else if (archive_read_data_skip(a.get()) != ARCHIVE_OK) {
-            Logger::log(LogLevel::Error, "Can't skip entry: " + archive_error(a.get()), tag);
+            Logger::log(LogLevel::Warning, "Can't skip entry, left as it is: " + archive_error(a.get()), tag);
             return std::nullopt;
         }
         manifest.items.push_back(std::move(item));
