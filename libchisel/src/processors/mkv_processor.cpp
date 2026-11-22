@@ -45,13 +45,12 @@ void MkvProcessor::recompress(const std::filesystem::path& input,
     args.emplace_back("--keep-info");
 
 #ifdef _WIN32
-    // On Windows, use wide strings for paths if the API supports it, 
-    // or at least ensure we use the absolute path string.
+    // mkclean takes utf-8 paths, string() would give the ansi code page
     std::error_code ec;
-    auto abs_input = std::filesystem::absolute(input, ec).string();
-    auto abs_output = std::filesystem::absolute(output, ec).string();
-    args.push_back(abs_input);
-    args.push_back(abs_output);
+    const auto abs_input = std::filesystem::absolute(input, ec).u8string();
+    const auto abs_output = std::filesystem::absolute(output, ec).u8string();
+    args.emplace_back(abs_input.begin(), abs_input.end());
+    args.emplace_back(abs_output.begin(), abs_output.end());
 #else
     args.push_back(input.string());
     args.push_back(output.string());
