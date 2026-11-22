@@ -13,13 +13,29 @@
 #include <map>
 #include <unordered_set>
 
-#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-#endif
-
 namespace chisel_win {
 
     namespace {
+        // windows 10 1809: the uxtheme ordinals below and DWM's dark title bar (attribute 19) appear
+        constexpr DWORD kDarkModeBuild = 17763;
+        // windows 10 2004: the dark title bar attribute becomes 20
+        constexpr DWORD kDarkAttribute20Build = 19041;
+
+        // the real build number: GetVersionEx reports what the manifest declares
+        DWORD windows_build() {
+            using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
+            static const DWORD build = [] {
+                RTL_OSVERSIONINFOW info{};
+                info.dwOSVersionInfoSize = sizeof(info);
+                const auto get = reinterpret_cast<RtlGetVersionFn>(
+                    reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion")));
+                return get && get(&info) == 0 ? info.dwBuildNumber : DWORD{0};
+            }();
+            return build;
+        }
+
+        bool dark_mode_available() { return windows_build() >= kDarkModeBuild; }
+
         enum class PreferredAppMode { Default, AllowDark, ForceDark, ForceLight, Max };
         using SetPreferredAppModeFn = PreferredAppMode(WINAPI*)(PreferredAppMode);
         using AllowDarkModeForWindowFn = BOOL(WINAPI*)(HWND, BOOL);
@@ -79,6 +95,8 @@ namespace chisel_win {
         Palette g_palette = make_light();
 
         bool system_uses_dark() {
+            // before 1809 a dark window would keep a light title bar, light menus and light scroll bars
+            if (!dark_mode_available()) return false;
             DWORD value = 1;
             DWORD size = sizeof(value);
             if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
@@ -126,8 +144,9 @@ namespace chisel_win {
     bool is_dark() { return g_palette.dark; }
 
     void init_dark_mode_support() {
-        // undocumented uxtheme ordinals, present since windows 10 1809; without them menus stay light
-        HMODULE ux = LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        // undocumented uxtheme ordinals: before 1809 the same numbers may be other functions, or missing.
+        // 135 is AllowDarkModeForApp(BOOL) on 1809 and SetPreferredAppMode from 1903: AllowDark (1) suits both
+        HMODULE ux = dark_mode_available() ? LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32) : nullptr;
         if (ux) {
             auto set_mode = reinterpret_cast<SetPreferredAppModeFn>(reinterpret_cast<void*>(GetProcAddress(ux, MAKEINTRESOURCEA(135))));
             g_allow_dark = reinterpret_cast<AllowDarkModeForWindowFn>(reinterpret_cast<void*>(GetProcAddress(ux, MAKEINTRESOURCEA(133))));
@@ -147,8 +166,10 @@ namespace chisel_win {
     }
 
     void apply_window_theme(HWND hwnd) {
+        if (!dark_mode_available()) return;
         BOOL dark = g_palette.dark ? TRUE : FALSE;
-        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
+        const DWORD attribute = windows_build() >= kDarkAttribute20Build ? 20 : 19;
+        DwmSetWindowAttribute(hwnd, attribute, &dark, sizeof(dark));
         if (g_allow_dark) g_allow_dark(hwnd, dark);
     }
 
