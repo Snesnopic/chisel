@@ -437,29 +437,23 @@ ExternalProject_Add(mozjpeg
         BUILD_BYPRODUCTS ${_mozjpeg_lib}
 )
 
-set(_mozjpeg_build_dir "${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build")
-set(_mozjpeg_jconfig   "${_mozjpeg_build_dir}/jconfig.h")
-set(_mozjpeg_dest      "${CMAKE_SOURCE_DIR}/third_party/mozjpeg/jconfig.h")
-
-add_custom_target(copy_mozjpeg_jconfig ALL
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_mozjpeg_jconfig}" "${_mozjpeg_dest}"
-        DEPENDS mozjpeg
-        COMMENT "Copying mozjpeg jconfig.h into third_party/mozjpeg"
-)
+# the installed headers sit next to this build's own jconfig.h, so builds for different platforms don't share one
+set(_mozjpeg_include "${CMAKE_BINARY_DIR}/mozjpeg-install/include")
+file(MAKE_DIRECTORY "${_mozjpeg_include}")
 
 add_library(mozjpeg_static STATIC IMPORTED GLOBAL)
 set_target_properties(mozjpeg_static PROPERTIES
         IMPORTED_LOCATION "${_mozjpeg_lib}"
-        INTERFACE_INCLUDE_DIRECTORIES
-        "${CMAKE_SOURCE_DIR}/third_party/mozjpeg;${CMAKE_BINARY_DIR}/mozjpeg/src/mozjpeg-build"
+        INTERFACE_INCLUDE_DIRECTORIES "${_mozjpeg_include}"
 )
-add_dependencies(mozjpeg_static mozjpeg copy_mozjpeg_jconfig)
+add_dependencies(mozjpeg_static mozjpeg)
 remove_definitions(JCONFIG_INCLUDED)
 add_library(JPEG::JPEG ALIAS mozjpeg_static)
 
-set(JPEG_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/mozjpeg" CACHE PATH "jpeg include dir")
-set(JPEG_INCLUDE_DIR "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
-set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir")
+# forced, since older build folders cached the source folder here
+set(JPEG_INCLUDE "${_mozjpeg_include}" CACHE PATH "jpeg include dir" FORCE)
+set(JPEG_INCLUDE_DIR "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir" FORCE)
+set(LIBJPEG_H_PATH "${JPEG_INCLUDE}" CACHE PATH "jpeg include dir" FORCE)
 set(LIBJPEG_LIB_PATH "${_mozjpeg_lib}" CACHE FILEPATH "jpeg library")
 set(JPEG_FOUND TRUE CACHE BOOL "jpeg found")
 
@@ -512,10 +506,10 @@ set(INSTALL_PKGCONFIG OFF CACHE BOOL "Disable qpdf pkg-config export" FORCE)
 set(INSTALL_MANUAL OFF CACHE BOOL "" FORCE)
 add_subdirectory(${qpdf_SOURCE_DIR} ${qpdf_BINARY_DIR} EXCLUDE_FROM_ALL)
 if(TARGET libqpdf_object)
-    add_dependencies(libqpdf_object copy_mozjpeg_jconfig)
+    add_dependencies(libqpdf_object mozjpeg)
 endif()
 if(TARGET libqpdf)
-    add_dependencies(libqpdf copy_mozjpeg_jconfig)
+    add_dependencies(libqpdf mozjpeg)
 endif()
 
 # libjxl
@@ -709,7 +703,6 @@ if(ENABLE_OPTIVORBIS)
 endif()
 
 add_subdirectory(libchisel)
-add_dependencies(libchisel copy_mozjpeg_jconfig)
 
 target_include_directories(libchisel SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/third_party/mseedout/include"
