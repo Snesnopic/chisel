@@ -146,6 +146,14 @@ int main(int argc, char* argv[]) {
     Settings settings;
     setup_cli_parser(app, settings);
 
+    // run with no arguments at all, chsl shows how to use it
+    if (argc <= 1) {
+        // parse() is what names the program in the usage line
+        app.name(argc == 1 ? argv[0] : "chsl");
+        std::cout << app.help();
+        return 0;
+    }
+
     try {
         app.parse(argc, argv);
     }

@@ -134,7 +134,7 @@ You can do the same for MKV optimizations (libmkclean specifically) with `-DENAB
 
 **Options:**
 -   `-h, --help`
-    Show the help message and exit.
+    Show the help message and exit. Running `chsl` with no arguments does the same.
 
 -   `--version`
     Display program version information and exit.
