@@ -25,6 +25,13 @@ option(CHISEL_BUILD_CLI "Build the chisel command-line executable" ON)
 option(ENABLE_OPTIVORBIS "Enable rust optivorbis bridge" ON)
 option(ENABLE_MATROSKA "Enable LibEBML and LibMatroska integration" ON)
 option(CHISEL_TSAN "Build with ThreadSanitizer instead of the Debug build's ASan/UBSan (not MSVC)" OFF)
+if(WIN32)
+    set(CHISEL_BUILD_GUI_DEFAULT ON)
+else()
+    set(CHISEL_BUILD_GUI_DEFAULT OFF)
+endif()
+option(CHISEL_BUILD_GUI "Build the desktop GUI and its UI-independent core library chisel_app" ${CHISEL_BUILD_GUI_DEFAULT})
+option(CHISEL_BUILD_APP_HEADLESS "Build chisel_app_headless, a command-line driver of chisel_app for testing" OFF)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION)
     set(CMAKE_UNITY_BUILD TRUE)
@@ -711,6 +718,14 @@ target_include_directories(libchisel SYSTEM PRIVATE
 
 if(CHISEL_BUILD_CLI)
     add_subdirectory(chisel_cli)
+endif()
+
+if(CHISEL_BUILD_GUI OR CHISEL_BUILD_APP_HEADLESS)
+    add_subdirectory(chisel_app)
+endif()
+
+if(CHISEL_BUILD_GUI AND WIN32)
+    add_subdirectory(chisel_win)
 endif()
 
 set(NON_UNITY_TARGETS
