@@ -130,9 +130,9 @@ jobs:
           Write-Host "STARTING WINGET SUBMISSION FOR VERSION: $packageVersion"
 
           # filter urls for each architecture based on asset names
-          $urlX64 = $assets | Where-Object -Property name -like '*windows-x64.zip' | Select-Object -ExpandProperty browser_download_url
-          $urlX86 = $assets | Where-Object -Property name -like '*windows-x86.zip' | Select-Object -ExpandProperty browser_download_url
-          $urlArm64 = $assets | Where-Object -Property name -like '*windows-arm64.zip' | Select-Object -ExpandProperty browser_download_url
+          $urlX64 = $assets | Where-Object -Property name -eq 'chsl-windows-x64.zip' | Select-Object -ExpandProperty browser_download_url
+          $urlX86 = $assets | Where-Object -Property name -eq 'chsl-windows-x86.zip' | Select-Object -ExpandProperty browser_download_url
+          $urlArm64 = $assets | Where-Object -Property name -eq 'chsl-windows-arm64.zip' | Select-Object -ExpandProperty browser_download_url
 
           # download latest wingetcreate standalone binary
           curl.exe -JLO https://aka.ms/wingetcreate/latest
