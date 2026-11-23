@@ -251,6 +251,23 @@ jobs:
           archive: false
           if-no-files-found: error
 
+      # a CI artifact for testers; the nightly release only picks up chsl-* artifacts
+      - name: Package GUI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force gui-package | Out-Null
+          Copy-Item bin/Release/Chisel.exe gui-package/Chisel.exe
+          Compress-Archive -Path gui-package/Chisel.exe -DestinationPath "Chisel-${{ matrix.asset_name }}.zip"
+
+      - name: Upload GUI artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          path: Chisel-${{ matrix.asset_name }}.zip
+          archive: false
+          if-no-files-found: error
+
   test:
     name: test (${{ matrix.asset_name }})
     needs: build
