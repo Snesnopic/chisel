@@ -763,7 +763,8 @@ namespace chisel_app {
                     executor = nullptr;
                 }
                 if (group.temp_output) {
-                    // results were moved out; what is left are chisel's copies of the inputs it didn't improve
+                    if (!group.target_folder.empty() && plan.options.copy_unchanged) place_unchanged(group);
+                    // the smaller files were moved out; what is left is chisel's own leftovers
                     std::error_code ec;
                     fs::remove_all(group.output_dir, ec);
                 }
@@ -797,6 +798,45 @@ namespace chisel_app {
                 push_log(static_cast<int>(chisel::LogLevel::Error), "chisel_app", "Can't save the statistics");
             }
             changed();
+        }
+
+        // where chisel lays out an input below its output directory (ProcessorExecutor::destination_for)
+        static fs::path layout_path(const fs::path& input, const fs::path& base) {
+            const auto path = normalized_path(input);
+            auto relative = path.lexically_relative(base);
+            if (base.empty() || relative.empty() || *relative.begin() == "..") {
+                auto root = to_utf8(path.root_name());
+                std::erase_if(root, [](const char c) { return c == ':' || c == '/' || c == '\\'; });
+                relative = from_utf8(root) / path.relative_path();
+            }
+            return relative;
+        }
+
+        // OutputFolder with copy_unchanged: chisel copied the inputs it didn't improve into the temp folder
+        void place_unchanged(const Group& group) {
+            const auto base = common_parent(group.layout_roots);
+            for (const auto& input : group.inputs) {
+                const auto relative = layout_path(input, base);
+                const auto copy = group.output_dir / relative;
+                std::error_code ec;
+                if (!fs::is_regular_file(copy, ec)) continue;
+                const auto placed = place_in_folder(copy, input, group.target_folder / relative);
+                const auto text = placed.error.empty() ? "COPIED UNCHANGED TO " + to_utf8(placed.result)
+                                                       : "CAN'T COPY UNCHANGED: " + placed.error;
+                {
+                    std::lock_guard lock(mtx);
+                    if (const auto root = run_roots.find(input.native()); root != run_roots.end()) {
+                        if (const auto it = nodes.find(root->second.id); it != nodes.end()) {
+                            it->second.logs.push_back(text);
+                            ++version;
+                        }
+                    }
+                }
+                if (!placed.error.empty()) {
+                    chisel::Logger::log(chisel::LogLevel::Error, "Can't copy " + to_utf8(input) + " to the output folder: " + placed.error, "chisel_app");
+                }
+                changed();
+            }
         }
 
         // on the inputs' volume, so that putting results in place is a rename: their common folder, else the first one's
@@ -974,6 +1014,10 @@ namespace chisel_app {
         const bool dry = options.dry_run;
         // everything but Overwrite: chisel writes into a temp folder and only the smaller files are placed
         const bool temp_output = !dry && mode != OutputMode::Overwrite;
+        plan.options.jpeg_progressive = settings.progressive_jpeg;
+        plan.options.flac_exhaustive = settings.exhaustive_flac;
+        // unchanged copies are only wanted in the output folder; elsewhere they would be a wasted copy into the temp folder
+        plan.options.copy_unchanged = temp_output && mode == OutputMode::OutputFolder && settings.copy_unchanged;
 
         {
             std::thread finished;

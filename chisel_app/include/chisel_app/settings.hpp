@@ -35,6 +35,9 @@ namespace chisel_app {
         bool recursive_folder_import = true;
         OutputMode output_mode = OutputMode::KeepOriginal;
         std::filesystem::path output_folder;
+        bool copy_unchanged = false;   // OutputFolder: also copy the files that didn't get smaller
+        bool progressive_jpeg = true;  // a JPEG may switch between baseline and progressive, whichever is smaller
+        bool exhaustive_flac = false;  // FLAC: try every encoding exactly, far slower
 
         bool operator==(const Settings&) const = default;
     };

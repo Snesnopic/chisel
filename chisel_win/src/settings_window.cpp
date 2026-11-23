@@ -17,7 +17,7 @@ namespace chisel_win {
             ID_APPLY = 3, ID_BROWSE = 300, ID_RESET, ID_FOLDER, ID_ITER, ID_ITER_LARGE, ID_ITER_SPIN, ID_ITER_LARGE_SPIN,
             ID_THREADS, ID_THREADS_VALUE, ID_THREADS_NOTE, ID_ITER_WARN,
             ID_MODE_OVERWRITE = 320, ID_MODE_KEEP, ID_MODE_SIDE, ID_MODE_FOLDER,
-            ID_SUBFOLDERS = 330, ID_HIDE, ID_PRESERVE, ID_VERIFY, ID_SIGNED,
+            ID_SUBFOLDERS = 330, ID_HIDE, ID_PRESERVE, ID_VERIFY, ID_SIGNED, ID_COPY_UNCHANGED, ID_KEEP_JPEG, ID_FLAC_EXHAUSTIVE,
             ID_LABEL_BASE = 400 // a label's id is its control's id plus this, so clicking it toggles the control
         };
 
@@ -85,11 +85,15 @@ namespace chisel_win {
                 add(WC_EDITW, L"", WS_TABSTOP | ES_AUTOHSCROLL | ES_READONLY | WS_BORDER, ID_FOLDER, Role::Input, 0,
                     {kLeft + 26, 278, kRight - 96, 306});
                 add(WC_BUTTONW, L"Browse…", WS_TABSTOP | BS_OWNERDRAW, ID_BROWSE, Role::Input, 0, {kRight - 88, 278, kRight, 306});
-                label(L"Adding files", 0, Role::Heading, 0, {kLeft, 330, kRight, 352});
-                option(L"Include subfolders when adding a folder", nullptr, ID_SUBFOLDERS, false, false, 0, 362, 0);
+                // belongs to "Save to a folder", so it sits under the folder and works only in that mode
+                add(WC_BUTTONW, L"", WS_TABSTOP | BS_AUTOCHECKBOX, ID_COPY_UNCHANGED, Role::Input, 0, {kLeft + 26, 316, kLeft + 44, 336});
+                label(L"Copy files that didn't shrink to the output folder", ID_COPY_UNCHANGED + ID_LABEL_BASE, Role::Text, 0,
+                      {kLeft + 52, 317, kRight, 335});
+                label(L"Adding files", 0, Role::Heading, 0, {kLeft, 352, kRight, 374});
+                option(L"Include subfolders when adding a folder", nullptr, ID_SUBFOLDERS, false, false, 0, 384, 0);
                 option(L"Hide unsupported files inside containers",
                        L"PDFs, archives and Office documents often hold many files that can't be recompressed.", ID_HIDE, false, false,
-                       0, 392, 1);
+                       0, 414, 1);
 
                 // compression
                 label(L"Compression", 0, Role::Heading, 1, {kLeft, 62, kRight, 84});
@@ -123,7 +127,14 @@ namespace chisel_win {
                     Role::Input, 2, {kRight - 20, 172, kRight, 200});
                 add(WC_STATICW, L"High values make processing much slower.", SS_LEFT, ID_ITER_WARN, Role::Warn, 2, {kLeft, 210, kRight, 228});
                 add(WC_BUTTONW, L"Reset to defaults", WS_TABSTOP | BS_OWNERDRAW, ID_RESET, Role::Input, 2, {kLeft, 238, kLeft + 150, 270});
-                label(L"Changes apply to the next run.", 0, Role::Desc, 2, {kLeft, 290, kRight, 308});
+                label(L"JPEG and FLAC", 0, Role::Heading, 2, {kLeft, 292, kRight, 314});
+                option(L"Keep each JPEG baseline or progressive as it is",
+                       L"Otherwise each JPEG becomes baseline or progressive, whichever is smaller. The image itself never changes.",
+                       ID_KEEP_JPEG, false, false, 2, 324, 1);
+                option(L"Exhaustive FLAC search",
+                       L"Slightly smaller FLAC files, at hundreds to thousands of times the encoding time.", ID_FLAC_EXHAUSTIVE, false,
+                       false, 2, 370, 1);
+                label(L"Changes apply to the next run.", 0, Role::Desc, 2, {kLeft, 424, kRight, 442});
 
                 // every tab
                 if (locked) {
@@ -148,6 +159,9 @@ namespace chisel_win {
                 Button_SetCheck(item(ID_PRESERVE), working.preserve_metadata ? BST_CHECKED : BST_UNCHECKED);
                 Button_SetCheck(item(ID_VERIFY), working.verify_checksums ? BST_CHECKED : BST_UNCHECKED);
                 Button_SetCheck(item(ID_SIGNED), working.break_signatures ? BST_CHECKED : BST_UNCHECKED);
+                Button_SetCheck(item(ID_COPY_UNCHANGED), working.copy_unchanged ? BST_CHECKED : BST_UNCHECKED);
+                Button_SetCheck(item(ID_KEEP_JPEG), working.progressive_jpeg ? BST_UNCHECKED : BST_CHECKED);
+                Button_SetCheck(item(ID_FLAC_EXHAUSTIVE), working.exhaustive_flac ? BST_CHECKED : BST_UNCHECKED);
                 SendMessageW(item(ID_THREADS), TBM_SETRANGE, TRUE, MAKELPARAM(1, max_threads));
                 SendMessageW(item(ID_THREADS), TBM_SETPOS, TRUE, static_cast<LPARAM>(std::min(working.threads, max_threads)));
                 SendMessageW(item(ID_ITER_SPIN), UDM_SETRANGE32, 1, 1000);
@@ -174,6 +188,8 @@ namespace chisel_win {
                 const bool folder = working.output_mode == chisel_app::OutputMode::OutputFolder;
                 EnableWindow(item(ID_FOLDER), folder && !locked);
                 EnableWindow(item(ID_BROWSE), folder && !locked);
+                EnableWindow(item(ID_COPY_UNCHANGED), folder && !locked);
+                EnableWindow(item(ID_COPY_UNCHANGED + ID_LABEL_BASE), folder && !locked);
                 EnableWindow(item(ID_APPLY), !locked && !(working == applied));
             }
 
@@ -187,6 +203,9 @@ namespace chisel_win {
                 working.preserve_metadata = Button_GetCheck(item(ID_PRESERVE)) == BST_CHECKED;
                 working.verify_checksums = Button_GetCheck(item(ID_VERIFY)) == BST_CHECKED;
                 working.break_signatures = Button_GetCheck(item(ID_SIGNED)) == BST_CHECKED;
+                working.copy_unchanged = Button_GetCheck(item(ID_COPY_UNCHANGED)) == BST_CHECKED;
+                working.progressive_jpeg = Button_GetCheck(item(ID_KEEP_JPEG)) != BST_CHECKED;
+                working.exhaustive_flac = Button_GetCheck(item(ID_FLAC_EXHAUSTIVE)) == BST_CHECKED;
                 working.threads = static_cast<unsigned>(std::max<LRESULT>(1, SendMessageW(item(ID_THREADS), TBM_GETPOS, 0, 0)));
                 const auto number = [&](const int id, const unsigned fallback) {
                     const std::wstring text = window_text(item(id));

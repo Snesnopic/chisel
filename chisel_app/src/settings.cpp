@@ -23,6 +23,9 @@ namespace chisel_app {
         constexpr std::string_view kRecursiveFolderImport = "recursiveFolderImport";
         constexpr std::string_view kOutputMode = "outputMode";
         constexpr std::string_view kOutputFolder = "outputFolder";
+        constexpr std::string_view kCopyUnchanged = "copyUnchanged";
+        constexpr std::string_view kProgressiveJpeg = "progressiveJpeg";
+        constexpr std::string_view kExhaustiveFlac = "exhaustiveFlac";
 
         std::optional<unsigned> parse_unsigned(const std::optional<std::string>& text) {
             if (!text) return std::nullopt;
@@ -139,6 +142,9 @@ namespace chisel_app {
         if (const auto v = parse_bool(store.get(kBreakSignatures))) s.break_signatures = *v;
         if (const auto v = parse_bool(store.get(kHideUnsupported))) s.hide_unsupported = *v;
         if (const auto v = parse_bool(store.get(kRecursiveFolderImport))) s.recursive_folder_import = *v;
+        if (const auto v = parse_bool(store.get(kCopyUnchanged))) s.copy_unchanged = *v;
+        if (const auto v = parse_bool(store.get(kProgressiveJpeg))) s.progressive_jpeg = *v;
+        if (const auto v = parse_bool(store.get(kExhaustiveFlac))) s.exhaustive_flac = *v;
         if (const auto v = store.get(kOutputMode)) {
             if (const auto mode = output_mode_from_string(*v)) s.output_mode = *mode;
         }
@@ -158,6 +164,9 @@ namespace chisel_app {
         store.set(kRecursiveFolderImport, flag(s.recursive_folder_import));
         store.set(kOutputMode, to_string(s.output_mode));
         store.set(kOutputFolder, to_utf8(s.output_folder));
+        store.set(kCopyUnchanged, flag(s.copy_unchanged));
+        store.set(kProgressiveJpeg, flag(s.progressive_jpeg));
+        store.set(kExhaustiveFlac, flag(s.exhaustive_flac));
     }
 
 } // namespace chisel_app

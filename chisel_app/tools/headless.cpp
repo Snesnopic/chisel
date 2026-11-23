@@ -43,6 +43,8 @@ namespace {
         check(defaults.preserve_metadata && !defaults.verify_checksums && !defaults.break_signatures, "metadata on, checksums off, signatures kept");
         check(defaults.hide_unsupported && defaults.recursive_folder_import, "hide unsupported, recursive import");
         check(defaults.output_mode == OutputMode::KeepOriginal && defaults.output_folder.empty(), "keepOriginal, no output folder");
+        check(!defaults.copy_unchanged && defaults.progressive_jpeg && !defaults.exhaustive_flac,
+              "no unchanged copies, JPEG scan type free, FLAC not exhaustive");
         const auto settings_file = dir / "settings.ini";
         fs::remove(settings_file, ec);
         {
@@ -60,6 +62,9 @@ namespace {
         custom.recursive_folder_import = false;
         custom.output_mode = OutputMode::OutputFolder;
         custom.output_folder = from_utf8("/tmp/out dir/caff\xc3\xa8=x\nline");
+        custom.copy_unchanged = true;
+        custom.progressive_jpeg = false;
+        custom.exhaustive_flac = true;
         {
             FileKeyValueStore store(settings_file);
             save_settings(custom, store);
@@ -347,6 +352,7 @@ namespace {
                      "       chisel_app_headless [--mode overwrite|sideBySide|keepOriginal|outputFolder] [--out DIR]\n"
                      "         [--threads N] [--iterations N] [--iterations-large N] [--dry-run] [--no-recursive]\n"
                      "         [--show-unsupported] [--verify] [--no-metadata] [--break-signatures] [--settings FILE]\n"
+                     "         [--copy-unchanged] [--keep-jpeg-scan] [--flac-exhaustive]\n"
                      "         [--stats FILE] [--stop-on-start NAME] [--stop-after-ms N] [--append-on-start NAME]\n"
                      "         [--logs] [--global-logs] PATH...\n";
     }
@@ -393,6 +399,9 @@ int main(int argc, char** argv) {
         else if (a == "--verify") opt.settings.verify_checksums = true;
         else if (a == "--no-metadata") opt.settings.preserve_metadata = false;
         else if (a == "--break-signatures") opt.settings.break_signatures = true;
+        else if (a == "--copy-unchanged") opt.settings.copy_unchanged = true;
+        else if (a == "--keep-jpeg-scan") opt.settings.progressive_jpeg = false;
+        else if (a == "--flac-exhaustive") opt.settings.exhaustive_flac = true;
         else if (a == "--stats") opt.stats_file = next();
         else if (a == "--stop-on-start") opt.stop_on_start = next();
         else if (a == "--stop-after-ms") opt.stop_after_ms = std::stol(next());
