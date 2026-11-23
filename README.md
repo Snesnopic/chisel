@@ -30,6 +30,8 @@ winget update
 winget install Snesnopic.Chisel
 ```
 
+On Windows, the zips on the releases page hold `Chisel.exe`, a desktop app (Windows 10 1903 or later), next to `chsl.exe`.
+
 > The executable name is 'chsl' because 'chisel' already exists in brew.
 
 ### Building from source

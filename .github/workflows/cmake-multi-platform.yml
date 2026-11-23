@@ -240,7 +240,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force package | Out-Null
           Copy-Item "${{ matrix.binary_path }}" package/chsl.exe
-          Compress-Archive -Path package/chsl.exe -DestinationPath "chsl-${{ matrix.asset_name }}.zip"
+          # the GUI ships in the same zip as the CLI
+          Copy-Item bin/Release/Chisel.exe package/Chisel.exe
+          Compress-Archive -Path package/chsl.exe, package/Chisel.exe -DestinationPath "chsl-${{ matrix.asset_name }}.zip"
           "ASSET=chsl-${{ matrix.asset_name }}.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # uploaded without a zip around it, so the artifact is the release asset itself
@@ -248,23 +250,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.ASSET }}
-          archive: false
-          if-no-files-found: error
-
-      # a CI artifact for testers; the nightly release only picks up chsl-* artifacts
-      - name: Package GUI (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force gui-package | Out-Null
-          Copy-Item bin/Release/Chisel.exe gui-package/Chisel.exe
-          Compress-Archive -Path gui-package/Chisel.exe -DestinationPath "Chisel-${{ matrix.asset_name }}.zip"
-
-      - name: Upload GUI artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v7
-        with:
-          path: Chisel-${{ matrix.asset_name }}.zip
           archive: false
           if-no-files-found: error
 
@@ -720,7 +705,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Output "Checking dependencies for Windows..."
-          $deps = & dumpbin /dependents "${{ env.BIN_DIR }}\chsl.exe"
+          $deps = foreach ($exe in @('chsl.exe', 'Chisel.exe')) { & dumpbin /dependents "${{ env.BIN_DIR }}\$exe" }
           $deps | Out-String | Write-Output
           Write-Output "---"
           $pattern = [regex]"(${env:FORBIDDEN_LIBS})\.dll"
