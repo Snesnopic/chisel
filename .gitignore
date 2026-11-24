@@ -15,6 +15,7 @@ Thumbs.db
 *.out
 *.app
 *.i*
+!*.iss
 *.d
 *.pdb
 *.mod

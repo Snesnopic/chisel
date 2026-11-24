@@ -114,36 +114,94 @@ jobs:
             echo "Formula already up to date."
           fi
 
+  # the manifest is written in full, as the formula is: wingetcreate update can't turn the portable zip package into an installer one
   update-winget:
     runs-on: windows-latest
     env:
       WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+      TAG_NAME: ${{ github.event.release.tag_name }}
+      PUBLISHED_AT: ${{ github.event.release.published_at }}
     steps:
-      - name: Submit package using wingetcreate
-        shell: powershell
+      - name: Write the manifest
+        shell: pwsh
         run: |
-          # extract version and assets from release event
-          $rawVersion = "${{ github.event.release.tag_name }}"
-          $packageVersion = $rawVersion.TrimStart('v')
-          $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
+          if (-not $env:TAG_NAME) { throw 'no release tag' }
+          $version = $env:TAG_NAME.TrimStart('v')
+          $base = "https://github.com/Snesnopic/chisel/releases/download/$env:TAG_NAME"
+          # the installer's AppId (chisel_win/installer/chisel.iss) plus Inno's suffix
+          $productCode = '{0DD956F3-D080-4F33-B823-86858AF5B03B}_is1'
+          $installers = foreach ($arch in 'x64', 'arm64', 'x86') {
+            $file = "chisel-setup-windows-$arch.exe"
+            Invoke-WebRequest -Uri "$base/$file" -OutFile $file -MaximumRetryCount 5 -RetryIntervalSec 10
+            $sha = (Get-FileHash $file -Algorithm SHA256).Hash
+            "- Architecture: $arch`n  InstallerUrl: $base/$file`n  InstallerSha256: $sha"
+          }
+          $dir = "manifest\$version"
+          New-Item -ItemType Directory -Force $dir | Out-Null
 
-          Write-Host "STARTING WINGET SUBMISSION FOR VERSION: $packageVersion"
+          @"
+          PackageIdentifier: Snesnopic.Chisel
+          PackageVersion: $version
+          DefaultLocale: en-US
+          ManifestType: version
+          ManifestVersion: 1.10.0
+          "@ | Set-Content "$dir\Snesnopic.Chisel.yaml"
 
-          # filter urls for each architecture based on asset names
-          $urlX64 = $assets | Where-Object -Property name -eq 'chsl-windows-x64.zip' | Select-Object -ExpandProperty browser_download_url
-          $urlX86 = $assets | Where-Object -Property name -eq 'chsl-windows-x86.zip' | Select-Object -ExpandProperty browser_download_url
-          $urlArm64 = $assets | Where-Object -Property name -eq 'chsl-windows-arm64.zip' | Select-Object -ExpandProperty browser_download_url
+          @"
+          PackageIdentifier: Snesnopic.Chisel
+          PackageVersion: $version
+          InstallerType: inno
+          Scope: user
+          InstallModes:
+          - interactive
+          - silent
+          - silentWithProgress
+          UpgradeBehavior: install
+          Commands:
+          - chisel
+          - chsl
+          ProductCode: '$productCode'
+          MinimumOSVersion: 10.0.18362.0
+          ReleaseDate: $($env:PUBLISHED_AT.Substring(0, 10))
+          Installers:
+          $($installers -join "`n")
+          ManifestType: installer
+          ManifestVersion: 1.10.0
+          "@ | Set-Content "$dir\Snesnopic.Chisel.installer.yaml"
 
-          # download latest wingetcreate standalone binary
+          @"
+          PackageIdentifier: Snesnopic.Chisel
+          PackageVersion: $version
+          PackageLocale: en-US
+          Publisher: Snesnopic
+          PublisherUrl: https://github.com/Snesnopic
+          PublisherSupportUrl: https://github.com/Snesnopic/chisel/issues
+          PackageName: Chisel
+          PackageUrl: https://github.com/Snesnopic/chisel
+          License: MIT
+          LicenseUrl: https://github.com/Snesnopic/chisel/blob/main/LICENSE
+          ShortDescription: Lossless file optimizer and re-compressor
+          Tags:
+          - cli
+          - compression
+          - cpp
+          - gui
+          - linux
+          - macos
+          - recompression
+          - windows
+          ReleaseNotesUrl: https://github.com/Snesnopic/chisel/releases/tag/$env:TAG_NAME
+          ManifestType: defaultLocale
+          ManifestVersion: 1.10.0
+          "@ | Set-Content "$dir\Snesnopic.Chisel.locale.en-US.yaml"
+
+          Get-ChildItem $dir | ForEach-Object { Write-Output "== $($_.Name)"; Get-Content $_.FullName }
+          "MANIFEST_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Submit the manifest
+        shell: pwsh
+        run: |
           curl.exe -JLO https://aka.ms/wingetcreate/latest
-
-          # execute update with explicit architecture mapping
-          $urls = @()
-          if ($urlX64) { $urls += "$urlX64|x64" }
-          if ($urlX86) { $urls += "$urlX86|x86" }
-          if ($urlArm64) { $urls += "$urlArm64|arm64" }
-
-          .\wingetcreate.exe update Snesnopic.Chisel `
-            --version $packageVersion `
-            --urls $urls `
-            --submit
+          .\wingetcreate.exe submit --prtitle "New version: Snesnopic.Chisel version $env:PACKAGE_VERSION" $env:MANIFEST_DIR
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate exited with $LASTEXITCODE" }

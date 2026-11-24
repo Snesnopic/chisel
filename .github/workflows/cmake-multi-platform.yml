@@ -253,6 +253,80 @@ jobs:
           archive: false
           if-no-files-found: error
 
+      # Chisel.exe in the Start menu, the CLI on the user's PATH as chsl and chisel
+      - name: Build installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup --version 6.7.1 -y --no-progress
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "no $iscc" }
+          $version = (Select-String -Path CMakeLists.txt -Pattern 'project\(chisel VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          $arch = @{ 'windows-x64' = 'x64'; 'windows-x86' = 'x86'; 'windows-arm' = 'arm64' }['${{ matrix.id }}']
+          & $iscc /Q "/DAppVersion=$version" "/DArch=$arch" "/DBinDir=$PWD\package" "/O$PWD" chisel_win/installer/chisel.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC exited with $LASTEXITCODE" }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "INSTALLER=chisel-setup-windows-$arch.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Test installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # the AppId in chisel.iss: winget's ProductCode
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{0DD956F3-D080-4F33-B823-86858AF5B03B}_is1'
+          $shortcut = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Chisel.lnk"
+          $p = Start-Process -FilePath ".\$env:INSTALLER" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/LOG=install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log; throw "setup exited with $($p.ExitCode)" }
+          $entry = Get-ItemProperty $key
+          Write-Output "installed: $($entry.DisplayName) $($entry.DisplayVersion) in $($entry.InstallLocation)"
+          if ($entry.DisplayName -ne 'Chisel' -or $entry.DisplayVersion -ne $env:APP_VERSION) { throw 'unexpected uninstall entry' }
+          $app = $entry.InstallLocation.TrimEnd('\')
+          if ($app -notlike '*\AppData\Local\Programs\Chisel') { throw "installed in $app" }
+          foreach ($f in 'Chisel.exe', 'chsl.exe', 'chisel.com') {
+            if (-not (Test-Path "$app\$f")) { throw "missing $app\$f" }
+          }
+          if (-not (Test-Path $shortcut)) { throw "missing $shortcut" }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (($userPath -split ';') -notcontains $app) { throw "$app is not on the user PATH: $userPath" }
+
+          # a new terminal: the PATH the installer wrote, in a folder with no chisel of its own
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $userPath
+          Push-Location $env:RUNNER_TEMP
+          $where = @(cmd /c where chisel)
+          Write-Output "cmd: where chisel -> $($where -join ', ')"
+          if ($where[0] -ne "$app\chisel.com") { throw "cmd finds $($where[0]) first" }
+          foreach ($shell in 'pwsh', 'powershell') {
+            $found = & $shell -NoProfile -Command '(Get-Command chisel)[0].Source'
+            Write-Output "${shell}: chisel -> $found"
+            if ($found -ne "$app\chisel.com") { throw "$shell finds $found first" }
+          }
+          foreach ($command in 'chisel', 'chsl') {
+            $out = cmd /c "$command --version"
+            Write-Output "${command} --version -> $out"
+            if ("$out" -notmatch [regex]::Escape($env:APP_VERSION)) { throw "$command --version printed $out, expected $env:APP_VERSION" }
+          }
+          Pop-Location
+
+          Start-Process -FilePath "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait
+          # the uninstaller finishes from a copy of itself in the temp folder
+          for ($i = 0; $i -lt 60 -and (Test-Path "$app\chsl.exe"); $i++) { Start-Sleep 1 }
+          foreach ($f in 'Chisel.exe', 'chsl.exe', 'chisel.com') {
+            if (Test-Path "$app\$f") { throw "uninstall left $app\$f" }
+          }
+          if (Test-Path $shortcut) { throw "uninstall left $shortcut" }
+          if (Test-Path $key) { throw "uninstall left $key" }
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if (($userPath -split ';') -contains $app) { throw "uninstall left $app on the user PATH: $userPath" }
+          Write-Output 'installed, found as chisel.com, uninstalled'
+
+      - name: Upload installer artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.INSTALLER }}
+          archive: false
+          if-no-files-found: error
+
   test:
     name: test (${{ matrix.asset_name }})
     needs: build
@@ -562,6 +636,13 @@ jobs:
           path: binaries
           skip-decompress: true
 
+      - name: Download installers
+        uses: actions/download-artifact@v8
+        with:
+          pattern: chisel-setup-*
+          path: binaries
+          skip-decompress: true
+
       - name: Download logs
         uses: actions/download-artifact@v8
         with:
@@ -571,7 +652,7 @@ jobs:
       - name: Prepare assets for release
         run: |
           mkdir -p release_assets
-          find binaries -type f \( -name 'chsl-*.tar.gz' -o -name 'chsl-*.zip' \) -exec cp {} release_assets/ \;
+          find binaries -type f \( -name 'chsl-*.tar.gz' -o -name 'chsl-*.zip' -o -name 'chisel-setup-*.exe' \) -exec cp {} release_assets/ \;
           # every platform's log is called chisel.log: each one goes out under its platform's name
           for dir in logs/chisel-log-*/; do
             platform=$(basename "$dir"); platform=${platform#chisel-log-}
