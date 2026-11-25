@@ -1,0 +1,220 @@
+# Italian catalog for Chisel.exe: english<TAB>italiano, with \t \n \\ escapes; tools/check_translations.py checks it
+# terms shared with ChiselSwift's Localizable.xcstrings keep its translation
+
+# formats window
+Archive	Archivio
+Audio	Audio
+Database	Database
+Document	Documento
+Font	Font
+Image	Immagine
+Scientific	Scientifico
+Video	Video
+Unknown	Sconosciuto
+
+# about window
+App icon by	Icona dell'app di
+Version {0}	Versione {0}
+Lossless recompression of images, audio, documents and archives, and of the files inside them.	Ricompressione senza perdita di immagini, audio, documenti e archivi, e dei file al loro interno.
+Supported formats	Formati supportati
+About Chisel	Informazioni su Chisel
+Supported formats ({0})	Formati supportati ({0})
+OK	OK
+
+# row status
+signed	firmato
+unsupported	non supportato
+empty	vuoto
+junk	superfluo
+nothing to do	niente da fare
+too deep	troppo annidato
+read-only	sola lettura
+changed	modificato
+Completed	Completato
+Would be smaller	Sarebbe più piccolo
+Processing…	Elaborazione…
+No gain	Nessun guadagno
+Skipped	Saltato
+Skipped: {0}	Saltato: {0}
+Error	Errore
+Stopped	Interrotto
+Pending	In attesa
+Read-only	Sola lettura
+Changed during the run	Modificato durante l'elaborazione
+
+# output modes in the status bar
+Replace originals	Sostituisci gli originali
+Keep originals	Mantieni gli originali
+Save next to originals	Salva accanto agli originali
+Save to a folder	Salva in una cartella
+Save to {0}	Salva in {0}
+
+# inspector
+Digitally signed: left untouched so its signature stays valid.	Firmato digitalmente: lasciato intatto perché la firma resti valida.
+No processor handles this format.	Nessun processore gestisce questo formato.
+Read-only: it, or its folder, can't be written.	Sola lettura: non si può scrivere sul file o nella sua cartella.
+Something else changed it while Chisel was working on it: left as it was.	È stato modificato da altro mentre Chisel ci lavorava: lasciato com'era.
+Empty file.	File vuoto.
+Nothing to recompress in it.	Niente da ricomprimere al suo interno.
+Discarded with its container.	Scartato insieme al suo contenitore.
+Select a file to see its details.	Seleziona un file per vederne i dettagli.
+Inside {0}	Dentro {0}
+Status	Stato
+Original size	Dimensione originale
+New size	Nuova dimensione
+Saved	Risparmiato
+Nothing: original kept	Niente: originale mantenuto
+Reason	Motivo
+Process log	Log di elaborazione
+Open file location	Apri percorso file
+Copy log	Copia log
+Waiting to be processed	In attesa di elaborazione
+
+# start errors, after "Can't start: "
+a run is already going	è già in corso un'elaborazione
+nothing is waiting to be processed	nessun file è in attesa di elaborazione
+no output folder is set	non è impostata una cartella di destinazione
+the output folder can't be created	non si può creare la cartella di destinazione
+the output folder is the folder the files come from	la cartella di destinazione è quella da cui provengono i file
+Can't start: {0}.	Impossibile avviare: {0}.
+
+# main window
+Name	Nome
+Original	Originale
+Add files	Aggiungi file
+Add folder	Aggiungi cartella
+See the supported formats	Vedi i formati supportati
+Show	Mostra
+Start	Avvia
+Stop	Interrompi
+Clear	Rimuovi
+Statistics	Statistiche
+Settings	Impostazioni
+Start\tF5	Avvia\tF5
+Dry run only (nothing is written)	Solo simulazione (non viene scritto nulla)
+Clear all	Rimuovi tutto
+Clear finished	Rimuovi i file elaborati
+Remove selected\tDel	Rimuovi selezionato\tCanc
+Drop files or folders here	Trascina qui file o cartelle
+Chisel makes them smaller without changing what's inside: images, audio, documents, archives, and the files they contain.	Chisel li rende più piccoli senza cambiarne il contenuto: immagini, audio, documenti, archivi e i file che contengono.
+Not added.	Non aggiunti.
+Already in the list.	Già nell'elenco.
+Those files are waiting to be processed.	Quei file sono in attesa di elaborazione.
+Files not added	File non aggiunti
+Wait for the current run to finish to add files.	Attendi la fine dell'elaborazione in corso per aggiungere file.
+Files are being processed. Stop and quit? Files not finished yet are left as they are.	Elaborazione dei file in corso. Interrompere e uscire? I file non ancora finiti restano come sono.
+{0} could not be recompressed; the original is unchanged.	Non è stato possibile ricomprimere {0}; l'originale non è cambiato.
+
+# status bar
+Stopping…	Interruzione…
+Analyzing	Analisi
+Recompressing	Ricompressione
+{0} · dry run	{0} · simulazione
+Saved so far: {0}	Risparmiati finora: {0}
+Adding files…	Aggiunta dei file…
+Stopped after {0}	Interrotto dopo {0}
+Dry run finished in {0}	Simulazione terminata in {0}
+Finished in {0}	Terminato in {0}
+Would save {0} ({1})	Si risparmierebbero {0} ({1})
+Saved {0} ({1})	Risparmiati {0} ({1})
+Ready	Pronto
+
+# file dialogs
+Choose the output folder	Scegli la cartella di destinazione
+
+# settings
+General	Generali
+Compression	Compressione
+Advanced	Avanzate
+Output	Salvataggio
+Replace the original	Sostituisci l'originale
+The smaller file takes the original's place.	Il file più piccolo prende il posto dell'originale.
+Keep the original	Mantieni l'originale
+The original is renamed to name.original.ext and the smaller file takes its name.	L'originale viene rinominato in nome.original.ext e il file più piccolo prende il suo nome.
+Save next to the original	Salva accanto all'originale
+The smaller file is saved as name.compressed.ext.	Il file più piccolo viene salvato come nome.compressed.ext.
+Smaller files go to this folder, in the folder layout they came from.	I file più piccoli vanno in questa cartella, con la struttura di cartelle da cui provengono.
+Browse…	Sfoglia…
+Copy files that didn't shrink to the output folder	Copia nella cartella di destinazione anche i file non ridotti
+Adding files	Aggiunta dei file
+Include subfolders when adding a folder	Includi le sottocartelle quando aggiungi una cartella
+Hide unsupported files inside containers	Nascondi i file non supportati nei contenitori
+PDFs, archives and Office documents often hold many files that can't be recompressed.	PDF, archivi e documenti Office contengono spesso molti file che non si possono ricomprimere.
+Preserve file metadata	Mantieni i metadati dei file
+Keeps EXIF, XMP and color profiles. Turning it off gives slightly smaller files but strips most non-essential data.	Mantiene EXIF, XMP e profili colore. Disattivandolo si ottengono file un po' più piccoli, ma si perde gran parte dei dati non essenziali.
+Verify data integrity	Verifica l'integrità dei dati
+After each compression, checks that the content matches the original exactly. Slower.	Dopo ogni compressione controlla che il contenuto corrisponda esattamente all'originale. Più lento.
+Optimize signed files	Ottimizza i file firmati
+Signed PDFs and Office documents, executables and photos with content credentials are left untouched so their signature stays valid. Turning this on breaks the signature.	PDF e documenti Office firmati, eseguibili e foto con credenziali di contenuto vengono lasciati intatti perché la firma resti valida. Attivandolo, la firma non è più valida.
+Performance	Prestazioni
+Files processed at the same time	File elaborati contemporaneamente
+{0} of {1}	{0} di {1}
+Using every thread will make the system unresponsive while Chisel runs.	Usare tutti i thread renderà il sistema poco reattivo mentre Chisel lavora.
+More files at once is faster but uses more CPU and memory. The default is half of your cores.	Più file alla volta è più veloce, ma usa più CPU e memoria. Il valore predefinito è metà dei core.
+Zopfli / Deflate	Zopfli / Deflate
+Iterations of the zopfli algorithm on deflate data: PNG, PDF, ZIP and other archives. More iterations find smaller files, slowly.	Iterazioni dell'algoritmo zopfli sui dati deflate: PNG, PDF, ZIP e altri archivi. Più iterazioni trovano file più piccoli, lentamente.
+Iterations	Iterazioni
+Iterations on large files	Iterazioni sui file grandi
+High values make processing much slower.	Valori alti rallentano molto l'elaborazione.
+Reset to defaults	Ripristina i valori predefiniti
+JPEG and FLAC	JPEG e FLAC
+Keep each JPEG baseline or progressive as it is	Mantieni ogni JPEG baseline o progressivo com'è
+Otherwise each JPEG becomes baseline or progressive, whichever is smaller. The image itself never changes.	Altrimenti ogni JPEG diventa baseline o progressivo, quello che occupa meno. L'immagine non cambia mai.
+Exhaustive FLAC search	Ricerca FLAC esaustiva
+Slightly smaller FLAC files, at hundreds to thousands of times the encoding time.	File FLAC un po' più piccoli, con tempi di codifica da centinaia a migliaia di volte più lunghi.
+Changes apply to the next run.	Le modifiche valgono dalla prossima elaborazione.
+Files are being processed: settings can't be changed until the run ends.	Elaborazione in corso: le impostazioni non si possono modificare finché non termina.
+Cancel	Annulla
+Apply	Applica
+
+# statistics
+Chisel statistics	Statistiche di Chisel
+Export CSV…	Esporta CSV…
+Reset…	Azzera…
+Nothing recorded yet	Ancora nessun dato registrato
+All time, since {0}	In totale, da {0}
+Space saved	Spazio risparmiato
+out of {0} processed	su {0} elaborati
+Files made smaller	File ridotti
+Average saving	Risparmio medio
+per file made smaller	per file ridotto
+Biggest save	Risparmio maggiore
+one {0} file	un file {0}
+Space saved per month	Spazio risparmiato al mese
+Space saved per day	Spazio risparmiato al giorno
+Last 12 months: {0}	Ultimi 12 mesi: {0}
+Last 30 days: {0}	Ultimi 30 giorni: {0}
+By day	Per giorno
+By month	Per mese
+No files made smaller in this period	Nessun file ridotto in questo periodo
+Saved by format	Risparmio per formato
+All time	Totale
+Nothing yet	Ancora niente
+chisel-statistics.csv	statistiche-chisel.csv
+Can't write that file.	Impossibile scrivere quel file.
+Delete every statistic Chisel has recorded? This can't be undone.	Eliminare tutte le statistiche registrate da Chisel? L'operazione non si può annullare.
+
+# sizes, durations, percentages
+{0} s	{0} s
+{0} min {1} s	{0} min {1} s
+{0} h {1} min	{0} h {1} min
+{0}%	{0}%
+
+# plurals: one, other, singolare, plurale
+{0} format	{0} formats	{0} formato	{0} formati
+{0} extension in {1}	{0} extensions in {1}	{0} estensione in {1}	{0} estensioni in {1}
+{0} category	{0} categories	{0} categoria	{0} categorie
+{0} file can't be made smaller by Chisel and wasn't added.	{0} files can't be made smaller by Chisel and weren't added.	{0} file non può essere ridotto da Chisel e non è stato aggiunto.	{0} file non possono essere ridotti da Chisel e non sono stati aggiunti.
+{0} thread	{0} threads	{0} thread	{0} thread
+{1} of {0} file	{1} of {0} files	{1} di {0} file	{1} di {0} file
+{0} file: {1}	{0} files: {1}	{0} file: {1}	{0} file: {1}
+{0} would be smaller	{0} would be smaller	{0} sarebbe più piccolo	{0} sarebbero più piccoli
+{0} smaller	{0} smaller	{0} più piccolo	{0} più piccoli
+{0} no gain	{0} no gain	{0} senza guadagno	{0} senza guadagno
+{0} skipped	{0} skipped	{0} saltato	{0} saltati
+{0} error	{0} errors	{0} errore	{0} errori
+{0} stopped	{0} stopped	{0} interrotto	{0} interrotti
+{0} file inside	{0} files inside	{0} file all'interno	{0} file all'interno
+Finished with {0} error.	Finished with {0} errors.	Terminato con {0} errore.	Terminato con {0} errori.
+in {0} run	in {0} runs	in {0} elaborazione	in {0} elaborazioni
+{0} byte	{0} bytes	{0} byte	{0} byte

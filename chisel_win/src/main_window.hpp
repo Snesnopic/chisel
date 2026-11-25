@@ -115,6 +115,7 @@ namespace chisel_win {
         HBRUSH log_brush_ = nullptr;
         HACCEL accel_ = nullptr;
         UINT dpi_ = 96;
+        int toolbar_min_w_ = 0; // client width the toolbar needs, in pixels
 
         chisel_app::Snapshot snap_;
         std::vector<std::size_t> visible_;

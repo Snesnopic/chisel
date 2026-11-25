@@ -1,4 +1,5 @@
 #include "main_window.hpp"
+#include "i18n.hpp"
 #include "info_windows.hpp"
 #include "platform.hpp"
 #include "settings_window.hpp"
@@ -48,14 +49,14 @@ namespace chisel_win {
         std::wstring skip_short(const chisel_app::SkipKind kind) {
             using chisel_app::SkipKind;
             switch (kind) {
-                case SkipKind::Signed: return L"signed";
-                case SkipKind::Unsupported: return L"unsupported";
-                case SkipKind::Empty: return L"empty";
-                case SkipKind::Junk: return L"junk";
-                case SkipKind::NothingToDo: return L"nothing to do";
-                case SkipKind::NestingTooDeep: return L"too deep";
-                case SkipKind::ReadOnly: return L"read-only";
-                case SkipKind::ChangedDuringRun: return L"changed";
+                case SkipKind::Signed: return tr(L"signed");
+                case SkipKind::Unsupported: return tr(L"unsupported");
+                case SkipKind::Empty: return tr(L"empty");
+                case SkipKind::Junk: return tr(L"junk");
+                case SkipKind::NothingToDo: return tr(L"nothing to do");
+                case SkipKind::NestingTooDeep: return tr(L"too deep");
+                case SkipKind::ReadOnly: return tr(L"read-only");
+                case SkipKind::ChangedDuringRun: return tr(L"changed");
                 default: return L"";
             }
         }
@@ -63,19 +64,19 @@ namespace chisel_win {
         StatusLook status_look(const Row& row) {
             const auto& p = palette();
             switch (row.status) {
-                case Status::Completed: return {L"Completed", p.ok, p.text};
-                case Status::Simulated: return {L"Would be smaller", p.ok, p.text2};
-                case Status::Processing: return {L"Processing…", p.accent, p.text};
-                case Status::NoGain: return {L"No gain", p.text3, p.text2};
+                case Status::Completed: return {tr(L"Completed"), p.ok, p.text};
+                case Status::Simulated: return {tr(L"Would be smaller"), p.ok, p.text2};
+                case Status::Processing: return {tr(L"Processing…"), p.accent, p.text};
+                case Status::NoGain: return {tr(L"No gain"), p.text3, p.text2};
                 case Status::Skipped: {
                     const auto why = skip_short(row.skip);
-                    return {why.empty() ? std::wstring(L"Skipped") : L"Skipped: " + why, p.warn, p.text2};
+                    return {why.empty() ? std::wstring(tr(L"Skipped")) : trf(L"Skipped: {0}", {why}), p.warn, p.text2};
                 }
-                case Status::Error: return {L"Error", p.err, p.err};
-                case Status::Stopped: return {L"Stopped", p.text3, p.text2};
+                case Status::Error: return {tr(L"Error"), p.err, p.err};
+                case Status::Stopped: return {tr(L"Stopped"), p.text3, p.text2};
                 case Status::Pending: break;
             }
-            return {L"Pending", p.pending_dot, p.text2};
+            return {tr(L"Pending"), p.pending_dot, p.text2};
         }
 
         bool has_gain(const Row& row) {
@@ -89,11 +90,12 @@ namespace chisel_win {
 
         std::wstring mode_label(const chisel_app::Settings& s) {
             switch (s.output_mode) {
-                case chisel_app::OutputMode::Overwrite: return L"Replace originals";
-                case chisel_app::OutputMode::KeepOriginal: return L"Keep originals";
-                case chisel_app::OutputMode::SideBySide: return L"Save next to originals";
+                case chisel_app::OutputMode::Overwrite: return tr(L"Replace originals");
+                case chisel_app::OutputMode::KeepOriginal: return tr(L"Keep originals");
+                case chisel_app::OutputMode::SideBySide: return tr(L"Save next to originals");
                 case chisel_app::OutputMode::OutputFolder:
-                    return s.output_folder.empty() ? L"Save to a folder" : L"Save to " + s.output_folder.filename().wstring();
+                    return s.output_folder.empty() ? std::wstring(tr(L"Save to a folder"))
+                                                   : trf(L"Save to {0}", {s.output_folder.filename().wstring()});
             }
             return L"";
         }
@@ -102,19 +104,41 @@ namespace chisel_win {
             if (row.status == Status::Error) return widen(row.error);
             if (row.status != Status::Skipped && row.status != Status::NoGain) return L"";
             switch (row.skip) {
-                case chisel_app::SkipKind::Signed: return L"Digitally signed: left untouched so its signature stays valid.";
-                case chisel_app::SkipKind::Unsupported: return L"No processor handles this format.";
-                case chisel_app::SkipKind::ReadOnly: return L"Read-only: it, or its folder, can't be written.";
-                case chisel_app::SkipKind::ChangedDuringRun: return L"Something else changed it while Chisel was working on it: left as it was.";
-                case chisel_app::SkipKind::Empty: return L"Empty file.";
-                case chisel_app::SkipKind::NothingToDo: return L"Nothing to recompress in it.";
+                case chisel_app::SkipKind::Signed: return tr(L"Digitally signed: left untouched so its signature stays valid.");
+                case chisel_app::SkipKind::Unsupported: return tr(L"No processor handles this format.");
+                case chisel_app::SkipKind::ReadOnly: return tr(L"Read-only: it, or its folder, can't be written.");
+                case chisel_app::SkipKind::ChangedDuringRun: return tr(L"Something else changed it while Chisel was working on it: left as it was.");
+                case chisel_app::SkipKind::Empty: return tr(L"Empty file.");
+                case chisel_app::SkipKind::NothingToDo: return tr(L"Nothing to recompress in it.");
                 default: break;
             }
             if (row.status == Status::Skipped) {
                 // a container's result settles what was inside it
-                return row.skip_message.empty() ? L"Discarded with its container." : widen(row.skip_message);
+                return row.skip_message.empty() ? std::wstring(tr(L"Discarded with its container.")) : widen(row.skip_message);
             }
             return L"";
+        }
+
+        std::wstring note_text(const chisel_app::SkipNote note) {
+            switch (note) {
+                case chisel_app::SkipNote::ReadOnly: return tr(L"Read-only");
+                case chisel_app::SkipNote::ChangedDuringRun: return tr(L"Changed during the run");
+                case chisel_app::SkipNote::None: break;
+            }
+            return L"";
+        }
+
+        std::wstring start_error_text(const chisel_app::StartError error) {
+            using chisel_app::StartError;
+            switch (error) {
+                case StartError::AlreadyRunning: return tr(L"a run is already going");
+                case StartError::NothingPending: return tr(L"nothing is waiting to be processed");
+                case StartError::NoOutputFolder: return tr(L"no output folder is set");
+                case StartError::OutputFolderUnavailable: return tr(L"the output folder can't be created");
+                case StartError::OutputFolderIsInputFolder: return tr(L"the output folder is the folder the files come from");
+                case StartError::None: break;
+            }
+            return widen(chisel_app::to_string(error));
         }
     } // namespace
 
@@ -204,7 +228,7 @@ namespace chisel_win {
                                 reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_LIST)), instance_, nullptr);
         ListView_SetExtendedListViewStyle(list_, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
         SetWindowSubclass(list_, list_proc, 1, reinterpret_cast<DWORD_PTR>(this));
-        const wchar_t* names[] = {L"Name", L"Original", L"New size", L"Saved", L"Status"};
+        const wchar_t* names[] = {tr(L"Name"), tr(L"Original"), tr(L"New size"), tr(L"Saved"), tr(L"Status")};
         const int formats[] = {LVCFMT_LEFT, LVCFMT_RIGHT, LVCFMT_RIGHT, LVCFMT_LEFT, LVCFMT_LEFT};
         for (int i = 0; i < 5; ++i) {
             LVCOLUMNW col{};
@@ -221,27 +245,27 @@ namespace chisel_win {
             return CreateWindowExW(0, WC_BUTTONW, text, WS_CHILD | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 0, 0, hwnd_,
                                    reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
         };
-        open_button_ = button(L"Open file location", IDC_OPEN);
-        copy_button_ = button(L"Copy log", IDC_COPY);
-        empty_files_ = button(L"Add files", IDC_EMPTY_FILES);
-        empty_folder_ = button(L"Add folder", IDC_EMPTY_FOLDER);
-        formats_link_ = button(L"See the supported formats", IDC_FORMATS);
-        info_button_ = button(L"Show", IDC_INFO);
+        open_button_ = button(tr(L"Open file location"), IDC_OPEN);
+        copy_button_ = button(tr(L"Copy log"), IDC_COPY);
+        empty_files_ = button(tr(L"Add files"), IDC_EMPTY_FILES);
+        empty_folder_ = button(tr(L"Add folder"), IDC_EMPTY_FOLDER);
+        formats_link_ = button(tr(L"See the supported formats"), IDC_FORMATS);
+        info_button_ = button(tr(L"Show"), IDC_INFO);
         DragAcceptFiles(hwnd_, TRUE);
 
         tools_.clear();
         const auto add = [&](ToolItem item) { tools_.push_back(std::move(item)); };
-        add({.kind = ToolItem::Button, .command = CMD_ADD_FILES, .glyph = glyph::add_file, .text = L"Add files"});
-        add({.kind = ToolItem::Button, .command = CMD_ADD_FOLDER, .glyph = glyph::add_folder, .text = L"Add folder"});
+        add({.kind = ToolItem::Button, .command = CMD_ADD_FILES, .glyph = glyph::add_file, .text = tr(L"Add files")});
+        add({.kind = ToolItem::Button, .command = CMD_ADD_FOLDER, .glyph = glyph::add_folder, .text = tr(L"Add folder")});
         add({.kind = ToolItem::Separator});
-        add({.kind = ToolItem::Accent, .command = CMD_START, .glyph = glyph::play, .text = L"Start", .split = true});
-        add({.kind = ToolItem::Button, .command = CMD_STOP, .glyph = glyph::stop, .text = L"Stop"});
+        add({.kind = ToolItem::Accent, .command = CMD_START, .glyph = glyph::play, .text = tr(L"Start"), .split = true});
+        add({.kind = ToolItem::Button, .command = CMD_STOP, .glyph = glyph::stop, .text = tr(L"Stop")});
         add({.kind = ToolItem::Separator});
-        add({.kind = ToolItem::Button, .command = CMD_CLEAR, .glyph = glyph::trash, .text = L"Clear", .chevron = true});
+        add({.kind = ToolItem::Button, .command = CMD_CLEAR, .glyph = glyph::trash, .text = tr(L"Clear"), .chevron = true});
         add({.kind = ToolItem::Spacer});
-        add({.kind = ToolItem::Button, .command = CMD_STATS, .glyph = glyph::chart, .text = L"Statistics", .right = true});
-        add({.kind = ToolItem::Button, .command = CMD_SETTINGS, .glyph = glyph::settings, .text = L"Settings", .right = true});
-        add({.kind = ToolItem::Button, .command = CMD_ABOUT, .glyph = glyph::info, .text = L"About Chisel", .icon_only = true, .right = true});
+        add({.kind = ToolItem::Button, .command = CMD_STATS, .glyph = glyph::chart, .text = tr(L"Statistics"), .right = true});
+        add({.kind = ToolItem::Button, .command = CMD_SETTINGS, .glyph = glyph::settings, .text = tr(L"Settings"), .right = true});
+        add({.kind = ToolItem::Button, .command = CMD_ABOUT, .glyph = glyph::info, .text = tr(L"About Chisel"), .icon_only = true, .right = true});
     }
 
     void MainWindow::apply_fonts() {
@@ -293,6 +317,12 @@ namespace chisel_win {
             if (t.right) right_total += item_width(t) + s(4);
         }
         int rx = width - s(12) - right_total;
+        // translated labels can make the toolbar wider than the design's minimum window
+        int left_total = 0;
+        for (const auto& t : tools_) {
+            if (!t.right && t.kind != ToolItem::Spacer) left_total += item_width(t) + s(4);
+        }
+        toolbar_min_w_ = s(12) + left_total + s(24) + right_total + s(12);
         for (auto& t : tools_) {
             if (t.kind == ToolItem::Spacer) continue;
             const int w = item_width(t);
@@ -329,32 +359,51 @@ namespace chisel_win {
         };
         place(list_, list_rc_, !empty);
         if (!empty) {
-            const int fixed = s(kColOriginal + kColNew + kColSaved + kColStatus);
+            // columns are at least as wide as their translated titles; status also fits its longer labels
+            HDC dc = GetDC(hwnd_);
+            const auto& f = fonts(dpi_);
+            const auto fit = [&](const int base, const std::wstring& text, HFONT font, const int pad) {
+                return std::max(s(base), static_cast<int>(measure_text(dc, text, font).cx) + pad);
+            };
+            const int original = fit(kColOriginal, tr(L"Original"), f.ui_small_semibold, s(16));
+            const int after = fit(kColNew, tr(L"New size"), f.ui_small_semibold, s(16));
+            const int saved = fit(kColSaved, tr(L"Saved"), f.ui_small_semibold, s(36));
+            int status = fit(kColStatus, tr(L"Status"), f.ui_small_semibold, s(16));
+            status = std::max(status, std::min(s(190), fit(0, tr(L"Would be smaller"), f.ui, s(24))));
+            status = std::max(status, std::min(s(190), fit(0, trf(L"Skipped: {0}", {tr(L"unsupported")}), f.ui, s(24))));
+            ReleaseDC(hwnd_, dc);
             const int scroll = GetSystemMetricsForDpi(SM_CXVSCROLL, dpi_);
+            const int fixed = original + after + saved + status;
             const int name = std::max(s(200), static_cast<int>(list_rc_.right - list_rc_.left) - fixed - scroll - 2);
             ListView_SetColumnWidth(list_, 0, name);
-            ListView_SetColumnWidth(list_, 1, s(kColOriginal));
-            ListView_SetColumnWidth(list_, 2, s(kColNew));
-            ListView_SetColumnWidth(list_, 3, s(kColSaved));
-            ListView_SetColumnWidth(list_, 4, s(kColStatus));
+            ListView_SetColumnWidth(list_, 1, original);
+            ListView_SetColumnWidth(list_, 2, after);
+            ListView_SetColumnWidth(list_, 3, saved);
+            ListView_SetColumnWidth(list_, 4, status);
         }
         const int ix = inspector_rc_.left;
         const int iy = inspector_rc_.top;
-        place(open_button_, {ix + s(20), iy + s(96), ix + s(20) + s(150), iy + s(126)}, !empty);
-        place(copy_button_, {ix + s(178), iy + s(96), ix + s(178) + s(100), iy + s(126)}, !empty);
+        const int open_w = std::max(s(150), button_width(open_button_, ButtonStyle::Normal, true, dpi_));
+        const int copy_w = std::max(s(100), button_width(copy_button_, ButtonStyle::Normal, true, dpi_));
+        place(open_button_, {ix + s(20), iy + s(96), ix + s(20) + open_w, iy + s(126)}, !empty);
+        place(copy_button_, {ix + s(20) + open_w + s(8), iy + s(96), ix + s(20) + open_w + s(8) + copy_w, iy + s(126)}, !empty);
         const RECT log_box{ix + s(20), iy + s(383), inspector_rc_.right - s(20), inspector_rc_.bottom - s(20)};
         place(log_, {log_box.left + s(10), log_box.top + s(8), log_box.right - s(4), log_box.bottom - s(4)},
               !empty && log_box.bottom - log_box.top > s(40));
-        place(info_button_, {info_rc_.right - s(12) - s(64), info_rc_.top + s(6), info_rc_.right - s(12), info_rc_.bottom - s(6)},
+        const int info_w = std::max(s(64), button_width(info_button_, ButtonStyle::Normal, false, dpi_));
+        place(info_button_, {info_rc_.right - s(12) - info_w, info_rc_.top + s(6), info_rc_.right - s(12), info_rc_.bottom - s(6)},
               info_kind_ != InfoKind::None && info_action_);
 
         // the empty state's box is centered in the content area
         const int cx = (content_rc_.left + content_rc_.right) / 2;
         const int cy = (content_rc_.top + content_rc_.bottom) / 2;
         const int buttons_y = cy + s(40);
-        place(empty_files_, {cx - s(4) - s(110), buttons_y, cx - s(4), buttons_y + s(36)}, empty);
-        place(empty_folder_, {cx + s(4), buttons_y, cx + s(4) + s(110), buttons_y + s(36)}, empty);
-        place(formats_link_, {cx - s(110), buttons_y + s(42), cx + s(110), buttons_y + s(42) + s(24)}, empty);
+        const int files_w = std::max(s(110), button_width(empty_files_, ButtonStyle::Accent, true, dpi_));
+        const int folder_w = std::max(s(110), button_width(empty_folder_, ButtonStyle::Normal, true, dpi_));
+        const int formats_w = std::max(s(220), button_width(formats_link_, ButtonStyle::Link, false, dpi_));
+        place(empty_files_, {cx - s(4) - files_w, buttons_y, cx - s(4), buttons_y + s(36)}, empty);
+        place(empty_folder_, {cx + s(4), buttons_y, cx + s(4) + folder_w, buttons_y + s(36)}, empty);
+        place(formats_link_, {cx - formats_w / 2, buttons_y + s(42), cx + formats_w / 2, buttons_y + s(42) + s(24)}, empty);
         InvalidateRect(hwnd_, nullptr, FALSE);
     }
 
@@ -381,7 +430,9 @@ namespace chisel_win {
                 return 0;
             case WM_GETMINMAXINFO: {
                 auto* mm = reinterpret_cast<MINMAXINFO*>(lp);
-                mm->ptMinTrackSize = {s(860), s(520)};
+                RECT frame{0, 0, toolbar_min_w_, 0};
+                AdjustWindowRectExForDpi(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi_);
+                mm->ptMinTrackSize = {std::max(s(860), static_cast<int>(frame.right - frame.left)), s(520)};
                 return 0;
             }
             case WM_DPICHANGED: {
@@ -516,12 +567,12 @@ namespace chisel_win {
             case WM_APP_ADDED: {
                 std::unique_ptr<chisel_app::Session::AddResult> result(reinterpret_cast<chisel_app::Session::AddResult*>(lp));
                 if (result && result->unsupported > 0) {
-                    wchar_t text[160];
-                    swprintf(text, 160, L"%zu file%s can't be made smaller by Chisel and %s added.", result->unsupported,
-                             result->unsupported == 1 ? L"" : L"s", result->unsupported == 1 ? L"wasn't" : L"weren't");
-                    show_info(InfoKind::Notice, L"Not added.", text, true);
+                    show_info(InfoKind::Notice, tr(L"Not added."),
+                              trn(L"{0} file can't be made smaller by Chisel and wasn't added.",
+                                  L"{0} files can't be made smaller by Chisel and weren't added.", result->unsupported),
+                              true);
                 } else if (result && result->added == 0 && result->requeued == 0 && result->duplicates > 0) {
-                    show_info(InfoKind::Notice, L"Already in the list.", L"Those files are waiting to be processed.", false);
+                    show_info(InfoKind::Notice, tr(L"Already in the list."), tr(L"Those files are waiting to be processed."), false);
                 }
                 update_toolbar_state();
                 InvalidateRect(hwnd_, &status_rc_, FALSE);
@@ -529,7 +580,7 @@ namespace chisel_win {
             }
             case WM_CLOSE:
                 if (snap_.stats.running) {
-                    if (MessageBoxW(hwnd_, L"Files are being processed. Stop and quit? Files not finished yet are left as they are.",
+                    if (MessageBoxW(hwnd_, tr(L"Files are being processed. Stop and quit? Files not finished yet are left as they are."),
                                     L"Chisel", MB_YESNO | MB_ICONQUESTION) != IDYES) {
                         return 0;
                     }
@@ -659,7 +710,7 @@ namespace chisel_win {
         const int x = r.left;
         const int y = r.top;
         if (!row) {
-            draw_text(dc, L"Select a file to see its details.", {x + s(20), y, r.right - s(20), r.bottom}, p.text2, f.ui,
+            draw_text(dc, tr(L"Select a file to see its details."), {x + s(20), y, r.right - s(20), r.bottom}, p.text2, f.ui,
                       DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             return;
         }
@@ -671,7 +722,7 @@ namespace chisel_win {
                   DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
         std::wstring where;
         if (row->parent != 0) {
-            if (const Row* parent = row_by_id(row->parent)) where = L"Inside " + widen(parent->name);
+            if (const Row* parent = row_by_id(row->parent)) where = trf(L"Inside {0}", {widen(parent->name)});
         } else {
             where = row->path.parent_path().wstring();
         }
@@ -682,49 +733,56 @@ namespace chisel_win {
 
         const auto look = status_look(*row);
         const int lx = x + s(20);
-        const int vx = x + s(20) + s(104) + s(12);
+        // the label column fits the longest translated label, leaving the values at least half the panel
+        int label_w = s(104);
+        for (const wchar_t* label : {tr(L"Status"), tr(L"Original size"), tr(L"New size"), tr(L"Saved"), tr(L"Error"), tr(L"Reason"),
+                                     tr(L"Skipped")}) {
+            label_w = std::max(label_w, static_cast<int>(measure_text(dc, label, f.ui).cx));
+        }
+        label_w = std::min(label_w, static_cast<int>(r.right - r.left) / 2 - s(32));
+        const int vx = lx + label_w + s(12);
         const auto field = [&](const int fy, const wchar_t* label) {
             draw_text(dc, label, {lx, fy, vx, fy + s(20)}, p.text2, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         };
         int fy = y + s(154);
-        field(fy, L"Status");
+        field(fy, tr(L"Status"));
         draw_dot(dc, vx + s(4), fy + s(10), s(8), look.dot);
         draw_text(dc, look.label, {vx + s(16), fy, r.right - s(20), fy + s(20)}, look.color, f.ui_semibold,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         fy += s(30);
-        field(fy, L"Original size");
+        field(fy, tr(L"Original size"));
         draw_text(dc, format_bytes(row->size), {vx, fy, r.right - s(20), fy + s(20)}, p.text, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         fy += s(30);
-        field(fy, L"New size");
+        field(fy, tr(L"New size"));
         std::wstring after = L"—";
         if (row->size_after && (row->status == Status::Completed || row->status == Status::Simulated || row->status == Status::NoGain)) {
             after = format_bytes(*row->size_after);
         }
         draw_text(dc, after, {vx, fy, r.right - s(20), fy + s(20)}, p.text, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         fy += s(30);
-        field(fy, L"Saved");
+        field(fy, tr(L"Saved"));
         std::wstring saved = L"—";
         COLORREF saved_color = p.text2;
         if (has_gain(*row)) {
             saved = format_bytes(row->size - *row->size_after) + L" (" + format_percent(gain_percent(*row)) + L")";
             saved_color = p.ok;
         } else if (row->status == Status::NoGain) {
-            saved = L"Nothing: original kept";
+            saved = tr(L"Nothing: original kept");
         }
         draw_text(dc, saved, {vx, fy, r.right - s(20), fy + s(20)}, saved_color, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         fy += s(30);
         const std::wstring reason = reason_text(*row);
         if (!reason.empty()) {
-            field(fy, row->status == Status::Error ? L"Error" : L"Reason");
+            field(fy, row->status == Status::Error ? tr(L"Error") : tr(L"Reason"));
             draw_text(dc, reason, {vx, fy + s(2), r.right - s(20), fy + s(54)}, row->status == Status::Error ? p.err : p.text, f.ui,
                       DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS | DT_EDITCONTROL);
         } else if (row->note != chisel_app::SkipNote::None) {
-            field(fy, L"Skipped");
-            draw_text(dc, widen(chisel_app::to_string(row->note)), {vx, fy, r.right - s(20), fy + s(20)}, p.text, f.ui,
+            field(fy, tr(L"Skipped"));
+            draw_text(dc, note_text(row->note), {vx, fy, r.right - s(20), fy + s(20)}, p.text, f.ui,
                       DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         }
         fill_rect(dc, {x, y + s(341), r.right, y + s(341) + 1}, p.border);
-        draw_text(dc, L"Process log", {lx, y + s(357), r.right - s(20), y + s(375)}, p.text2, f.ui_small_semibold,
+        draw_text(dc, tr(L"Process log"), {lx, y + s(357), r.right - s(20), y + s(375)}, p.text2, f.ui_small_semibold,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         const RECT box{x + s(20), y + s(383), r.right - s(20), r.bottom - s(20)};
         if (box.bottom - box.top > s(40)) fill_round_rect(dc, box, s(6), p.log_bg, p.border);
@@ -748,14 +806,11 @@ namespace chisel_win {
             draw_text(dc, text, {right - ts.cx - 1, status_rc_.top, right, status_rc_.bottom}, color, font, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
             right -= ts.cx + s(16);
         };
-        wchar_t threads[48];
-        swprintf(threads, 48, L"%u thread%s", st.threads ? st.threads : settings_.threads, (st.threads ? st.threads : settings_.threads) == 1 ? L"" : L"s");
+        const std::wstring threads = trn(L"{0} thread", L"{0} threads", st.threads ? st.threads : settings_.threads);
         if (st.running) {
-            const wchar_t* phase = st.stopping ? L"Stopping…" : st.phase == chisel_app::Phase::Analyzing ? L"Analyzing" : L"Recompressing";
+            const wchar_t* phase = st.stopping ? tr(L"Stopping…") : st.phase == chisel_app::Phase::Analyzing ? tr(L"Analyzing") : tr(L"Recompressing");
             left_text(phase, p.text, f.ui_small_semibold);
-            wchar_t count[64];
-            swprintf(count, 64, L"%zu of %zu file%s", st.run_done, st.run_total, st.run_total == 1 ? L"" : L"s");
-            left_text(count, p.text2, f.ui_small);
+            left_text(trn(L"{1} of {0} file", L"{1} of {0} files", st.run_total, {std::to_wstring(st.run_done)}), p.text2, f.ui_small);
             const RECT track{x, (status_rc_.top + status_rc_.bottom) / 2 - s(2), x + s(200), (status_rc_.top + status_rc_.bottom) / 2 + s(2)};
             fill_round_rect(dc, track, s(2), p.bar_track);
             if (st.run_total > 0 && st.run_done > 0) {
@@ -763,12 +818,12 @@ namespace chisel_win {
                 fill.right = track.left + static_cast<LONG>((track.right - track.left) * static_cast<double>(st.run_done) / static_cast<double>(st.run_total));
                 fill_round_rect(dc, fill, s(2), p.accent);
             }
-            right_text(std::wstring(threads) + (st.dry_run ? L" · dry run" : L""), p.text2, f.ui_small);
-            right_text(L"Saved so far: " + format_bytes(st.run_bytes_saved), p.text2, f.ui_small);
+            right_text(st.dry_run ? trf(L"{0} · dry run", {threads}) : threads, p.text2, f.ui_small);
+            right_text(trf(L"Saved so far: {0}", {format_bytes(st.run_bytes_saved)}), p.text2, f.ui_small);
             return;
         }
         if (adding_) {
-            left_text(L"Adding files…", p.text, f.ui_small_semibold);
+            left_text(tr(L"Adding files…"), p.text, f.ui_small_semibold);
             return;
         }
         if (st.run_total > 0) {
@@ -776,28 +831,29 @@ namespace chisel_win {
             draw_glyph(dc, stopped ? glyph::stop : glyph::check, {x, status_rc_.top, x + s(14), status_rc_.bottom},
                        stopped ? p.text2 : p.ok, f.icons_small);
             x += s(14) + s(8);
-            std::wstring head = stopped ? L"Stopped after " : (st.dry_run ? L"Dry run finished in " : L"Finished in ");
-            left_text(head + format_duration(st.elapsed), p.text, f.ui_small_semibold);
-            std::wstring summary = std::to_wstring(st.run_total) + (st.run_total == 1 ? L" file:" : L" files:");
-            bool first = true;
-            const auto part = [&](const std::size_t n, const wchar_t* label) {
-                if (n == 0) return;
-                summary += (first ? L" " : L", ") + std::to_wstring(n) + L" " + label;
-                first = false;
+            const std::wstring elapsed = format_duration(st.elapsed);
+            left_text(stopped ? trf(L"Stopped after {0}", {elapsed})
+                              : (st.dry_run ? trf(L"Dry run finished in {0}", {elapsed}) : trf(L"Finished in {0}", {elapsed})),
+                      p.text, f.ui_small_semibold);
+            std::wstring parts;
+            const auto part = [&](const std::size_t n, const std::wstring& text) {
+                if (n > 0) parts += (parts.empty() ? L"" : L", ") + text;
             };
-            part(st.run_completed + st.run_simulated, st.dry_run ? L"would be smaller" : L"smaller");
-            part(st.run_no_gain, L"no gain");
-            part(st.run_skipped, L"skipped");
-            part(st.run_errors, st.run_errors == 1 ? L"error" : L"errors");
-            part(st.run_stopped, L"stopped");
-            left_text(summary, p.text2, f.ui_small);
+            const std::size_t smaller = st.run_completed + st.run_simulated;
+            part(smaller, st.dry_run ? trn(L"{0} would be smaller", L"{0} would be smaller", smaller)
+                                     : trn(L"{0} smaller", L"{0} smaller", smaller));
+            part(st.run_no_gain, trn(L"{0} no gain", L"{0} no gain", st.run_no_gain));
+            part(st.run_skipped, trn(L"{0} skipped", L"{0} skipped", st.run_skipped));
+            part(st.run_errors, trn(L"{0} error", L"{0} errors", st.run_errors));
+            part(st.run_stopped, trn(L"{0} stopped", L"{0} stopped", st.run_stopped));
+            left_text(trn(L"{0} file: {1}", L"{0} files: {1}", st.run_total, {parts}), p.text2, f.ui_small);
             right_text(threads, p.text2, f.ui_small);
             const double pct = st.run_bytes_total ? 100.0 * static_cast<double>(st.run_bytes_saved) / static_cast<double>(st.run_bytes_total) : 0;
-            right_text((st.dry_run ? L"Would save " : L"Saved ") + format_bytes(st.run_bytes_saved) + L" (" + format_percent(pct) + L")",
+            right_text(trf(st.dry_run ? L"Would save {0} ({1})" : L"Saved {0} ({1})", {format_bytes(st.run_bytes_saved), format_percent(pct)}),
                        p.ok, f.ui_small_semibold);
             return;
         }
-        left_text(L"Ready", p.text2, f.ui_small);
+        left_text(tr(L"Ready"), p.text2, f.ui_small);
         right_text(mode_label(settings_) + L" · " + threads + L" · chisel " + widen(CHISEL_VERSION), p.text2, f.ui_small);
     }
 
@@ -817,9 +873,9 @@ namespace chisel_win {
         SelectObject(dc, old_brush);
         DeleteObject(pen);
         draw_glyph(dc, glyph::upload, {cx - s(30), box.top + s(30), cx + s(30), box.top + s(90)}, p.accent, f.icons_big);
-        draw_text(dc, L"Drop files or folders here", {box.left, box.top + s(100), box.right, box.top + s(130)}, p.text, f.title,
+        draw_text(dc, tr(L"Drop files or folders here"), {box.left, box.top + s(100), box.right, box.top + s(130)}, p.text, f.title,
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        draw_text(dc, L"Chisel makes them smaller without changing what's inside: images, audio, documents, archives, and the files they contain.",
+        draw_text(dc, tr(L"Chisel makes them smaller without changing what's inside: images, audio, documents, archives, and the files they contain."),
                   {cx - s(200), box.top + s(136), cx + s(200), box.top + s(180)}, p.text2, f.ui, DT_CENTER | DT_WORDBREAK);
     }
 
@@ -878,7 +934,7 @@ namespace chisel_win {
         x += s(40) + s(8);
         int name_right = col_x[1] - s(8);
         if (row.child_count > 0) {
-            const std::wstring note = row.child_count == 1 ? L"1 file inside" : std::to_wstring(row.child_count) + L" files inside";
+            const std::wstring note = trn(L"{0} file inside", L"{0} files inside", row.child_count);
             const SIZE ns = measure_text(dc, note, f.ui_small);
             const std::wstring name = widen(row.name);
             const SIZE ts = measure_text(dc, name, f.ui);
@@ -1027,15 +1083,15 @@ namespace chisel_win {
     void MainWindow::show_menu(const ToolItem& item, const bool start_menu) {
         HMENU menu = CreatePopupMenu();
         if (start_menu) {
-            AppendMenuW(menu, MF_STRING, CMD_START, L"Start\tF5");
-            AppendMenuW(menu, MF_STRING, CMD_DRY_RUN, L"Dry run only (nothing is written)");
+            AppendMenuW(menu, MF_STRING, CMD_START, tr(L"Start\tF5"));
+            AppendMenuW(menu, MF_STRING, CMD_DRY_RUN, tr(L"Dry run only (nothing is written)"));
         } else {
-            AppendMenuW(menu, MF_STRING, CMD_CLEAR_ALL, L"Clear all");
+            AppendMenuW(menu, MF_STRING, CMD_CLEAR_ALL, tr(L"Clear all"));
             bool finished = false;
             for (const auto& r : snap_.rows) finished = finished || (r.parent == 0 && r.status != Status::Pending);
-            AppendMenuW(menu, MF_STRING | (finished ? 0 : MF_GRAYED), CMD_CLEAR_FINISHED, L"Clear finished");
+            AppendMenuW(menu, MF_STRING | (finished ? 0 : MF_GRAYED), CMD_CLEAR_FINISHED, tr(L"Clear finished"));
             AppendMenuW(menu, MF_STRING | (selected_row() && selected_row()->parent == 0 ? 0 : MF_GRAYED), CMD_REMOVE,
-                        L"Remove selected\tDel");
+                        tr(L"Remove selected\tDel"));
         }
         POINT pt{item.rc.left, item.rc.bottom};
         ClientToScreen(hwnd_, &pt);
@@ -1126,7 +1182,7 @@ namespace chisel_win {
                         }
                         text += path.filename().wstring() + L"\n";
                     }
-                    MessageBoxW(hwnd_, text.c_str(), L"Files not added", MB_OK | MB_ICONINFORMATION);
+                    MessageBoxW(hwnd_, text.c_str(), tr(L"Files not added"), MB_OK | MB_ICONINFORMATION);
                 }
                 break;
             default:
@@ -1138,7 +1194,7 @@ namespace chisel_win {
         if (paths.empty()) return;
         if (snap_.stats.running) {
             MessageBeep(MB_ICONWARNING);
-            show_info(InfoKind::Notice, L"Not added.", L"Wait for the current run to finish to add files.", false);
+            show_info(InfoKind::Notice, tr(L"Not added."), tr(L"Wait for the current run to finish to add files."), false);
             return;
         }
         clear_info();
@@ -1180,7 +1236,7 @@ namespace chisel_win {
         clear_info();
         const auto error = session_.start(settings_, {.dry_run = dry_run});
         if (error != chisel_app::StartError::None) {
-            const std::wstring text = L"Can't start: " + widen(chisel_app::to_string(error)) + L".";
+            const std::wstring text = trf(L"Can't start: {0}.", {start_error_text(error)});
             MessageBoxW(hwnd_, text.c_str(), L"Chisel", MB_OK | MB_ICONWARNING);
         }
     }
@@ -1300,7 +1356,7 @@ namespace chisel_win {
         std::wstring text;
         if (row) {
             for (const auto& line : session_.row_logs(row->id)) text += widen(line) + L"\r\n";
-            if (text.empty()) text = L"Waiting to be processed";
+            if (text.empty()) text = tr(L"Waiting to be processed");
         }
         if (text != log_text_) {
             const bool grew = !log_text_.empty() && text.starts_with(log_text_);
@@ -1356,9 +1412,8 @@ namespace chisel_win {
         if (stats_window_) stats_window_->refresh();
         if (st.run_errors > 0) {
             const Row* first = row_by_id(st.first_error);
-            wchar_t title[96];
-            swprintf(title, 96, L"Finished with %zu error%s.", st.run_errors, st.run_errors == 1 ? L"" : L"s");
-            std::wstring text = first ? widen(first->name) + L" could not be recompressed; the original is unchanged." : L"";
+            const std::wstring title = trn(L"Finished with {0} error.", L"Finished with {0} errors.", st.run_errors);
+            std::wstring text = first ? trf(L"{0} could not be recompressed; the original is unchanged.", {widen(first->name)}) : L"";
             info_target_ = st.first_error;
             show_info(InfoKind::Errors, title, text, first != nullptr);
         }

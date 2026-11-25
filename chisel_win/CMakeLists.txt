@@ -2,6 +2,8 @@ configure_file(res/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h @ONLY)
 
 add_executable(chisel_win WIN32
         src/main.cpp
+        src/i18n.cpp
+        src/i18n.hpp
         src/ui.cpp
         src/ui.hpp
         src/platform.cpp

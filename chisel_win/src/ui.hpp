@@ -58,6 +58,8 @@ namespace chisel_win {
     // owner-drawn buttons in the design's three styles
     enum class ButtonStyle { Normal, Accent, Link };
     void draw_button(const DRAWITEMSTRUCT& di, ButtonStyle style, wchar_t icon, UINT dpi);
+    // the width a button's text and icon need, padding included
+    int button_width(HWND button, ButtonStyle style, bool icon, UINT dpi);
 
     std::wstring widen(std::string_view utf8);
     std::string narrow(std::wstring_view text);

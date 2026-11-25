@@ -1,4 +1,5 @@
 #include "platform.hpp"
+#include "i18n.hpp"
 #include "ui.hpp"
 
 #include <shellapi.h>
@@ -99,12 +100,12 @@ namespace chisel_win {
     }
 
     std::vector<fs::path> pick_files(HWND owner) {
-        return run_open_dialog(owner, FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST, L"Add files");
+        return run_open_dialog(owner, FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST, tr(L"Add files"));
     }
 
     std::vector<fs::path> pick_folders(HWND owner, const bool multiple) {
         return run_open_dialog(owner, FOS_PICKFOLDERS | (multiple ? FOS_ALLOWMULTISELECT : 0),
-                               multiple ? L"Add folder" : L"Choose the output folder");
+                               multiple ? tr(L"Add folder") : tr(L"Choose the output folder"));
     }
 
     std::optional<fs::path> pick_save_file(HWND owner, const wchar_t* default_name, const wchar_t* filter_name,

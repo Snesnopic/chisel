@@ -1,4 +1,5 @@
 #include "ui.hpp"
+#include "i18n.hpp"
 
 #include "chisel_app/formats.hpp"
 
@@ -335,6 +336,14 @@ namespace chisel_win {
         }
     }
 
+    int button_width(HWND button, const ButtonStyle style, const bool icon, const UINT dpi) {
+        HDC dc = GetDC(button);
+        const auto& f = fonts(dpi);
+        const int text = measure_text(dc, window_text(button), style == ButtonStyle::Accent ? f.ui_semibold : f.ui).cx;
+        ReleaseDC(button, dc);
+        return text + (icon ? scale(14, dpi) + scale(6, dpi) : 0) + scale(24, dpi);
+    }
+
     std::wstring widen(const std::string_view utf8) {
         if (utf8.empty()) return {};
         const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
@@ -354,24 +363,25 @@ namespace chisel_win {
     std::wstring format_bytes(const std::uint64_t bytes) {
         wchar_t text[64] = {};
         if (FAILED(StrFormatByteSizeEx(bytes, SFBS_FLAGS_ROUND_TO_NEAREST_DISPLAYED_DIGIT, text, 64))) {
-            swprintf(text, 64, L"%llu bytes", static_cast<unsigned long long>(bytes));
+            return trn(L"{0} byte", L"{0} bytes", bytes);
         }
         return text;
     }
 
     std::wstring format_duration(const std::chrono::milliseconds ms) {
         const auto total = ms.count() / 1000;
-        wchar_t text[64];
-        if (total < 60) swprintf(text, 64, L"%lld s", static_cast<long long>(total));
-        else if (total < 3600) swprintf(text, 64, L"%lld min %lld s", static_cast<long long>(total / 60), static_cast<long long>(total % 60));
-        else swprintf(text, 64, L"%lld h %lld min", static_cast<long long>(total / 3600), static_cast<long long>(total % 3600 / 60));
-        return text;
+        if (total < 60) return trf(L"{0} s", {std::to_wstring(total)});
+        if (total < 3600) return trf(L"{0} min {1} s", {std::to_wstring(total / 60), std::to_wstring(total % 60)});
+        return trf(L"{0} h {1} min", {std::to_wstring(total / 3600), std::to_wstring(total % 3600 / 60)});
     }
 
     std::wstring format_percent(const double percent) {
-        wchar_t text[32];
-        swprintf(text, 32, L"%.1f%%", percent);
-        return text;
+        wchar_t number[32];
+        swprintf(number, 32, L"%.1f", percent);
+        for (wchar_t* c = number; *c; ++c) {
+            if (*c == L'.') *c = decimal_separator();
+        }
+        return trf(L"{0}%", {number});
     }
 
     Category category_for(const std::string& extension) {

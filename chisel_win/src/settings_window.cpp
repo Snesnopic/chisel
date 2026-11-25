@@ -1,4 +1,5 @@
 #include "settings_window.hpp"
+#include "i18n.hpp"
 #include "platform.hpp"
 #include "ui.hpp"
 
@@ -24,6 +25,7 @@ namespace chisel_win {
         enum class Role { Heading, Text, Desc, Warn, Input };
 
         constexpr int kWidth = 640, kHeight = 600, kTabH = 44, kFooterH = 60, kLeft = 24, kRight = 616;
+        constexpr DWORD kStyle = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
 
         struct Control {
             HWND hwnd = nullptr;
@@ -42,6 +44,7 @@ namespace chisel_win {
             bool locked = false;
             bool done = false;
             int tab = 0;
+            int height = kHeight; // at 96 dpi, taller when translated text needs it
             unsigned max_threads = 1;
             const std::function<void(const chisel_app::Settings&)>* apply = nullptr;
             std::vector<Control> controls;
@@ -75,79 +78,140 @@ namespace chisel_win {
 
             void create_controls() {
                 // general
-                label(L"Output", 0, Role::Heading, 0, {kLeft, 62, kRight, 84});
-                option(L"Replace the original", L"The smaller file takes the original's place.", ID_MODE_OVERWRITE, true, true, 0, 94, 1);
-                option(L"Keep the original", L"The original is renamed to name.original.ext and the smaller file takes its name.",
+                label(tr(L"Output"), 0, Role::Heading, 0, {kLeft, 62, kRight, 84});
+                option(tr(L"Replace the original"), tr(L"The smaller file takes the original's place."), ID_MODE_OVERWRITE, true, true, 0, 94, 1);
+                option(tr(L"Keep the original"), tr(L"The original is renamed to name.original.ext and the smaller file takes its name."),
                        ID_MODE_KEEP, true, false, 0, 140, 1);
-                option(L"Save next to the original", L"The smaller file is saved as name.compressed.ext.", ID_MODE_SIDE, true, false, 0, 186, 1);
-                option(L"Save to a folder", L"Smaller files go to this folder, in the folder layout they came from.", ID_MODE_FOLDER, true,
+                option(tr(L"Save next to the original"), tr(L"The smaller file is saved as name.compressed.ext."), ID_MODE_SIDE, true, false, 0, 186, 1);
+                option(tr(L"Save to a folder"), tr(L"Smaller files go to this folder, in the folder layout they came from."), ID_MODE_FOLDER, true,
                        false, 0, 232, 1);
                 add(WC_EDITW, L"", WS_TABSTOP | ES_AUTOHSCROLL | ES_READONLY | WS_BORDER, ID_FOLDER, Role::Input, 0,
                     {kLeft + 26, 278, kRight - 96, 306});
-                add(WC_BUTTONW, L"Browse…", WS_TABSTOP | BS_OWNERDRAW, ID_BROWSE, Role::Input, 0, {kRight - 88, 278, kRight, 306});
+                add(WC_BUTTONW, tr(L"Browse…"), WS_TABSTOP | BS_OWNERDRAW, ID_BROWSE, Role::Input, 0, {kRight - 88, 278, kRight, 306});
                 // belongs to "Save to a folder", so it sits under the folder and works only in that mode
                 add(WC_BUTTONW, L"", WS_TABSTOP | BS_AUTOCHECKBOX, ID_COPY_UNCHANGED, Role::Input, 0, {kLeft + 26, 316, kLeft + 44, 336});
-                label(L"Copy files that didn't shrink to the output folder", ID_COPY_UNCHANGED + ID_LABEL_BASE, Role::Text, 0,
+                label(tr(L"Copy files that didn't shrink to the output folder"), ID_COPY_UNCHANGED + ID_LABEL_BASE, Role::Text, 0,
                       {kLeft + 52, 317, kRight, 335});
-                label(L"Adding files", 0, Role::Heading, 0, {kLeft, 352, kRight, 374});
-                option(L"Include subfolders when adding a folder", nullptr, ID_SUBFOLDERS, false, false, 0, 384, 0);
-                option(L"Hide unsupported files inside containers",
-                       L"PDFs, archives and Office documents often hold many files that can't be recompressed.", ID_HIDE, false, false,
+                label(tr(L"Adding files"), 0, Role::Heading, 0, {kLeft, 352, kRight, 374});
+                option(tr(L"Include subfolders when adding a folder"), nullptr, ID_SUBFOLDERS, false, false, 0, 384, 0);
+                option(tr(L"Hide unsupported files inside containers"),
+                       tr(L"PDFs, archives and Office documents often hold many files that can't be recompressed."), ID_HIDE, false, false,
                        0, 414, 1);
 
                 // compression
-                label(L"Compression", 0, Role::Heading, 1, {kLeft, 62, kRight, 84});
-                option(L"Preserve file metadata",
-                       L"Keeps EXIF, XMP and color profiles. Turning it off gives slightly smaller files but strips most non-essential data.",
+                label(tr(L"Compression"), 0, Role::Heading, 1, {kLeft, 62, kRight, 84});
+                option(tr(L"Preserve file metadata"),
+                       tr(L"Keeps EXIF, XMP and color profiles. Turning it off gives slightly smaller files but strips most non-essential data."),
                        ID_PRESERVE, false, false, 1, 94, 2);
-                option(L"Verify data integrity",
-                       L"After each compression, checks that the content matches the original exactly. Slower.", ID_VERIFY, false,
+                option(tr(L"Verify data integrity"),
+                       tr(L"After each compression, checks that the content matches the original exactly. Slower."), ID_VERIFY, false,
                        false, 1, 156, 1);
-                option(L"Optimize signed files",
-                       L"Signed PDFs and Office documents, executables and photos with content credentials are left untouched so their "
-                       L"signature stays valid. Turning this on breaks the signature.",
+                option(tr(L"Optimize signed files"),
+                       tr(L"Signed PDFs and Office documents, executables and photos with content credentials are left untouched so their "
+                       L"signature stays valid. Turning this on breaks the signature."),
                        ID_SIGNED, false, false, 1, 202, 2);
-                label(L"Performance", 0, Role::Heading, 1, {kLeft, 280, kRight, 302});
-                label(L"Files processed at the same time", 0, Role::Text, 1, {kLeft, 312, kRight - 100, 330});
+                label(tr(L"Performance"), 0, Role::Heading, 1, {kLeft, 280, kRight, 302});
+                label(tr(L"Files processed at the same time"), 0, Role::Text, 1, {kLeft, 312, kRight - 100, 330});
                 add(WC_STATICW, L"", SS_RIGHT, ID_THREADS_VALUE, Role::Desc, 1, {kRight - 100, 312, kRight, 330});
                 add(TRACKBAR_CLASSW, L"", WS_TABSTOP | TBS_HORZ | TBS_NOTICKS, ID_THREADS, Role::Input, 1, {kLeft - 4, 334, kRight + 4, 364});
                 add(WC_STATICW, L"", SS_LEFT, ID_THREADS_NOTE, Role::Desc, 1, {kLeft, 368, kRight, 400});
 
                 // advanced
-                label(L"Zopfli / Deflate", 0, Role::Heading, 2, {kLeft, 62, kRight, 84});
-                label(L"Iterations of the zopfli algorithm on deflate data: PNG, PDF, ZIP and other archives. More iterations find smaller "
-                      L"files, slowly.", 0, Role::Desc, 2, {kLeft, 88, kRight, 120});
-                label(L"Iterations", 0, Role::Text, 2, {kLeft, 136, kRight - 136, 156});
+                label(tr(L"Zopfli / Deflate"), 0, Role::Heading, 2, {kLeft, 62, kRight, 84});
+                label(tr(L"Iterations of the zopfli algorithm on deflate data: PNG, PDF, ZIP and other archives. More iterations find smaller "
+                      L"files, slowly."), 0, Role::Desc, 2, {kLeft, 88, kRight, 120});
+                label(tr(L"Iterations"), 0, Role::Text, 2, {kLeft, 136, kRight - 136, 156});
                 add(WC_EDITW, L"", WS_TABSTOP | ES_NUMBER | WS_BORDER, ID_ITER, Role::Input, 2, {kRight - 120, 132, kRight, 160});
                 add(UPDOWN_CLASSW, L"", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_NOTHOUSANDS, ID_ITER_SPIN, Role::Input, 2,
                     {kRight - 20, 132, kRight, 160});
-                label(L"Iterations on large files", 0, Role::Text, 2, {kLeft, 176, kRight - 136, 196});
+                label(tr(L"Iterations on large files"), 0, Role::Text, 2, {kLeft, 176, kRight - 136, 196});
                 add(WC_EDITW, L"", WS_TABSTOP | ES_NUMBER | WS_BORDER, ID_ITER_LARGE, Role::Input, 2, {kRight - 120, 172, kRight, 200});
                 add(UPDOWN_CLASSW, L"", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_NOTHOUSANDS, ID_ITER_LARGE_SPIN,
                     Role::Input, 2, {kRight - 20, 172, kRight, 200});
-                add(WC_STATICW, L"High values make processing much slower.", SS_LEFT, ID_ITER_WARN, Role::Warn, 2, {kLeft, 210, kRight, 228});
-                add(WC_BUTTONW, L"Reset to defaults", WS_TABSTOP | BS_OWNERDRAW, ID_RESET, Role::Input, 2, {kLeft, 238, kLeft + 150, 270});
-                label(L"JPEG and FLAC", 0, Role::Heading, 2, {kLeft, 292, kRight, 314});
-                option(L"Keep each JPEG baseline or progressive as it is",
-                       L"Otherwise each JPEG becomes baseline or progressive, whichever is smaller. The image itself never changes.",
+                add(WC_STATICW, tr(L"High values make processing much slower."), SS_LEFT, ID_ITER_WARN, Role::Warn, 2, {kLeft, 210, kRight, 228});
+                add(WC_BUTTONW, tr(L"Reset to defaults"), WS_TABSTOP | BS_OWNERDRAW, ID_RESET, Role::Input, 2, {kLeft, 238, kLeft + 150, 270});
+                label(tr(L"JPEG and FLAC"), 0, Role::Heading, 2, {kLeft, 292, kRight, 314});
+                option(tr(L"Keep each JPEG baseline or progressive as it is"),
+                       tr(L"Otherwise each JPEG becomes baseline or progressive, whichever is smaller. The image itself never changes."),
                        ID_KEEP_JPEG, false, false, 2, 324, 1);
-                option(L"Exhaustive FLAC search",
-                       L"Slightly smaller FLAC files, at hundreds to thousands of times the encoding time.", ID_FLAC_EXHAUSTIVE, false,
+                option(tr(L"Exhaustive FLAC search"),
+                       tr(L"Slightly smaller FLAC files, at hundreds to thousands of times the encoding time."), ID_FLAC_EXHAUSTIVE, false,
                        false, 2, 370, 1);
-                label(L"Changes apply to the next run.", 0, Role::Desc, 2, {kLeft, 424, kRight, 442});
+                label(tr(L"Changes apply to the next run."), 0, Role::Desc, 2, {kLeft, 424, kRight, 442});
 
                 // every tab
                 if (locked) {
-                    label(L"Files are being processed: settings can't be changed until the run ends.", 0, Role::Warn, -1,
-                          {kLeft, kHeight - kFooterH - 30, kRight, kHeight - kFooterH - 12});
+                    label(tr(L"Files are being processed: settings can't be changed until the run ends."), 0, Role::Warn, -1,
+                          {kLeft, height - kFooterH - 30, kRight, height - kFooterH - 12});
                 }
-                const int by = kHeight - kFooterH + 14;
-                add(WC_BUTTONW, L"OK", WS_TABSTOP | BS_OWNERDRAW, IDOK, Role::Input, -1, {kRight + 4 - 3 * 88 - 16, by, kRight + 4 - 2 * 88 - 16, by + 32});
-                add(WC_BUTTONW, L"Cancel", WS_TABSTOP | BS_OWNERDRAW, IDCANCEL, Role::Input, -1, {kRight + 4 - 2 * 88 - 8, by, kRight + 4 - 88 - 8, by + 32});
-                add(WC_BUTTONW, L"Apply", WS_TABSTOP | BS_OWNERDRAW, ID_APPLY, Role::Input, -1, {kRight + 4 - 88, by, kRight + 4, by + 32});
+                const int by = height - kFooterH + 14;
+                add(WC_BUTTONW, tr(L"OK"), WS_TABSTOP | BS_OWNERDRAW, IDOK, Role::Input, -1, {kRight + 4 - 3 * 88 - 16, by, kRight + 4 - 2 * 88 - 16, by + 32});
+                add(WC_BUTTONW, tr(L"Cancel"), WS_TABSTOP | BS_OWNERDRAW, IDCANCEL, Role::Input, -1, {kRight + 4 - 2 * 88 - 8, by, kRight + 4 - 88 - 8, by + 32});
+                add(WC_BUTTONW, tr(L"Apply"), WS_TABSTOP | BS_OWNERDRAW, ID_APPLY, Role::Input, -1, {kRight + 4 - 88, by, kRight + 4, by + 32});
             }
 
             HWND item(const int id) const { return GetDlgItem(hwnd, id); }
+
+            // wrapped text gets the lines it needs and pushes down what's below it; the window grows if a tab runs out of room
+            void fit_texts() {
+                HDC dc = GetDC(hwnd);
+                HGDIOBJ old = SelectObject(dc, fonts(dpi).ui_small);
+                const auto lines_height = [&](const std::wstring& text, const RECT& at) {
+                    RECT r{0, 0, s(at.right - at.left), 0};
+                    DrawTextW(dc, text.c_str(), -1, &r, DT_CALCRECT | DT_WORDBREAK | DT_EXPANDTABS);
+                    return MulDiv(r.bottom, 96, static_cast<int>(dpi)) + 1;
+                };
+                for (Control& c : controls) {
+                    if (c.role != Role::Desc && c.role != Role::Warn) continue;
+                    int needed = 0;
+                    if (c.hwnd == item(ID_THREADS_NOTE)) {
+                        // refresh_derived switches between two texts
+                        needed = std::max(lines_height(tr(L"Using every thread will make the system unresponsive while Chisel runs."), c.at),
+                                          lines_height(tr(L"More files at once is faster but uses more CPU and memory. The default is half of your cores."), c.at));
+                    } else if (const std::wstring text = window_text(c.hwnd); !text.empty()) {
+                        needed = lines_height(text, c.at);
+                    }
+                    const int grow = needed - static_cast<int>(c.at.bottom - c.at.top);
+                    if (grow <= 0) continue;
+                    if (c.tab == -1) {
+                        c.at.top -= grow;
+                        continue;
+                    }
+                    const LONG old_bottom = c.at.bottom;
+                    c.at.bottom += grow;
+                    for (Control& other : controls) {
+                        if (&other != &c && other.tab == c.tab && other.at.top >= old_bottom) OffsetRect(&other.at, 0, grow);
+                    }
+                }
+                SelectObject(dc, old);
+                ReleaseDC(hwnd, dc);
+                if (HWND reset = item(ID_RESET)) {
+                    for (Control& c : controls) {
+                        if (c.hwnd != reset) continue;
+                        const int needed = MulDiv(button_width(reset, ButtonStyle::Normal, false, dpi), 96, static_cast<int>(dpi)) + 1;
+                        c.at.right = std::max<LONG>(c.at.right, c.at.left + needed);
+                    }
+                }
+
+                LONG bottom = 0;
+                LONG warning_top = height - kFooterH;
+                for (const Control& c : controls) {
+                    if (c.tab >= 0) bottom = std::max(bottom, c.at.bottom);
+                    else if (c.role == Role::Warn) warning_top = std::min(warning_top, c.at.top);
+                }
+                const int extra = static_cast<int>(bottom - (warning_top - 12));
+                if (extra <= 0) return;
+                height += extra;
+                for (Control& c : controls) {
+                    if (c.tab == -1) OffsetRect(&c.at, 0, extra);
+                }
+                RECT rc{0, 0, s(kWidth), s(height)};
+                AdjustWindowRectExForDpi(&rc, kStyle, FALSE, WS_EX_DLGMODALFRAME, dpi);
+                RECT now;
+                GetWindowRect(hwnd, &now);
+                SetWindowPos(hwnd, nullptr, now.left, now.top - s(extra) / 2, rc.right - rc.left, rc.bottom - rc.top,
+                             SWP_NOZORDER | SWP_NOACTIVATE);
+            }
 
             void load_values() {
                 syncing = true;
@@ -173,12 +237,10 @@ namespace chisel_win {
             }
 
             void refresh_derived() {
-                wchar_t text[64];
-                swprintf(text, 64, L"%u of %u", working.threads, max_threads);
-                SetWindowTextW(item(ID_THREADS_VALUE), text);
+                SetWindowTextW(item(ID_THREADS_VALUE), trf(L"{0} of {1}", {std::to_wstring(working.threads), std::to_wstring(max_threads)}).c_str());
                 const bool all = working.threads >= max_threads;
-                SetWindowTextW(item(ID_THREADS_NOTE), all ? L"Using every thread will make the system unresponsive while Chisel runs."
-                                                          : L"More files at once is faster but uses more CPU and memory. The default is half of your cores.");
+                SetWindowTextW(item(ID_THREADS_NOTE), all ? tr(L"Using every thread will make the system unresponsive while Chisel runs.")
+                                                          : tr(L"More files at once is faster but uses more CPU and memory. The default is half of your cores."));
                 for (auto& c : controls) {
                     if (c.hwnd == item(ID_THREADS_NOTE)) c.role = all ? Role::Warn : Role::Desc;
                 }
@@ -237,7 +299,7 @@ namespace chisel_win {
                 SendMessageW(item(ID_ITER_LARGE_SPIN), UDM_SETBUDDY, reinterpret_cast<WPARAM>(item(ID_ITER_LARGE)), 0);
                 HDC dc = GetDC(hwnd);
                 int x = s(16);
-                const wchar_t* names[] = {L"General", L"Compression", L"Advanced"};
+                const wchar_t* names[] = {tr(L"General"), tr(L"Compression"), tr(L"Advanced")};
                 for (int i = 0; i < 3; ++i) {
                     const int w = measure_text(dc, names[i], fonts(dpi).ui_semibold).cx + s(24);
                     tab_rc[i] = {x, 0, x + w, s(kTabH)};
@@ -270,7 +332,7 @@ namespace chisel_win {
                 fill_rect(dc, {0, s(kTabH), rc.right, rc.bottom - s(kFooterH)}, p.surface);
                 fill_rect(dc, {0, rc.bottom - s(kFooterH), rc.right, rc.bottom}, p.window);
                 fill_rect(dc, {0, rc.bottom - s(kFooterH), rc.right, rc.bottom - s(kFooterH) + 1}, p.border);
-                const wchar_t* names[] = {L"General", L"Compression", L"Advanced"};
+                const wchar_t* names[] = {tr(L"General"), tr(L"Compression"), tr(L"Advanced")};
                 for (int i = 0; i < 3; ++i) {
                     const bool on = i == tab;
                     draw_text(dc, names[i], tab_rc[i], on ? p.text : p.text2, on ? f.ui_semibold : f.ui, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -445,18 +507,18 @@ namespace chisel_win {
         w.max_threads = std::max({1u, std::thread::hardware_concurrency(), current.threads});
         w.dpi = GetDpiForWindow(owner);
 
-        const DWORD style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN;
         RECT rc{0, 0, scale(kWidth, w.dpi), scale(kHeight, w.dpi)};
-        AdjustWindowRectExForDpi(&rc, style, FALSE, WS_EX_DLGMODALFRAME, w.dpi);
+        AdjustWindowRectExForDpi(&rc, kStyle, FALSE, WS_EX_DLGMODALFRAME, w.dpi);
         RECT orc;
         GetWindowRect(owner, &orc);
         const int width = rc.right - rc.left;
         const int height = rc.bottom - rc.top;
         const int x = orc.left + (orc.right - orc.left - width) / 2;
         const int y = orc.top + (orc.bottom - orc.top - height) / 2;
-        CreateWindowExW(WS_EX_DLGMODALFRAME, L"ChiselSettings", L"Settings", style, x, y, width, height, owner, nullptr, instance, &w);
+        CreateWindowExW(WS_EX_DLGMODALFRAME, L"ChiselSettings", tr(L"Settings"), kStyle, x, y, width, height, owner, nullptr, instance, &w);
         if (!w.hwnd) return;
         w.create_controls();
+        w.fit_texts();
         w.layout();
         w.apply_theme();
         w.load_values();

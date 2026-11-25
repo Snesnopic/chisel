@@ -1,4 +1,5 @@
 #include "stats_window.hpp"
+#include "i18n.hpp"
 #include "platform.hpp"
 #include "ui.hpp"
 
@@ -34,7 +35,7 @@ namespace chisel_win {
             st.wMonth = static_cast<WORD>(tm.tm_mon + 1);
             st.wDay = static_cast<WORD>(tm.tm_mday);
             wchar_t text[64] = {};
-            GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &st, format, text, 64, nullptr);
+            GetDateFormatEx(date_locale(), 0, &st, format, text, 64, nullptr);
             return text;
         }
 
@@ -81,12 +82,12 @@ namespace chisel_win {
                 registered = true;
             }
             dpi_ = GetDpiForWindow(owner);
-            CreateWindowExW(0, L"ChiselStatistics", L"Chisel statistics", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT,
+            CreateWindowExW(0, L"ChiselStatistics", tr(L"Chisel statistics"), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT,
                             CW_USEDEFAULT, scale(960, dpi_), scale(680, dpi_), owner, nullptr, instance_, this);
             if (!hwnd_) return;
-            export_button_ = CreateWindowExW(0, WC_BUTTONW, L"Export CSV…", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+            export_button_ = CreateWindowExW(0, WC_BUTTONW, tr(L"Export CSV…"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                              0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_EXPORT)), instance_, nullptr);
-            reset_button_ = CreateWindowExW(0, WC_BUTTONW, L"Reset…", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+            reset_button_ = CreateWindowExW(0, WC_BUTTONW, tr(L"Reset…"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
                                             0, 0, 0, 0, hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(ID_RESET)), instance_, nullptr);
             theme_changed();
             refresh();
@@ -118,7 +119,8 @@ namespace chisel_win {
             by_format[r.extension] += r.saved();
         }
         if (counted) average_percent_ /= static_cast<double>(counted);
-        since_ = records_.empty() ? L"Nothing recorded yet" : L"All time, since " + date_text(local_tm(first), L"MMMM yyyy");
+        since_ = records_.empty() ? std::wstring(tr(L"Nothing recorded yet"))
+                                  : trf(L"All time, since {0}", {date_text(local_tm(first), L"MMMM yyyy")});
 
         formats_.clear();
         for (const auto& [ext, saved] : by_format) formats_.push_back({ext, saved});
@@ -158,8 +160,10 @@ namespace chisel_win {
         RECT rc;
         GetClientRect(hwnd_, &rc);
         const int y = s(12);
-        SetWindowPos(reset_button_, nullptr, rc.right - s(20) - s(100), y, s(100), s(32), SWP_NOZORDER);
-        SetWindowPos(export_button_, nullptr, rc.right - s(20) - s(100) - s(12) - s(130), y, s(130), s(32), SWP_NOZORDER);
+        const int reset_w = std::max(s(100), button_width(reset_button_, ButtonStyle::Normal, true, dpi_));
+        const int export_w = std::max(s(130), button_width(export_button_, ButtonStyle::Normal, true, dpi_));
+        SetWindowPos(reset_button_, nullptr, rc.right - s(20) - reset_w, y, reset_w, s(32), SWP_NOZORDER);
+        SetWindowPos(export_button_, nullptr, rc.right - s(20) - reset_w - s(12) - export_w, y, export_w, s(32), SWP_NOZORDER);
         InvalidateRect(hwnd_, nullptr, FALSE);
     }
 
@@ -169,8 +173,8 @@ namespace chisel_win {
         RECT rc;
         GetClientRect(hwnd_, &rc);
         fill_rect(dc, rc, p.window);
-        const SIZE ts = measure_text(dc, L"Statistics", f.title);
-        draw_text(dc, L"Statistics", {s(20), 0, s(20) + ts.cx + 1, s(56)}, p.text, f.title, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        const SIZE ts = measure_text(dc, tr(L"Statistics"), f.title);
+        draw_text(dc, tr(L"Statistics"), {s(20), 0, s(20) + ts.cx + 1, s(56)}, p.text, f.title, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         draw_text(dc, since_, {s(20) + ts.cx + s(12), 0, rc.right - s(280), s(56)}, p.text2, f.ui,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
@@ -191,15 +195,13 @@ namespace chisel_win {
         };
         std::uint64_t original = 0;
         for (const auto& r : records_) original += r.original_size;
-        card(0, L"Space saved", format_bytes(summary_.saved_bytes), L"out of " + format_bytes(original) + L" processed", p.ok, f.big_bold);
-        wchar_t files[64];
-        swprintf(files, 64, L"%llu", static_cast<unsigned long long>(summary_.files));
-        wchar_t runs[64];
-        swprintf(runs, 64, L"in %zu run%s", summary_.runs, summary_.runs == 1 ? L"" : L"s");
-        card(1, L"Files made smaller", files, runs, p.text, f.big);
-        card(2, L"Average saving", format_percent(average_percent_), L"per file made smaller", p.text, f.big);
-        card(3, L"Biggest save", summary_.biggest ? format_bytes(summary_.biggest->saved()) : L"—",
-             summary_.biggest ? L"one " + badge_text(summary_.biggest->extension) + L" file" : L"", p.text, f.big);
+        card(0, tr(L"Space saved"), format_bytes(summary_.saved_bytes), trf(L"out of {0} processed", {format_bytes(original)}), p.ok,
+             f.big_bold);
+        card(1, tr(L"Files made smaller"), std::to_wstring(summary_.files), trn(L"in {0} run", L"in {0} runs", summary_.runs), p.text,
+             f.big);
+        card(2, tr(L"Average saving"), format_percent(average_percent_), tr(L"per file made smaller"), p.text, f.big);
+        card(3, tr(L"Biggest save"), summary_.biggest ? format_bytes(summary_.biggest->saved()) : L"—",
+             summary_.biggest ? trf(L"one {0} file", {badge_text(summary_.biggest->extension)}) : L"", p.text, f.big);
 
         // chart
         const int top = cards.bottom + s(12);
@@ -215,9 +217,9 @@ namespace chisel_win {
             total += b.saved;
             peak = std::max(peak, b.saved);
         }
-        draw_text(dc, by_month_ ? L"Space saved per month" : L"Space saved per day",
+        draw_text(dc, by_month_ ? tr(L"Space saved per month") : tr(L"Space saved per day"),
                   {chart.left + s(16), chart.top + s(16), chart.right - s(200), chart.top + s(36)}, p.text, f.heading, DT_LEFT | DT_SINGLELINE);
-        draw_text(dc, (by_month_ ? L"Last 12 months: " : L"Last 30 days: ") + format_bytes(total),
+        draw_text(dc, trf(by_month_ ? L"Last 12 months: {0}" : L"Last 30 days: {0}", {format_bytes(total)}),
                   {chart.left + s(16), chart.top + s(36), chart.right - s(200), chart.top + s(54)}, p.text2, f.ui_small, DT_LEFT | DT_SINGLELINE);
         const RECT seg{chart.right - s(16) - s(190), chart.top + s(18), chart.right - s(16), chart.top + s(50)};
         fill_round_rect(dc, seg, s(6), p.ctrl_bg, p.ctrl_border);
@@ -225,8 +227,8 @@ namespace chisel_win {
         seg_month_ = {(seg.left + seg.right) / 2, seg.top + s(2), seg.right - s(2), seg.bottom - s(2)};
         if (!by_month_) fill_round_rect(dc, seg_day_, s(4), p.seg_on);
         else fill_round_rect(dc, seg_month_, s(4), p.seg_on);
-        draw_text(dc, L"By day", seg_day_, by_month_ ? p.text2 : p.text, by_month_ ? f.ui : f.ui_semibold, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        draw_text(dc, L"By month", seg_month_, by_month_ ? p.text : p.text2, by_month_ ? f.ui_semibold : f.ui, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        draw_text(dc, tr(L"By day"), seg_day_, by_month_ ? p.text2 : p.text, by_month_ ? f.ui : f.ui_semibold, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        draw_text(dc, tr(L"By month"), seg_month_, by_month_ ? p.text : p.text2, by_month_ ? f.ui_semibold : f.ui, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         const RECT plot{chart.left + s(16) + s(60), chart.top + s(78), chart.right - s(16), chart.bottom - s(16) - s(22)};
         if (plot.bottom - plot.top > s(40) && !bars.empty()) {
@@ -257,14 +259,14 @@ namespace chisel_win {
                 }
             }
             if (peak == 0) {
-                draw_text(dc, L"No files made smaller in this period", plot, p.text2, f.ui, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                draw_text(dc, tr(L"No files made smaller in this period"), plot, p.text2, f.ui, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
         }
 
         // by format
-        draw_text(dc, L"Saved by format", {list.left + s(16), list.top + s(16), list.right - s(16), list.top + s(36)}, p.text, f.heading,
+        draw_text(dc, tr(L"Saved by format"), {list.left + s(16), list.top + s(16), list.right - s(16), list.top + s(36)}, p.text, f.heading,
                   DT_LEFT | DT_SINGLELINE);
-        draw_text(dc, L"All time", {list.left + s(16), list.top + s(36), list.right - s(16), list.top + s(54)}, p.text2, f.ui_small,
+        draw_text(dc, tr(L"All time"), {list.left + s(16), list.top + s(36), list.right - s(16), list.top + s(54)}, p.text2, f.ui_small,
                   DT_LEFT | DT_SINGLELINE);
         int y = list.top + s(70);
         const std::uint64_t most = formats_.empty() ? 1 : std::max<std::uint64_t>(1, formats_.front().saved);
@@ -284,16 +286,16 @@ namespace chisel_win {
             y += s(32);
         }
         if (formats_.empty()) {
-            draw_text(dc, L"Nothing yet", {list.left + s(16), y, list.right - s(16), y + s(20)}, p.text2, f.ui, DT_LEFT | DT_SINGLELINE);
+            draw_text(dc, tr(L"Nothing yet"), {list.left + s(16), y, list.right - s(16), y + s(20)}, p.text2, f.ui, DT_LEFT | DT_SINGLELINE);
         }
     }
 
     void StatsWindow::export_csv() {
-        const auto file = pick_save_file(hwnd_, L"chisel-statistics.csv", L"CSV", L"*.csv");
+        const auto file = pick_save_file(hwnd_, tr(L"chisel-statistics.csv"), L"CSV", L"*.csv");
         if (!file) return;
         std::ofstream out(*file, std::ios::binary | std::ios::trunc);
         if (!out) {
-            MessageBoxW(hwnd_, L"Can't write that file.", L"Chisel statistics", MB_OK | MB_ICONWARNING);
+            MessageBoxW(hwnd_, tr(L"Can't write that file."), tr(L"Chisel statistics"), MB_OK | MB_ICONWARNING);
             return;
         }
         out << "\xEF\xBB\xBF" << "date,extension,original_size,compressed_size,saved,saved_percent,duration_ms,run_id,file_name\r\n";
@@ -309,7 +311,7 @@ namespace chisel_win {
     }
 
     void StatsWindow::reset() {
-        if (MessageBoxW(hwnd_, L"Delete every statistic Chisel has recorded? This can't be undone.", L"Chisel statistics",
+        if (MessageBoxW(hwnd_, tr(L"Delete every statistic Chisel has recorded? This can't be undone."), tr(L"Chisel statistics"),
                         MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
             return;
         }

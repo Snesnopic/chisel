@@ -30,6 +30,8 @@ UninstallDisplayName=Chisel
 UninstallDisplayIcon={app}\Chisel.exe
 SetupIconFile=..\res\chisel.ico
 WizardStyle=modern
+; the wizard follows Windows' display language and asks only when none of these match it
+ShowLanguageDialog=auto
 Compression=lzma2/ultra64
 SolidCompression=yes
 OutputBaseFilename=chisel-setup-windows-{#Arch}
@@ -42,6 +44,10 @@ ArchitecturesInstallIn64BitMode=arm64
 #elif Arch != "x86"
   #error Arch must be x64, x86 or arm64
 #endif
+
+[Languages]
+Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Tasks]
 Name: desktopicon; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

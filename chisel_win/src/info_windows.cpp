@@ -1,4 +1,5 @@
 #include "info_windows.hpp"
+#include "i18n.hpp"
 #include "ui.hpp"
 
 #include "chisel_app/formats.hpp"
@@ -17,6 +18,22 @@ namespace chisel_win {
     namespace {
         constexpr const wchar_t* kRepository = L"https://github.com/Snesnopic/chisel";
         constexpr const wchar_t* kIconAuthor = L"https://www.behance.net/mychan1";
+
+        std::wstring kind_text(const chisel_app::FileKind kind) {
+            using chisel_app::FileKind;
+            switch (kind) {
+                case FileKind::Archive: return tr(L"Archive");
+                case FileKind::Audio: return tr(L"Audio");
+                case FileKind::Database: return tr(L"Database");
+                case FileKind::Document: return tr(L"Document");
+                case FileKind::Font: return tr(L"Font");
+                case FileKind::Image: return tr(L"Image");
+                case FileKind::Scientific: return tr(L"Scientific");
+                case FileKind::Video: return tr(L"Video");
+                case FileKind::Unknown: break;
+            }
+            return tr(L"Unknown");
+        }
         enum : int { ID_LINK = 600, ID_CREDIT, ID_FORMATS };
         constexpr int kAboutW = 440, kAboutH = 300;
 
@@ -92,7 +109,7 @@ namespace chisel_win {
             void layout() {
                 HDC dc = GetDC(hwnd);
                 const auto width = [&](HWND w) { return static_cast<int>(measure_text(dc, window_text(w), fonts(dpi).ui).cx) + s(4); };
-                credit_x = s(24) + measure_text(dc, L"App icon by ", fonts(dpi).ui).cx;
+                credit_x = s(24) + measure_text(dc, std::wstring(tr(L"App icon by")) + L" ", fonts(dpi).ui).cx;
                 SetWindowPos(link, nullptr, s(22), s(158), width(link), s(24), SWP_NOZORDER);
                 SetWindowPos(credit, nullptr, credit_x - s(2), s(186), width(credit), s(24), SWP_NOZORDER);
                 SetWindowPos(formats, nullptr, s(22), s(214), width(formats), s(24), SWP_NOZORDER);
@@ -110,11 +127,11 @@ namespace chisel_win {
                 fill_rect(dc, rc, p.window);
                 if (icon) DrawIconEx(dc, s(24), s(24), icon, s(64), s(64), 0, nullptr, DI_NORMAL);
                 draw_text(dc, L"Chisel", {s(104), s(26), rc.right - s(24), s(56)}, p.text, f.title, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                draw_text(dc, L"Version " + widen(CHISEL_VERSION), {s(104), s(58), rc.right - s(24), s(78)}, p.text2, f.ui,
+                draw_text(dc, trf(L"Version {0}", {widen(CHISEL_VERSION)}), {s(104), s(58), rc.right - s(24), s(78)}, p.text2, f.ui,
                           DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                draw_text(dc, L"Lossless recompression of images, audio, documents and archives, and of the files inside them.",
+                draw_text(dc, tr(L"Lossless recompression of images, audio, documents and archives, and of the files inside them."),
                           {s(24), s(106), rc.right - s(24), s(150)}, p.text, f.ui, DT_LEFT | DT_WORDBREAK);
-                draw_text(dc, L"App icon by ", {s(24), s(186), credit_x, s(210)}, p.text, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                draw_text(dc, std::wstring(tr(L"App icon by")) + L" ", {s(24), s(186), credit_x, s(210)}, p.text, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             }
 
             LRESULT handle(const UINT msg, const WPARAM wp, const LPARAM lp) {
@@ -235,7 +252,7 @@ namespace chisel_win {
                 GetClientRect(hwnd, &rc);
                 fill_rect(dc, rc, p.surface);
                 const int dy = -pos;
-                draw_text(dc, L"Supported formats", {s(24), s(18) + dy, rc.right - s(24), s(48) + dy}, p.text, f.title,
+                draw_text(dc, tr(L"Supported formats"), {s(24), s(18) + dy, rc.right - s(24), s(48) + dy}, p.text, f.title,
                           DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                 draw_text(dc, summary, {s(24), s(50) + dy, rc.right - s(24), s(70) + dy}, p.text2, f.ui, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                 for (const auto& section : sections) {
@@ -353,7 +370,7 @@ namespace chisel_win {
         w.instance = instance;
         w.extensions = &extensions;
         w.dpi = GetDpiForWindow(owner);
-        create_centered(owner, instance, L"ChiselAbout", L"About Chisel", WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN, kAboutW,
+        create_centered(owner, instance, L"ChiselAbout", tr(L"About Chisel"), WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_CLIPCHILDREN, kAboutW,
                         kAboutH, w.dpi, &w);
         if (!w.hwnd) return;
         const auto link = [&](const std::wstring& text, const int id) {
@@ -362,8 +379,8 @@ namespace chisel_win {
         };
         w.link = link(L"github.com/Snesnopic/chisel", ID_LINK);
         w.credit = link(L"Mahary Esposito", ID_CREDIT);
-        w.formats = link(L"Supported formats (" + std::to_wstring(extensions.size()) + L")", ID_FORMATS);
-        w.ok = CreateWindowExW(0, WC_BUTTONW, L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 0, 0, w.hwnd,
+        w.formats = link(trf(L"Supported formats ({0})", {std::to_wstring(extensions.size())}), ID_FORMATS);
+        w.ok = CreateWindowExW(0, WC_BUTTONW, tr(L"OK"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0, 0, 0, w.hwnd,
                                reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDOK)), instance, nullptr);
         apply_window_theme(w.hwnd);
         w.layout();
@@ -379,8 +396,8 @@ namespace chisel_win {
         const auto groups = chisel_app::group_by_kind(extensions);
         for (const auto& [kind, list] : groups) {
             FormatsWindow::Section section;
-            section.name = widen(chisel_app::kind_name(kind));
-            section.count = std::to_wstring(list.size()) + (list.size() == 1 ? L" format" : L" formats");
+            section.name = kind_text(kind);
+            section.count = trn(L"{0} format", L"{0} formats", list.size());
             section.badge = list.empty() ? CatApp : category_for(list.front());
             for (const auto& ext : list) {
                 if (!section.list.empty()) section.list += L",  ";
@@ -388,8 +405,9 @@ namespace chisel_win {
             }
             w.sections.push_back(std::move(section));
         }
-        w.summary = std::to_wstring(extensions.size()) + L" extensions in " + std::to_wstring(groups.size()) + L" categories";
-        create_centered(owner, instance, L"ChiselFormats", L"Supported formats",
+        w.summary = trn(L"{0} extension in {1}", L"{0} extensions in {1}", extensions.size(),
+                        {trn(L"{0} category", L"{0} categories", groups.size())});
+        create_centered(owner, instance, L"ChiselFormats", tr(L"Supported formats"),
                         WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VSCROLL, 600, 640, w.dpi, &w);
         if (!w.hwnd) return;
         apply_window_theme(w.hwnd);
