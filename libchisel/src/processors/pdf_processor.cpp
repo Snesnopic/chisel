@@ -270,6 +270,19 @@ void enable_qpdf_zopfli_once(const ProcessingOptions& options) {
             // choice in finalize_extraction() for the streams chisel
             // compresses itself.
             Pl_Flate::setZopfliIterations(static_cast<int>(options.iterations));
+            // the blocks of one stream, like the xref stream written last and alone, share the pool; same output
+            Pl_Flate::setZopfliRunner([](const std::size_t n, const std::function<void(std::size_t)>& body) {
+                ThreadPool* pool = ThreadPool::current();
+                if (!pool || pool->size() < 2) {
+                    for (std::size_t i = 0; i < n; ++i) body(i);
+                    return;
+                }
+                try {
+                    pool->parallel_for(n, body);
+                } catch (const Interrupted&) {
+                    // can't cross zopfli's frames: finalize_extraction drops the file after a stop
+                }
+            });
         }
     });
 }
@@ -1205,6 +1218,8 @@ std::filesystem::path PdfProcessor::finalize_extraction(const ExtractedContent &
             });
         }
         writer.write();
+        // blocks skipped by a stop leave qpdf's own zopfli streams incomplete
+        if (ThreadPool* pool = ThreadPool::current(); pool && pool->stop_requested()) throw Interrupted{};
 
         // only a file that reads back as the same document may replace the original
         const auto check_start = std::chrono::steady_clock::now();
